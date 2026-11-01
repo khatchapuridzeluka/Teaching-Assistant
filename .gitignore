@@ -1,0 +1,31 @@
+# .NET build output
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+*.user
+*.suo
+TestResults/
+*.trx
+*.nupkg
+
+# IDEs
+.idea/
+.vs/
+.vscode/
+*.DotSettings.user
+
+# Frontend (React + Vite)
+node_modules/
+frontend/dist/
+*.log
+
+# Secrets and local config (API keys live in user-secrets, never in the repo)
+.env
+.env.*
+!.env.example
+appsettings.*.local.json
+
+# OS
+.DS_Store
+Thumbs.db

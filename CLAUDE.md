@@ -74,7 +74,7 @@ Previously graded homework exists (Claude-drafted, teacher-corrected). Use it as
 - **Web app**, run locally first (single user, no auth yet), deployed to GCP later.
 - **Backend:** C# / ASP.NET Core API (the tool is .NET even though graded code is Java/C++). Written and reviewed carefully by the teacher — all grading logic, agents and data live here.
 - **Frontend:** React + Vite + TypeScript, Tailwind + shadcn/ui, `@monaco-editor/react` (code viewer, inline comments, diff), Recharts, TanStack Query. **Mostly AI-generated ("vibe-coded")** — so it must stay a thin client: no grading/business logic in the frontend, it only displays and edits what the API returns.
-- **API contract first:** endpoints and DTOs defined in the backend, exposed via OpenAPI; TypeScript types are generated from it, never hand-written.
+- **API contract first:** endpoints and DTOs defined in the backend, exposed via **Swashbuckle** (Swagger UI at `/swagger`, spec at `/swagger/v1/swagger.json`; not Microsoft.AspNetCore.OpenApi); TypeScript types are generated from it, never hand-written.
 - Semantic Kernel — or Microsoft Agent Framework if that's where SK's agent features moved (verify current status before starting)
 - Google Classroom API + Drive API (read-only scopes), **personal Google account**: own Google Cloud project, OAuth consent screen in "Testing" mode with the teacher as test user. Note: refresh tokens in Testing mode expire after ~7 days — re-auth flow must be easy.
 - Postgres + pgvector (grades, mistake records, profiles)
@@ -99,9 +99,25 @@ frontend/                             React + Vite (edited in Rider); Vite proxi
 - Dependencies point inward: WebAPI → Application → Domain; Infrastructure → Application/Domain. WebAPI references Infrastructure **only** for DI registration.
 - Domain and Application reference **no** external packages (no Anthropic, EF Core, Google, Docker). If they do, the boundary is broken.
 - Organize inside projects by feature folders: `Ingestion/`, `Grading/`, `Sandbox/`, `Profiling/`.
+- Application layout: `Interfaces/` (ports like `ILanguageModel`), `Interfaces/Services/` (use-case interfaces), `Services/` (use-case implementations — pure, no SDKs), `Contracts/` (what the API returns), `Models/` (internal port types), `Exceptions/`. Infrastructure implements ports and translates SDK exceptions into Application exceptions (e.g. `LanguageModelUnavailableException`).- All LLM calls go through `ILanguageModel` — never call the Anthropic SDK from anywhere else. Model and settings in the `Anthropic` config section; the API key only in user-secrets (`Anthropic:ApiKey`) or the `ANTHROPIC_API_KEY` env var.
 - No MediatR/CQRS, no generic repository/unit-of-work over EF, no mapping layers between identical shapes.
 - Sandbox runner is the only part that becomes a separate deployable (week 3, Cloud Run Job/VM), behind `ISandboxRunner`.
 - Production: one container — ASP.NET serves the API and the built React app.
+
+### Controller conventions
+
+Controllers live in `src/TeachingAssistant.WebAPI/Controllers/`. Contracts (use-case inputs/outputs the API returns) live in `src/TeachingAssistant.Application/Contracts/`; controllers return them directly. A WebAPI-side request type exists only for HTTP-specific shapes (e.g. `IFormFile` uploads), mapped to an Application contract in the controller. Controllers stay thin: constructor-inject an Application service, call it, return the result. Document every action with a short `<summary>` (what it returns/does, one sentence) and one `<response code>` line per status — no long remarks. Return `ActionResult<T>`, suffix async actions with `Async`. The XML docs flow into the OpenAPI document.
+
+```csharp
+/// <summary>
+/// Returns a single assignment by ID.
+/// </summary>
+/// <response code="200">Assignment retrieved successfully</response>
+/// <response code="404">Assignment not found</response>
+[HttpGet("{id:guid}")]
+public async Task<ActionResult<AssignmentDto>> GetByIdAsync(Guid id) =>
+    Ok(await _assignmentService.GetByIdAsync(id));
+```
 
 ## Prompting conventions
 

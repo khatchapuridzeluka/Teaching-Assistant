@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
@@ -7,10 +7,16 @@
         <!-- XML doc comments on controllers flow into the OpenAPI document -->
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <NoWarn>$(NoWarn);CS1591</NoWarn>
-    </PropertyGroup>
+      <UserSecretsId>8e9072c4-63b9-42e8-8302-b86ab9b9dadf</UserSecretsId>
+  </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12"/>
+      <ProjectReference Include="..\TeachingAssistant.Application\TeachingAssistant.Application.csproj" />
+      <ProjectReference Include="..\TeachingAssistant.Infrastructure\TeachingAssistant.Infrastructure.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Swashbuckle.AspNetCore" Version="10.3.1" />
     </ItemGroup>
 
 </Project>
