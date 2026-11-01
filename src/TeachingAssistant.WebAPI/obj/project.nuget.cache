@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "9eUOikDdSLg=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\OONEN_17\\OneDrive\\Desktop\\Teaching-assistant\\src\\TeachingAssistant.WebAPI\\TeachingAssistant.WebAPI.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\OONEN_17\\.nuget\\packages\\microsoft.aspnetcore.openapi\\10.0.12\\microsoft.aspnetcore.openapi.10.0.12.nupkg.sha512",
+    "C:\\Users\\OONEN_17\\.nuget\\packages\\microsoft.openapi\\2.12.0\\microsoft.openapi.2.12.0.nupkg.sha512"
+  ],
+  "logs": []
+}
