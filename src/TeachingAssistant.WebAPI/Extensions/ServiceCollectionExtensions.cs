@@ -1,10 +1,14 @@
+using System.Text.Json.Serialization;
 using Anthropic;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
+using Serilog;
 using TeachingAssistant.Application.Interfaces;
 using TeachingAssistant.Application.Interfaces.Services;
 using TeachingAssistant.Application.Services;
+using TeachingAssistant.Infrastructure.Google;
 using TeachingAssistant.Infrastructure.LanguageModel;
+using TeachingAssistant.WebAPI.ExceptionHandling;
 
 namespace TeachingAssistant.WebAPI.Extensions;
 
@@ -13,10 +17,35 @@ public static class ServiceCollectionExtensions
     // Everything the API needs, in one call from Program.cs.
     public static IServiceCollection AddServices(this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddControllers();
+        // Enums travel as names ("Connected"), not numbers, in JSON and Swagger.
+        services.AddControllers()
+            .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+        services.AddSerilogLogging(configuration);
+        services.AddErrorHandling();
         services.AddSwagger();
         services.AddApplicationServices();
         services.AddLanguageModel(configuration);
+        services.AddGoogle(configuration);
+
+        return services;
+    }
+
+    // Serilog replaces the built-in logger; levels and sinks come from the "Serilog" config section.
+    public static IServiceCollection AddSerilogLogging(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddSerilog((sp, logger) => logger
+            .ReadFrom.Configuration(configuration)
+            .ReadFrom.Services(sp)
+            .Enrich.FromLogContext());
+
+        return services;
+    }
+
+    // Errors are returned as ProblemDetails; known Application exceptions get their own status codes.
+    public static IServiceCollection AddErrorHandling(this IServiceCollection services)
+    {
+        services.AddProblemDetails();
+        services.AddExceptionHandler<ApplicationExceptionHandler>();
 
         return services;
     }
@@ -39,6 +68,7 @@ public static class ServiceCollectionExtensions
     {
         services.AddSingleton(TimeProvider.System);
         services.AddScoped<IModelHealthService, ModelHealthService>();
+        services.AddScoped<ICourseService, CourseService>();
 
         return services;
     }
@@ -55,6 +85,18 @@ public static class ServiceCollectionExtensions
                 : new AnthropicClient { ApiKey = options.ApiKey };
         });
         services.AddSingleton<ILanguageModel, ClaudeLanguageModel>();
+
+        return services;
+    }
+
+    // Google account connection (local "installed app" OAuth) and Classroom as a submission source.
+    // Client ID/secret come from user-secrets.
+    public static IServiceCollection AddGoogle(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.Configure<GoogleOptions>(configuration.GetSection(GoogleOptions.SectionName));
+        services.AddSingleton<GoogleAuthorization>();
+        services.AddSingleton<IGoogleConnectionService, GoogleConnectionService>();
+        services.AddSingleton<ISubmissionSource, GoogleClassroomSource>();
 
         return services;
     }
