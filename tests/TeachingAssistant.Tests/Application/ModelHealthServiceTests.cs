@@ -7,46 +7,41 @@ namespace TeachingAssistant.Tests.Application;
 
 public class ModelHealthServiceTests
 {
-    [Test]
+    [Fact]
     public async Task CheckAsync_ModelReplies_ReturnsHealthyWithReply()
     {
         var service = new ModelHealthService(new FakeLanguageModel(reply: "ok"), TimeProvider.System);
 
-        var result = await service.CheckAsync();
+        var result = await service.CheckAsync(TestContext.Current.CancellationToken);
 
-        Assert.Multiple(() =>
-        {
-            Assert.That(result.Healthy, Is.True);
-            Assert.That(result.Model, Is.EqualTo(FakeLanguageModel.Id));
-            Assert.That(result.Reply, Is.EqualTo("ok"));
-            Assert.That(result.Error, Is.Null);
-        });
+        Assert.True(result.Healthy);
+        Assert.Equal(FakeLanguageModel.Id, result.Model);
+        Assert.Equal("ok", result.Reply);
+        Assert.Null(result.Error);
     }
 
-    [Test]
+    [Fact]
     public async Task CheckAsync_ModelUnavailable_ReturnsUnhealthyWithError()
     {
         var failure = new LanguageModelUnavailableException("Authentication failed.");
         var service = new ModelHealthService(new FakeLanguageModel(failure: failure), TimeProvider.System);
 
-        var result = await service.CheckAsync();
+        var result = await service.CheckAsync(TestContext.Current.CancellationToken);
 
-        Assert.Multiple(() =>
-        {
-            Assert.That(result.Healthy, Is.False);
-            Assert.That(result.Model, Is.EqualTo(FakeLanguageModel.Id));
-            Assert.That(result.Reply, Is.Null);
-            Assert.That(result.Error, Is.EqualTo("Authentication failed."));
-        });
+        Assert.False(result.Healthy);
+        Assert.Equal(FakeLanguageModel.Id, result.Model);
+        Assert.Null(result.Reply);
+        Assert.Equal("Authentication failed.", result.Error);
     }
 
-    [Test]
-    public void CheckAsync_UnexpectedException_IsNotSwallowed()
+    [Fact]
+    public async Task CheckAsync_UnexpectedException_IsNotSwallowed()
     {
         var service = new ModelHealthService(
             new FakeLanguageModel(failure: new InvalidOperationException("bug")), TimeProvider.System);
 
-        Assert.ThrowsAsync<InvalidOperationException>(() => service.CheckAsync());
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.CheckAsync(TestContext.Current.CancellationToken));
     }
 
     private sealed class FakeLanguageModel(string? reply = null, Exception? failure = null) : ILanguageModel

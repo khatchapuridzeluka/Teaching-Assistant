@@ -92,7 +92,7 @@ src/TeachingAssistant.Domain          entities, enums, pure rules (score calc, p
 src/TeachingAssistant.Application     use cases (GradeAssignment, RegradeNewVersion, ApproveGrade), interfaces, prompt templates
 src/TeachingAssistant.Infrastructure  Claude (Anthropic SDK), EF Core/Postgres, Classroom/GitHub adapters, Docker runner
 src/TeachingAssistant.WebAPI          presentation: thin controllers, DTOs, OpenAPI, DI composition root; serves built React from wwwroot
-tests/TeachingAssistant.Tests         NUnit — focus on Domain rules and Application flows with fakes
+tests/TeachingAssistant.Tests         xUnit v3 — focus on Domain rules and Application flows with fakes
 frontend/                             React + Vite (edited in Rider); Vite proxies /api → ASP.NET in dev
 ```
 
