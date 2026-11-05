@@ -49,17 +49,17 @@ public class GoogleClassroomSource : ISubmissionSource
 
     private async Task<ClassroomService> CreateClassroomAsync(CancellationToken cancellationToken)
     {
-        if (!_authorization.IsConfigured)
+        if (!_authorization.TryGetFlow(out var flow))
             throw new SubmissionSourceNotConnectedException(
                 "Google:ClientId and Google:ClientSecret are not set. Add them with dotnet user-secrets.");
 
-        var token = await _authorization.Flow.LoadTokenAsync(GoogleAuthorization.UserKey, cancellationToken)
+        var token = await flow.LoadTokenAsync(GoogleAuthorization.UserKey, cancellationToken)
             ?? throw new SubmissionSourceNotConnectedException(
                 "Google account is not connected. Call POST /auth/google/connect.");
 
         return new ClassroomService(new BaseClientService.Initializer
         {
-            HttpClientInitializer = new UserCredential(_authorization.Flow, GoogleAuthorization.UserKey, token),
+            HttpClientInitializer = new UserCredential(flow, GoogleAuthorization.UserKey, token),
             ApplicationName = ApplicationName,
         });
     }

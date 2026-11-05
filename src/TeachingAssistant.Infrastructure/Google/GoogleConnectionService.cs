@@ -25,10 +25,9 @@ public class GoogleConnectionService : IGoogleConnectionService
 
     public async Task<GoogleConnectionStatus> GetStatusAsync(CancellationToken cancellationToken = default)
     {
-        if (!_authorization.IsConfigured)
+        if (!_authorization.TryGetFlow(out var flow))
             return NotConfigured();
 
-        var flow = _authorization.Flow;
         var token = await flow.LoadTokenAsync(GoogleAuthorization.UserKey, cancellationToken);
         if (token is null)
             return new GoogleConnectionStatus(GoogleConnectionState.NotConnected, [], "Not connected. Call POST /auth/google/connect.");
@@ -90,10 +89,9 @@ public class GoogleConnectionService : IGoogleConnectionService
 
     public async Task DisconnectAsync(CancellationToken cancellationToken = default)
     {
-        if (!_authorization.IsConfigured)
+        if (!_authorization.TryGetFlow(out var flow))
             return;
 
-        var flow = _authorization.Flow;
         var token = await flow.LoadTokenAsync(GoogleAuthorization.UserKey, cancellationToken);
         if (token is null)
             return;

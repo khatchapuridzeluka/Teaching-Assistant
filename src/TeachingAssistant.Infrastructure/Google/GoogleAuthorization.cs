@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Auth.OAuth2.Flows;
 using Google.Apis.Util.Store;
@@ -44,11 +45,18 @@ public class GoogleAuthorization
     /// <summary>File store under %APPDATA% holding the teacher's tokens (plain JSON; local development only).</summary>
     public FileDataStore TokenStore { get; }
 
-    public bool IsConfigured =>
-        !string.IsNullOrWhiteSpace(_options.ClientId) && !string.IsNullOrWhiteSpace(_options.ClientSecret);
-
     public ClientSecrets ClientSecrets => new() { ClientId = _options.ClientId, ClientSecret = _options.ClientSecret };
 
-    /// <summary>One flow for the app's lifetime; only valid when <see cref="IsConfigured"/> is true.</summary>
-    public GoogleAuthorizationCodeFlow Flow => _flow.Value;
+    /// <summary>
+    /// Returns the app's single OAuth flow, or false when Google:ClientId/ClientSecret are not configured.
+    /// The only way to reach the flow, so an unconfigured flow is never built or used.
+    /// </summary>
+    public bool TryGetFlow([NotNullWhen(true)] out GoogleAuthorizationCodeFlow? flow)
+    {
+        flow = IsConfigured ? _flow.Value : null;
+        return flow is not null;
+    }
+
+    private bool IsConfigured =>
+        !string.IsNullOrWhiteSpace(_options.ClientId) && !string.IsNullOrWhiteSpace(_options.ClientSecret);
 }
