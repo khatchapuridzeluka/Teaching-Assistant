@@ -112,6 +112,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<GoogleAuthorization>();
         services.AddSingleton<IGoogleConnectionService, GoogleConnectionService>();
         services.AddSingleton<ISubmissionSource, GoogleClassroomSource>();
+        services.AddSingleton<IRemoteFileSource, GoogleDriveFileSource>();
 
         return services;
     }

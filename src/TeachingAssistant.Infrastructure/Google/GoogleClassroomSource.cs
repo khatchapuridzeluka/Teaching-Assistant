@@ -1,13 +1,8 @@
-using System.Net;
-using Google;
-using Google.Apis.Auth.OAuth2;
-using Google.Apis.Auth.OAuth2.Responses;
 using Google.Apis.Classroom.v1;
 using Google.Apis.Classroom.v1.Data;
 using Google.Apis.Requests;
 using Google.Apis.Services;
 using TeachingAssistant.Application.Contracts;
-using TeachingAssistant.Application.Exceptions;
 using TeachingAssistant.Application.Interfaces;
 
 namespace TeachingAssistant.Infrastructure.Google;
@@ -18,7 +13,7 @@ namespace TeachingAssistant.Infrastructure.Google;
 /// </summary>
 public class GoogleClassroomSource : ISubmissionSource
 {
-    private const string ApplicationName = "Teaching Assistant";
+    private const string ServiceName = "Google Classroom";
 
     // Items per page; Google may return fewer, so paging always follows the next-page token.
     private const int PageSize = 100;
@@ -109,7 +104,7 @@ public class GoogleClassroomSource : ISubmissionSource
             page => readPage(page).NextPageToken is { Length: > 0 } token ? token : null, // empty token = last page
             page => readPage(page).Items ?? []);
 
-        return TranslateErrorsAsync(() => streamer.FetchAllAsync(request, cancellationToken));
+        return GoogleErrors.TranslateAsync(ServiceName, () => streamer.FetchAllAsync(request, cancellationToken));
     }
 
     // The latest turn-in from the history; every resubmission adds a new TURNED_IN entry.
@@ -134,48 +129,10 @@ public class GoogleClassroomSource : ISubmissionSource
             ? new DateTimeOffset(year, month, day, time?.Hours ?? 0, time?.Minutes ?? 0, 0, TimeSpan.Zero)
             : null;
 
-    private async Task<ClassroomService> CreateClassroomAsync(CancellationToken cancellationToken)
-    {
-        if (!_authorization.TryGetFlow(out var flow))
-            throw new SubmissionSourceNotConnectedException(
-                "Google:ClientId and Google:ClientSecret are not set. Add them with dotnet user-secrets.");
-
-        var token = await flow.LoadTokenAsync(GoogleAuthorization.UserKey, cancellationToken)
-            ?? throw new SubmissionSourceNotConnectedException(
-                "Google account is not connected. Call POST /auth/google/connect.");
-
-        return new ClassroomService(new BaseClientService.Initializer
+    private async Task<ClassroomService> CreateClassroomAsync(CancellationToken cancellationToken) =>
+        new(new BaseClientService.Initializer
         {
-            HttpClientInitializer = new UserCredential(flow, GoogleAuthorization.UserKey, token),
-            ApplicationName = ApplicationName,
+            HttpClientInitializer = await _authorization.GetCredentialAsync(cancellationToken),
+            ApplicationName = GoogleAuthorization.ApplicationName,
         });
-    }
-
-    // Turns Google's exceptions into submission-source exceptions, which the API maps to 409/404/502.
-    private static async Task<T> TranslateErrorsAsync<T>(Func<Task<T>> call)
-    {
-        try
-        {
-            return await call();
-        }
-        catch (TokenResponseException ex)
-        {
-            throw new SubmissionSourceNotConnectedException(
-                $"Google authorization is no longer valid ({ex.Error.Error}). Call POST /auth/google/connect.", ex);
-        }
-        catch (GoogleApiException ex) when (ex.HttpStatusCode == HttpStatusCode.NotFound)
-        {
-            throw new SubmissionSourceNotFoundException(
-                $"Not found in Google Classroom: {ex.Error?.Message ?? ex.Message}", ex);
-        }
-        catch (GoogleApiException ex)
-        {
-            throw new SubmissionSourceUnavailableException(
-                $"Google Classroom returned {(int)ex.HttpStatusCode}: {ex.Error?.Message ?? ex.Message}", ex);
-        }
-        catch (HttpRequestException ex)
-        {
-            throw new SubmissionSourceUnavailableException("Could not reach Google Classroom (network error).", ex);
-        }
-    }
 }

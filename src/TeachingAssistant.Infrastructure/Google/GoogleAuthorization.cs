@@ -4,12 +4,13 @@ using Google.Apis.Auth.OAuth2;
 using Google.Apis.Auth.OAuth2.Flows;
 using Google.Apis.Util.Store;
 using Microsoft.Extensions.Options;
+using TeachingAssistant.Application.Exceptions;
 
 namespace TeachingAssistant.Infrastructure.Google;
 
 /// <summary>
 /// Shared Google OAuth plumbing: client secrets, the read-only scopes and the token store.
-/// Used by <see cref="GoogleConnectionService"/> (connect/status) and the Classroom source (API calls).
+/// Used by <see cref="GoogleConnectionService"/> (connect/status) and the Classroom and Drive adapters (API calls).
 /// </summary>
 public class GoogleAuthorization
 {
@@ -25,6 +26,9 @@ public class GoogleAuthorization
 
     // Single-user app: one stored token under a fixed key.
     public const string UserKey = "teacher";
+
+    // Sent in the User-Agent of every Google API request.
+    public const string ApplicationName = "Teaching Assistant";
 
     private readonly GoogleOptions _options;
     private readonly Lazy<GoogleAuthorizationCodeFlow> _flow;
@@ -55,6 +59,24 @@ public class GoogleAuthorization
     {
         flow = IsConfigured ? _flow.Value : null;
         return flow is not null;
+    }
+
+    /// <summary>
+    /// Returns a credential for calling Google APIs as the teacher. It adds the access token to every request
+    /// and refreshes it when stale. Throws <see cref="SubmissionSourceNotConnectedException"/> when the client
+    /// is not configured or no token is stored; an expired token only fails on the first real request.
+    /// </summary>
+    public async Task<UserCredential> GetCredentialAsync(CancellationToken cancellationToken)
+    {
+        if (!TryGetFlow(out var flow))
+            throw new SubmissionSourceNotConnectedException(
+                "Google:ClientId and Google:ClientSecret are not set. Add them with dotnet user-secrets.");
+
+        var token = await flow.LoadTokenAsync(UserKey, cancellationToken)
+            ?? throw new SubmissionSourceNotConnectedException(
+                "Google account is not connected. Call POST /auth/google/connect.");
+
+        return new UserCredential(flow, UserKey, token);
     }
 
     private bool IsConfigured =>

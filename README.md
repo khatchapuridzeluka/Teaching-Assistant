@@ -63,7 +63,7 @@ src/
     Exceptions/                          application-level errors
   TeachingAssistant.Infrastructure/
     LanguageModel/                       Claude adapter
-    Google/                              OAuth, Classroom adapter
+    Google/                              OAuth, Classroom adapter, Drive adapter (file metadata and download)
     Persistence/                         EF Core DbContext, entity mappings, migrations
   TeachingAssistant.WebAPI/
     Controllers/                         HTTP endpoints
