@@ -119,6 +119,10 @@ public async Task<ActionResult<AssignmentDto>> GetByIdAsync(Guid id) =>
     Ok(await _assignmentService.GetByIdAsync(id));
 ```
 
+## README
+
+When a change affects anything `README.md` describes (features and their status, stack, project structure, setup steps, configuration, API endpoints, security notes), update `README.md` in the same change.
+
 ## Prompting conventions
 
 - Instructions in natural language, explain the *why*.
