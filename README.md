@@ -22,7 +22,7 @@ This project automates the drafting, not the deciding:
 
 | Area | What it does | Status |
 |---|---|---|
-| **Classroom ingestion** | Connects a teacher's Google account (read-only OAuth) and lists courses, assignments and submissions | Courses ✅ · assignments & submissions in progress |
+| **Classroom ingestion** | Connects a teacher's Google account (read-only OAuth) and lists courses, assignments and submissions | Courses, assignments & submissions ✅ · attachment download in progress |
 | **Submission formats** | Zip archives of `.java` files, loose files, or GitHub repository links | Planned |
 | **Sandboxed checks** | Compiles and runs student code in Docker (JDK 17–27), collecting compiler warnings, static analysis and test results before any AI judgment | Planned |
 | **Rubric grading** | Claude grades against a layered rubric: base rubric → per-assignment extensions → the teacher's policy rules | Planned |
@@ -124,6 +124,8 @@ Swagger UI opens at `https://localhost:7107/swagger`. To connect Classroom, call
 | `POST` | `/auth/google/connect` | Opens Google sign-in on the local machine and stores the authorization |
 | `POST` | `/auth/google/disconnect` | Revokes access at Google and deletes the stored token |
 | `GET` | `/courses` | Courses the teacher teaches in Google Classroom |
+| `GET` | `/courses/{courseId}/assignments` | Published assignments of a course, newest first, with the task statement and due date |
+| `GET` | `/courses/{courseId}/assignments/{assignmentId}/submissions` | Every student's submission: state, late flag, latest turn-in, attachments (Drive files and links) |
 
 Errors are returned as [RFC 9457 Problem Details](https://www.rfc-editor.org/rfc/rfc9457). The full, documented specification is available at `/swagger/v1/swagger.json`.
 

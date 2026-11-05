@@ -22,6 +22,7 @@ public class ApplicationExceptionHandler : IExceptionHandler
         (int Status, string Title)? mapped = exception switch
         {
             SubmissionSourceNotConnectedException => (StatusCodes.Status409Conflict, "Source not connected"),
+            SubmissionSourceNotFoundException => (StatusCodes.Status404NotFound, "Not found"),
             SubmissionSourceUnavailableException => (StatusCodes.Status502BadGateway, "Source unavailable"),
             _ => null,
         };

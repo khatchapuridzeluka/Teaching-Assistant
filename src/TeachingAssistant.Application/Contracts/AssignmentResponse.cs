@@ -1,0 +1,16 @@
+namespace TeachingAssistant.Application.Contracts;
+
+/// <summary>
+/// A published assignment in a course. Description is the task statement as written in the source.
+/// DueAt is in UTC and null when the assignment has no due date. MaxPoints is null for ungraded work.
+/// </summary>
+public record AssignmentResponse(
+    string Id,
+    string CourseId,
+    string Title,
+    string? Description,
+    string WorkType,
+    double? MaxPoints,
+    DateTimeOffset? DueAt,
+    DateTimeOffset? CreatedAt,
+    string? Link);

@@ -69,6 +69,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton(TimeProvider.System);
         services.AddScoped<IModelHealthService, ModelHealthService>();
         services.AddScoped<ICourseService, CourseService>();
+        services.AddScoped<IAssignmentService, AssignmentService>();
+        services.AddScoped<ISubmissionService, SubmissionService>();
 
         return services;
     }
