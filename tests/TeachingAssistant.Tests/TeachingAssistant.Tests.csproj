@@ -23,6 +23,7 @@
     <ItemGroup>
       <ProjectReference Include="..\..\src\TeachingAssistant.Domain\TeachingAssistant.Domain.csproj" />
       <ProjectReference Include="..\..\src\TeachingAssistant.Application\TeachingAssistant.Application.csproj" />
+      <ProjectReference Include="..\..\src\TeachingAssistant.Infrastructure\TeachingAssistant.Infrastructure.csproj" />
     </ItemGroup>
 
 </Project>

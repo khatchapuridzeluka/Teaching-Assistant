@@ -87,8 +87,10 @@ public class SubmissionFetchService : ISubmissionFetchService
                 continue;
             }
 
-            submission.AddVersion(version.Status, version.StatusDetail, contentHash: null, version.StoragePath,
+            var added = submission.AddVersion(version.Status, version.StatusDetail, contentHash: null, version.StoragePath,
                 result.Item.TurnedInAt, version.FetchedAt, version.Contents);
+            added.RecordExtraction(version.Extraction.ContentHash, version.Extraction.ExtractedStoredNames,
+                ExtractionDetail(version.Extraction));
 
             if (result.IsNew)
             {
@@ -202,6 +204,7 @@ public class SubmissionFetchService : ISubmissionFetchService
     {
         await using var writer = _storage.BeginVersion(submission.StorageFolder, submission.NextVersionNumber);
         StoredContent[] results;
+        CodeExtraction extraction;
 
         try
         {
@@ -210,6 +213,12 @@ public class SubmissionFetchService : ISubmissionFetchService
             results = await Task.WhenAll(current.Select(content => content.File is { } file
                 ? StoreFileAsync(writer, file, cancellationToken)
                 : Task.FromResult(LinkContent(content))));
+
+            // Unpack the code next to the originals before committing, so a version appears with both or not at all.
+            extraction = await writer.ExtractCodeAsync(results
+                .Where(r => r.Content.StoredName is not null)
+                .Select(r => new ExtractableFile(r.Content.StoredName!, r.Content.Kind))
+                .ToList(), cancellationToken);
 
             await writer.CommitAsync(cancellationToken);
         }
@@ -228,8 +237,9 @@ public class SubmissionFetchService : ISubmissionFetchService
         var detail = notStored.Count == 0 ? null : string.Join(" ", notStored);
         if (detail is not null)
             problems.Add(new FetchProblem(item.StudentName, detail));
+        problems.AddRange(extraction.Problems.Select(p => new FetchProblem(item.StudentName, p)));
 
-        return new PreparedVersion(status, detail, writer.RelativePath, _timeProvider.GetUtcNow(), contents);
+        return new PreparedVersion(status, detail, writer.RelativePath, _timeProvider.GetUtcNow(), contents, extraction);
     }
 
     private async Task<StoredContent> StoreFileAsync(ISnapshotWriter writer, RemoteFile file, CancellationToken cancellationToken)
@@ -276,6 +286,9 @@ public class SubmissionFetchService : ISubmissionFetchService
             isRepository ? $"GitHub repository {url} is not fetched yet." : $"Link {url} cannot be downloaded.");
     }
 
+    internal static string? ExtractionDetail(CodeExtraction extraction) =>
+        extraction.Problems.Count == 0 ? null : string.Join(" ", extraction.Problems);
+
     // Runs one call to the source under the shared cap on parallel file calls.
     private async Task<T> LimitedAsync<T>(Func<Task<T>> call, CancellationToken cancellationToken)
     {
@@ -309,7 +322,8 @@ public class SubmissionFetchService : ISubmissionFetchService
 
     // A new version whose files are already stored, waiting to be added to its submission in phase 2.
     private sealed record PreparedVersion(
-        VersionStatus Status, string? StatusDetail, string StoragePath, DateTimeOffset FetchedAt, List<VersionContent> Contents);
+        VersionStatus Status, string? StatusDetail, string StoragePath, DateTimeOffset FetchedAt,
+        List<VersionContent> Contents, CodeExtraction Extraction);
 
     // The outcome of phase 1 for one student. Submission is null when the student was skipped;
     // Version is null when nothing changed.

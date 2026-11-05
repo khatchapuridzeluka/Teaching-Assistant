@@ -78,6 +78,11 @@ public static class ServiceCollectionExtensions
             options.SwaggerDoc("v1", new OpenApiInfo { Title = "Teaching Assistant API", Version = "v1" });
             options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, "TeachingAssistant.WebAPI.xml"));
             options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, "TeachingAssistant.Application.xml"));
+
+            // Non-nullable C# properties become required in the spec, so the generated TypeScript types
+            // say "string" vs "string | null" exactly like the contracts.
+            options.SupportNonNullableReferenceTypes();
+            options.NonNullableReferenceTypesAsRequired();
         });
 
         return services;
@@ -91,6 +96,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAssignmentService, AssignmentService>();
         services.AddScoped<ISubmissionService, SubmissionService>();
         services.AddScoped<ISubmissionFetchService, SubmissionFetchService>();
+        services.AddScoped<IStoredSubmissionService, StoredSubmissionService>();
 
         return services;
     }

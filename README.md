@@ -23,11 +23,12 @@ This project automates the drafting, not the deciding:
 | Area | What it does | Status |
 |---|---|---|
 | **Classroom ingestion** | Connects a teacher's Google account (read-only OAuth), lists courses, assignments and submissions, and fetches turned-in work into stored versions (snapshots); unchanged submissions are skipped | Listing ✅ · fetch & versions ✅ |
-| **Submission formats** | Zip/rar/7z archives of `.java` files, loose files, documents, images, or GitHub repository links | Drive files stored ✅ · archive extraction and GitHub cloning planned |
+| **Submission formats** | Zip/rar/7z archives of `.java` files, loose files, documents, images, or GitHub repository links | Drive files stored ✅ · zip/rar/7z/tar extraction ✅ · GitHub cloning planned |
 | **Sandboxed checks** | Compiles and runs student code in Docker (JDK 17–27), collecting compiler warnings, static analysis and test results before any AI judgment | Planned |
 | **Rubric grading** | Claude grades against a layered rubric: base rubric → per-assignment extensions → the teacher's policy rules | Planned |
 | **Batch calibration** | Calibrates scores across the class and clusters common mistakes, so one explanation covers many students | Planned |
 | **Resubmissions** | Detects new versions, grades the diff, reports fixed / remaining / new mistakes; tracks initial and final scores | Planned |
+| **Teacher UI** | Courses, assignments with task statements, submissions table, "Fetch from Classroom", preview of stored submissions (extracted code in a read-only Monaco viewer, image gallery, PDFs and exported Google Docs inline, downloads), re-extraction, Google connection and model check | Initial version ✅ |
 | **Review dashboard** | Code viewer with inline mistake comments, score editing and approval | Planned |
 | **Student profiles** | Mistake history per student, repeated vs. fixed issues, progress over time | Planned |
 
@@ -42,7 +43,7 @@ This project automates the drafting, not the deciding:
 | **Sandbox** | **Docker** containers with multiple JDK images |
 | **API docs** | **Swashbuckle** (Swagger UI) with XML documentation |
 | **Logging** | **Serilog** (structured logging) |
-| **Frontend** | **React 19** + Vite + TypeScript, Tailwind CSS, shadcn/ui, Monaco Editor |
+| **Frontend** | **React 19** + Vite + TypeScript, Tailwind CSS, TanStack Query, React Router; API types generated from the Swagger spec (`openapi-typescript`) |
 | **Tests** | **xUnit v3** on Microsoft Testing Platform |
 
 ## Project structure
@@ -65,14 +66,17 @@ src/
     LanguageModel/                       Claude adapter
     Google/                              OAuth, Classroom adapter, Drive adapter (file metadata and download)
     Persistence/                         EF Core DbContext, entity mappings, migrations, submission store
-    Storage/                             submission files on disk (versions written atomically)
+    Storage/                             submission files on disk (versions written atomically), code extraction
   TeachingAssistant.WebAPI/
     Controllers/                         HTTP endpoints
     Extensions/                          service registration
     ExceptionHandling/                   exceptions → ProblemDetails responses
 tests/
   TeachingAssistant.Tests/               xUnit tests for Domain and Application
-frontend/                                React app (coming soon)
+frontend/                                React app (Vite)
+  src/api/                               generated API types (schema.d.ts), client, one hook per endpoint
+  src/components/                        layout (sidebar, top bar) and small UI pieces
+  src/pages/                             Courses, Course (assignments), Assignment (submissions + fetch), Settings
 ```
 
 ## Getting started
@@ -115,7 +119,7 @@ dotnet user-secrets set "ConnectionStrings:Postgres" "Host=localhost;Port=5432;D
 dotnet ef database update --project src/TeachingAssistant.Infrastructure --startup-project src/TeachingAssistant.WebAPI
 ```
 
-Data lives in a Docker volume, outside the repository. Submission files are stored under `%LOCALAPPDATA%\TeachingAssistant` (configurable as `Storage:Root`), outside the repository and outside synced folders such as OneDrive, as `submissions\{course}\{assignment}\{student} ({id})\v{n}\original\`. After changing the entity model, add a migration with `dotnet ef migrations add <Name> --project src/TeachingAssistant.Infrastructure --startup-project src/TeachingAssistant.WebAPI --output-dir Persistence/Migrations`.
+Data lives in a Docker volume, outside the repository. Submission files are stored under `%LOCALAPPDATA%\TeachingAssistant` (configurable as `Storage:Root`), outside the repository and outside synced folders such as OneDrive, as `submissions\{course}\{assignment}\{student} ({id})\v{n}\` with `original\` (exactly as submitted) and `code\` (archives unpacked, IDE folders and compiled files left out). After changing the entity model, add a migration with `dotnet ef migrations add <Name> --project src/TeachingAssistant.Infrastructure --startup-project src/TeachingAssistant.WebAPI --output-dir Persistence/Migrations`.
 
 ### 4. Set up Google Classroom access
 
@@ -134,6 +138,18 @@ dotnet run --project src/TeachingAssistant.WebAPI --launch-profile https
 
 Swagger UI opens at `https://localhost:7107/swagger`. To connect Classroom, call `POST /auth/google/connect` — a browser window opens for Google sign-in and consent.
 
+### 6. Run the frontend
+
+Requires [Node.js](https://nodejs.org) (LTS). With the API running on `http://localhost:5288`:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open `http://localhost:5173`. The Vite dev server forwards `/api/*` to the API, so no CORS setup is needed. After changing API contracts, regenerate the TypeScript types with `npm run gen:api` (the API must be running).
+
 ## API
 
 | Method | Endpoint | Description |
@@ -147,6 +163,11 @@ Swagger UI opens at `https://localhost:7107/swagger`. To connect Classroom, call
 | `GET` | `/courses/{courseId}/assignments` | Published assignments of a course, newest first, with the task statement and due date |
 | `GET` | `/courses/{courseId}/assignments/{assignmentId}/submissions` | Every student's submission: state, late flag, latest turn-in, attachments (Drive files and links) |
 | `POST` | `/courses/{courseId}/assignments/{assignmentId}/submissions/fetch` | Downloads and stores new or changed turned-in submissions as versions; returns a summary with problems |
+| `GET` | `/courses/{courseId}/assignments/{assignmentId}/submissions/stored` | Submissions stored by fetch, with all versions (newest first) and their files |
+| `POST` | `/courses/{courseId}/assignments/{assignmentId}/submissions/extract` | Rebuilds the extracted code of all stored versions from the stored originals (no download) |
+| `GET` | `/stored-files/{contentId}` | One stored file by ID, shown inline (images, PDF) or saved with `?download=true` |
+| `GET` | `/versions/{versionId}/code` | Files extracted from a stored version |
+| `GET` | `/versions/{versionId}/code/file?path=…` | One extracted file (source code as UTF-8 text); paths outside the version's code folder are refused |
 
 Errors are returned as [RFC 9457 Problem Details](https://www.rfc-editor.org/rfc/rfc9457). The full, documented specification is available at `/swagger/v1/swagger.json`.
 

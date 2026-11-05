@@ -36,6 +36,9 @@ public class SubmissionFetchServiceTests
         Assert.Equal(ContentKind.CodeArchive, content.Kind);
         Assert.Equal("md5-a", content.Fingerprint);
         Assert.Equal("homework.zip", content.StoredName);
+        Assert.Equal(ContentStatus.Extracted, content.Status);
+        Assert.Equal("code-hash", version.ContentHash);
+        Assert.Null(version.ExtractionDetail);
         Assert.Equal("submissions/Java II/Assignment 4/Ana K. (user-sub-1)", submission.StorageFolder);
         Assert.Equal("submissions/Java II/Assignment 4/Ana K. (user-sub-1)/v1", version.StoragePath);
         Assert.Equal(["homework.zip"], _storage.Committed[version.StoragePath]);
@@ -236,6 +239,15 @@ public class SubmissionFetchServiceTests
         public string GetSubmissionFolder(string courseName, string assignmentTitle, string studentName, string studentId) =>
             $"submissions/{courseName}/{assignmentTitle}/{studentName} ({studentId})";
 
+        public Stream? OpenOriginal(string versionPath, string storedName) => throw new NotSupportedException();
+
+        public Task<CodeExtraction> ReExtractAsync(string versionPath, IReadOnlyList<ExtractableFile> files, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public IReadOnlyList<CodeFile> ListCode(string versionPath) => throw new NotSupportedException();
+
+        public Stream? OpenCode(string versionPath, string relativePath) => throw new NotSupportedException();
+
         public ISnapshotWriter BeginVersion(string submissionFolder, int versionNumber) =>
             new Writer(this, $"{submissionFolder}/v{versionNumber}");
 
@@ -245,6 +257,13 @@ public class SubmissionFetchServiceTests
             private bool _committed;
 
             public string RelativePath => path;
+
+            // Pretends every archive and source file extracts cleanly.
+            public Task<CodeExtraction> ExtractCodeAsync(IReadOnlyList<ExtractableFile> files, CancellationToken cancellationToken = default)
+            {
+                var code = files.Where(f => f.Kind is ContentKind.CodeArchive or ContentKind.SourceFile).Select(f => f.StoredName).ToList();
+                return Task.FromResult(new CodeExtraction(code.Count > 0 ? "code-hash" : null, code.Count, code, []));
+            }
 
             public async Task<string> AddOriginalAsync(string fileName, Func<Stream, Task> write, CancellationToken cancellationToken = default)
             {
@@ -276,6 +295,12 @@ public class SubmissionFetchServiceTests
 
         public Task<IReadOnlyList<Submission>> GetByAssignmentAsync(SubmissionSource source, string assignmentId, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<Submission>>(Submissions.Where(s => s.AssignmentId == assignmentId).ToList());
+
+        public Task<StoredFileLocation?> FindStoredFileAsync(Guid contentId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<string?> FindVersionPathAsync(Guid versionId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
 
         public void Add(Submission submission) => Submissions.Add(submission);
 

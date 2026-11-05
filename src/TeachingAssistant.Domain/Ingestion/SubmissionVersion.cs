@@ -46,7 +46,27 @@ public class SubmissionVersion
     public string? ContentHash { get; private set; }
 
     public string StoragePath { get; private set; } = null!;
+
+    /// <summary>What could not be extracted into code/ (broken or protected archive, no code found); null when all went well.</summary>
+    public string? ExtractionDetail { get; private set; }
     public DateTimeOffset? TurnedInAt { get; private set; }
     public DateTimeOffset FetchedAt { get; private set; }
     public IReadOnlyList<VersionContent> Contents => _contents;
+
+    /// <summary>
+    /// Records the result of extracting the code into code/. Code is derived from the originals, so this may be
+    /// recorded again when extraction is re-run; the originals themselves never change.
+    /// </summary>
+    /// <param name="contentHash">Hash of the extracted files, or null when no code was extracted.</param>
+    /// <param name="extractedStoredNames">Stored names of the archives and source files whose code was extracted.</param>
+    /// <param name="detail">What could not be extracted; null when nothing went wrong.</param>
+    public void RecordExtraction(string? contentHash, IEnumerable<string> extractedStoredNames, string? detail)
+    {
+        ContentHash = contentHash;
+        ExtractionDetail = detail;
+
+        var extracted = extractedStoredNames.ToHashSet();
+        foreach (var content in _contents)
+            content.SetExtracted(content.StoredName is not null && extracted.Contains(content.StoredName));
+    }
 }

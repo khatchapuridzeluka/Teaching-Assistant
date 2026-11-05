@@ -65,4 +65,13 @@ public class VersionContent
     public ContentStatus Status { get; private set; }
 
     public ContentFingerprint ToFingerprint() => new(Origin, ExternalId, Fingerprint);
+
+    // Stored originals become Extracted once their code is in code/, and go back to Stored if a later extraction fails.
+    internal void SetExtracted(bool extracted)
+    {
+        if (extracted)
+            Status = ContentStatus.Extracted;
+        else if (Status == ContentStatus.Extracted)
+            Status = ContentStatus.Stored;
+    }
 }

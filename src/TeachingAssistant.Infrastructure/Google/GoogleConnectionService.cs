@@ -112,8 +112,18 @@ public class GoogleConnectionService : IGoogleConnectionService
         _logger.LogInformation("Google account disconnected");
     }
 
+    // Google reports some granted scopes under an older alias of the name we requested.
+    private static readonly Dictionary<string, string> ScopeAliases = new()
+    {
+        ["https://www.googleapis.com/auth/classroom.student-submissions.students.readonly"] =
+            "https://www.googleapis.com/auth/classroom.coursework.students.readonly",
+    };
+
+    // The granted scopes under the names we request, so they can be compared with GoogleAuthorization.Scopes.
     private static List<string> GrantedScopes(TokenResponse token) =>
-        (token.Scope ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries).ToList();
+        (token.Scope ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Select(scope => ScopeAliases.GetValueOrDefault(scope, scope))
+            .ToList();
 
     private static GoogleConnectionStatus NotConfigured() => new(GoogleConnectionState.NotConfigured, [],
         "Google:ClientId and Google:ClientSecret are not set. Add them with dotnet user-secrets.");

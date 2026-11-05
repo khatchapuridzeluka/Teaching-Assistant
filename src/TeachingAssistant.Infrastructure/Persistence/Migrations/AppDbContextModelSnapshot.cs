@@ -90,6 +90,10 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("content_hash");
 
+                    b.Property<string>("ExtractionDetail")
+                        .HasColumnType("text")
+                        .HasColumnName("extraction_detail");
+
                     b.Property<DateTimeOffset>("FetchedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("fetched_at");
