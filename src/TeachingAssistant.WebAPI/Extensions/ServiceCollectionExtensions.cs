@@ -10,6 +10,7 @@ using TeachingAssistant.Application.Services;
 using TeachingAssistant.Infrastructure.Google;
 using TeachingAssistant.Infrastructure.LanguageModel;
 using TeachingAssistant.Infrastructure.Persistence;
+using TeachingAssistant.Infrastructure.Storage;
 using TeachingAssistant.WebAPI.ExceptionHandling;
 
 namespace TeachingAssistant.WebAPI.Extensions;
@@ -33,12 +34,17 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
-    // Postgres via EF Core. The connection string comes from user-secrets (ConnectionStrings:Postgres).
+    // Postgres via EF Core for records, the local disk for submission files.
+    // The connection string comes from user-secrets (ConnectionStrings:Postgres).
     public static IServiceCollection AddPersistence(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddDbContext<AppDbContext>(options => options
             .UseNpgsql(configuration.GetConnectionString("Postgres"))
             .UseSnakeCaseNamingConvention());
+        services.AddScoped<ISubmissionStore, SubmissionStore>();
+
+        services.Configure<StorageOptions>(configuration.GetSection(StorageOptions.SectionName));
+        services.AddSingleton<ISnapshotStorage, FileSystemSnapshotStorage>();
 
         return services;
     }
@@ -84,6 +90,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ICourseService, CourseService>();
         services.AddScoped<IAssignmentService, AssignmentService>();
         services.AddScoped<ISubmissionService, SubmissionService>();
+        services.AddScoped<ISubmissionFetchService, SubmissionFetchService>();
 
         return services;
     }
