@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using Anthropic;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
 using Serilog;
@@ -8,6 +9,7 @@ using TeachingAssistant.Application.Interfaces.Services;
 using TeachingAssistant.Application.Services;
 using TeachingAssistant.Infrastructure.Google;
 using TeachingAssistant.Infrastructure.LanguageModel;
+using TeachingAssistant.Infrastructure.Persistence;
 using TeachingAssistant.WebAPI.ExceptionHandling;
 
 namespace TeachingAssistant.WebAPI.Extensions;
@@ -26,6 +28,17 @@ public static class ServiceCollectionExtensions
         services.AddApplicationServices();
         services.AddLanguageModel(configuration);
         services.AddGoogle(configuration);
+        services.AddPersistence(configuration);
+
+        return services;
+    }
+
+    // Postgres via EF Core. The connection string comes from user-secrets (ConnectionStrings:Postgres).
+    public static IServiceCollection AddPersistence(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddDbContext<AppDbContext>(options => options
+            .UseNpgsql(configuration.GetConnectionString("Postgres"))
+            .UseSnakeCaseNamingConvention());
 
         return services;
     }

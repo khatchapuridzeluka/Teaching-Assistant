@@ -1,0 +1,21 @@
+# Local development services. Start with: docker compose up -d
+services:
+  postgres:
+    # Postgres 18 with the pgvector extension (planned for mistake similarity search).
+    image: pgvector/pgvector:pg18
+    container_name: teaching-assistant-postgres
+    environment:
+      POSTGRES_DB: teaching_assistant
+      POSTGRES_USER: teaching_assistant
+      # Set in .env (git-ignored); see .env.example.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    ports:
+      # Only reachable from this machine.
+      - "127.0.0.1:5432:5432"
+    volumes:
+      # Postgres 18 images keep their data under /var/lib/postgresql.
+      - postgres-data:/var/lib/postgresql
+    restart: unless-stopped
+
+volumes:
+  postgres-data:

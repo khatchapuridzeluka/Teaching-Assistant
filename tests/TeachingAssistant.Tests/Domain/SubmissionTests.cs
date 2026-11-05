@@ -1,0 +1,84 @@
+using TeachingAssistant.Domain.Ingestion;
+
+namespace TeachingAssistant.Tests.Domain;
+
+public class SubmissionTests
+{
+    private static readonly DateTimeOffset Now = new(2026, 11, 5, 12, 0, 0, TimeSpan.Zero);
+
+    [Fact]
+    public void HasChanged_NoVersionYet_IsTrue()
+    {
+        var submission = NewSubmission();
+
+        Assert.True(submission.HasChanged([Drive("file-1", "md5-a")]));
+    }
+
+    [Fact]
+    public void HasChanged_SameContentInAnyOrder_IsFalse()
+    {
+        var submission = NewSubmission();
+        AddVersion(submission, Content("file-1", "md5-a"), Content("file-2", "md5-b"));
+
+        Assert.False(submission.HasChanged([Drive("file-2", "md5-b"), Drive("file-1", "md5-a")]));
+    }
+
+    [Fact]
+    public void HasChanged_ReplacedFile_IsTrue()
+    {
+        var submission = NewSubmission();
+        AddVersion(submission, Content("file-1", "md5-a"));
+
+        Assert.True(submission.HasChanged([Drive("file-1", "md5-changed")]));
+    }
+
+    [Fact]
+    public void HasChanged_AddedOrRemovedFile_IsTrue()
+    {
+        var submission = NewSubmission();
+        AddVersion(submission, Content("file-1", "md5-a"));
+
+        Assert.True(submission.HasChanged([Drive("file-1", "md5-a"), Drive("file-2", "md5-b")]));
+        Assert.True(submission.HasChanged([]));
+    }
+
+    [Fact]
+    public void AddVersion_NumbersVersionsInOrder()
+    {
+        var submission = NewSubmission();
+
+        var first = AddVersion(submission, Content("file-1", "md5-a"));
+        var second = AddVersion(submission, Content("file-1", "md5-b"));
+
+        Assert.Equal(1, first.Number);
+        Assert.Equal(2, second.Number);
+        Assert.Same(second, submission.LatestVersion);
+        Assert.Equal(3, submission.NextVersionNumber);
+        Assert.Equal(submission.Id, second.SubmissionId);
+    }
+
+    [Fact]
+    public void AddVersion_StoresTimesInUtc()
+    {
+        var submission = NewSubmission();
+        var tbilisi = new DateTimeOffset(2026, 11, 5, 16, 0, 0, TimeSpan.FromHours(4));
+
+        var version = submission.AddVersion(VersionStatus.Ready, null, "hash", "submissions/x/v1", tbilisi, tbilisi, []);
+
+        Assert.Equal(TimeSpan.Zero, version.FetchedAt.Offset);
+        Assert.Equal(new DateTimeOffset(2026, 11, 5, 12, 0, 0, TimeSpan.Zero), version.FetchedAt);
+    }
+
+    private static Submission NewSubmission() =>
+        new(SubmissionSource.GoogleClassroom, "course-1", "assignment-1", "student-1", "Nino B.", "submission-1", Now);
+
+    private static SubmissionVersion AddVersion(Submission submission, params VersionContent[] contents) =>
+        submission.AddVersion(VersionStatus.Ready, null, "hash", $"submissions/{submission.Id}/v{submission.NextVersionNumber}",
+            Now, Now, contents);
+
+    private static VersionContent Content(string fileId, string md5) =>
+        new(ContentOrigin.Drive, ContentKind.CodeArchive, fileId, "homework.zip", "application/zip", md5,
+            null, 1024, "homework.zip", null, ContentStatus.Extracted);
+
+    private static ContentFingerprint Drive(string fileId, string md5) => new(ContentOrigin.Drive, fileId, md5);
+}

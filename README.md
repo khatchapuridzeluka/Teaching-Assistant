@@ -37,6 +37,7 @@ This project automates the drafting, not the deciding:
 |---|---|
 | **Backend** | ASP.NET Core Web API on **.NET 10**, onion architecture |
 | **AI** | **Anthropic Claude** via the official Anthropic C# SDK |
+| **Database** | **PostgreSQL 18** (with pgvector) in Docker, **EF Core 10** with migrations |
 | **Integrations** | **Google Classroom API** and **Google Drive API** (read-only scopes), Google OAuth 2.0 |
 | **Sandbox** | **Docker** containers with multiple JDK images |
 | **API docs** | **Swashbuckle** (Swagger UI) with XML documentation |
@@ -49,8 +50,11 @@ This project automates the drafting, not the deciding:
 ```
 TeachingAssistant.WebAPI.sln
 global.json                              test runner configuration (Microsoft Testing Platform)
+dotnet-tools.json                        local tools (dotnet-ef)
+docker-compose.yml                       local Postgres
 src/
-  TeachingAssistant.Domain/              entities and pure rules
+  TeachingAssistant.Domain/
+    Ingestion/                           submissions, versions (snapshots), content, change detection
   TeachingAssistant.Application/
     Contracts/                           what the API returns
     Interfaces/                          ports (ILanguageModel, ISubmissionSource)
@@ -60,6 +64,7 @@ src/
   TeachingAssistant.Infrastructure/
     LanguageModel/                       Claude adapter
     Google/                              OAuth, Classroom adapter
+    Persistence/                         EF Core DbContext, entity mappings, migrations
   TeachingAssistant.WebAPI/
     Controllers/                         HTTP endpoints
     Extensions/                          service registration
@@ -74,6 +79,7 @@ frontend/                                React app (coming soon)
 ### Prerequisites
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download)
+- [Docker](https://www.docker.com/products/docker-desktop/) (for Postgres, and later the code sandboxes)
 - An [Anthropic API key](https://console.anthropic.com/)
 - A Google Cloud project with an OAuth client (for Classroom access — see below)
 
@@ -82,6 +88,7 @@ frontend/                                React app (coming soon)
 ```bash
 git clone <repository-url>
 cd Teaching-assistant
+dotnet tool restore
 dotnet build
 ```
 
@@ -97,7 +104,19 @@ dotnet user-secrets set "Google:ClientSecret" "YOUR_CLIENT_SECRET" --project src
 
 The Anthropic key can alternatively be provided through the `ANTHROPIC_API_KEY` environment variable.
 
-### 3. Set up Google Classroom access
+### 3. Start the database
+
+Copy `.env.example` to `.env` (git-ignored) and choose a local password, then start Postgres and create the tables:
+
+```bash
+docker compose up -d
+dotnet user-secrets set "ConnectionStrings:Postgres" "Host=localhost;Port=5432;Database=teaching_assistant;Username=teaching_assistant;Password=YOUR_LOCAL_PASSWORD" --project src/TeachingAssistant.WebAPI
+dotnet ef database update --project src/TeachingAssistant.Infrastructure --startup-project src/TeachingAssistant.WebAPI
+```
+
+Data lives in a Docker volume, outside the repository. After changing the entity model, add a migration with `dotnet ef migrations add <Name> --project src/TeachingAssistant.Infrastructure --startup-project src/TeachingAssistant.WebAPI --output-dir Persistence/Migrations`.
+
+### 4. Set up Google Classroom access
 
 1. Create a project in the [Google Cloud Console](https://console.cloud.google.com/).
 2. Enable the **Google Classroom API** and the **Google Drive API**.
@@ -106,7 +125,7 @@ The Anthropic key can alternatively be provided through the `ANTHROPIC_API_KEY` 
 
 > In Testing mode, Google refresh tokens expire after about 7 days. Reconnect with `POST /auth/google/connect` when the status shows `ReconnectRequired`.
 
-### 4. Run
+### 5. Run
 
 ```bash
 dotnet run --project src/TeachingAssistant.WebAPI --launch-profile https
