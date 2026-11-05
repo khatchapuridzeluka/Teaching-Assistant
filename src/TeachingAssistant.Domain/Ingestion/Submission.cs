@@ -20,6 +20,7 @@ public class Submission
         string studentId,
         string studentName,
         string externalSubmissionId,
+        string storageFolder,
         DateTimeOffset createdAt)
     {
         Id = Guid.CreateVersion7();
@@ -29,6 +30,7 @@ public class Submission
         StudentId = studentId;
         StudentName = studentName;
         ExternalSubmissionId = externalSubmissionId;
+        StorageFolder = storageFolder;
         CreatedAt = createdAt.ToUniversalTime();
     }
 
@@ -42,6 +44,13 @@ public class Submission
     public string StudentName { get; private set; } = null!;
 
     public string ExternalSubmissionId { get; private set; } = null!;
+
+    /// <summary>
+    /// Folder holding all versions' files, relative to the storage root. Chosen once when the submission is first
+    /// stored, so later renames of the course or student never move existing files.
+    /// </summary>
+    public string StorageFolder { get; private set; } = null!;
+
     public DateTimeOffset CreatedAt { get; private set; }
     public IReadOnlyList<SubmissionVersion> Versions => _versions;
 

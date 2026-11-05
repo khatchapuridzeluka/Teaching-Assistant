@@ -5,7 +5,7 @@ namespace TeachingAssistant.Domain.Ingestion;
 /// </summary>
 public enum VersionStatus
 {
-    /// <summary>All content stored and the code extracted; ready to build and grade.</summary>
+    /// <summary>All content stored.</summary>
     Ready,
 
     /// <summary>Some content is unsupported or too large; the rest is usable. StatusDetail says what.</summary>

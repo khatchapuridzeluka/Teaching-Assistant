@@ -1,5 +1,6 @@
 using System.Collections.Frozen;
 using System.Runtime.ExceptionServices;
+using Google.Apis.Auth.OAuth2;
 using Google.Apis.Download;
 using Google.Apis.Drive.v3;
 using Google.Apis.Services;
@@ -32,6 +33,7 @@ public class GoogleDriveFileSource : IRemoteFileSource
     }.ToFrozenSet();
 
     private readonly GoogleAuthorization _authorization;
+    private volatile Client? _client;
 
     public GoogleDriveFileSource(GoogleAuthorization authorization)
     {
@@ -40,7 +42,7 @@ public class GoogleDriveFileSource : IRemoteFileSource
 
     public async Task<RemoteFile> GetFileAsync(string fileId, CancellationToken cancellationToken = default)
     {
-        using var drive = await CreateDriveAsync(cancellationToken);
+        var drive = await GetDriveAsync(cancellationToken);
 
         var request = drive.Files.Get(fileId);
         request.Fields = MetadataFields;
@@ -55,7 +57,7 @@ public class GoogleDriveFileSource : IRemoteFileSource
         if (!file.IsDownloadable)
             throw new InvalidOperationException($"'{file.Name}' ({file.MimeType}) has no content to download.");
 
-        using var drive = await CreateDriveAsync(cancellationToken);
+        var drive = await GetDriveAsync(cancellationToken);
 
         await GoogleErrors.TranslateAsync(ServiceName, async () =>
         {
@@ -98,10 +100,22 @@ public class GoogleDriveFileSource : IRemoteFileSource
             IsDownloadable: !isGoogleApp || exportedAsPdf);
     }
 
-    private async Task<DriveService> CreateDriveAsync(CancellationToken cancellationToken) =>
-        new(new BaseClientService.Initializer
+    // One client for all calls, so connections to Google stay open instead of a new handshake per request.
+    // Rebuilt only when the shared credential changes (after connect/disconnect).
+    private async Task<DriveService> GetDriveAsync(CancellationToken cancellationToken)
+    {
+        var credential = await _authorization.GetCredentialAsync(cancellationToken);
+        if (_client is { } client && ReferenceEquals(client.Credential, credential))
+            return client.Service;
+
+        var service = new DriveService(new BaseClientService.Initializer
         {
-            HttpClientInitializer = await _authorization.GetCredentialAsync(cancellationToken),
+            HttpClientInitializer = credential,
             ApplicationName = GoogleAuthorization.ApplicationName,
         });
+        _client = new Client(credential, service);
+        return service;
+    }
+
+    private sealed record Client(UserCredential Credential, DriveService Service);
 }

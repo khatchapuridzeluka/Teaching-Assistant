@@ -32,6 +32,7 @@ public class GoogleAuthorization
 
     private readonly GoogleOptions _options;
     private readonly Lazy<GoogleAuthorizationCodeFlow> _flow;
+    private volatile UserCredential? _credential;
 
     public GoogleAuthorization(IOptions<GoogleOptions> options)
     {
@@ -62,12 +63,17 @@ public class GoogleAuthorization
     }
 
     /// <summary>
-    /// Returns a credential for calling Google APIs as the teacher. It adds the access token to every request
+    /// Returns the credential for calling Google APIs as the teacher. It adds the access token to every request
     /// and refreshes it when stale. Throws <see cref="SubmissionSourceNotConnectedException"/> when the client
     /// is not configured or no token is stored; an expired token only fails on the first real request.
+    /// The same credential is shared by all calls (one refresh for everyone, safe in parallel) until
+    /// <see cref="ResetCredential"/> is called.
     /// </summary>
     public async Task<UserCredential> GetCredentialAsync(CancellationToken cancellationToken)
     {
+        if (_credential is { } cached)
+            return cached;
+
         if (!TryGetFlow(out var flow))
             throw new SubmissionSourceNotConnectedException(
                 "Google:ClientId and Google:ClientSecret are not set. Add them with dotnet user-secrets.");
@@ -76,8 +82,15 @@ public class GoogleAuthorization
             ?? throw new SubmissionSourceNotConnectedException(
                 "Google account is not connected. Call POST /auth/google/connect.");
 
-        return new UserCredential(flow, UserKey, token);
+        // Two first calls at once may both build one; either is fine, and from then on all calls share it.
+        return _credential = new UserCredential(flow, UserKey, token);
     }
+
+    /// <summary>
+    /// Forgets the shared credential so the next call reads the stored token again. Call after connecting
+    /// or disconnecting; otherwise calls would keep using the previous (revoked or replaced) token.
+    /// </summary>
+    public void ResetCredential() => _credential = null;
 
     private bool IsConfigured =>
         !string.IsNullOrWhiteSpace(_options.ClientId) && !string.IsNullOrWhiteSpace(_options.ClientSecret);

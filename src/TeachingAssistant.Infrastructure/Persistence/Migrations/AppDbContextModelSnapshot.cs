@@ -52,6 +52,11 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("source");
 
+                    b.Property<string>("StorageFolder")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("storage_folder");
+
                     b.Property<string>("StudentId")
                         .IsRequired()
                         .HasColumnType("text")
@@ -178,7 +183,6 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
                         .HasColumnName("status");
 
                     b.Property<string>("StoredName")
-                        .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("stored_name");
 

@@ -70,7 +70,8 @@ public class SubmissionTests
     }
 
     private static Submission NewSubmission() =>
-        new(SubmissionSource.GoogleClassroom, "course-1", "assignment-1", "student-1", "Nino B.", "submission-1", Now);
+        new(SubmissionSource.GoogleClassroom, "course-1", "assignment-1", "student-1", "Nino B.", "submission-1",
+            "submissions/Java II/Assignment 4/Nino B. (1)", Now);
 
     private static SubmissionVersion AddVersion(Submission submission, params VersionContent[] contents) =>
         submission.AddVersion(VersionStatus.Ready, null, "hash", $"submissions/{submission.Id}/v{submission.NextVersionNumber}",

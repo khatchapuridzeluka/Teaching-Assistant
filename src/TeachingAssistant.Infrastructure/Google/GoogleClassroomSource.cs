@@ -1,3 +1,4 @@
+using Google.Apis.Auth.OAuth2;
 using Google.Apis.Classroom.v1;
 using Google.Apis.Classroom.v1.Data;
 using Google.Apis.Requests;
@@ -19,6 +20,7 @@ public class GoogleClassroomSource : ISubmissionSource
     private const int PageSize = 100;
 
     private readonly GoogleAuthorization _authorization;
+    private volatile Client? _client;
 
     public GoogleClassroomSource(GoogleAuthorization authorization)
     {
@@ -27,7 +29,7 @@ public class GoogleClassroomSource : ISubmissionSource
 
     public async Task<IReadOnlyList<CourseResponse>> GetCoursesAsync(CancellationToken cancellationToken = default)
     {
-        using var classroom = await CreateClassroomAsync(cancellationToken);
+        var classroom = await GetClassroomAsync(cancellationToken);
 
         var request = classroom.Courses.List();
         request.TeacherId = "me"; // only courses the teacher teaches, not ones they're enrolled in
@@ -36,12 +38,20 @@ public class GoogleClassroomSource : ISubmissionSource
         var courses = await FetchAllAsync(request, (r, token) => r.PageToken = token,
             (ListCoursesResponse page) => (page.Courses, page.NextPageToken), cancellationToken);
 
-        return courses.Select(c => new CourseResponse(c.Id, c.Name, c.Section, c.CourseState, c.AlternateLink)).ToList();
+        return courses.Select(ToCourse).ToList();
+    }
+
+    public async Task<CourseResponse> GetCourseAsync(string courseId, CancellationToken cancellationToken = default)
+    {
+        var classroom = await GetClassroomAsync(cancellationToken);
+        var course = await GoogleErrors.TranslateAsync(ServiceName,
+            () => classroom.Courses.Get(courseId).ExecuteAsync(cancellationToken));
+        return ToCourse(course);
     }
 
     public async Task<IReadOnlyList<AssignmentResponse>> GetAssignmentsAsync(string courseId, CancellationToken cancellationToken = default)
     {
-        using var classroom = await CreateClassroomAsync(cancellationToken);
+        var classroom = await GetClassroomAsync(cancellationToken);
 
         // Without a state filter Classroom returns published work only, which is what students can submit to.
         var request = classroom.Courses.CourseWork.List(courseId);
@@ -50,14 +60,26 @@ public class GoogleClassroomSource : ISubmissionSource
         var courseWork = await FetchAllAsync(request, (r, token) => r.PageToken = token,
             (ListCourseWorkResponse page) => (page.CourseWork, page.NextPageToken), cancellationToken);
 
-        return courseWork.Select(w => new AssignmentResponse(
-            w.Id, w.CourseId, w.Title, w.Description, w.WorkType, w.MaxPoints,
-            DueAt(w.DueDate, w.DueTime), w.CreationTimeDateTimeOffset, w.AlternateLink)).ToList();
+        return courseWork.Select(ToAssignment).ToList();
     }
+
+    public async Task<AssignmentResponse> GetAssignmentAsync(string courseId, string assignmentId, CancellationToken cancellationToken = default)
+    {
+        var classroom = await GetClassroomAsync(cancellationToken);
+        var courseWork = await GoogleErrors.TranslateAsync(ServiceName,
+            () => classroom.Courses.CourseWork.Get(courseId, assignmentId).ExecuteAsync(cancellationToken));
+        return ToAssignment(courseWork);
+    }
+
+    private static CourseResponse ToCourse(Course c) => new(c.Id, c.Name, c.Section, c.CourseState, c.AlternateLink);
+
+    private static AssignmentResponse ToAssignment(CourseWork w) => new(
+        w.Id, w.CourseId, w.Title, w.Description, w.WorkType, w.MaxPoints,
+        DueAt(w.DueDate, w.DueTime), w.CreationTimeDateTimeOffset, w.AlternateLink);
 
     public async Task<IReadOnlyList<SubmissionResponse>> GetSubmissionsAsync(string courseId, string assignmentId, CancellationToken cancellationToken = default)
     {
-        using var classroom = await CreateClassroomAsync(cancellationToken);
+        var classroom = await GetClassroomAsync(cancellationToken);
 
         // Submissions only carry a user ID; names come from the course roster.
         var names = await GetStudentNamesAsync(classroom, courseId, cancellationToken);
@@ -129,10 +151,22 @@ public class GoogleClassroomSource : ISubmissionSource
             ? new DateTimeOffset(year, month, day, time?.Hours ?? 0, time?.Minutes ?? 0, 0, TimeSpan.Zero)
             : null;
 
-    private async Task<ClassroomService> CreateClassroomAsync(CancellationToken cancellationToken) =>
-        new(new BaseClientService.Initializer
+    // One client for all calls, so connections to Google stay open instead of a new handshake per request.
+    // Rebuilt only when the shared credential changes (after connect/disconnect).
+    private async Task<ClassroomService> GetClassroomAsync(CancellationToken cancellationToken)
+    {
+        var credential = await _authorization.GetCredentialAsync(cancellationToken);
+        if (_client is { } client && ReferenceEquals(client.Credential, credential))
+            return client.Service;
+
+        var service = new ClassroomService(new BaseClientService.Initializer
         {
-            HttpClientInitializer = await _authorization.GetCredentialAsync(cancellationToken),
+            HttpClientInitializer = credential,
             ApplicationName = GoogleAuthorization.ApplicationName,
         });
+        _client = new Client(credential, service);
+        return service;
+    }
+
+    private sealed record Client(UserCredential Credential, ClassroomService Service);
 }

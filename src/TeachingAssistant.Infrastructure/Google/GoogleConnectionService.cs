@@ -71,6 +71,7 @@ public class GoogleConnectionService : IGoogleConnectionService
                 _authorization.ClientSecrets, GoogleAuthorization.Scopes, GoogleAuthorization.UserKey,
                 timeout.Token, _authorization.TokenStore);
 
+            _authorization.ResetCredential(); // API calls switch to the new token
             _logger.LogInformation("Google account connected");
             return await GetStatusAsync(cancellationToken);
         }
@@ -107,6 +108,7 @@ public class GoogleConnectionService : IGoogleConnectionService
         }
 
         await flow.DeleteTokenAsync(GoogleAuthorization.UserKey, cancellationToken);
+        _authorization.ResetCredential(); // API calls stop using the revoked token
         _logger.LogInformation("Google account disconnected");
     }
 

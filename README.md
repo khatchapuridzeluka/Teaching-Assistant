@@ -22,8 +22,8 @@ This project automates the drafting, not the deciding:
 
 | Area | What it does | Status |
 |---|---|---|
-| **Classroom ingestion** | Connects a teacher's Google account (read-only OAuth) and lists courses, assignments and submissions | Courses, assignments & submissions ✅ · attachment download in progress |
-| **Submission formats** | Zip archives of `.java` files, loose files, or GitHub repository links | Planned |
+| **Classroom ingestion** | Connects a teacher's Google account (read-only OAuth), lists courses, assignments and submissions, and fetches turned-in work into stored versions (snapshots); unchanged submissions are skipped | Listing ✅ · fetch & versions ✅ |
+| **Submission formats** | Zip/rar/7z archives of `.java` files, loose files, documents, images, or GitHub repository links | Drive files stored ✅ · archive extraction and GitHub cloning planned |
 | **Sandboxed checks** | Compiles and runs student code in Docker (JDK 17–27), collecting compiler warnings, static analysis and test results before any AI judgment | Planned |
 | **Rubric grading** | Claude grades against a layered rubric: base rubric → per-assignment extensions → the teacher's policy rules | Planned |
 | **Batch calibration** | Calibrates scores across the class and clusters common mistakes, so one explanation covers many students | Planned |
@@ -64,7 +64,8 @@ src/
   TeachingAssistant.Infrastructure/
     LanguageModel/                       Claude adapter
     Google/                              OAuth, Classroom adapter, Drive adapter (file metadata and download)
-    Persistence/                         EF Core DbContext, entity mappings, migrations
+    Persistence/                         EF Core DbContext, entity mappings, migrations, submission store
+    Storage/                             submission files on disk (versions written atomically)
   TeachingAssistant.WebAPI/
     Controllers/                         HTTP endpoints
     Extensions/                          service registration
@@ -114,7 +115,7 @@ dotnet user-secrets set "ConnectionStrings:Postgres" "Host=localhost;Port=5432;D
 dotnet ef database update --project src/TeachingAssistant.Infrastructure --startup-project src/TeachingAssistant.WebAPI
 ```
 
-Data lives in a Docker volume, outside the repository. After changing the entity model, add a migration with `dotnet ef migrations add <Name> --project src/TeachingAssistant.Infrastructure --startup-project src/TeachingAssistant.WebAPI --output-dir Persistence/Migrations`.
+Data lives in a Docker volume, outside the repository. Submission files are stored under `%LOCALAPPDATA%\TeachingAssistant` (configurable as `Storage:Root`), outside the repository and outside synced folders such as OneDrive, as `submissions\{course}\{assignment}\{student} ({id})\v{n}\original\`. After changing the entity model, add a migration with `dotnet ef migrations add <Name> --project src/TeachingAssistant.Infrastructure --startup-project src/TeachingAssistant.WebAPI --output-dir Persistence/Migrations`.
 
 ### 4. Set up Google Classroom access
 
@@ -145,6 +146,7 @@ Swagger UI opens at `https://localhost:7107/swagger`. To connect Classroom, call
 | `GET` | `/courses` | Courses the teacher teaches in Google Classroom |
 | `GET` | `/courses/{courseId}/assignments` | Published assignments of a course, newest first, with the task statement and due date |
 | `GET` | `/courses/{courseId}/assignments/{assignmentId}/submissions` | Every student's submission: state, late flag, latest turn-in, attachments (Drive files and links) |
+| `POST` | `/courses/{courseId}/assignments/{assignmentId}/submissions/fetch` | Downloads and stores new or changed turned-in submissions as versions; returns a summary with problems |
 
 Errors are returned as [RFC 9457 Problem Details](https://www.rfc-editor.org/rfc/rfc9457). The full, documented specification is available at `/swagger/v1/swagger.json`.
 
@@ -163,6 +165,7 @@ Tests focus on Application use cases and Domain rules, using hand-written fakes 
 - **Student code is isolated.** Submissions run only inside Docker sandboxes, never on the host.
 - **Privacy.** Student identifiers are anonymized before any data is sent to a language model.
 - **Secrets stay local.** API keys and OAuth client secrets live in user-secrets or environment variables; OAuth tokens are stored outside the repository.
+- **Student work stays on the machine.** Fetched submissions are stored in a local folder outside the repository and outside cloud-synced folders.
 
 ## Author
 

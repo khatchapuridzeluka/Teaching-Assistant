@@ -7,5 +7,9 @@ public enum ContentOrigin
 {
     Drive,
     GitHub,
+
+    /// <summary>A web link that is not a GitHub repository.</summary>
+    Link,
+
     Upload,
 }
