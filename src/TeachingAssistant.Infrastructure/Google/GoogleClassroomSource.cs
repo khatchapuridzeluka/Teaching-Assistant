@@ -20,6 +20,9 @@ public class GoogleClassroomSource : ISubmissionSource
 {
     private const string ApplicationName = "Teaching Assistant";
 
+    // Items per page; Google may return fewer, so paging always follows the next-page token.
+    private const int PageSize = 100;
+
     private readonly GoogleAuthorization _authorization;
 
     public GoogleClassroomSource(GoogleAuthorization authorization)
@@ -31,45 +34,30 @@ public class GoogleClassroomSource : ISubmissionSource
     {
         using var classroom = await CreateClassroomAsync(cancellationToken);
 
-        var courses = new List<CourseResponse>();
-        string? pageToken = null;
-        do
-        {
-            var request = classroom.Courses.List();
-            request.TeacherId = "me"; // only courses the teacher teaches, not ones they're enrolled in
-            request.PageSize = 100;
-            request.PageToken = pageToken;
+        var request = classroom.Courses.List();
+        request.TeacherId = "me"; // only courses the teacher teaches, not ones they're enrolled in
+        request.PageSize = PageSize;
 
-            var page = await ExecuteAsync(request, cancellationToken);
-            courses.AddRange((page.Courses ?? []).Select(c =>
-                new CourseResponse(c.Id, c.Name, c.Section, c.CourseState, c.AlternateLink)));
-            pageToken = page.NextPageToken;
-        } while (!string.IsNullOrEmpty(pageToken));
+        var courses = await FetchAllAsync(request, (r, token) => r.PageToken = token,
+            (ListCoursesResponse page) => (page.Courses, page.NextPageToken), cancellationToken);
 
-        return courses;
+        return courses.Select(c => new CourseResponse(c.Id, c.Name, c.Section, c.CourseState, c.AlternateLink)).ToList();
     }
 
     public async Task<IReadOnlyList<AssignmentResponse>> GetAssignmentsAsync(string courseId, CancellationToken cancellationToken = default)
     {
         using var classroom = await CreateClassroomAsync(cancellationToken);
 
-        var assignments = new List<AssignmentResponse>();
-        string? pageToken = null;
-        do
-        {
-            // Without a state filter Classroom returns published work only, which is what students can submit to.
-            var request = classroom.Courses.CourseWork.List(courseId);
-            request.PageSize = 100;
-            request.PageToken = pageToken;
+        // Without a state filter Classroom returns published work only, which is what students can submit to.
+        var request = classroom.Courses.CourseWork.List(courseId);
+        request.PageSize = PageSize;
 
-            var page = await ExecuteAsync(request, cancellationToken);
-            assignments.AddRange((page.CourseWork ?? []).Select(w => new AssignmentResponse(
-                w.Id, w.CourseId, w.Title, w.Description, w.WorkType, w.MaxPoints,
-                DueAt(w.DueDate, w.DueTime), w.CreationTimeDateTimeOffset, w.AlternateLink)));
-            pageToken = page.NextPageToken;
-        } while (!string.IsNullOrEmpty(pageToken));
+        var courseWork = await FetchAllAsync(request, (r, token) => r.PageToken = token,
+            (ListCourseWorkResponse page) => (page.CourseWork, page.NextPageToken), cancellationToken);
 
-        return assignments;
+        return courseWork.Select(w => new AssignmentResponse(
+            w.Id, w.CourseId, w.Title, w.Description, w.WorkType, w.MaxPoints,
+            DueAt(w.DueDate, w.DueTime), w.CreationTimeDateTimeOffset, w.AlternateLink)).ToList();
     }
 
     public async Task<IReadOnlyList<SubmissionResponse>> GetSubmissionsAsync(string courseId, string assignmentId, CancellationToken cancellationToken = default)
@@ -79,42 +67,49 @@ public class GoogleClassroomSource : ISubmissionSource
         // Submissions only carry a user ID; names come from the course roster.
         var names = await GetStudentNamesAsync(classroom, courseId, cancellationToken);
 
-        var submissions = new List<SubmissionResponse>();
-        string? pageToken = null;
-        do
-        {
-            var request = classroom.Courses.CourseWork.StudentSubmissions.List(courseId, assignmentId);
-            request.PageSize = 100;
-            request.PageToken = pageToken;
+        var request = classroom.Courses.CourseWork.StudentSubmissions.List(courseId, assignmentId);
+        request.PageSize = PageSize;
 
-            var page = await ExecuteAsync(request, cancellationToken);
-            submissions.AddRange((page.StudentSubmissions ?? []).Select(s => new SubmissionResponse(
-                s.Id, s.UserId, names.GetValueOrDefault(s.UserId, "Unknown student"), s.State, s.Late ?? false,
-                LastTurnedInAt(s), s.UpdateTimeDateTimeOffset, Attachments(s), s.AlternateLink)));
-            pageToken = page.NextPageToken;
-        } while (!string.IsNullOrEmpty(pageToken));
+        var submissions = await FetchAllAsync(request, (r, token) => r.PageToken = token,
+            (ListStudentSubmissionsResponse page) => (page.StudentSubmissions, page.NextPageToken), cancellationToken);
 
-        return submissions;
+        return submissions.Select(s => new SubmissionResponse(
+            s.Id, s.UserId, names.GetValueOrDefault(s.UserId, "Unknown student"), s.State, s.Late ?? false,
+            LastTurnedInAt(s), s.UpdateTimeDateTimeOffset, Attachments(s), s.AlternateLink)).ToList();
     }
 
     private static async Task<Dictionary<string, string>> GetStudentNamesAsync(
         ClassroomService classroom, string courseId, CancellationToken cancellationToken)
     {
-        var names = new Dictionary<string, string>();
-        string? pageToken = null;
-        do
-        {
-            var request = classroom.Courses.Students.List(courseId);
-            request.PageSize = 100;
-            request.PageToken = pageToken;
+        var request = classroom.Courses.Students.List(courseId);
+        request.PageSize = PageSize;
 
-            var page = await ExecuteAsync(request, cancellationToken);
-            foreach (var student in page.Students ?? [])
-                names[student.UserId] = student.Profile?.Name?.FullName ?? student.UserId;
-            pageToken = page.NextPageToken;
-        } while (!string.IsNullOrEmpty(pageToken));
+        var students = await FetchAllAsync(request, (r, token) => r.PageToken = token,
+            (ListStudentsResponse page) => (page.Students, page.NextPageToken), cancellationToken);
 
-        return names;
+        return students.ToDictionary(s => s.UserId, s => s.Profile?.Name?.FullName ?? s.UserId);
+    }
+
+    /// <summary>
+    /// Runs a Classroom list request page by page until there is no next page, and returns all items.
+    /// Classroom never returns a whole list at once: each page ends with a token that asks for the next one.
+    /// </summary>
+    /// <param name="request">The first request, with filters and page size already set.</param>
+    /// <param name="setPageToken">Puts the next page's token on the request (each request type has its own PageToken property).</param>
+    /// <param name="readPage">Takes the items and the next page's token out of one response.</param>
+    private static Task<IList<TItem>> FetchAllAsync<TRequest, TResponse, TItem>(
+        TRequest request,
+        Action<TRequest, string?> setPageToken,
+        Func<TResponse, (IList<TItem>? Items, string? NextPageToken)> readPage,
+        CancellationToken cancellationToken)
+        where TRequest : IClientServiceRequest<TResponse>
+    {
+        var streamer = new PageStreamer<TItem, TRequest, TResponse, string?>(
+            setPageToken,
+            page => readPage(page).NextPageToken is { Length: > 0 } token ? token : null, // empty token = last page
+            page => readPage(page).Items ?? []);
+
+        return TranslateErrorsAsync(() => streamer.FetchAllAsync(request, cancellationToken));
     }
 
     // The latest turn-in from the history; every resubmission adds a new TURNED_IN entry.
@@ -156,11 +151,12 @@ public class GoogleClassroomSource : ISubmissionSource
         });
     }
 
-    private static async Task<T> ExecuteAsync<T>(ClientServiceRequest<T> request, CancellationToken cancellationToken)
+    // Turns Google's exceptions into submission-source exceptions, which the API maps to 409/404/502.
+    private static async Task<T> TranslateErrorsAsync<T>(Func<Task<T>> call)
     {
         try
         {
-            return await request.ExecuteAsync(cancellationToken);
+            return await call();
         }
         catch (TokenResponseException ex)
         {
