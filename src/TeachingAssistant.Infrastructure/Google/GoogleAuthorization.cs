@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Auth.OAuth2.Flows;
 using Google.Apis.Util.Store;
@@ -12,7 +13,8 @@ namespace TeachingAssistant.Infrastructure.Google;
 public class GoogleAuthorization
 {
     // Read-only on purpose: the app must never be able to write grades or change anything in Classroom or Drive.
-    public static readonly string[] Scopes =
+    // ImmutableArray so nothing can change the list at runtime (a plain array's items could be overwritten).
+    public static ImmutableArray<string> Scopes { get; } =
     [
         "https://www.googleapis.com/auth/classroom.courses.readonly",
         "https://www.googleapis.com/auth/classroom.coursework.students.readonly",
