@@ -188,7 +188,7 @@ public class SubmissionFetchServiceTests
             Task.FromResult(new CourseResponse(courseId, "Java II", null, "ACTIVE", null));
 
         public Task<AssignmentResponse> GetAssignmentAsync(string courseId, string assignmentId, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new AssignmentResponse(assignmentId, courseId, "Assignment 4", null, "ASSIGNMENT", 100, null, null, null));
+            Task.FromResult(new AssignmentResponse(assignmentId, courseId, "Assignment 4", null, "ASSIGNMENT", 100, null, null, null, []));
 
         public Task<IReadOnlyList<CourseResponse>> GetCoursesAsync(CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
@@ -309,6 +309,9 @@ public class SubmissionFetchServiceTests
             throw new NotSupportedException();
 
         public Task<string?> FindVersionPathAsync(Guid versionId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<Submission?> FindByVersionAsync(Guid versionId, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
         public void Add(Submission submission) => Submissions.Add(submission);

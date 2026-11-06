@@ -27,6 +27,14 @@ public class SubmissionStore(AppDbContext db) : ISubmissionStore
                 (c, v) => new StoredFileLocation(v.StoragePath, c.StoredName!, c.Name, c.MimeType))
             .SingleOrDefaultAsync(cancellationToken);
 
+    public Task<Submission?> FindByVersionAsync(Guid versionId, CancellationToken cancellationToken = default) =>
+        db.Submissions
+            .Include(s => s.Versions)
+            .ThenInclude(v => v.Contents)
+            .Where(s => s.Versions.Any(v => v.Id == versionId))
+            .AsSplitQuery()
+            .SingleOrDefaultAsync(cancellationToken);
+
     public Task<string?> FindVersionPathAsync(Guid versionId, CancellationToken cancellationToken = default) =>
         db.SubmissionVersions
             .Where(v => v.Id == versionId)

@@ -38,7 +38,7 @@ export interface paths {
                         "application/json": components["schemas"]["ChatResponse"];
                     };
                 };
-                /** @description Invalid conversation (empty, or not ending with the teacher's message) */
+                /** @description Invalid conversation: not ending with the teacher's message, or that message empty or over 8,000 characters */
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -615,6 +615,79 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/versions/{versionId}/grade": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sends a stored version and its assignment's instructions to the model and returns the draft review (not saved); can take a minute. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    versionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Draft review, with the files that were sent and skipped */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GradingResponse"];
+                    };
+                };
+                /** @description Nothing to grade, or the assignment has no instructions the model can read */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No stored version with this ID, or the assignment or an instruction file was not found in Google */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Google account not connected or authorization expired; call POST /auth/google/connect */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Google Classroom or Drive returned an error or could not be reached */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Model unreachable, returned an error, or declined */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/versions/{versionId}/code": {
         parameters: {
             query?: never;
@@ -716,6 +789,8 @@ export interface components {
         /**
          * @description A published assignment in a course. Description is the task statement as written in the source.
          *     DueAt is in UTC and null when the assignment has no due date. MaxPoints is null for ungraded work.
+         *     Materials are the files and links the teacher attached to the assignment, usually the instructions and grading
+         *     scheme (e.g. a PDF); the grader reads them.
          */
         AssignmentResponse: {
             id: string;
@@ -730,6 +805,7 @@ export interface components {
             /** Format: date-time */
             createdAt?: string | null;
             link?: string | null;
+            materials: components["schemas"]["SubmissionAttachment"][];
         };
         /**
          * @description What a submission attachment is.
@@ -823,6 +899,19 @@ export interface components {
             state: components["schemas"]["GoogleConnectionState"];
             grantedScopes: string[];
             message?: string | null;
+        };
+        /**
+         * @description The model's draft review of one stored version (Markdown: score per task, mistakes, short feedback). A draft for the
+         *     teacher, not saved yet. SentFiles lists everything the model was given (instructions and student files); SkippedFiles
+         *     lists what was left out and why, so the teacher can judge whether the review saw the whole submission.
+         */
+        GradingResponse: {
+            /** Format: uuid */
+            versionId: string;
+            model: string;
+            review: string;
+            sentFiles: string[];
+            skippedFiles: string[];
         };
         /** @description Result of a test call to the grading model. Reply is null and Error is set when the call failed. */
         ModelHealthResponse: {

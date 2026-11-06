@@ -90,6 +90,23 @@ export const useCodeFileText = (versionId: string, path: string | null) =>
     staleTime: Infinity, // a stored version's code never changes until it is re-extracted
   });
 
+// Sends one stored version to the model for a draft review. Costs tokens and can take a minute, so it only runs when
+// the teacher clicks; nothing is saved on the server yet.
+export const useGradeVersion = () =>
+  useMutation({
+    mutationFn: (versionId: string) =>
+      unwrap(api.POST("/versions/{versionId}/grade", { params: { path: { versionId } } })),
+  });
+
+// Downloads a stored file's bytes for viewers that lay the file out in the browser (Word documents).
+export const useStoredFileBlob = (fileId: string) =>
+  useQuery({
+    queryKey: ["stored-files", fileId],
+    queryFn: () =>
+      unwrap(api.GET("/stored-files/{contentId}", { params: { path: { contentId: fileId } }, parseAs: "blob" })),
+    staleTime: Infinity, // stored originals never change
+  });
+
 export const useGoogleStatus = () =>
   useQuery({ queryKey: ["google-status"], queryFn: () => unwrap(api.GET("/auth/google/status")) });
 

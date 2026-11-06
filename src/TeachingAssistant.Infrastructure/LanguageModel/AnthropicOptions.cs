@@ -15,4 +15,10 @@ public class AnthropicOptions
 
     /// <summary>Upper limit for one chat reply; chat answers are longer than the short internal prompts. Set in appsettings.json.</summary>
     public int ChatMaxTokens { get; set; } = 8192;
+
+    /// <summary>Model for grading: judging class design needs the strongest model, unlike chat. Set in appsettings.json.</summary>
+    public string GradingModel { get; set; } = "claude-opus-5-5";
+
+    /// <summary>Upper limit for one grading reply, including the model's thinking. Set in appsettings.json.</summary>
+    public int GradingMaxTokens { get; set; } = 16000;
 }

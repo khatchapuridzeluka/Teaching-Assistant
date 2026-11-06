@@ -14,6 +14,7 @@ export type StoredVersion = components["schemas"]["StoredVersionResponse"];
 export type StoredFile = components["schemas"]["StoredFileResponse"];
 
 export type CodeFile = components["schemas"]["CodeFileResponse"];
+export type GradingResult = components["schemas"]["GradingResponse"];
 export type ExtractionSummary = components["schemas"]["ExtractionSummary"];
 
 /** URL of one extracted file of a version; path comes from the version's code list. */

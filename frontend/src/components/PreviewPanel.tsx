@@ -2,7 +2,14 @@ import { type ReactNode, useEffect, useState } from "react";
 import { type StoredFile, type StoredSubmission, storedFileUrl } from "../api/client";
 import { formatDate } from "../format";
 import { CodeBrowser } from "./CodeBrowser";
+import { DocxPreview } from "./DocxPreview";
 import { Button, Chip, type ChipTone } from "./ui";
+
+const docxMimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+// By type or by extension: Drive sometimes reports a generic type (application/octet-stream) for uploaded files.
+const isPdf = (file: StoredFile) => file.mimeType === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+const isDocx = (file: StoredFile) => file.mimeType === docxMimeType || file.name.toLowerCase().endsWith(".docx");
 
 const versionChip: Record<string, { tone: ChipTone; label: string }> = {
   Ready: { tone: "tint", label: "All files stored" },
@@ -12,7 +19,7 @@ const versionChip: Record<string, { tone: ChipTone; label: string }> = {
 
 /**
  * Shows a stored submission from our own copy (not Google Drive): the extracted code in a viewer, images as a gallery,
- * PDFs (including exported Google Docs) inline, and everything else as a download.
+ * PDFs (including exported Google Docs) and Word documents (.docx) inline, and everything else as a download.
  */
 export function PreviewPanel({ submission, onClose }: { submission: StoredSubmission; onClose: () => void }) {
   const [versionId, setVersionId] = useState(submission.versions[0]?.id);
@@ -32,8 +39,9 @@ export function PreviewPanel({ submission, onClose }: { submission: StoredSubmis
 
   const stored = version.files.filter((f) => f.stored);
   const images = stored.filter((f) => f.kind === "Image");
-  const pdfs = stored.filter((f) => f.mimeType === "application/pdf");
-  const others = stored.filter((f) => !images.includes(f) && !pdfs.includes(f));
+  const pdfs = stored.filter((f) => !images.includes(f) && isPdf(f));
+  const docs = stored.filter((f) => !images.includes(f) && isDocx(f));
+  const others = stored.filter((f) => !images.includes(f) && !pdfs.includes(f) && !docs.includes(f));
   const notStored = version.files.filter((f) => !f.stored);
   const chip = versionChip[version.status];
 
@@ -98,6 +106,12 @@ export function PreviewPanel({ submission, onClose }: { submission: StoredSubmis
             {pdfs.map((file) => (
               <Section key={file.id} title={file.name} action={<DownloadLink file={file} />}>
                 <iframe src={storedFileUrl(file.id)} title={file.name} className="h-[640px] w-full rounded-[10px] border border-line bg-white" />
+              </Section>
+            ))}
+
+            {docs.map((file) => (
+              <Section key={file.id} title={file.name} action={<DownloadLink file={file} />}>
+                <DocxPreview file={file} />
               </Section>
             ))}
 
@@ -179,7 +193,7 @@ function describe(file: StoredFile, hasCode: boolean): string {
     case "SourceFile":
       return `Source file${size}${extracted && hasCode ? " · see Code above" : ""}`;
     case "Document":
-      return `Document${size} · inline preview coming`;
+      return `Document${size} · no inline preview for this format, download to open`;
     default:
       return `File${size}`;
   }

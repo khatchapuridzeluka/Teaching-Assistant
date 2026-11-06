@@ -29,4 +29,12 @@ public interface ILanguageModel
     /// <exception cref="Exceptions.LanguageModelUnavailableException">The model could not be reached or returned an error.</exception>
     Task<LanguageModelReply> ChatAsync(
         string systemPrompt, IReadOnlyList<ChatMessage> messages, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Grades work: sends one message made of the parts in order (text and files) to the grading model, which is
+    /// stronger and slower than the chat model, and returns its whole reply.
+    /// </summary>
+    /// <exception cref="Exceptions.LanguageModelUnavailableException">The model could not be reached, returned an error, or declined.</exception>
+    Task<LanguageModelReply> GradeAsync(
+        string systemPrompt, IReadOnlyList<PromptPart> parts, CancellationToken cancellationToken = default);
 }

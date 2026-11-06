@@ -75,7 +75,18 @@ public class GoogleClassroomSource : ISubmissionSource
 
     private static AssignmentResponse ToAssignment(CourseWork w) => new(
         w.Id, w.CourseId, w.Title, w.Description, w.WorkType, w.MaxPoints,
-        DueAt(w.DueDate, w.DueTime), w.CreationTimeDateTimeOffset, w.AlternateLink);
+        DueAt(w.DueDate, w.DueTime), w.CreationTimeDateTimeOffset, w.AlternateLink, Materials(w));
+
+    // The teacher's attachments on the assignment (instructions, grading scheme). Drive files are wrapped in a
+    // SharedDriveFile here, unlike student attachments.
+    private static List<SubmissionAttachment> Materials(CourseWork courseWork) =>
+        (courseWork.Materials ?? []).Select(m => m switch
+        {
+            { DriveFile.DriveFile: { } file } => new SubmissionAttachment(AttachmentKind.DriveFile, file.Title, file.AlternateLink, file.Id),
+            { Link: { } link } => new SubmissionAttachment(AttachmentKind.Link, link.Title ?? link.Url, link.Url, null),
+            _ => new SubmissionAttachment(AttachmentKind.Other,
+                m.YoutubeVideo?.Title ?? m.Form?.Title ?? "Unsupported material", null, null),
+        }).ToList();
 
     public async Task<IReadOnlyList<SubmissionResponse>> GetSubmissionsAsync(string courseId, string assignmentId, CancellationToken cancellationToken = default)
     {

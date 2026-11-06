@@ -59,5 +59,9 @@ public class ModelHealthServiceTests
         public Task<LanguageModelReply> ChatAsync(
             string systemPrompt, IReadOnlyList<ChatMessage> messages, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
+
+        public Task<LanguageModelReply> GradeAsync(
+            string systemPrompt, IReadOnlyList<PromptPart> parts, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 }

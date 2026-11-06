@@ -18,6 +18,11 @@ public interface ISubmissionStore
     /// <summary>Where a stored file is, by its content ID; null when there is no such content or it was not stored.</summary>
     Task<StoredFileLocation?> FindStoredFileAsync(Guid contentId, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// The submission that holds a version, with all versions and their contents loaded; null when there is no such version.
+    /// </summary>
+    Task<Submission?> FindByVersionAsync(Guid versionId, CancellationToken cancellationToken = default);
+
     /// <summary>A version's storage path by its ID; null when there is no such version.</summary>
     Task<string?> FindVersionPathAsync(Guid versionId, CancellationToken cancellationToken = default);
 

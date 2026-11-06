@@ -25,10 +25,10 @@ This project automates the drafting, not the deciding:
 | **Classroom ingestion** | Connects a teacher's Google account (read-only OAuth), lists courses, assignments and submissions, and fetches turned-in work into stored versions (snapshots); unchanged submissions are skipped | Listing ✅ · fetch & versions ✅ |
 | **Submission formats** | Zip/rar/7z archives of `.java` files, loose files, documents, images, or GitHub repository links | Drive files stored ✅ · zip/rar/7z/tar extraction ✅ · GitHub cloning planned |
 | **Sandboxed checks** | Compiles and runs student code in Docker (JDK 17–27), collecting compiler warnings, static analysis and test results before any AI judgment | Planned |
-| **Rubric grading** | Claude grades against a layered rubric: base rubric → per-assignment extensions → the teacher's policy rules | Planned |
+| **Rubric grading** | Claude grades against a layered rubric: base rubric → per-assignment extensions → the teacher's policy rules | First version ✅: "Grade with AI" sends one stored version (code, PDFs, images; Word .docx as text) with the assignment's instruction files from Classroom to Claude Opus 5.5 (`Anthropic:GradingModel`) and shows a Markdown draft review; reads the code only, not saved yet · structured scores, saving, base rubric and policy rules planned |
 | **Batch calibration** | Calibrates scores across the class and clusters common mistakes, so one explanation covers many students | Planned |
 | **Resubmissions** | Detects new versions, grades the diff, reports fixed / remaining / new mistakes; tracks initial and final scores | Planned |
-| **Teacher UI** | Courses, assignments with task statements, submissions table, "Fetch from Classroom", preview of stored submissions (extracted code in a read-only Monaco viewer, image gallery, PDFs and exported Google Docs inline, downloads), re-extraction, Google connection and model check | Initial version ✅ |
+| **Teacher UI** | Courses, assignments with task statements, submissions table, "Fetch from Classroom", preview of stored submissions (extracted code in a read-only Monaco viewer, image gallery, PDFs, exported Google Docs and Word .docx files inline, downloads), re-extraction, Google connection and model check | Initial version ✅ |
 | **Agent chat** | "Ask agent" panel on the right of every page: replies from Claude rendered as Markdown, knows which course/assignment page is open (names only, no student data); remembers the conversation, which is kept in the browser tab (sessionStorage) and sent with each question | Chat ✅ · tools (fetch, read code, grade) planned |
 | **Review dashboard** | Code viewer with inline mistake comments, score editing and approval | Planned |
 | **Student profiles** | Mistake history per student, repeated vs. fixed issues, progress over time | Planned |
@@ -70,6 +70,7 @@ src/
     Google/                              OAuth, Classroom adapter, Drive adapter (file metadata and download)
     Persistence/                         EF Core DbContext, entity mappings, migrations, submission store
     Storage/                             submission files on disk (versions written atomically), code extraction
+    Documents/                           reads the text of Word .docx files (instructions, reports) for the model
   TeachingAssistant.WebAPI/
     Controllers/                         HTTP endpoints
     Extensions/                          service registration
@@ -163,13 +164,14 @@ Open `http://localhost:5173`. The Vite dev server forwards `/api/*` to the API, 
 | `POST` | `/auth/google/connect` | Opens Google sign-in on the local machine and stores the authorization |
 | `POST` | `/auth/google/disconnect` | Revokes access at Google and deletes the stored token |
 | `GET` | `/courses` | Courses the teacher teaches in Google Classroom |
-| `GET` | `/courses/{courseId}/assignments` | Published assignments of a course, newest first, with the task statement and due date |
+| `GET` | `/courses/{courseId}/assignments` | Published assignments of a course, newest first, with the task statement, due date and materials (the teacher's attached instruction files and links) |
 | `GET` | `/courses/{courseId}/assignments/{assignmentId}/submissions` | Every student's submission: state, late flag, latest turn-in, attachments (Drive files and links) |
 | `POST` | `/courses/{courseId}/assignments/{assignmentId}/submissions/fetch` | Downloads and stores new or changed turned-in submissions as versions; returns a summary with problems |
 | `GET` | `/courses/{courseId}/assignments/{assignmentId}/submissions/stored` | Submissions stored by fetch, with all versions (newest first) and their files |
 | `POST` | `/courses/{courseId}/assignments/{assignmentId}/submissions/extract` | Rebuilds the extracted code of all stored versions from the stored originals (no download) |
 | `GET` | `/stored-files/{contentId}` | One stored file by ID, shown inline (images, PDF) or saved with `?download=true` |
 | `GET` | `/versions/{versionId}/code` | Files extracted from a stored version |
+| `POST` | `/versions/{versionId}/grade` | Sends a stored version and its assignment's instructions to Claude and returns a draft review (Markdown) with the files sent and skipped; not saved |
 | `GET` | `/versions/{versionId}/code/file?path=…` | One extracted file (source code as UTF-8 text); paths outside the version's code folder are refused |
 | `POST` | `/agent/chat` | Chat with the assistant: sends the conversation so far with the teacher's new message and returns the whole reply (Markdown); long histories are trimmed to the most recent messages |
 

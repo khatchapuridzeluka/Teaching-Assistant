@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useParams } from "react-router";
 import type { Attachment, ExtractionSummary, FetchSummary, StoredSubmission, Submission } from "../api/client";
-import { useAssignments, useFetchSubmissions, useReExtract, useStoredSubmissions, useSubmissions } from "../api/hooks";
+import { useAssignments, useFetchSubmissions, useGradeVersion, useReExtract, useStoredSubmissions, useSubmissions } from "../api/hooks";
+import { GradingPanel } from "../components/GradingPanel";
 import { PreviewPanel } from "../components/PreviewPanel";
 import { Avatar, Button, Card, CardHeader, Chip, type ChipTone, EmptyState, ErrorPanel, PageHeader, Spinner } from "../components/ui";
 import { formatDate, initials } from "../format";
@@ -15,6 +16,18 @@ export function AssignmentPage() {
   const fetch = useFetchSubmissions(courseId, assignmentId);
   const extract = useReExtract(courseId, assignmentId);
   const [previewing, setPreviewing] = useState<StoredSubmission | null>(null);
+  const grade = useGradeVersion();
+  const [grading, setGrading] = useState<{ submission: StoredSubmission; versionNumber: number } | null>(null);
+
+  // Grades the newest stored version. Started from the click (not from the panel), so it is sent exactly once.
+  function startGrading(stored: StoredSubmission) {
+    const latest = stored.versions[0];
+    if (!latest) {
+      return;
+    }
+    setGrading({ submission: stored, versionNumber: latest.number });
+    grade.mutate(latest.id);
+  }
 
   // Stored copies are matched to the live list by the Classroom submission ID.
   const storedById = new Map(stored.data?.map((s) => [s.externalSubmissionId, s]));
@@ -93,6 +106,8 @@ export function AssignmentPage() {
                     submission={submission}
                     stored={storedById.get(submission.id)}
                     onPreview={setPreviewing}
+                    onGrade={startGrading}
+                    gradingBusy={grade.isPending}
                   />
                 ))}
               </tbody>
@@ -102,6 +117,16 @@ export function AssignmentPage() {
       )}
 
       {previewing && <PreviewPanel submission={previewing} onClose={() => setPreviewing(null)} />}
+      {grading && (
+        <GradingPanel
+          submission={grading.submission}
+          versionNumber={grading.versionNumber}
+          pending={grade.isPending}
+          error={grade.error}
+          result={grade.data}
+          onClose={() => setGrading(null)}
+        />
+      )}
     </>
   );
 }
@@ -194,10 +219,14 @@ function SubmissionRow({
   submission,
   stored,
   onPreview,
+  onGrade,
+  gradingBusy,
 }: {
   submission: Submission;
   stored: StoredSubmission | undefined;
   onPreview: (stored: StoredSubmission) => void;
+  onGrade: (stored: StoredSubmission) => void;
+  gradingBusy: boolean;
 }) {
   const state = stateChip[submission.state] ?? { tone: "muted" as const, label: submission.state };
   const latest = stored?.versions[0];
@@ -234,6 +263,14 @@ function SubmissionRow({
           <div className="flex items-center gap-2 pt-0.5">
             <Button small variant="primary" onClick={() => onPreview(stored)}>
               Preview
+            </Button>
+            <Button
+              small
+              onClick={() => onGrade(stored)}
+              disabled={gradingBusy}
+              title="Send this version and the assignment's instructions to the AI for a draft review"
+            >
+              Grade with AI
             </Button>
             <span className="text-xs text-ink-muted">
               v{latest.number} · {latest.files.filter((f) => f.stored).length} files

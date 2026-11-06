@@ -7,6 +7,7 @@ using Serilog;
 using TeachingAssistant.Application.Interfaces;
 using TeachingAssistant.Application.Interfaces.Services;
 using TeachingAssistant.Application.Services;
+using TeachingAssistant.Infrastructure.Documents;
 using TeachingAssistant.Infrastructure.Google;
 using TeachingAssistant.Infrastructure.LanguageModel;
 using TeachingAssistant.Infrastructure.Persistence;
@@ -45,6 +46,7 @@ public static class ServiceCollectionExtensions
 
         services.Configure<StorageOptions>(configuration.GetSection(StorageOptions.SectionName));
         services.AddSingleton<ISnapshotStorage, FileSystemSnapshotStorage>();
+        services.AddSingleton<IDocumentReader, WordDocumentReader>();
 
         return services;
     }
@@ -98,6 +100,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ISubmissionFetchService, SubmissionFetchService>();
         services.AddScoped<IStoredSubmissionService, StoredSubmissionService>();
         services.AddScoped<IAgentChatService, AgentChatService>();
+        services.AddScoped<IGradingService, GradingService>();
 
         return services;
     }
