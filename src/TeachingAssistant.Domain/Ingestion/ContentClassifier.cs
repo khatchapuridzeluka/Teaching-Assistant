@@ -33,17 +33,47 @@ public static class ContentClassifier
     {
         var extension = Path.GetExtension(fileName);
 
-        if (ArchiveExtensions.Contains(extension)) return ContentKind.CodeArchive;
-        if (SourceExtensions.Contains(extension)) return ContentKind.SourceFile;
-        if (DocumentExtensions.Contains(extension)) return ContentKind.Document;
-        if (ImageExtensions.Contains(extension)) return ContentKind.Image;
+        if (ArchiveExtensions.Contains(extension))
+        {
+            return ContentKind.CodeArchive;
+        }
+
+        if (SourceExtensions.Contains(extension))
+        {
+            return ContentKind.SourceFile;
+        }
+
+        if (DocumentExtensions.Contains(extension))
+        {
+            return ContentKind.Document;
+        }
+
+        if (ImageExtensions.Contains(extension))
+        {
+            return ContentKind.Image;
+        }
 
         // No useful extension: fall back to the reported type.
-        if (mimeType is null) return ContentKind.Other;
-        if (ArchiveMimeTypes.Contains(mimeType)) return ContentKind.CodeArchive;
-        if (mimeType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)) return ContentKind.Image;
+        if (mimeType is null)
+        {
+            return ContentKind.Other;
+        }
+
+        if (ArchiveMimeTypes.Contains(mimeType))
+        {
+            return ContentKind.CodeArchive;
+        }
+
+        if (mimeType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+        {
+            return ContentKind.Image;
+        }
+
         if (mimeType.Equals("application/pdf", StringComparison.OrdinalIgnoreCase)
-            || mimeType.StartsWith("text/", StringComparison.OrdinalIgnoreCase)) return ContentKind.Document;
+            || mimeType.StartsWith("text/", StringComparison.OrdinalIgnoreCase))
+        {
+            return ContentKind.Document;
+        }
 
         return ContentKind.Other;
     }

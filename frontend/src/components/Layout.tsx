@@ -43,8 +43,12 @@ function usePageDescription(): string | null {
   const course = useCourses().data?.find((c) => c.id === courseId);
   const assignment = useAssignments(courseId).data?.find((a) => a.id === assignmentId);
 
-  if (assignment && course) return `Assignment '${assignment.title}' in course '${course.name}'`;
-  if (course) return `Course '${course.name}' (list of assignments)`;
+  if (assignment && course) {
+    return `Assignment '${assignment.title}' in course '${course.name}'`;
+  }
+  if (course) {
+    return `Course '${course.name}' (list of assignments)`;
+  }
   return null;
 }
 

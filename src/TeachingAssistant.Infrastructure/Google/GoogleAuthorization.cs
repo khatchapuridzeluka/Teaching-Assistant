@@ -72,11 +72,15 @@ public class GoogleAuthorization
     public async Task<UserCredential> GetCredentialAsync(CancellationToken cancellationToken)
     {
         if (_credential is { } cached)
+        {
             return cached;
+        }
 
         if (!TryGetFlow(out var flow))
+        {
             throw new SubmissionSourceNotConnectedException(
                 "Google:ClientId and Google:ClientSecret are not set. Add them with dotnet user-secrets.");
+        }
 
         var token = await flow.LoadTokenAsync(UserKey, cancellationToken)
             ?? throw new SubmissionSourceNotConnectedException(

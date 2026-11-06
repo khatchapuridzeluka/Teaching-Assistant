@@ -1,0 +1,10 @@
+<Project>
+
+    <!-- Applies to every project in the repository. -->
+    <PropertyGroup>
+        <!-- dotnet build reports the code-style rules from .editorconfig (e.g. braces, IDE0011) as warnings,
+             not only the IDE. -->
+        <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    </PropertyGroup>
+
+</Project>

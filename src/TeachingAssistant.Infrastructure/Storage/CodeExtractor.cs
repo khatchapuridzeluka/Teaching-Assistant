@@ -80,7 +80,9 @@ public static class CodeExtractor
 
         var hash = ComputeHash(codeDirectory, out var fileCount);
         if (fileCount == 0 && codeFiles.Count > 0 && problems.Count == 0)
+        {
             problems.Add("No code files were found in the submitted archives.");
+        }
 
         return new CodeExtraction(hash, fileCount, extracted, problems);
     }
@@ -104,18 +106,27 @@ public static class CodeExtractor
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (entry.IsDirectory)
+            {
                 continue;
+            }
+
             if (entry.IsEncrypted)
+            {
                 throw new InvalidDataException("the archive is password-protected.");
+            }
 
             // A single-file .gz has no name inside; use the archive's own name without .gz.
             var relative = SafeRelativePath(entry.Key ?? Path.GetFileNameWithoutExtension(archivePath));
             if (relative is null || IsJunk(relative))
+            {
                 continue;
+            }
 
             var destination = Path.GetFullPath(Path.Combine(root, relative));
             if (!destination.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            {
                 continue; // would land outside the folder ("zip slip")
+            }
 
             using var input = entry.OpenEntryStream();
             WriteFile(input, destination, budget);
@@ -159,7 +170,10 @@ public static class CodeExtractor
         {
             written += read;
             if (written > MaxFileBytes)
+            {
                 throw new InvalidDataException($"a file is larger than {MaxFileBytes / 1024 / 1024} MB.");
+            }
+
             budget.AddBytes(read);
             output.Write(buffer, 0, read);
         }
@@ -172,7 +186,10 @@ public static class CodeExtractor
             .Where(s => s != ".")
             .ToList();
         if (segments.Count == 0 || segments.Contains(".."))
+        {
             return null;
+        }
+
         return Path.Combine(segments.Select(SafeSegment).ToArray());
     }
 
@@ -229,14 +246,20 @@ public static class CodeExtractor
         public void RollBackTo(int checkpoint)
         {
             foreach (var path in _written[checkpoint..])
+            {
                 File.Delete(path);
+            }
+
             _written.RemoveRange(checkpoint, _written.Count - checkpoint);
         }
 
         public void AddFile(string path)
         {
             if (_written.Count >= MaxFiles)
+            {
                 throw new InvalidDataException($"it contains more than {MaxFiles} files.");
+            }
+
             _written.Add(path);
         }
 
@@ -244,7 +267,9 @@ public static class CodeExtractor
         {
             _bytes += count;
             if (_bytes > MaxTotalBytes)
+            {
                 throw new InvalidDataException($"its contents are larger than {MaxTotalBytes / 1024 / 1024} MB.");
+            }
         }
     }
 }

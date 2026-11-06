@@ -30,7 +30,9 @@ public class ApplicationExceptionHandler : IExceptionHandler
         };
 
         if (mapped is null)
+        {
             return false;
+        }
 
         httpContext.Response.StatusCode = mapped.Value.Status;
         return await _problemDetailsService.TryWriteAsync(new ProblemDetailsContext

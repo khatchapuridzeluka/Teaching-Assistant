@@ -52,6 +52,8 @@ This project automates the drafting, not the deciding:
 ```
 TeachingAssistant.WebAPI.sln
 global.json                              test runner configuration (Microsoft Testing Platform)
+.editorconfig                            C# code-style rules (e.g. braces on every if/for), checked by the IDE and the build
+Directory.Build.props                    settings for every project (code-style checks during dotnet build)
 dotnet-tools.json                        local tools (dotnet-ef)
 docker-compose.yml                       local Postgres
 src/

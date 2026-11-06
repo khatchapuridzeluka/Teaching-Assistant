@@ -20,7 +20,7 @@ public class AgentController : ControllerBase
     /// Sends the teacher's message (with the conversation so far) to the assistant and returns its whole reply.
     /// </summary>
     /// <response code="200">The assistant's reply (Markdown)</response>
-    /// <response code="400">Invalid conversation (empty, or not ending with the teacher's message)</response>
+    /// <response code="400">Invalid conversation: not ending with the teacher's message, or that message empty or over 8,000 characters</response>
     /// <response code="503">Model unreachable or returned an error</response>
     [HttpPost("chat")]
     public async Task<ActionResult<ChatResponse>> ChatAsync(ChatRequest request, CancellationToken cancellationToken)

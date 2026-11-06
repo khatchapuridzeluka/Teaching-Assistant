@@ -41,7 +41,9 @@ public class FileSystemSnapshotStorage(IOptions<StorageOptions> options) : ISnap
 
         // The arguments come from our database, but check anyway: never serve anything outside the storage root.
         if (!path.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) || !File.Exists(path))
+        {
             return null;
+        }
 
         return new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 81920, useAsync: true);
     }
@@ -58,14 +60,19 @@ public class FileSystemSnapshotStorage(IOptions<StorageOptions> options) : ISnap
             // Build the new code/ beside the old one and swap at the end, so a failure leaves the old code in place.
             var result = CodeExtractor.Extract(Path.Combine(versionDirectory, OriginalFolder), staging, files, cancellationToken);
             if (Directory.Exists(codeDirectory))
+            {
                 Directory.Delete(codeDirectory, recursive: true);
+            }
+
             Directory.Move(staging, codeDirectory);
             return Task.FromResult(result);
         }
         finally
         {
             if (Directory.Exists(staging))
+            {
                 Directory.Delete(staging, recursive: true);
+            }
         }
     }
 
@@ -79,7 +86,9 @@ public class FileSystemSnapshotStorage(IOptions<StorageOptions> options) : ISnap
 
         // relativePath comes from the browser: only ever serve files inside this version's code/ folder.
         if (!path.StartsWith(codeDirectory + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) || !File.Exists(path))
+        {
             return null;
+        }
 
         return new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 81920, useAsync: true);
     }
@@ -95,7 +104,9 @@ public class FileSystemSnapshotStorage(IOptions<StorageOptions> options) : ISnap
             .Trim().Trim('.');
 
         if (cleaned.Length > 120)
+        {
             cleaned = cleaned[..(120 - Path.GetExtension(cleaned).Length)] + Path.GetExtension(cleaned);
+        }
 
         return cleaned.Length == 0 ? "unnamed" : cleaned;
     }
@@ -124,7 +135,9 @@ public class FileSystemSnapshotStorage(IOptions<StorageOptions> options) : ISnap
             // A folder already at the final path is left over from a fetch whose database save failed
             // (no version row points to it), so it is safe to replace.
             if (Directory.Exists(finalPath))
+            {
                 Directory.Delete(finalPath, recursive: true);
+            }
 
             Directory.CreateDirectory(Path.GetDirectoryName(finalPath)!);
             Directory.Move(tempPath, finalPath);
@@ -135,7 +148,10 @@ public class FileSystemSnapshotStorage(IOptions<StorageOptions> options) : ISnap
         public ValueTask DisposeAsync()
         {
             if (!_committed && Directory.Exists(tempPath))
+            {
                 Directory.Delete(tempPath, recursive: true);
+            }
+
             return ValueTask.CompletedTask;
         }
 
@@ -147,7 +163,10 @@ public class FileSystemSnapshotStorage(IOptions<StorageOptions> options) : ISnap
             {
                 var candidate = name;
                 for (var i = 2; !_names.Add(candidate); i++)
+                {
                     candidate = $"{Path.GetFileNameWithoutExtension(name)} ({i}){Path.GetExtension(name)}";
+                }
+
                 return candidate;
             }
         }

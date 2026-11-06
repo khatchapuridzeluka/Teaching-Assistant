@@ -157,7 +157,9 @@ public class GoogleClassroomSource : ISubmissionSource
     {
         var credential = await _authorization.GetCredentialAsync(cancellationToken);
         if (_client is { } client && ReferenceEquals(client.Credential, credential))
+        {
             return client.Service;
+        }
 
         var service = new ClassroomService(new BaseClientService.Initializer
         {

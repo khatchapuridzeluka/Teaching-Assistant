@@ -25,7 +25,9 @@ public class StoredFilesController : ControllerBase
     {
         var file = await _storedService.OpenFileAsync(contentId, cancellationToken);
         if (file is null)
+        {
             return NotFound();
+        }
 
         return download
             ? File(file.Content, file.ContentType, file.FileName, enableRangeProcessing: true)

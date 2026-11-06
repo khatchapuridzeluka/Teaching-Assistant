@@ -70,8 +70,12 @@ public class VersionContent
     internal void SetExtracted(bool extracted)
     {
         if (extracted)
+        {
             Status = ContentStatus.Extracted;
+        }
         else if (Status == ContentStatus.Extracted)
+        {
             Status = ContentStatus.Stored;
+        }
     }
 }

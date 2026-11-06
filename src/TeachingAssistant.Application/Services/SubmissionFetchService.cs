@@ -77,7 +77,9 @@ public class SubmissionFetchService : ISubmissionFetchService
         {
             problems.AddRange(result.Problems);
             if (result.Submission is not { } submission)
+            {
                 continue; // skipped; the reason is in the problems
+            }
 
             submission.UpdateStudentName(result.Item.StudentName);
 
@@ -128,7 +130,9 @@ public class SubmissionFetchService : ISubmissionFetchService
 
         var current = await DescribeAsync(item, problems, cancellationToken);
         if (current is null)
+        {
             return StudentResult.Skipped(item, problems); // attachments could not be read; retried on the next fetch
+        }
 
         if (current.Count == 0)
         {
@@ -143,7 +147,9 @@ public class SubmissionFetchService : ISubmissionFetchService
             _timeProvider.GetUtcNow());
 
         if (!submission.HasChanged(current.Select(c => c.Fingerprint)))
+        {
             return new StudentResult(item, submission, existing is null, null, problems);
+        }
 
         var version = await TryStoreFilesAsync(submission, item, current, problems, cancellationToken);
         return version is null
@@ -160,7 +166,9 @@ public class SubmissionFetchService : ISubmissionFetchService
 
         problems.AddRange(described.Select(d => d.Problem).OfType<FetchProblem>());
         if (described.Any(d => d.Failed))
+        {
             return null;
+        }
 
         // Task.WhenAll keeps the input order, so contents stay in the order the student attached them.
         return described.Select(d => d.Content).OfType<CurrentContent>().ToList();
@@ -236,7 +244,10 @@ public class SubmissionFetchService : ISubmissionFetchService
             : VersionStatus.Failed;
         var detail = notStored.Count == 0 ? null : string.Join(" ", notStored);
         if (detail is not null)
+        {
             problems.Add(new FetchProblem(item.StudentName, detail));
+        }
+
         problems.AddRange(extraction.Problems.Select(p => new FetchProblem(item.StudentName, p)));
 
         return new PreparedVersion(status, detail, writer.RelativePath, _timeProvider.GetUtcNow(), contents, extraction);

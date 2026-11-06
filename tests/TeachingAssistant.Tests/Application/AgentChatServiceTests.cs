@@ -49,6 +49,81 @@ public class AgentChatServiceTests
         Assert.Equal("latest", _model.Messages[^1].Text);
     }
 
+    [Theory]
+    [InlineData(false)] // whitespace only
+    [InlineData(true)] // one character over the limit
+    public async Task Reply_RejectsAnEmptyOrTooLongNewMessage(bool tooLong)
+    {
+        var service = new AgentChatService(_model);
+        var text = tooLong ? new string('x', 8_001) : "   ";
+        var request = new ChatRequest(
+        [
+            new ChatMessage(ChatRole.User, "earlier question"),
+            new ChatMessage(ChatRole.Assistant, "earlier answer"),
+            new ChatMessage(ChatRole.User, text),
+        ], null);
+
+        await Assert.ThrowsAsync<InvalidRequestException>(() => service.ReplyAsync(request, TestContext.Current.CancellationToken));
+        Assert.Null(_model.Messages);
+    }
+
+    [Fact]
+    public async Task Reply_DropsEmptyEarlierMessages_InsteadOfFailing()
+    {
+        var service = new AgentChatService(_model);
+        var request = new ChatRequest(
+        [
+            new ChatMessage(ChatRole.User, "first"),
+            new ChatMessage(ChatRole.Assistant, ""),
+            new ChatMessage(ChatRole.User, "second"),
+        ], null);
+
+        await service.ReplyAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.Equal(["first", "second"], _model.Messages!.Select(m => m.Text));
+    }
+
+    [Fact]
+    public async Task Reply_KeepsALongEarlierReply()
+    {
+        var service = new AgentChatService(_model);
+        var longReply = new string('x', 30_000); // a long model answer, far over the new-message limit
+        var request = new ChatRequest(
+        [
+            new ChatMessage(ChatRole.User, "draft a rubric"),
+            new ChatMessage(ChatRole.Assistant, longReply),
+            new ChatMessage(ChatRole.User, "shorter please"),
+        ], null);
+
+        await service.ReplyAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.Equal(3, _model.Messages!.Count);
+        Assert.Equal(longReply, _model.Messages[1].Text);
+    }
+
+    [Fact]
+    public async Task Reply_DropsTheOldestMessagesBeyondTheLengthBudget()
+    {
+        var service = new AgentChatService(_model);
+        // Two of these plus "recent question" fill the 120,000-character budget almost exactly.
+        var big = new string('x', 59_990);
+        var request = new ChatRequest(
+        [
+            new ChatMessage(ChatRole.User, "oldest question"),
+            new ChatMessage(ChatRole.Assistant, big),
+            new ChatMessage(ChatRole.User, "middle question"),
+            new ChatMessage(ChatRole.Assistant, big),
+            new ChatMessage(ChatRole.User, "recent question"),
+            new ChatMessage(ChatRole.Assistant, big),
+            new ChatMessage(ChatRole.User, "latest"),
+        ], null);
+
+        await service.ReplyAsync(request, TestContext.Current.CancellationToken);
+
+        // "middle question" no longer fits, which would leave a reply first; it is dropped so the chat starts with the teacher.
+        Assert.Equal(["recent question", big, "latest"], _model.Messages!.Select(m => m.Text));
+    }
+
     private sealed class RecordingModel : ILanguageModel
     {
         public string? System { get; private set; }

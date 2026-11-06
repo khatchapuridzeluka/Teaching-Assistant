@@ -26,17 +26,23 @@ public class GoogleConnectionService : IGoogleConnectionService
     public async Task<GoogleConnectionStatus> GetStatusAsync(CancellationToken cancellationToken = default)
     {
         if (!_authorization.TryGetFlow(out var flow))
+        {
             return NotConfigured();
+        }
 
         var token = await flow.LoadTokenAsync(GoogleAuthorization.UserKey, cancellationToken);
         if (token is null)
+        {
             return new GoogleConnectionStatus(GoogleConnectionState.NotConnected, [], "Not connected. Call POST /auth/google/connect.");
+        }
 
         var granted = GrantedScopes(token);
         var missing = GoogleAuthorization.Scopes.Except(granted).ToList();
         if (missing.Count > 0)
+        {
             return new GoogleConnectionStatus(GoogleConnectionState.ReconnectRequired, granted,
                 $"Missing scopes: {string.Join(", ", missing)}. Connect again and allow all requested access.");
+        }
 
         // A stored token can be dead (refresh tokens expire after ~7 days in Testing mode), so prove it works.
         try
@@ -57,7 +63,9 @@ public class GoogleConnectionService : IGoogleConnectionService
     {
         var status = await GetStatusAsync(cancellationToken);
         if (status.State is GoogleConnectionState.NotConfigured or GoogleConnectionState.Connected)
+        {
             return status;
+        }
 
         // The broker reuses any stored token without checking it, so drop a dead one first.
         await _authorization.TokenStore.DeleteAsync<TokenResponse>(GoogleAuthorization.UserKey);
@@ -91,11 +99,15 @@ public class GoogleConnectionService : IGoogleConnectionService
     public async Task DisconnectAsync(CancellationToken cancellationToken = default)
     {
         if (!_authorization.TryGetFlow(out var flow))
+        {
             return;
+        }
 
         var token = await flow.LoadTokenAsync(GoogleAuthorization.UserKey, cancellationToken);
         if (token is null)
+        {
             return;
+        }
 
         try
         {

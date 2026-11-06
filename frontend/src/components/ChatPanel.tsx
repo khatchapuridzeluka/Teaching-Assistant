@@ -30,7 +30,9 @@ export function ChatPanel({ page, onClose }: { page: string | null; onClose: () 
 
   async function send(text: string) {
     const question = text.trim();
-    if (!question || waiting) return;
+    if (!question || waiting) {
+      return;
+    }
 
     const prompt = { role: "User" as const, text: question };
     setTurns((current) => [...current, prompt]);

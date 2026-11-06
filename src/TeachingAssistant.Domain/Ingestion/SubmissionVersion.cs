@@ -67,6 +67,8 @@ public class SubmissionVersion
 
         var extracted = extractedStoredNames.ToHashSet();
         foreach (var content in _contents)
+        {
             content.SetExtracted(content.StoredName is not null && extracted.Contains(content.StoredName));
+        }
     }
 }

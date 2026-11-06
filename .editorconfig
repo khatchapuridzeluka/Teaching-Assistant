@@ -1,0 +1,13 @@
+root = true
+
+# Coding rules for the .NET projects. Rider, Visual Studio and `dotnet build` all read this file
+# (the build checks style rules because Directory.Build.props sets EnforceCodeStyleInBuild).
+
+[*.cs]
+# Every if/else/for/foreach/while/using/lock body uses braces, even a single line (see CLAUDE.md, "Braces").
+csharp_prefer_braces = true:warning
+dotnet_diagnostic.IDE0011.severity = warning
+
+# EF Core migrations are generated; leave them as the tool writes them.
+[**/Migrations/*.cs]
+dotnet_diagnostic.IDE0011.severity = none

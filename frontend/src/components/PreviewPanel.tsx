@@ -26,7 +26,9 @@ export function PreviewPanel({ submission, onClose }: { submission: StoredSubmis
     return () => window.removeEventListener("keydown", onKey);
   }, [enlarged, onClose]);
 
-  if (!version) return null;
+  if (!version) {
+    return null;
+  }
 
   const stored = version.files.filter((f) => f.stored);
   const images = stored.filter((f) => f.kind === "Image");

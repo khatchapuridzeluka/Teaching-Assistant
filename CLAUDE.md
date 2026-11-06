@@ -121,6 +121,24 @@ public async Task<ActionResult<AssignmentDto>> GetByIdAsync(Guid id)
 }
 ```
 
+### Braces
+
+Every `if`, `else`, `for`, `foreach`, `while`, `do`, `using` and `lock` body uses braces `{ }`, even when it is a single line — in C# and in the frontend's TypeScript alike. Never write a one-line body without them:
+
+```csharp
+// Wrong
+if (request.Messages.Count == 0)
+    throw new InvalidRequestException("...");
+
+// Right
+if (request.Messages.Count == 0)
+{
+    throw new InvalidRequestException("...");
+}
+```
+
+Generated code (EF Core migrations, `schema.d.ts`) is left as generated. For C# the rule is enforced: `.editorconfig` sets IDE0011 and `Directory.Build.props` turns on `EnforceCodeStyleInBuild`, so `dotnet build` warns about a missing brace. `dotnet format style --diagnostics IDE0011` fixes them automatically. TypeScript has no linter yet, so check it by hand.
+
 ## README
 
 When a change affects anything `README.md` describes (features and their status, stack, project structure, setup steps, configuration, API endpoints, security notes), update `README.md` in the same change.

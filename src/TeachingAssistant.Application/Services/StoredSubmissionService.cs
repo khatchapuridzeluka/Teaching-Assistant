@@ -43,7 +43,9 @@ public class StoredSubmissionService : IStoredSubmissionService
     {
         var location = await _store.FindStoredFileAsync(contentId, cancellationToken);
         if (location is null)
+        {
             return null;
+        }
 
         var stream = _storage.OpenOriginal(location.VersionPath, location.StoredName);
         return stream is null
@@ -58,21 +60,26 @@ public class StoredSubmissionService : IStoredSubmissionService
         int versions = 0, withCode = 0;
 
         foreach (var submission in submissions)
-        foreach (var version in submission.Versions)
         {
-            var files = version.Contents
-                .Where(c => c.StoredName is not null)
-                .Select(c => new ExtractableFile(c.StoredName!, c.Kind))
-                .ToList();
+            foreach (var version in submission.Versions)
+            {
+                var files = version.Contents
+                    .Where(c => c.StoredName is not null)
+                    .Select(c => new ExtractableFile(c.StoredName!, c.Kind))
+                    .ToList();
 
-            var extraction = await _storage.ReExtractAsync(version.StoragePath, files, cancellationToken);
-            version.RecordExtraction(extraction.ContentHash, extraction.ExtractedStoredNames,
-                SubmissionFetchService.ExtractionDetail(extraction));
+                var extraction = await _storage.ReExtractAsync(version.StoragePath, files, cancellationToken);
+                version.RecordExtraction(extraction.ContentHash, extraction.ExtractedStoredNames,
+                    SubmissionFetchService.ExtractionDetail(extraction));
 
-            versions++;
-            if (extraction.ContentHash is not null)
-                withCode++;
-            problems.AddRange(extraction.Problems.Select(p => new FetchProblem(submission.StudentName, $"v{version.Number}: {p}")));
+                versions++;
+                if (extraction.ContentHash is not null)
+                {
+                    withCode++;
+                }
+
+                problems.AddRange(extraction.Problems.Select(p => new FetchProblem(submission.StudentName, $"v{version.Number}: {p}")));
+            }
         }
 
         await _store.SaveChangesAsync(cancellationToken);

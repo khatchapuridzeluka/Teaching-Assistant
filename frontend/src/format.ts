@@ -1,6 +1,8 @@
 // Dates come from the API in UTC; show them in the teacher's local time.
 export function formatDate(value: string | null | undefined): string {
-  if (!value) return "–";
+  if (!value) {
+    return "–";
+  }
   return new Date(value).toLocaleString(undefined, {
     month: "short",
     day: "numeric",

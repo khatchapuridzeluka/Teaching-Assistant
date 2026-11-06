@@ -222,7 +222,10 @@ public class SubmissionFetchServiceTests
         public async Task DownloadAsync(RemoteFile file, Stream destination, CancellationToken cancellationToken = default)
         {
             if (FailDownloads)
+            {
                 throw new SubmissionSourceUnavailableException("Google Drive returned 500.");
+            }
+
             Interlocked.Increment(ref _downloads); // students are fetched in parallel
             await destination.WriteAsync("abc"u8.ToArray(), cancellationToken);
         }
@@ -269,7 +272,10 @@ public class SubmissionFetchServiceTests
             {
                 await write(new MemoryStream());
                 lock (_files) // a version's files are downloaded in parallel
+                {
                     _files.Add(fileName);
+                }
+
                 return fileName;
             }
 
@@ -283,7 +289,10 @@ public class SubmissionFetchServiceTests
             public ValueTask DisposeAsync()
             {
                 if (!_committed)
+                {
                     Interlocked.Increment(ref storage._discarded);
+                }
+
                 return ValueTask.CompletedTask;
             }
         }

@@ -55,7 +55,9 @@ public class GoogleDriveFileSource : IRemoteFileSource
     public async Task DownloadAsync(RemoteFile file, Stream destination, CancellationToken cancellationToken = default)
     {
         if (!file.IsDownloadable)
+        {
             throw new InvalidOperationException($"'{file.Name}' ({file.MimeType}) has no content to download.");
+        }
 
         var drive = await GetDriveAsync(cancellationToken);
 
@@ -67,8 +69,10 @@ public class GoogleDriveFileSource : IRemoteFileSource
 
             // Downloads report failure in the result instead of throwing; rethrow so it is translated like any Google error.
             if (progress.Status == DownloadStatus.Failed)
+            {
                 ExceptionDispatchInfo.Throw(progress.Exception
                     ?? new HttpRequestException($"Download of '{file.Name}' failed after {progress.BytesDownloaded} bytes."));
+            }
 
             return progress;
         });
@@ -106,7 +110,9 @@ public class GoogleDriveFileSource : IRemoteFileSource
     {
         var credential = await _authorization.GetCredentialAsync(cancellationToken);
         if (_client is { } client && ReferenceEquals(client.Credential, credential))
+        {
             return client.Service;
+        }
 
         var service = new DriveService(new BaseClientService.Initializer
         {

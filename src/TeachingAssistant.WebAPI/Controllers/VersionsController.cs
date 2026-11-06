@@ -45,7 +45,9 @@ public class VersionsController : ControllerBase
     {
         var stream = await _storedService.OpenCodeFileAsync(versionId, path, cancellationToken);
         if (stream is null)
+        {
             return NotFound();
+        }
 
         return File(stream, ContentTypeFor(path));
     }

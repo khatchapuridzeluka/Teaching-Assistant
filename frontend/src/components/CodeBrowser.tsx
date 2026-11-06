@@ -21,16 +21,26 @@ export function CodeBrowser({ versionId }: { versionId: string }) {
 
   // Open the most likely entry point first: Main.java, else the first source file.
   useEffect(() => {
-    if (!files.data || files.data.length === 0) return;
-    if (selected && files.data.some((f) => f.path === selected)) return;
+    if (!files.data || files.data.length === 0) {
+      return;
+    }
+    if (selected && files.data.some((f) => f.path === selected)) {
+      return;
+    }
     const main = files.data.find((f) => /(^|\/)main\.java$/i.test(f.path));
     const source = files.data.find((f) => languages[extension(f.path)] && extension(f.path) !== "txt");
     setSelected((main ?? source ?? files.data[0]!).path);
   }, [files.data, selected]);
 
-  if (files.isLoading) return <Spinner label="Loading code…" />;
-  if (files.isError) return <ErrorPanel error={files.error} />;
-  if (!files.data || files.data.length === 0) return <div className="text-ink-muted">No code was extracted for this version.</div>;
+  if (files.isLoading) {
+    return <Spinner label="Loading code…" />;
+  }
+  if (files.isError) {
+    return <ErrorPanel error={files.error} />;
+  }
+  if (!files.data || files.data.length === 0) {
+    return <div className="text-ink-muted">No code was extracted for this version.</div>;
+  }
 
   return (
     <div className="flex h-[560px] overflow-hidden rounded-[10px] border border-line bg-white">
