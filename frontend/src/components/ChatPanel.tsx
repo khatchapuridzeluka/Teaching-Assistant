@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { type ChatMessage, sendChat } from "../api/chat";
+import { sendChat } from "../api/chat";
 import { Button } from "./ui";
+import { useChatHistory } from "./useChatHistory";
 
 const suggestions = [
   "Draft rubric criteria for a Strategy pattern assignment",
@@ -10,14 +11,13 @@ const suggestions = [
   "Write short feedback for a student who made all fields public",
 ];
 
-type Turn = ChatMessage & { error?: boolean };
-
 /**
- * The "Ask agent" chat docked on the right. Each question is sent on its own (no conversation memory yet), together
- * with the page you are on. The panel keeps showing earlier messages while you move between pages. No tools yet.
+ * The "Ask agent" chat docked on the right. Each question is sent with the conversation so far and the page you are on,
+ * so the agent remembers earlier messages. The conversation lasts until "New chat" or until the tab is closed
+ * (see useChatHistory). No tools yet.
  */
 export function ChatPanel({ page, onClose }: { page: string | null; onClose: () => void }) {
-  const [turns, setTurns] = useState<Turn[]>([]);
+  const { turns, add, clear } = useChatHistory();
   const [input, setInput] = useState("");
   const [waiting, setWaiting] = useState(false);
   const abort = useRef<AbortController | null>(null);
@@ -35,19 +35,21 @@ export function ChatPanel({ page, onClose }: { page: string | null; onClose: () 
     }
 
     const prompt = { role: "User" as const, text: question };
-    setTurns((current) => [...current, prompt]);
+    // Everything said so far, without error notices: those are messages from the app, not from the agent.
+    // The API trims a long history itself, so the whole conversation is sent.
+    const history = turns.filter((turn) => !turn.error).map(({ role, text }) => ({ role, text }));
+    add(prompt);
     setInput("");
     setWaiting(true);
     abort.current = new AbortController();
 
     try {
-      // Only the new question is sent: the model has no memory of earlier messages yet. The panel still shows them.
-      const reply = await sendChat({ messages: [prompt], page }, abort.current.signal);
-      setTurns((current) => [...current, { role: "Assistant", text: reply }]);
+      const reply = await sendChat({ messages: [...history, prompt], page }, abort.current.signal);
+      add({ role: "Assistant", text: reply });
     } catch (error) {
       const stopped = error instanceof DOMException && error.name === "AbortError";
       const message = stopped ? "Stopped." : error instanceof Error ? error.message : "Something went wrong.";
-      setTurns((current) => [...current, { role: "Assistant", text: message, error: true }]);
+      add({ role: "Assistant", text: message, error: true });
     } finally {
       setWaiting(false);
       abort.current = null;
@@ -62,7 +64,7 @@ export function ChatPanel({ page, onClose }: { page: string | null; onClose: () 
           <div className="truncate text-[11px] text-ink-muted">{page ?? "General question"}</div>
         </div>
         <div className="flex shrink-0 gap-1.5">
-          <Button small onClick={() => setTurns([])} disabled={waiting || turns.length === 0}>New chat</Button>
+          <Button small onClick={clear} disabled={waiting || turns.length === 0}>New chat</Button>
           <Button small onClick={onClose}>Close</Button>
         </div>
       </header>
@@ -147,7 +149,7 @@ export function ChatPanel({ page, onClose }: { page: string | null; onClose: () 
           </div>
         </div>
         <div className="mt-1.5 text-[11px] text-ink-muted">
-          Enter to send · Shift+Enter for a new line. Each question is answered on its own: the agent does not remember earlier messages yet.
+          Enter to send · Shift+Enter for a new line. The agent remembers this conversation until New chat or until you close the tab.
         </div>
       </form>
     </aside>

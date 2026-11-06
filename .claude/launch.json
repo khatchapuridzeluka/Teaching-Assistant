@@ -2,6 +2,13 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "api",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "src/TeachingAssistant.WebAPI", "--launch-profile", "http"],
+      "port": 5288,
+      "url": "http://localhost:5288"
+    },
+    {
       "name": "frontend",
       "runtimeExecutable": "C:\\Program Files\\nodejs\\npm.cmd",
       "runtimeArgs": ["--prefix", "frontend", "run", "dev"],
