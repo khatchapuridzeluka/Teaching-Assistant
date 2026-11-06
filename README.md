@@ -29,6 +29,7 @@ This project automates the drafting, not the deciding:
 | **Batch calibration** | Calibrates scores across the class and clusters common mistakes, so one explanation covers many students | Planned |
 | **Resubmissions** | Detects new versions, grades the diff, reports fixed / remaining / new mistakes; tracks initial and final scores | Planned |
 | **Teacher UI** | Courses, assignments with task statements, submissions table, "Fetch from Classroom", preview of stored submissions (extracted code in a read-only Monaco viewer, image gallery, PDFs and exported Google Docs inline, downloads), re-extraction, Google connection and model check | Initial version ✅ |
+| **Agent chat** | "Ask agent" panel on the right of every page: replies from Claude rendered as Markdown, knows which course/assignment page is open (names only, no student data) | Chat ✅ · tools (fetch, read code, grade) planned |
 | **Review dashboard** | Code viewer with inline mistake comments, score editing and approval | Planned |
 | **Student profiles** | Mistake history per student, repeated vs. fixed issues, progress over time | Planned |
 
@@ -148,7 +149,7 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5173`. The Vite dev server forwards `/api/*` to the API, so no CORS setup is needed. After changing API contracts, regenerate the TypeScript types with `npm run gen:api` (the API must be running).
+Open `http://localhost:5173`. The Vite dev server forwards `/api/*` to the API, so no CORS setup is needed. After changing API contracts, regenerate the TypeScript types with `npm run gen:api` (the API must be running). To point the dev server at an API on another port, set `API_URL` (e.g. `API_URL=http://localhost:5299`).
 
 ## API
 
@@ -168,6 +169,7 @@ Open `http://localhost:5173`. The Vite dev server forwards `/api/*` to the API, 
 | `GET` | `/stored-files/{contentId}` | One stored file by ID, shown inline (images, PDF) or saved with `?download=true` |
 | `GET` | `/versions/{versionId}/code` | Files extracted from a stored version |
 | `GET` | `/versions/{versionId}/code/file?path=…` | One extracted file (source code as UTF-8 text); paths outside the version's code folder are refused |
+| `POST` | `/agent/chat` | Chat with the assistant: sends the teacher's message and returns the whole reply (Markdown) |
 
 Errors are returned as [RFC 9457 Problem Details](https://www.rfc-editor.org/rfc/rfc9457). The full, documented specification is available at `/swagger/v1/swagger.json`.
 

@@ -12,5 +12,8 @@ public class HealthController : ControllerBase
     /// <response code="200">API is running</response>
     [HttpGet]
     [Produces("text/plain")]
-    public ActionResult<string> Get() => Ok("ok");
+    public ActionResult<string> Get()
+    {
+        return Ok("ok");
+    }
 }

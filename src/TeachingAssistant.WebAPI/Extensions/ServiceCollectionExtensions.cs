@@ -97,6 +97,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ISubmissionService, SubmissionService>();
         services.AddScoped<ISubmissionFetchService, SubmissionFetchService>();
         services.AddScoped<IStoredSubmissionService, StoredSubmissionService>();
+        services.AddScoped<IAgentChatService, AgentChatService>();
 
         return services;
     }

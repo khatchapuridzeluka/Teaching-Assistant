@@ -4,6 +4,62 @@
  */
 
 export interface paths {
+    "/agent/chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sends the teacher's message (with the conversation so far) to the assistant and returns its whole reply. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ChatRequest"];
+                    "text/json": components["schemas"]["ChatRequest"];
+                    "application/*+json": components["schemas"]["ChatRequest"];
+                };
+            };
+            responses: {
+                /** @description The assistant's reply (Markdown) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ChatResponse"];
+                    };
+                };
+                /** @description Invalid conversation (empty, or not ending with the teacher's message) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Model unreachable or returned an error */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/courses/{courseId}/assignments": {
         parameters: {
             query?: never;
@@ -680,6 +736,29 @@ export interface components {
          * @enum {string}
          */
         AttachmentKind: "DriveFile" | "Link" | "Other";
+        /** @description One message of a chat conversation. */
+        ChatMessage: {
+            role: components["schemas"]["ChatRole"];
+            text: string;
+        };
+        /**
+         * @description A chat turn from the teacher: the conversation so far (oldest first, ending with the teacher's new message)
+         *     and where in the app the teacher is, e.g. "Assignment 'Assignment 4' in course 'Java II N2'". The page
+         *     description holds no student data.
+         */
+        ChatRequest: {
+            messages: components["schemas"]["ChatMessage"][];
+            page?: string | null;
+        };
+        /** @description The assistant's reply to a chat turn (Markdown). */
+        ChatResponse: {
+            text: string;
+        };
+        /**
+         * @description Who wrote a chat message.
+         * @enum {string}
+         */
+        ChatRole: "User" | "Assistant";
         /** @description One extracted file in a version's code folder. Path uses forward slashes and is passed back to read the file. */
         CodeFileResponse: {
             path: string;

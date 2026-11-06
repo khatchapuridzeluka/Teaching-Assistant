@@ -106,7 +106,7 @@ frontend/                             React + Vite (edited in Rider); Vite proxi
 
 ### Controller conventions
 
-Controllers live in `src/TeachingAssistant.WebAPI/Controllers/`. Contracts (use-case inputs/outputs the API returns) live in `src/TeachingAssistant.Application/Contracts/`; controllers return them directly. A WebAPI-side request type exists only for HTTP-specific shapes (e.g. `IFormFile` uploads), mapped to an Application contract in the controller. Controllers stay thin: constructor-inject an Application service, call it, return the result. Document every action with a short `<summary>` (what it returns/does, one sentence) and one `<response code>` line per status — no long remarks. Return `ActionResult<T>`, suffix async actions with `Async`. The XML docs flow into the OpenAPI document.
+Controllers live in `src/TeachingAssistant.WebAPI/Controllers/`. Contracts (use-case inputs/outputs the API returns) live in `src/TeachingAssistant.Application/Contracts/`; controllers return them directly. A WebAPI-side request type exists only for HTTP-specific shapes (e.g. `IFormFile` uploads), mapped to an Application contract in the controller. Controllers stay thin: constructor-inject an Application service, call it, return the result. Document every action with a short `<summary>` (what it returns/does, one sentence) and one `<response code>` line per status — no long remarks. Return `ActionResult<T>`, suffix async actions with `Async`. Every controller member uses a block body `{ }` with an explicit `return`, never an expression body (`=>`), even for one line. The XML docs flow into the OpenAPI document.
 
 ```csharp
 /// <summary>
@@ -115,8 +115,10 @@ Controllers live in `src/TeachingAssistant.WebAPI/Controllers/`. Contracts (use-
 /// <response code="200">Assignment retrieved successfully</response>
 /// <response code="404">Assignment not found</response>
 [HttpGet("{id:guid}")]
-public async Task<ActionResult<AssignmentDto>> GetByIdAsync(Guid id) =>
-    Ok(await _assignmentService.GetByIdAsync(id));
+public async Task<ActionResult<AssignmentDto>> GetByIdAsync(Guid id)
+{
+    return Ok(await _assignmentService.GetByIdAsync(id));
+}
 ```
 
 ## README

@@ -23,6 +23,8 @@ public class CoursesController : ControllerBase
     /// <response code="409">Google account not connected or authorization expired; call POST /auth/google/connect</response>
     /// <response code="502">Google Classroom returned an error or could not be reached</response>
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<CourseResponse>>> GetAllAsync(CancellationToken cancellationToken) =>
-        Ok(await _courseService.GetCoursesAsync(cancellationToken));
+    public async Task<ActionResult<IReadOnlyList<CourseResponse>>> GetAllAsync(CancellationToken cancellationToken)
+    {
+        return Ok(await _courseService.GetCoursesAsync(cancellationToken));
+    }
 }

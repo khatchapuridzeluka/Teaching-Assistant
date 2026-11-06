@@ -12,4 +12,7 @@ public class AnthropicOptions
     public string? ApiKey { get; set; }
     public string Model { get; set; } = "claude-haiku-5-5";
     public int MaxTokens { get; set; } = 1024;
+
+    /// <summary>Upper limit for one chat reply; chat answers are longer than the short internal prompts. Set in appsettings.json.</summary>
+    public int ChatMaxTokens { get; set; } = 8192;
 }

@@ -21,8 +21,10 @@ public class GoogleAuthController : ControllerBase
     /// </summary>
     /// <response code="200">Current connection state (NotConfigured, NotConnected, Connected or ReconnectRequired)</response>
     [HttpGet("status")]
-    public async Task<ActionResult<GoogleConnectionStatus>> GetStatusAsync(CancellationToken cancellationToken) =>
-        Ok(await _googleConnectionService.GetStatusAsync(cancellationToken));
+    public async Task<ActionResult<GoogleConnectionStatus>> GetStatusAsync(CancellationToken cancellationToken)
+    {
+        return Ok(await _googleConnectionService.GetStatusAsync(cancellationToken));
+    }
 
     /// <summary>
     /// Opens Google sign-in in the browser on the machine running the API and waits up to 5 minutes for approval. Local development only.

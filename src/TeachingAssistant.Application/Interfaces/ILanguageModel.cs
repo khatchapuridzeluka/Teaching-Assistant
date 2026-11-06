@@ -1,3 +1,4 @@
+using TeachingAssistant.Application.Contracts;
 using TeachingAssistant.Application.Models;
 
 namespace TeachingAssistant.Application.Interfaces;
@@ -18,4 +19,14 @@ public interface ILanguageModel
     /// </summary>
     /// <exception cref="Exceptions.LanguageModelUnavailableException">The model could not be reached or returned an error.</exception>
     Task<LanguageModelReply> CompleteAsync(string prompt, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Continues a conversation and returns the model's whole reply.
+    /// </summary>
+    /// <param name="systemPrompt">Instructions for the whole conversation.</param>
+    /// <param name="messages">The conversation so far, oldest first, ending with the user's new message.</param>
+    /// <param name="cancellationToken">Stops the model when the user cancels.</param>
+    /// <exception cref="Exceptions.LanguageModelUnavailableException">The model could not be reached or returned an error.</exception>
+    Task<LanguageModelReply> ChatAsync(
+        string systemPrompt, IReadOnlyList<ChatMessage> messages, CancellationToken cancellationToken = default);
 }

@@ -1,6 +1,8 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { Link, NavLink, Outlet, useMatches } from "react-router";
 import { useApiHealth, useAssignments, useCourses, useGoogleStatus } from "../api/hooks";
+import { ChatPanel } from "./ChatPanel";
+import { Button } from "./ui";
 
 // Pages describe their breadcrumb via route handles; the top bar shows them.
 export type Crumb = { label: ReactNode; to?: string };
@@ -12,19 +14,38 @@ const navClass = ({ isActive }: { isActive: boolean }) =>
   }`;
 
 export function Layout() {
+  const [chatOpen, setChatOpen] = useState(false);
+  const page = usePageDescription();
+
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
-        <TopBar />
+        <TopBar chatOpen={chatOpen} onToggleChat={() => setChatOpen(!chatOpen)} />
         <main className="flex-1 overflow-y-auto px-7 py-6">
           <div className="mx-auto flex max-w-[1180px] flex-col gap-[18px]">
             <Outlet />
           </div>
         </main>
       </div>
+      {/* Hidden rather than removed when closed, so the conversation survives closing and navigating. */}
+      <div className={chatOpen ? "flex" : "hidden"}>
+        <ChatPanel page={page} onClose={() => setChatOpen(false)} />
+      </div>
     </div>
   );
+}
+
+// Where the teacher is, in words, for the agent: course and assignment names only, never student data.
+function usePageDescription(): string | null {
+  const matches = useMatches();
+  const { courseId = "", assignmentId = "" } = (matches[matches.length - 1]?.params ?? {}) as Record<string, string | undefined>;
+  const course = useCourses().data?.find((c) => c.id === courseId);
+  const assignment = useAssignments(courseId).data?.find((a) => a.id === assignmentId);
+
+  if (assignment && course) return `Assignment '${assignment.title}' in course '${course.name}'`;
+  if (course) return `Course '${course.name}' (list of assignments)`;
+  return null;
 }
 
 function Sidebar() {
@@ -91,7 +112,7 @@ export function AssignmentTitle({ courseId, assignmentId }: { courseId: string; 
   return <>{assignments.data?.find((a) => a.id === assignmentId)?.title ?? "Assignment"}</>;
 }
 
-function TopBar() {
+function TopBar({ chatOpen, onToggleChat }: { chatOpen: boolean; onToggleChat: () => void }) {
   const matches = useMatches();
   const health = useApiHealth();
   const crumbs = matches.flatMap((match) =>
@@ -112,10 +133,15 @@ function TopBar() {
           </span>
         ))}
       </nav>
-      <span className="flex items-center gap-2 text-xs text-ink-muted">
-        <span className={`h-2 w-2 rounded-full ${health.isSuccess ? "bg-accent" : "bg-line"}`} />
-        {health.isSuccess ? "API online" : health.isLoading ? "Checking API…" : "API offline"}
-      </span>
+      <div className="flex shrink-0 items-center gap-4">
+        <span className="flex items-center gap-2 text-xs text-ink-muted">
+          <span className={`h-2 w-2 rounded-full ${health.isSuccess ? "bg-accent" : "bg-line"}`} />
+          {health.isSuccess ? "API online" : health.isLoading ? "Checking API…" : "API offline"}
+        </span>
+        <Button variant={chatOpen ? "outline" : "dark"} onClick={onToggleChat}>
+          {chatOpen ? "Hide agent" : "Ask agent"}
+        </Button>
+      </div>
     </header>
   );
 }

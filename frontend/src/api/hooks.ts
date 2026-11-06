@@ -10,6 +10,7 @@ export const useAssignments = (courseId: string) =>
   useQuery({
     queryKey: ["courses", courseId, "assignments"],
     queryFn: () => unwrap(api.GET("/courses/{courseId}/assignments", { params: { path: { courseId } } })),
+    enabled: courseId !== "", // pages without a course (Courses, Settings) don't ask
   });
 
 export const useSubmissions = (courseId: string, assignmentId: string) =>

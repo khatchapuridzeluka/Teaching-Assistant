@@ -1,3 +1,4 @@
+using TeachingAssistant.Application.Contracts;
 using TeachingAssistant.Application.Exceptions;
 using TeachingAssistant.Application.Interfaces;
 using TeachingAssistant.Application.Models;
@@ -54,5 +55,9 @@ public class ModelHealthServiceTests
             failure is null
                 ? Task.FromResult(new LanguageModelReply(Id, reply!))
                 : Task.FromException<LanguageModelReply>(failure);
+
+        public Task<LanguageModelReply> ChatAsync(
+            string systemPrompt, IReadOnlyList<ChatMessage> messages, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 }

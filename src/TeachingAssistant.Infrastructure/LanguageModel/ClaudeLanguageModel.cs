@@ -2,6 +2,7 @@ using Anthropic;
 using Anthropic.Exceptions;
 using Anthropic.Models.Messages;
 using Microsoft.Extensions.Options;
+using TeachingAssistant.Application.Contracts;
 using TeachingAssistant.Application.Exceptions;
 using TeachingAssistant.Application.Interfaces;
 using TeachingAssistant.Application.Models;
@@ -41,25 +42,46 @@ public class ClaudeLanguageModel : ILanguageModel
             var text = string.Concat(response.Content.Select(b => b.Value).OfType<TextBlock>().Select(t => t.Text));
             return new LanguageModelReply(_options.Model, text.Trim());
         }
-        catch (AnthropicUnauthorizedException ex)
+        catch (Exception ex) when (Translate(ex) is { } translated)
         {
-            throw new LanguageModelUnavailableException("Authentication failed: the Anthropic API key is missing or invalid.", ex);
-        }
-        catch (AnthropicNotFoundException ex)
-        {
-            throw new LanguageModelUnavailableException($"Model '{_options.Model}' was not found.", ex);
-        }
-        catch (AnthropicRateLimitException ex)
-        {
-            throw new LanguageModelUnavailableException("Rate limited by the Anthropic API. Try again shortly.", ex);
-        }
-        catch (AnthropicApiException ex)
-        {
-            throw new LanguageModelUnavailableException($"Anthropic API error: {ex.Message}", ex);
-        }
-        catch (AnthropicIOException ex)
-        {
-            throw new LanguageModelUnavailableException("Could not reach the Anthropic API (network error).", ex);
+            throw translated;
         }
     }
+
+    public async Task<LanguageModelReply> ChatAsync(
+        string systemPrompt, IReadOnlyList<ChatMessage> messages, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await _client.Messages.Create(new MessageCreateParams
+            {
+                Model = _options.Model,
+                MaxTokens = _options.ChatMaxTokens,
+                System = systemPrompt,
+                Messages = messages.Select(ToParam).ToList(),
+            }, cancellationToken);
+
+            var text = string.Concat(response.Content.Select(b => b.Value).OfType<TextBlock>().Select(t => t.Text));
+            return new LanguageModelReply(_options.Model, text.Trim());
+        }
+        catch (Exception ex) when (Translate(ex) is { } translated)
+        {
+            throw translated;
+        }
+    }
+
+    private static MessageParam ToParam(ChatMessage message) => message.Role == ChatRole.User
+        ? new UserMessageParam { Content = message.Text }
+        : new AssistantMessageParam { Content = message.Text };
+
+    // Null for exceptions that are not about the Anthropic API; those are bugs and must surface as they are.
+    private LanguageModelUnavailableException? Translate(Exception ex) => ex switch
+    {
+        AnthropicUnauthorizedException => new("Authentication failed: the Anthropic API key is missing or invalid.", ex),
+        AnthropicNotFoundException => new($"Model '{_options.Model}' was not found.", ex),
+        AnthropicRateLimitException => new("Rate limited by the Anthropic API. Try again shortly.", ex),
+        AnthropicApiException => new($"Anthropic API error: {ex.Message}", ex),
+        AnthropicIOException => new("Could not reach the Anthropic API (network error).", ex),
+        _ => null,
+    };
 }

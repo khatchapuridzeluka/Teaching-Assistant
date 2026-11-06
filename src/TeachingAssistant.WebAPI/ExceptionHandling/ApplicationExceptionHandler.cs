@@ -21,6 +21,8 @@ public class ApplicationExceptionHandler : IExceptionHandler
     {
         (int Status, string Title)? mapped = exception switch
         {
+            InvalidRequestException => (StatusCodes.Status400BadRequest, "Invalid request"),
+            LanguageModelUnavailableException => (StatusCodes.Status503ServiceUnavailable, "Model unavailable"),
             SubmissionSourceNotConnectedException => (StatusCodes.Status409Conflict, "Source not connected"),
             SubmissionSourceNotFoundException => (StatusCodes.Status404NotFound, "Not found"),
             SubmissionSourceUnavailableException => (StatusCodes.Status502BadGateway, "Source unavailable"),

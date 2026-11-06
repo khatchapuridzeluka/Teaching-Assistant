@@ -52,10 +52,12 @@ public class VersionsController : ControllerBase
 
     // Images, PDFs and the like keep their type; everything else (source code, unknown or "binary" defaults such as
     // the built-in table's application/octet-stream for .java) is served as text.
-    private static string ContentTypeFor(string path) =>
-        ContentTypes.TryGetContentType(path, out var known)
-        && !known.StartsWith("text/", StringComparison.Ordinal)
-        && known != "application/octet-stream"
+    private static string ContentTypeFor(string path)
+    {
+        return ContentTypes.TryGetContentType(path, out var known)
+            && !known.StartsWith("text/", StringComparison.Ordinal)
+            && known != "application/octet-stream"
             ? known
             : TextContentType;
+    }
 }
