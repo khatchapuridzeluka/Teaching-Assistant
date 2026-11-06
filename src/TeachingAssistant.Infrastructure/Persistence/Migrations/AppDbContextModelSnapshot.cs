@@ -22,6 +22,148 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("TeachingAssistant.Domain.Ingestion.AssignmentInstructions", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AssignmentId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("assignment_id");
+
+                    b.Property<string>("CourseId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("course_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("source");
+
+                    b.Property<string>("StorageFolder")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("storage_folder");
+
+                    b.HasKey("Id")
+                        .HasName("pk_assignment_instructions");
+
+                    b.HasIndex("Source", "AssignmentId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_assignment_instructions_source_assignment_id");
+
+                    b.ToTable("assignment_instructions", (string)null);
+                });
+
+            modelBuilder.Entity("TeachingAssistant.Domain.Ingestion.InstructionsContent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ExternalId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("external_id");
+
+                    b.Property<string>("Fingerprint")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("fingerprint");
+
+                    b.Property<string>("MimeType")
+                        .HasColumnType("text")
+                        .HasColumnName("mime_type");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Origin")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("origin");
+
+                    b.Property<long?>("SizeBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("size_bytes");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<string>("StoredName")
+                        .HasColumnType("text")
+                        .HasColumnName("stored_name");
+
+                    b.Property<Guid>("VersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("version_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_instructions_contents");
+
+                    b.HasIndex("VersionId")
+                        .HasDatabaseName("ix_instructions_contents_version_id");
+
+                    b.ToTable("instructions_contents", (string)null);
+                });
+
+            modelBuilder.Entity("TeachingAssistant.Domain.Ingestion.InstructionsVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text")
+                        .HasColumnName("description");
+
+                    b.Property<DateTimeOffset>("FetchedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fetched_at");
+
+                    b.Property<Guid>("InstructionsId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("instructions_id");
+
+                    b.Property<double?>("MaxPoints")
+                        .HasColumnType("double precision")
+                        .HasColumnName("max_points");
+
+                    b.Property<int>("Number")
+                        .HasColumnType("integer")
+                        .HasColumnName("number");
+
+                    b.Property<string>("StoragePath")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("storage_path");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("title");
+
+                    b.HasKey("Id")
+                        .HasName("pk_instructions_versions");
+
+                    b.HasIndex("InstructionsId", "Number")
+                        .IsUnique()
+                        .HasDatabaseName("ix_instructions_versions_instructions_id_number");
+
+                    b.ToTable("instructions_versions", (string)null);
+                });
+
             modelBuilder.Entity("TeachingAssistant.Domain.Ingestion.Submission", b =>
                 {
                     b.Property<Guid>("Id")
@@ -203,6 +345,26 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
                     b.ToTable("version_contents", (string)null);
                 });
 
+            modelBuilder.Entity("TeachingAssistant.Domain.Ingestion.InstructionsContent", b =>
+                {
+                    b.HasOne("TeachingAssistant.Domain.Ingestion.InstructionsVersion", null)
+                        .WithMany("Contents")
+                        .HasForeignKey("VersionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_instructions_contents_instructions_versions_version_id");
+                });
+
+            modelBuilder.Entity("TeachingAssistant.Domain.Ingestion.InstructionsVersion", b =>
+                {
+                    b.HasOne("TeachingAssistant.Domain.Ingestion.AssignmentInstructions", null)
+                        .WithMany("Versions")
+                        .HasForeignKey("InstructionsId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_instructions_versions_assignment_instructions_instructions_");
+                });
+
             modelBuilder.Entity("TeachingAssistant.Domain.Ingestion.SubmissionVersion", b =>
                 {
                     b.HasOne("TeachingAssistant.Domain.Ingestion.Submission", null)
@@ -221,6 +383,16 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_version_contents_submission_versions_version_id");
+                });
+
+            modelBuilder.Entity("TeachingAssistant.Domain.Ingestion.AssignmentInstructions", b =>
+                {
+                    b.Navigation("Versions");
+                });
+
+            modelBuilder.Entity("TeachingAssistant.Domain.Ingestion.InstructionsVersion", b =>
+                {
+                    b.Navigation("Contents");
                 });
 
             modelBuilder.Entity("TeachingAssistant.Domain.Ingestion.Submission", b =>

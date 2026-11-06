@@ -11,33 +11,35 @@ namespace TeachingAssistant.Tests.Application;
 public class GradingServiceTests
 {
     private const string StudentName = "Nino Beridze";
+    private const string DocxType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
     private readonly FakeStore _store = new();
+    private readonly FakeInstructionsStore _instructions = new();
     private readonly FakeStorage _storage = new();
-    private readonly FakeSource _source = new();
-    private readonly FakeFiles _files = new();
     private readonly RecordingModel _model = new();
 
-    private GradingService Service() => new(_store, _storage, _source, _files, new FakeWordReader(), _model);
+    private GradingService Service() => new(_store, _instructions, _storage, new FakeWordReader(), _model);
 
     [Fact]
-    public async Task Grade_SendsInstructionsFirst_ThenCodeAndStudentFiles()
+    public async Task Grade_SendsStoredInstructionsFirst_ThenCodeAndStudentFiles()
     {
+        _instructions.Store(null,
+            Stored("Homework 2.pdf", "application/pdf", [9, 9]),
+            new InstructionsContent(ContentOrigin.Drive, "video-1", "demo.mp4", "video/mp4", "md5", 1000, null, ContentStatus.Unsupported));
         var versionId = _store.AddVersion(
             Content(ContentKind.CodeArchive, "zoo.zip", "application/zip"),
             Content(ContentKind.Document, "report.pdf", "application/pdf"),
-            Content(ContentKind.Document, "notes.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
-            Content(ContentKind.Other, "demo.mp4", "video/mp4"));
+            Content(ContentKind.Document, "notes.docx", DocxType),
+            Content(ContentKind.Other, "screen.mp4", "video/mp4"));
         _storage.Code["src/Zoo.java"] = "public class Zoo {\n}";
         _storage.Originals["report.pdf"] = [1, 2, 3];
         _storage.Originals["notes.docx"] = Encoding.UTF8.GetBytes("My report");
-        _source.Materials = [new SubmissionAttachment(AttachmentKind.DriveFile, "Homework 2.pdf", null, "file-1")];
-        _files.Add("file-1", "Homework 2.pdf", "application/pdf", [9, 9]);
 
         var result = await Service().GradeVersionAsync(versionId, TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         Assert.Equal("The review", result.Review);
+        Assert.Equal(1, result.InstructionsVersion);
 
         // Instructions first (shared by the class), then the student's code, then the student's PDF.
         var files = _model.Parts!.OfType<FilePart>().ToList();
@@ -51,22 +53,21 @@ public class GradingServiceTests
         Assert.Contains("<file path=\"src/Zoo.java\">", code);
         Assert.Contains("   1 | public class Zoo {", code);
 
-        // Word documents go as text; formats the model cannot read are reported, not silently dropped.
+        // Word documents go as text; what the model cannot read is reported, not silently dropped.
         Assert.Equal(
             ["Instructions: Homework 2.pdf", "Code: src/Zoo.java", "Student file: report.pdf", "Student file: notes.docx (as text)"],
             result.SentFiles);
         Assert.Contains(_model.Parts!, p => p is TextPart t && t.Text.Contains("<student_document name=\"notes.docx\">\nMy report"));
         Assert.Contains(result.SkippedFiles, s => s.Contains("demo.mp4"));
+        Assert.Contains(result.SkippedFiles, s => s.Contains("screen.mp4"));
     }
 
     [Fact]
-    public async Task Grade_SendsWordInstructionsAsText()
+    public async Task Grade_SendsStoredWordInstructionsAsText()
     {
+        _instructions.Store(null, Stored("Homework_2.docx", DocxType, Encoding.UTF8.GetBytes("Task 1: Animal | 15")));
         var versionId = _store.AddVersion(Content(ContentKind.CodeArchive, "zoo.zip", "application/zip"));
         _storage.Code["Main.java"] = "class Main {}";
-        _source.Materials = [new SubmissionAttachment(AttachmentKind.DriveFile, "Homework_2.docx", null, "file-2")];
-        _files.Add("file-2", "Homework_2.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            Encoding.UTF8.GetBytes("Task 1: Animal | 15"));
 
         var result = await Service().GradeVersionAsync(versionId, TestContext.Current.CancellationToken);
 
@@ -78,9 +79,9 @@ public class GradingServiceTests
     [Fact]
     public async Task Grade_NeverSendsTheStudentsName()
     {
+        _instructions.Store("Write a zoo.");
         var versionId = _store.AddVersion(Content(ContentKind.CodeArchive, "zoo.zip", "application/zip"));
         _storage.Code["Main.java"] = "class Main {}";
-        _source.Description = "Write a zoo.";
 
         await Service().GradeVersionAsync(versionId, TestContext.Current.CancellationToken);
 
@@ -91,10 +92,10 @@ public class GradingServiceTests
     [Fact]
     public async Task Grade_SkipsBinaryFilesInTheCode()
     {
+        _instructions.Store("Write a zoo.");
         var versionId = _store.AddVersion(Content(ContentKind.CodeArchive, "zoo.zip", "application/zip"));
         _storage.Code["Main.java"] = "class Main {}";
         _storage.Code["diagram.png"] = "\0PNG";
-        _source.Description = "Write a zoo.";
 
         var result = await Service().GradeVersionAsync(versionId, TestContext.Current.CancellationToken);
 
@@ -103,14 +104,29 @@ public class GradingServiceTests
     }
 
     [Fact]
-    public async Task Grade_RejectsAnAssignmentWithoutInstructions()
+    public async Task Grade_AsksToFetchFirst_WhenNoInstructionsAreStored()
     {
+        var versionId = _store.AddVersion(Content(ContentKind.CodeArchive, "zoo.zip", "application/zip"));
+        _storage.Code["Main.java"] = "class Main {}";
+
+        var error = await Assert.ThrowsAsync<InvalidRequestException>(() =>
+            Service().GradeVersionAsync(versionId, TestContext.Current.CancellationToken));
+
+        Assert.Contains("Fetch from Classroom", error.Message);
+        Assert.Null(_model.Parts); // the model was never called
+    }
+
+    [Fact]
+    public async Task Grade_Rejects_WhenTheStoredInstructionsHaveNothingReadable()
+    {
+        _instructions.Store(null,
+            new InstructionsContent(ContentOrigin.Drive, "video-1", "demo.mp4", "video/mp4", "md5", 1000, null, ContentStatus.Unsupported));
         var versionId = _store.AddVersion(Content(ContentKind.CodeArchive, "zoo.zip", "application/zip"));
         _storage.Code["Main.java"] = "class Main {}";
 
         await Assert.ThrowsAsync<InvalidRequestException>(() =>
             Service().GradeVersionAsync(versionId, TestContext.Current.CancellationToken));
-        Assert.Null(_model.Parts); // the model was never called
+        Assert.Null(_model.Parts);
     }
 
     [Fact]
@@ -123,6 +139,13 @@ public class GradingServiceTests
 
     private static VersionContent Content(ContentKind kind, string name, string mimeType) =>
         new(ContentOrigin.Drive, kind, $"drive-{name}", name, mimeType, "md5", null, 100, name, null, ContentStatus.Stored);
+
+    // A stored instruction file; its bytes are registered with the fake storage by FakeInstructionsStore.Store.
+    private InstructionsContent Stored(string name, string mimeType, byte[] bytes)
+    {
+        _storage.Originals[name] = bytes;
+        return new InstructionsContent(ContentOrigin.Drive, $"drive-{name}", name, mimeType, "md5", bytes.Length, name, ContentStatus.Stored);
+    }
 
     private sealed class FakeStore : ISubmissionStore
     {
@@ -154,9 +177,30 @@ public class GradingServiceTests
         public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
+    private sealed class FakeInstructionsStore : IInstructionsStore
+    {
+        private AssignmentInstructions? _instructions;
+
+        public void Store(string? description, params InstructionsContent[] contents)
+        {
+            _instructions = new AssignmentInstructions(SubmissionSource.GoogleClassroom, "course-1", "assignment-1",
+                "instructions-folder", DateTimeOffset.UtcNow);
+            _instructions.AddVersion("Homework 2", description, 100, "instructions-folder/v1", DateTimeOffset.UtcNow, contents);
+        }
+
+        public Task<AssignmentInstructions?> GetAsync(SubmissionSource source, string assignmentId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(_instructions?.AssignmentId == assignmentId ? _instructions : null);
+
+        public void Add(AssignmentInstructions instructions) => throw new NotSupportedException();
+
+        public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
     private sealed class FakeStorage : ISnapshotStorage
     {
         public Dictionary<string, string> Code { get; } = [];
+
+        // Stored originals by name, for both instruction files and student files.
         public Dictionary<string, byte[]> Originals { get; } = [];
 
         public IReadOnlyList<CodeFile> ListCode(string versionPath) =>
@@ -171,45 +215,13 @@ public class GradingServiceTests
         public string GetSubmissionFolder(string courseName, string assignmentTitle, string studentName, string studentId) =>
             throw new NotSupportedException();
 
+        public string GetInstructionsFolder(string courseName, string assignmentTitle, string assignmentId) =>
+            throw new NotSupportedException();
+
         public ISnapshotWriter BeginVersion(string submissionFolder, int versionNumber) => throw new NotSupportedException();
 
         public Task<CodeExtraction> ReExtractAsync(string versionPath, IReadOnlyList<ExtractableFile> files, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
-    }
-
-    private sealed class FakeSource : ISubmissionSource
-    {
-        public string? Description { get; set; }
-        public IReadOnlyList<SubmissionAttachment> Materials { get; set; } = [];
-
-        public Task<AssignmentResponse> GetAssignmentAsync(string courseId, string assignmentId, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new AssignmentResponse(assignmentId, courseId, "Homework 2", Description, "ASSIGNMENT", 100, null, null, null, Materials));
-
-        public Task<IReadOnlyList<CourseResponse>> GetCoursesAsync(CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task<CourseResponse> GetCourseAsync(string courseId, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task<IReadOnlyList<AssignmentResponse>> GetAssignmentsAsync(string courseId, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task<IReadOnlyList<SubmissionResponse>> GetSubmissionsAsync(string courseId, string assignmentId, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-    }
-
-    private sealed class FakeFiles : IRemoteFileSource
-    {
-        private readonly Dictionary<string, (RemoteFile File, byte[] Content)> _files = [];
-
-        public void Add(string id, string name, string mimeType, byte[] content) =>
-            _files[id] = (new RemoteFile(id, name, mimeType, content.Length, "md5", null, name, mimeType, true), content);
-
-        public Task<RemoteFile> GetFileAsync(string fileId, CancellationToken cancellationToken = default) =>
-            Task.FromResult(_files[fileId].File);
-
-        public Task DownloadAsync(RemoteFile file, Stream destination, CancellationToken cancellationToken = default) =>
-            destination.WriteAsync(_files[file.Id].Content, cancellationToken).AsTask();
     }
 
     // Treats a .docx's bytes as its text; the real format is tested in WordDocumentReaderTests.

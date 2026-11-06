@@ -9,8 +9,9 @@ using TeachingAssistant.Domain.Ingestion;
 namespace TeachingAssistant.Application.Services;
 
 /// <summary>
-/// Grades one stored version by reading: the assignment's instructions (the files the teacher attached in Classroom and
-/// the task statement) and the student's work go to the model in one message, and its Markdown review comes back.
+/// Grades one stored version by reading: the assignment's instructions (as stored by the last fetch: the task statement
+/// and the files the teacher attached in Classroom) and the student's work go to the model in one message, and its
+/// Markdown review comes back. Nothing is read from the source here.
 /// PDFs and images are sent as files the model reads itself; Word documents are sent as their text.
 /// Instructions come first and the student's work last, so the shared part can be cached across a class later.
 /// The student's name is never sent.
@@ -62,24 +63,21 @@ public class GradingService : IGradingService
         """;
 
     private readonly ISubmissionStore _store;
+    private readonly IInstructionsStore _instructionsStore;
     private readonly ISnapshotStorage _storage;
-    private readonly ISubmissionSource _submissionSource;
-    private readonly IRemoteFileSource _fileSource;
     private readonly IDocumentReader _documentReader;
     private readonly ILanguageModel _languageModel;
 
     public GradingService(
         ISubmissionStore store,
+        IInstructionsStore instructionsStore,
         ISnapshotStorage storage,
-        ISubmissionSource submissionSource,
-        IRemoteFileSource fileSource,
         IDocumentReader documentReader,
         ILanguageModel languageModel)
     {
         _store = store;
+        _instructionsStore = instructionsStore;
         _storage = storage;
-        _submissionSource = submissionSource;
-        _fileSource = fileSource;
         _documentReader = documentReader;
         _languageModel = languageModel;
     }
@@ -93,17 +91,25 @@ public class GradingService : IGradingService
         }
 
         var version = submission.Versions.Single(v => v.Id == versionId);
-        var assignment = await _submissionSource.GetAssignmentAsync(submission.CourseId, submission.AssignmentId, cancellationToken);
+
+        // The instructions as stored by the last fetch: no calls to the source, and the same bytes for every student.
+        var stored = await _instructionsStore.GetAsync(submission.Source, submission.AssignmentId, cancellationToken);
+        if (stored?.LatestVersion is not { } instructions)
+        {
+            throw new InvalidRequestException(
+                "The assignment's instructions are not stored yet. Use \"Fetch from Classroom\" first; it stores them " +
+                "together with the submissions.");
+        }
 
         var prompt = new Prompt();
 
         // Shared by every student of the assignment: the task statement and the instruction files.
-        await AddInstructionsAsync(prompt, assignment, cancellationToken);
+        AddInstructions(prompt, instructions);
         if (!prompt.HasInstructions)
         {
             throw new InvalidRequestException(
-                "The assignment has no instructions the model can read. Attach the instructions as a PDF in Classroom " +
-                "or write a task statement.");
+                "The assignment has no instructions the model can read. Attach them in Classroom as a PDF or Word " +
+                "document, or write a task statement, then fetch again.");
         }
 
         // This student's work.
@@ -122,66 +128,59 @@ public class GradingService : IGradingService
               "\n\nGrade this submission against the instructions.");
 
         var reply = await _languageModel.GradeAsync(SystemPrompt, prompt.Parts, cancellationToken);
-        return new GradingResponse(versionId, reply.Model, reply.Text, prompt.Sent, prompt.Skipped);
+        return new GradingResponse(versionId, reply.Model, reply.Text, instructions.Number, prompt.Sent, prompt.Skipped);
     }
 
-    private async Task AddInstructionsAsync(Prompt prompt, AssignmentResponse assignment, CancellationToken cancellationToken)
+    // The stored task statement and instruction files. PDFs and images go as files; Word documents (how most
+    // instructions are written) as their text, read from the stored file.
+    private void AddInstructions(Prompt prompt, InstructionsVersion instructions)
     {
         var task = new StringBuilder("<task>\n")
-            .Append("Title: ").AppendLine(assignment.Title);
-        if (assignment.MaxPoints is { } maxPoints)
+            .Append("Title: ").AppendLine(instructions.Title);
+        if (instructions.MaxPoints is { } maxPoints)
         {
             task.Append("Maximum points: ").AppendLine(maxPoints.ToString(System.Globalization.CultureInfo.InvariantCulture));
         }
 
-        if (!string.IsNullOrWhiteSpace(assignment.Description))
+        if (!string.IsNullOrWhiteSpace(instructions.Description))
         {
-            task.AppendLine().AppendLine(assignment.Description.Trim());
+            task.AppendLine().AppendLine(instructions.Description.Trim());
             prompt.HasInstructions = true;
         }
 
         prompt.Text(task.Append("</task>").ToString());
 
-        foreach (var material in assignment.Materials)
+        foreach (var content in instructions.Contents)
         {
-            if (material is not { Kind: AttachmentKind.DriveFile, FileId: { } fileId })
+            if (content.StoredName is null)
             {
-                prompt.Skip($"Instructions: '{material.Title}' (only files can be sent, not links or forms)");
+                // Links and videos are recorded at fetch but never stored; too large files neither.
+                prompt.Skip(content.Status == ContentStatus.TooLarge
+                    ? $"Instructions: '{content.Name}' (too large)"
+                    : $"Instructions: '{content.Name}' (not a file the model can read)");
                 continue;
             }
 
-            // PDFs and images go as files; Word documents (how most instructions are written) as their text.
-            var file = await _fileSource.GetFileAsync(fileId, cancellationToken);
-            var asFile = file.IsDownloadable && FilePart.IsSupported(file.DownloadMimeType);
-            var asText = file.IsDownloadable && !asFile && _documentReader.CanRead(file.DownloadName, file.DownloadMimeType);
-            if (!asFile && !asText)
+            var bytes = ReadAll(_storage.OpenOriginal(instructions.StoragePath, content.StoredName));
+            if (bytes is null)
             {
-                prompt.Skip($"Instructions: '{file.Name}' (the model cannot read {file.MimeType} files)");
+                prompt.Skip($"Instructions: '{content.Name}' (missing from storage)");
                 continue;
             }
 
-            if (!prompt.FitsFiles(file.SizeBytes ?? 0))
+            if (FilePart.IsSupported(content.MimeType) && prompt.FitsFiles(bytes.Length))
             {
-                prompt.Skip($"Instructions: '{file.Name}' (too large)");
-                continue;
+                prompt.File($"Instructions file: {content.StoredName}", new FilePart(content.StoredName, content.MimeType!, bytes));
+                prompt.Sent.Add($"Instructions: {content.StoredName}");
             }
-
-            using var download = new MemoryStream();
-            await _fileSource.DownloadAsync(file, download, cancellationToken);
-            if (asFile)
+            else if (_documentReader.CanRead(content.StoredName, content.MimeType) && _documentReader.ReadText(bytes) is { } text)
             {
-                prompt.File($"Instructions file: {file.DownloadName}",
-                    new FilePart(file.DownloadName, file.DownloadMimeType, download.ToArray()));
-                prompt.Sent.Add($"Instructions: {file.DownloadName}");
-            }
-            else if (_documentReader.ReadText(download.ToArray()) is { } text)
-            {
-                prompt.Text($"<instructions_document name=\"{file.DownloadName}\">\n{text}\n</instructions_document>");
-                prompt.Sent.Add($"Instructions: {file.DownloadName} (as text)");
+                prompt.Text($"<instructions_document name=\"{content.StoredName}\">\n{text}\n</instructions_document>");
+                prompt.Sent.Add($"Instructions: {content.StoredName} (as text)");
             }
             else
             {
-                prompt.Skip($"Instructions: '{file.Name}' (the document could not be read)");
+                prompt.Skip($"Instructions: '{content.Name}' (could not be read)");
                 continue;
             }
 

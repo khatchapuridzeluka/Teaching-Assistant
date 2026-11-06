@@ -43,6 +43,7 @@ public static class ServiceCollectionExtensions
             .UseNpgsql(configuration.GetConnectionString("Postgres"))
             .UseSnakeCaseNamingConvention());
         services.AddScoped<ISubmissionStore, SubmissionStore>();
+        services.AddScoped<IInstructionsStore, InstructionsStore>();
 
         services.Configure<StorageOptions>(configuration.GetSection(StorageOptions.SectionName));
         services.AddSingleton<ISnapshotStorage, FileSystemSnapshotStorage>();
@@ -98,6 +99,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAssignmentService, AssignmentService>();
         services.AddScoped<ISubmissionService, SubmissionService>();
         services.AddScoped<ISubmissionFetchService, SubmissionFetchService>();
+        services.AddScoped<IInstructionsFetchService, InstructionsFetchService>();
         services.AddScoped<IStoredSubmissionService, StoredSubmissionService>();
         services.AddScoped<IAgentChatService, AgentChatService>();
         services.AddScoped<IGradingService, GradingService>();

@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using TeachingAssistant.Application.Contracts;
 using TeachingAssistant.Application.Exceptions;
 using TeachingAssistant.Application.Interfaces;
+using TeachingAssistant.Application.Interfaces.Services;
 using TeachingAssistant.Application.Models;
 using TeachingAssistant.Application.Services;
 using TeachingAssistant.Domain.Ingestion;
@@ -14,8 +15,9 @@ public class SubmissionFetchServiceTests
     private readonly FakeFileSource _files = new();
     private readonly FakeStorage _storage = new();
     private readonly FakeStore _store = new();
+    private readonly FakeInstructionsFetch _instructions = new();
 
-    private SubmissionFetchService Service() => new(_source, _files, _storage, _store, TimeProvider.System);
+    private SubmissionFetchService Service() => new(_source, _files, _storage, _store, _instructions, TimeProvider.System);
 
     private Task<FetchSummary> FetchAsync() => Service().FetchAsync("course-1", "assignment-1", TestContext.Current.CancellationToken);
 
@@ -170,6 +172,32 @@ public class SubmissionFetchServiceTests
         Assert.Contains(summary.Problems, p => p.Detail.StartsWith("Could not read 'missing'"));
     }
 
+    [Fact]
+    public async Task Fetch_StoresTheInstructions_AndReportsTheirVersion()
+    {
+        _instructions.Result = new InstructionsFetchResult(2, IsNew: true, []);
+
+        var summary = await FetchAsync();
+
+        Assert.Equal("assignment-1", _instructions.FetchedAssignmentId);
+        Assert.Equal(2, summary.InstructionsVersion);
+        Assert.True(summary.NewInstructions);
+    }
+
+    [Fact]
+    public async Task InstructionsThatCannotBeRead_AreReported_ButSubmissionsAreStillFetched()
+    {
+        _instructions.Failure = new SubmissionSourceUnavailableException("Google Drive returned 500.");
+        _files.Add("file-1", "homework.zip", "md5-a");
+        _source.Add("sub-1", "Ana K.", "TURNED_IN", DriveAttachment("file-1"));
+
+        var summary = await FetchAsync();
+
+        Assert.Single(_store.Submissions);
+        Assert.Null(summary.InstructionsVersion);
+        Assert.Contains(summary.Problems, p => p.StudentName == "Instructions" && p.Detail.Contains("Google Drive returned 500."));
+    }
+
     private static SubmissionAttachment DriveAttachment(string fileId) =>
         new(AttachmentKind.DriveFile, fileId, null, fileId);
 
@@ -241,6 +269,9 @@ public class SubmissionFetchServiceTests
 
         public string GetSubmissionFolder(string courseName, string assignmentTitle, string studentName, string studentId) =>
             $"submissions/{courseName}/{assignmentTitle}/{studentName} ({studentId})";
+
+        public string GetInstructionsFolder(string courseName, string assignmentTitle, string assignmentId) =>
+            throw new NotSupportedException();
 
         public Stream? OpenOriginal(string versionPath, string storedName) => throw new NotSupportedException();
 
@@ -317,5 +348,20 @@ public class SubmissionFetchServiceTests
         public void Add(Submission submission) => Submissions.Add(submission);
 
         public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
+    // Instructions have their own tests (InstructionsFetchServiceTests); here only how the fetch uses the result.
+    private sealed class FakeInstructionsFetch : IInstructionsFetchService
+    {
+        public InstructionsFetchResult Result { get; set; } = new(1, IsNew: false, []);
+        public Exception? Failure { get; set; }
+        public string? FetchedAssignmentId { get; private set; }
+
+        public Task<InstructionsFetchResult> FetchAsync(
+            string courseId, string courseName, AssignmentResponse assignment, CancellationToken cancellationToken = default)
+        {
+            FetchedAssignmentId = assignment.Id;
+            return Failure is null ? Task.FromResult(Result) : Task.FromException<InstructionsFetchResult>(Failure);
+        }
     }
 }

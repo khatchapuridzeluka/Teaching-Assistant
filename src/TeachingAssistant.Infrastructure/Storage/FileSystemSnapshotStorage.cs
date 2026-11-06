@@ -26,6 +26,12 @@ public class FileSystemSnapshotStorage(IOptions<StorageOptions> options) : ISnap
         return $"submissions/{SafeName(courseName)}/{SafeName(assignmentTitle)}/{SafeName(studentName)} ({SafeName(idSuffix)})";
     }
 
+    public string GetInstructionsFolder(string courseName, string assignmentTitle, string assignmentId)
+    {
+        var idSuffix = assignmentId.Length > StudentIdSuffixLength ? assignmentId[^StudentIdSuffixLength..] : assignmentId;
+        return $"instructions/{SafeName(courseName)}/{SafeName(assignmentTitle)} ({SafeName(idSuffix)})";
+    }
+
     public ISnapshotWriter BeginVersion(string submissionFolder, int versionNumber)
     {
         var relativePath = $"{submissionFolder}/v{versionNumber}";

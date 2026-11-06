@@ -15,34 +15,10 @@ public class VersionsController : ControllerBase
     private static readonly FileExtensionContentTypeProvider ContentTypes = new();
 
     private readonly IStoredSubmissionService _storedService;
-    private readonly IGradingService _gradingService;
 
-    public VersionsController(IStoredSubmissionService storedService, IGradingService gradingService)
+    public VersionsController(IStoredSubmissionService storedService)
     {
         _storedService = storedService;
-        _gradingService = gradingService;
-    }
-
-    /// <summary>
-    /// Sends a stored version and its assignment's instructions to the model and returns the draft review (not saved); can take a minute.
-    /// </summary>
-    /// <response code="200">Draft review, with the files that were sent and skipped</response>
-    /// <response code="400">Nothing to grade, or the assignment has no instructions the model can read</response>
-    /// <response code="404">No stored version with this ID, or the assignment or an instruction file was not found in Google</response>
-    /// <response code="409">Google account not connected or authorization expired; call POST /auth/google/connect</response>
-    /// <response code="502">Google Classroom or Drive returned an error or could not be reached</response>
-    /// <response code="503">Model unreachable, returned an error, or declined</response>
-    [HttpPost("grade")]
-    [Produces("application/json")]
-    public async Task<ActionResult<GradingResponse>> GradeAsync(Guid versionId, CancellationToken cancellationToken)
-    {
-        var result = await _gradingService.GradeVersionAsync(versionId, cancellationToken);
-        if (result is null)
-        {
-            return NotFound();
-        }
-
-        return Ok(result);
     }
 
     /// <summary>

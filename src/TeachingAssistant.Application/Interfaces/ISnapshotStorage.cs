@@ -15,6 +15,12 @@ public interface ISnapshotStorage
     string GetSubmissionFolder(string courseName, string assignmentTitle, string studentName, string studentId);
 
     /// <summary>
+    /// Returns the folder for an assignment's instructions, relative to the storage root, readable when browsing
+    /// (course / assignment). The assignment ID keeps two equally named assignments apart. Only builds the name.
+    /// </summary>
+    string GetInstructionsFolder(string courseName, string assignmentTitle, string assignmentId);
+
+    /// <summary>
     /// Starts writing a new version's files under the submission's folder. Nothing is visible at the version's path
     /// until the writer is committed; disposing an uncommitted writer discards everything written so far.
     /// </summary>

@@ -12,6 +12,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Submission> Submissions => Set<Submission>();
     public DbSet<SubmissionVersion> SubmissionVersions => Set<SubmissionVersion>();
     public DbSet<VersionContent> VersionContents => Set<VersionContent>();
+    public DbSet<AssignmentInstructions> AssignmentInstructions => Set<AssignmentInstructions>();
+    public DbSet<InstructionsVersion> InstructionsVersions => Set<InstructionsVersion>();
+    public DbSet<InstructionsContent> InstructionsContents => Set<InstructionsContent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder) =>
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);

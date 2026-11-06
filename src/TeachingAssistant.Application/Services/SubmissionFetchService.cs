@@ -28,10 +28,14 @@ public class SubmissionFetchService : ISubmissionFetchService
     // Classroom states meaning work was handed in. RETURNED = handed in, then returned by the teacher.
     private static readonly HashSet<string> TurnedInStates = ["TURNED_IN", "RETURNED"];
 
+    // Shown in place of a student's name for problems with the assignment's instructions.
+    private const string InstructionsLabel = "Instructions";
+
     private readonly ISubmissionSource _submissionSource;
     private readonly IRemoteFileSource _fileSource;
     private readonly ISnapshotStorage _storage;
     private readonly ISubmissionStore _store;
+    private readonly IInstructionsFetchService _instructionsFetch;
     private readonly TimeProvider _timeProvider;
     private readonly SemaphoreSlim _fileCalls = new(MaxParallelFileCalls);
 
@@ -40,26 +44,36 @@ public class SubmissionFetchService : ISubmissionFetchService
         IRemoteFileSource fileSource,
         ISnapshotStorage storage,
         ISubmissionStore store,
+        IInstructionsFetchService instructionsFetch,
         TimeProvider timeProvider)
     {
         _submissionSource = submissionSource;
         _fileSource = fileSource;
         _storage = storage;
         _store = store;
+        _instructionsFetch = instructionsFetch;
         _timeProvider = timeProvider;
     }
 
     public async Task<FetchSummary> FetchAsync(string courseId, string assignmentId, CancellationToken cancellationToken = default)
     {
         var listed = await _submissionSource.GetSubmissionsAsync(courseId, assignmentId, cancellationToken);
+
+        // The course and the assignment: names for the folders, and the assignment's instructions to store.
+        var courseCall = _submissionSource.GetCourseAsync(courseId, cancellationToken);
+        var assignmentCall = _submissionSource.GetAssignmentAsync(courseId, assignmentId, cancellationToken);
+        await Task.WhenAll(courseCall, assignmentCall);
+        var (course, assignment) = (await courseCall, await assignmentCall);
+        var names = new FolderNames(course.Name, assignment.Title);
+
+        // Instructions first: grading needs them, and they are one small download. A failure here is reported but does
+        // not stop the submissions.
+        var problems = new List<FetchProblem>();
+        var instructions = await FetchInstructionsAsync(courseId, course.Name, assignment, problems, cancellationToken);
+
         var stored = (await _store.GetByAssignmentAsync(SubmissionSource.GoogleClassroom, assignmentId, cancellationToken))
             .ToDictionary(s => s.ExternalSubmissionId);
         var turnedIn = listed.Where(s => TurnedInStates.Contains(s.State)).ToList();
-
-        // Folder names (course / assignment / student) are only needed for submissions stored for the first time.
-        var names = turnedIn.Any(s => !stored.ContainsKey(s.Id))
-            ? await GetNamesAsync(courseId, assignmentId, cancellationToken)
-            : null;
 
         // Phase 1, in parallel: only reads stored submissions, never changes them or touches the database.
         var results = new StudentResult[turnedIn.Count];
@@ -71,7 +85,6 @@ public class SubmissionFetchService : ISubmissionFetchService
 
         // Phase 2, one by one in list order: apply the results to the submissions and save.
         int newSubmissions = 0, newVersions = 0, unchanged = 0;
-        var problems = new List<FetchProblem>();
 
         foreach (var result in results)
         {
@@ -110,15 +123,28 @@ public class SubmissionFetchService : ISubmissionFetchService
 
         await _store.SaveChangesAsync(cancellationToken); // student name updates on unchanged submissions
         return new FetchSummary(listed.Count, newSubmissions, newVersions, unchanged,
-            listed.Count - turnedIn.Count, problems);
+            listed.Count - turnedIn.Count, problems, instructions?.VersionNumber, instructions?.IsNew ?? false);
     }
 
-    private async Task<FolderNames> GetNamesAsync(string courseId, string assignmentId, CancellationToken cancellationToken)
+    // Stores the assignment's instructions when they changed. Null when they could not be read; the previously stored
+    // version, if any, stays in use for grading.
+    private async Task<InstructionsFetchResult?> FetchInstructionsAsync(
+        string courseId, string courseName, AssignmentResponse assignment, List<FetchProblem> problems,
+        CancellationToken cancellationToken)
     {
-        var course = _submissionSource.GetCourseAsync(courseId, cancellationToken);
-        var assignment = _submissionSource.GetAssignmentAsync(courseId, assignmentId, cancellationToken);
-        await Task.WhenAll(course, assignment);
-        return new FolderNames((await course).Name, (await assignment).Title);
+        try
+        {
+            var result = await _instructionsFetch.FetchAsync(courseId, courseName, assignment, cancellationToken);
+            problems.AddRange(result.Problems.Select(p => new FetchProblem(InstructionsLabel, p)));
+            return result;
+        }
+        catch (Exception ex) when (ex is SubmissionSourceNotFoundException or SubmissionSourceUnavailableException)
+        {
+            problems.Add(new FetchProblem(InstructionsLabel,
+                $"Could not store the assignment's instructions: {ex.Message} Grading uses the previously stored " +
+                "instructions, if any; retried on the next fetch."));
+            return null;
+        }
     }
 
     // Everything for one student that talks to the source or the disk: read attachments, compare, download.

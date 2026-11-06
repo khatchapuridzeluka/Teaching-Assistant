@@ -1,5 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, unwrap } from "./client";
+import { skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { api, type GradingResult, unwrap } from "./client";
 
 // One hook per endpoint. Components only call these; no fetch logic lives in pages.
 
@@ -91,11 +91,25 @@ export const useCodeFileText = (versionId: string, path: string | null) =>
   });
 
 // Sends one stored version to the model for a draft review. Costs tokens and can take a minute, so it only runs when
-// the teacher clicks; nothing is saved on the server yet.
-export const useGradeVersion = () =>
-  useMutation({
+// the teacher clicks. Nothing is saved on the server yet: the review is kept in this browser session (see useReview),
+// so closing the panel or changing pages does not lose it; a page refresh does.
+export const useGradeVersion = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
     mutationFn: (versionId: string) =>
       unwrap(api.POST("/versions/{versionId}/grade", { params: { path: { versionId } } })),
+    onSuccess: (review, versionId) => queryClient.setQueryData(["reviews", versionId], review),
+  });
+};
+
+// The latest AI review of a version in this browser session, or undefined before it is graded. Never fetched from the
+// API (there is nothing stored there yet): only useGradeVersion fills it, and it is kept until the page is refreshed.
+export const useReview = (versionId: string | undefined) =>
+  useQuery<GradingResult>({
+    queryKey: ["reviews", versionId],
+    queryFn: skipToken,
+    staleTime: Infinity,
+    gcTime: Infinity,
   });
 
 // Downloads a stored file's bytes for viewers that lay the file out in the browser (Word documents).

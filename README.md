@@ -22,10 +22,10 @@ This project automates the drafting, not the deciding:
 
 | Area | What it does | Status |
 |---|---|---|
-| **Classroom ingestion** | Connects a teacher's Google account (read-only OAuth), lists courses, assignments and submissions, and fetches turned-in work into stored versions (snapshots); unchanged submissions are skipped | Listing ✅ · fetch & versions ✅ |
+| **Classroom ingestion** | Connects a teacher's Google account (read-only OAuth), lists courses, assignments and submissions, and fetches turned-in work into stored versions (snapshots); unchanged submissions are skipped. The same fetch stores the assignment's instructions (task statement and attached files) as versions too, downloading them again only when they change | Listing ✅ · fetch & versions ✅ · instructions stored ✅ |
 | **Submission formats** | Zip/rar/7z archives of `.java` files, loose files, documents, images, or GitHub repository links | Drive files stored ✅ · zip/rar/7z/tar extraction ✅ · GitHub cloning planned |
 | **Sandboxed checks** | Compiles and runs student code in Docker (JDK 17–27), collecting compiler warnings, static analysis and test results before any AI judgment | Planned |
-| **Rubric grading** | Claude grades against a layered rubric: base rubric → per-assignment extensions → the teacher's policy rules | First version ✅: "Grade with AI" sends one stored version (code, PDFs, images; Word .docx as text) with the assignment's instruction files from Classroom to Claude Opus 5.5 (`Anthropic:GradingModel`) and shows a Markdown draft review; reads the code only, not saved yet · structured scores, saving, base rubric and policy rules planned |
+| **Rubric grading** | Claude grades against a layered rubric: base rubric → per-assignment extensions → the teacher's policy rules | First version ✅: "Grade with AI" sends one stored version (code, PDFs, images; Word .docx as text) with the assignment's stored instructions (saved by the fetch; no Classroom calls while grading) to Claude Opus 5.5 (`Anthropic:GradingModel`) and shows a Markdown draft review; reads the code only, not saved yet · structured scores, saving, base rubric and policy rules planned |
 | **Batch calibration** | Calibrates scores across the class and clusters common mistakes, so one explanation covers many students | Planned |
 | **Resubmissions** | Detects new versions, grades the diff, reports fixed / remaining / new mistakes; tracks initial and final scores | Planned |
 | **Teacher UI** | Courses, assignments with task statements, submissions table, "Fetch from Classroom", preview of stored submissions (extracted code in a read-only Monaco viewer, image gallery, PDFs, exported Google Docs and Word .docx files inline, downloads), re-extraction, Google connection and model check | Initial version ✅ |
@@ -115,15 +115,16 @@ The Anthropic key can alternatively be provided through the `ANTHROPIC_API_KEY` 
 
 ### 3. Start the database
 
-Copy `.env.example` to `.env` (git-ignored) and choose a local password, then start Postgres and create the tables:
+Copy `.env.example` to `.env` (git-ignored) and choose a local password, then start Postgres and point the API at it:
 
 ```bash
 docker compose up -d
 dotnet user-secrets set "ConnectionStrings:Postgres" "Host=localhost;Port=5432;Database=teaching_assistant;Username=teaching_assistant;Password=YOUR_LOCAL_PASSWORD" --project src/TeachingAssistant.WebAPI
-dotnet ef database update --project src/TeachingAssistant.Infrastructure --startup-project src/TeachingAssistant.WebAPI
 ```
 
-Data lives in a Docker volume, outside the repository. Submission files are stored under `%LOCALAPPDATA%\TeachingAssistant` (configurable as `Storage:Root`), outside the repository and outside synced folders such as OneDrive, as `submissions\{course}\{assignment}\{student} ({id})\v{n}\` with `original\` (exactly as submitted) and `code\` (archives unpacked, IDE folders and compiled files left out). After changing the entity model, add a migration with `dotnet ef migrations add <Name> --project src/TeachingAssistant.Infrastructure --startup-project src/TeachingAssistant.WebAPI --output-dir Persistence/Migrations`.
+In Development the API creates the database and applies pending migrations when it starts, so there is no separate step. Outside Development, apply them deliberately with `dotnet ef database update --project src/TeachingAssistant.Infrastructure --startup-project src/TeachingAssistant.WebAPI`.
+
+Data lives in a Docker volume, outside the repository. Submission files are stored under `%LOCALAPPDATA%\TeachingAssistant` (configurable as `Storage:Root`), outside the repository and outside synced folders such as OneDrive, as `submissions\{course}\{assignment}\{student} ({id})\v{n}\` with `original\` (exactly as submitted) and `code\` (archives unpacked, IDE folders and compiled files left out). Assignment instructions are stored next to them as `instructions\{course}\{assignment} ({id})\v{n}\original\`. After changing the entity model, add a migration with `dotnet ef migrations add <Name> --project src/TeachingAssistant.Infrastructure --startup-project src/TeachingAssistant.WebAPI --output-dir Persistence/Migrations`.
 
 ### 4. Set up Google Classroom access
 
@@ -166,12 +167,12 @@ Open `http://localhost:5173`. The Vite dev server forwards `/api/*` to the API, 
 | `GET` | `/courses` | Courses the teacher teaches in Google Classroom |
 | `GET` | `/courses/{courseId}/assignments` | Published assignments of a course, newest first, with the task statement, due date and materials (the teacher's attached instruction files and links) |
 | `GET` | `/courses/{courseId}/assignments/{assignmentId}/submissions` | Every student's submission: state, late flag, latest turn-in, attachments (Drive files and links) |
-| `POST` | `/courses/{courseId}/assignments/{assignmentId}/submissions/fetch` | Downloads and stores new or changed turned-in submissions as versions; returns a summary with problems |
+| `POST` | `/courses/{courseId}/assignments/{assignmentId}/submissions/fetch` | Stores the assignment's instructions (when new or changed), then downloads and stores new or changed turned-in submissions as versions; returns a summary with the instructions version and problems |
 | `GET` | `/courses/{courseId}/assignments/{assignmentId}/submissions/stored` | Submissions stored by fetch, with all versions (newest first) and their files |
 | `POST` | `/courses/{courseId}/assignments/{assignmentId}/submissions/extract` | Rebuilds the extracted code of all stored versions from the stored originals (no download) |
 | `GET` | `/stored-files/{contentId}` | One stored file by ID, shown inline (images, PDF) or saved with `?download=true` |
 | `GET` | `/versions/{versionId}/code` | Files extracted from a stored version |
-| `POST` | `/versions/{versionId}/grade` | Sends a stored version and its assignment's instructions to Claude and returns a draft review (Markdown) with the files sent and skipped; not saved |
+| `POST` | `/versions/{versionId}/grade` | Sends a stored version and its assignment's stored instructions to Claude and returns a draft review (Markdown) with the instructions version and the files sent and skipped; not saved; 400 until a fetch has stored the instructions |
 | `GET` | `/versions/{versionId}/code/file?path=…` | One extracted file (source code as UTF-8 text); paths outside the version's code folder are refused |
 | `POST` | `/agent/chat` | Chat with the assistant: sends the conversation so far with the teacher's new message and returns the whole reply (Markdown); long histories are trimmed to the most recent messages |
 

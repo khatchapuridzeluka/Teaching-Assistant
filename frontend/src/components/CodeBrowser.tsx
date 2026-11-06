@@ -14,8 +14,11 @@ const imageExtensions = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp", "sv
 
 const extension = (path: string) => path.split(".").pop()?.toLowerCase() ?? "";
 
-/** The extracted code of one version: a file list on the left, the selected file on the right (read-only). */
-export function CodeBrowser({ versionId }: { versionId: string }) {
+/**
+ * The extracted code of one version: a file list on the left, the selected file on the right (read-only).
+ * className sets the height; by default a fixed 560px, "h-full" to fill a column.
+ */
+export function CodeBrowser({ versionId, className = "h-[560px]" }: { versionId: string; className?: string }) {
   const files = useCodeFiles(versionId, true);
   const [selected, setSelected] = useState<string | null>(null);
 
@@ -43,7 +46,7 @@ export function CodeBrowser({ versionId }: { versionId: string }) {
   }
 
   return (
-    <div className="flex h-[560px] overflow-hidden rounded-[10px] border border-line bg-white">
+    <div className={`flex overflow-hidden rounded-[10px] border border-line bg-white ${className}`}>
       <FileList files={files.data} selected={selected} onSelect={setSelected} />
       <div className="flex min-w-0 flex-1 flex-col">
         {selected && <FileView versionId={versionId} path={selected} />}

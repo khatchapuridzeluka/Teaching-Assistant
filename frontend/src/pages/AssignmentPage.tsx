@@ -1,7 +1,15 @@
 import { useState } from "react";
 import { useParams } from "react-router";
 import type { Attachment, ExtractionSummary, FetchSummary, StoredSubmission, Submission } from "../api/client";
-import { useAssignments, useFetchSubmissions, useGradeVersion, useReExtract, useStoredSubmissions, useSubmissions } from "../api/hooks";
+import {
+  useAssignments,
+  useFetchSubmissions,
+  useGradeVersion,
+  useReExtract,
+  useReview,
+  useStoredSubmissions,
+  useSubmissions,
+} from "../api/hooks";
 import { GradingPanel } from "../components/GradingPanel";
 import { PreviewPanel } from "../components/PreviewPanel";
 import { Avatar, Button, Card, CardHeader, Chip, type ChipTone, EmptyState, ErrorPanel, PageHeader, Spinner } from "../components/ui";
@@ -17,16 +25,21 @@ export function AssignmentPage() {
   const extract = useReExtract(courseId, assignmentId);
   const [previewing, setPreviewing] = useState<StoredSubmission | null>(null);
   const grade = useGradeVersion();
-  const [grading, setGrading] = useState<{ submission: StoredSubmission; versionNumber: number } | null>(null);
+  const [reviewing, setReviewing] = useState<{ submission: StoredSubmission; versionId: string; versionNumber: number } | null>(null);
+  // The version being graded right now, if any: one grading at a time.
+  const gradingVersionId = grade.isPending ? grade.variables : undefined;
 
-  // Grades the newest stored version. Started from the click (not from the panel), so it is sent exactly once.
-  function startGrading(stored: StoredSubmission) {
+  // Opens the review panel for the newest stored version and, when asked, grades it. Grading starts from the click
+  // (not from the panel), so it is sent exactly once.
+  function openReview(stored: StoredSubmission, gradeNow: boolean) {
     const latest = stored.versions[0];
     if (!latest) {
       return;
     }
-    setGrading({ submission: stored, versionNumber: latest.number });
-    grade.mutate(latest.id);
+    setReviewing({ submission: stored, versionId: latest.id, versionNumber: latest.number });
+    if (gradeNow) {
+      grade.mutate(latest.id);
+    }
   }
 
   // Stored copies are matched to the live list by the Classroom submission ID.
@@ -106,8 +119,9 @@ export function AssignmentPage() {
                     submission={submission}
                     stored={storedById.get(submission.id)}
                     onPreview={setPreviewing}
-                    onGrade={startGrading}
-                    gradingBusy={grade.isPending}
+                    onGrade={(stored) => openReview(stored, true)}
+                    onOpenReview={(stored) => openReview(stored, false)}
+                    gradingVersionId={gradingVersionId}
                   />
                 ))}
               </tbody>
@@ -117,14 +131,17 @@ export function AssignmentPage() {
       )}
 
       {previewing && <PreviewPanel submission={previewing} onClose={() => setPreviewing(null)} />}
-      {grading && (
+      {reviewing && (
         <GradingPanel
-          submission={grading.submission}
-          versionNumber={grading.versionNumber}
-          pending={grade.isPending}
-          error={grade.error}
-          result={grade.data}
-          onClose={() => setGrading(null)}
+          submission={reviewing.submission}
+          versionId={reviewing.versionId}
+          versionNumber={reviewing.versionNumber}
+          pending={gradingVersionId === reviewing.versionId}
+          // Only this version's failure; a failed grading of another student is not shown here.
+          error={grade.isError && grade.variables === reviewing.versionId ? grade.error : null}
+          onRegrade={() => grade.mutate(reviewing.versionId)}
+          regradeDisabled={grade.isPending}
+          onClose={() => setReviewing(null)}
         />
       )}
     </>
@@ -167,6 +184,16 @@ function FetchResult({ summary }: { summary: FetchSummary }) {
             <div className="text-xs font-semibold text-accent">{tile.note}</div>
           </div>
         ))}
+      </div>
+      <div className="border-t border-line px-[18px] py-2.5 text-xs">
+        <b>Instructions:</b>{" "}
+        <span className="text-ink-muted">
+          {summary.instructionsVersion == null
+            ? "could not be stored (see below); grading uses the previously stored version, if any"
+            : summary.newInstructions
+              ? `stored as v${summary.instructionsVersion} (new or changed in Classroom)`
+              : `unchanged since v${summary.instructionsVersion}`}
+        </span>
       </div>
       {summary.problems.length > 0 && (
         <div className="border-t border-line px-[18px] py-3">
@@ -220,17 +247,21 @@ function SubmissionRow({
   stored,
   onPreview,
   onGrade,
-  gradingBusy,
+  onOpenReview,
+  gradingVersionId,
 }: {
   submission: Submission;
   stored: StoredSubmission | undefined;
   onPreview: (stored: StoredSubmission) => void;
   onGrade: (stored: StoredSubmission) => void;
-  gradingBusy: boolean;
+  onOpenReview: (stored: StoredSubmission) => void;
+  gradingVersionId: string | undefined;
 }) {
   const state = stateChip[submission.state] ?? { tone: "muted" as const, label: submission.state };
   const latest = stored?.versions[0];
   const turnedIn = submission.state === "TURNED_IN" || submission.state === "RETURNED";
+  const hasReview = useReview(latest?.id).data !== undefined;
+  const gradingThis = latest !== undefined && gradingVersionId === latest.id;
 
   return (
     <tr className="border-b border-paper-dark align-top last:border-b-0">
@@ -264,14 +295,21 @@ function SubmissionRow({
             <Button small variant="primary" onClick={() => onPreview(stored)}>
               Preview
             </Button>
-            <Button
-              small
-              onClick={() => onGrade(stored)}
-              disabled={gradingBusy}
-              title="Send this version and the assignment's instructions to the AI for a draft review"
-            >
-              Grade with AI
-            </Button>
+            {/* A review or a running grading opens the panel; otherwise this grades. One grading at a time. */}
+            {hasReview || gradingThis ? (
+              <Button small onClick={() => onOpenReview(stored)} title="Show the AI review next to the code">
+                {gradingThis ? "Grading…" : "AI review"}
+              </Button>
+            ) : (
+              <Button
+                small
+                onClick={() => onGrade(stored)}
+                disabled={gradingVersionId !== undefined}
+                title="Send this version and the assignment's instructions to the AI for a draft review"
+              >
+                Grade with AI
+              </Button>
+            )}
             <span className="text-xs text-ink-muted">
               v{latest.number} · {latest.files.filter((f) => f.stored).length} files
             </span>

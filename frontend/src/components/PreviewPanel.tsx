@@ -46,8 +46,9 @@ export function PreviewPanel({ submission, onClose }: { submission: StoredSubmis
   const chip = versionChip[version.status];
 
   return (
-    <div className="fixed inset-0 z-40 flex justify-end bg-ink/40" onClick={onClose}>
-      <aside className="flex h-full w-full max-w-[920px] flex-col bg-paper shadow-xl" onClick={(e) => e.stopPropagation()}>
+    // Full screen: the whole window is for reading the submission. Close or Escape returns to the table.
+    <div className="fixed inset-0 z-40 flex">
+      <aside className="flex h-full w-full flex-col bg-paper">
         <header className="flex items-center justify-between gap-4 border-b border-line bg-white px-6 py-4">
           <div className="min-w-0">
             <div className="truncate text-[15px] font-bold">{submission.studentName}</div>

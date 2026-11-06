@@ -289,6 +289,65 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/versions/{versionId}/grade": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sends a stored version and its assignment's stored instructions to the model and returns the draft review (not saved); can take a minute. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    versionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Draft review, with the instructions version used and the files that were sent and skipped */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GradingResponse"];
+                    };
+                };
+                /** @description Nothing to grade, instructions not stored yet (fetch first), or no instructions the model can read */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No stored version with this ID */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Model unreachable, returned an error, or declined */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -615,79 +674,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/versions/{versionId}/grade": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Sends a stored version and its assignment's instructions to the model and returns the draft review (not saved); can take a minute. */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    versionId: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Draft review, with the files that were sent and skipped */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["GradingResponse"];
-                    };
-                };
-                /** @description Nothing to grade, or the assignment has no instructions the model can read */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description No stored version with this ID, or the assignment or an instruction file was not found in Google */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Google account not connected or authorization expired; call POST /auth/google/connect */
-                409: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Google Classroom or Drive returned an error or could not be reached */
-                502: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Model unreachable, returned an error, or declined */
-                503: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/versions/{versionId}/code": {
         parameters: {
             query?: never;
@@ -864,7 +850,10 @@ export interface components {
             versionsWithCode: number;
             problems: components["schemas"]["FetchProblem"][];
         };
-        /** @description Something a fetch could not handle for one student, e.g. an unsupported attachment or a failed download. */
+        /**
+         * @description Something a fetch could not handle for one student, e.g. an unsupported attachment or a failed download. For a
+         *     problem with the assignment's instructions, StudentName is "Instructions".
+         */
         FetchProblem: {
             studentName: string;
             detail: string;
@@ -872,6 +861,8 @@ export interface components {
         /**
          * @description What one fetch of an assignment did. Unchanged submissions were already stored and were not downloaded again.
          *     NotSubmitted counts students who have not turned anything in. Problems lists what needs the teacher's attention.
+         *     InstructionsVersion is the stored version of the assignment's instructions used for grading (null when none could be
+         *     stored); NewInstructions is true when this fetch stored it because the instructions changed (or were stored for the first time).
          */
         FetchSummary: {
             /** Format: int32 */
@@ -885,6 +876,9 @@ export interface components {
             /** Format: int32 */
             notSubmitted: number;
             problems: components["schemas"]["FetchProblem"][];
+            /** Format: int32 */
+            instructionsVersion?: number | null;
+            newInstructions: boolean;
         };
         /**
          * @description Connection state of the teacher's Google account.
@@ -902,14 +896,17 @@ export interface components {
         };
         /**
          * @description The model's draft review of one stored version (Markdown: score per task, mistakes, short feedback). A draft for the
-         *     teacher, not saved yet. SentFiles lists everything the model was given (instructions and student files); SkippedFiles
-         *     lists what was left out and why, so the teacher can judge whether the review saw the whole submission.
+         *     teacher, not saved yet. InstructionsVersion is the stored version of the assignment's instructions it was graded
+         *     against. SentFiles lists everything the model was given (instructions and student files); SkippedFiles lists what was
+         *     left out and why, so the teacher can judge whether the review saw the whole submission.
          */
         GradingResponse: {
             /** Format: uuid */
             versionId: string;
             model: string;
             review: string;
+            /** Format: int32 */
+            instructionsVersion: number;
             sentFiles: string[];
             skippedFiles: string[];
         };
