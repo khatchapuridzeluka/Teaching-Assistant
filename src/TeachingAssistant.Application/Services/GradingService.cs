@@ -29,6 +29,20 @@ public class GradingService : IGradingService
     private const long MaxFilesBytes = 20L * 1024 * 1024;
     private const long MaxImageBytes = 5L * 1024 * 1024;
 
+    // Images taken from one submission's archive. The API accepts many more; homework has a handful of drawings, and the
+    // cap keeps a folder of screenshots from crowding out the code.
+    private const int MaxSubmissionImages = 20;
+
+    // Image files in the extracted code (drawings, diagrams, screenshots of output) the model can read, by extension.
+    private static readonly Dictionary<string, string> ImageTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        [".png"] = "image/png",
+        [".jpg"] = "image/jpeg",
+        [".jpeg"] = "image/jpeg",
+        [".gif"] = "image/gif",
+        [".webp"] = "image/webp",
+    };
+
     private const string SystemPrompt =
         """
         You grade programming homework for a university course (Advanced Java, and C++ basics) as the teacher's
@@ -173,10 +187,9 @@ public class GradingService : IGradingService
                 prompt.File($"Instructions file: {content.StoredName}", new FilePart(content.StoredName, content.MimeType!, bytes));
                 prompt.Sent.Add($"Instructions: {content.StoredName}");
             }
-            else if (_documentReader.CanRead(content.StoredName, content.MimeType) && _documentReader.ReadText(bytes) is { } text)
+            else if (_documentReader.CanRead(content.StoredName, content.MimeType) && _documentReader.Read(bytes) is { } document)
             {
-                prompt.Text($"<instructions_document name=\"{content.StoredName}\">\n{text}\n</instructions_document>");
-                prompt.Sent.Add($"Instructions: {content.StoredName} (as text)");
+                AddDocument(prompt, "instructions_document", "Instructions", content.StoredName, document);
             }
             else
             {
@@ -189,11 +202,35 @@ public class GradingService : IGradingService
     }
 
     // The extracted code as text, every file with its path and line numbers so the review can point at lines.
+    // Images in the extracted code (homework often asks for drawings, e.g. stack and heap diagrams) go as images right
+    // after the code, labelled with their path. Other binary files are skipped.
     private void AddCode(Prompt prompt, SubmissionVersion version)
     {
         var code = new StringBuilder();
+        var images = new List<(string Path, FilePart Image)>();
+        long imageBytes = 0;
+
         foreach (var file in _storage.ListCode(version.StoragePath))
         {
+            if (ImageTypes.TryGetValue(Path.GetExtension(file.Path), out var imageType))
+            {
+                if (images.Count >= MaxSubmissionImages)
+                {
+                    prompt.Skip($"{file.Path} (more than {MaxSubmissionImages} images in the submission)");
+                }
+                else if (file.SizeBytes > MaxImageBytes || !prompt.FitsFiles(imageBytes + file.SizeBytes))
+                {
+                    prompt.Skip($"{file.Path} (image too large)");
+                }
+                else if (ReadAll(_storage.OpenCode(version.StoragePath, file.Path)) is { } image)
+                {
+                    images.Add((file.Path, new FilePart(file.Path, imageType, image)));
+                    imageBytes += image.Length;
+                }
+
+                continue;
+            }
+
             if (file.SizeBytes > MaxCodeFileBytes)
             {
                 prompt.Skip($"{file.Path} (larger than {MaxCodeFileBytes / 1000} KB, not hand-written code)");
@@ -203,8 +240,7 @@ public class GradingService : IGradingService
             var bytes = ReadAll(_storage.OpenCode(version.StoragePath, file.Path));
             if (bytes is null || IsBinary(bytes))
             {
-                // Binary files in an archive (images, compiled leftovers) are not code; images inside archives are
-                // not sent yet.
+                // Other binary files in an archive (compiled leftovers, other formats) are not code.
                 prompt.Skip($"{file.Path} (not a text file)");
                 continue;
             }
@@ -230,6 +266,13 @@ public class GradingService : IGradingService
         if (code.Length > 0)
         {
             prompt.Text("<submission>\nThe student's source code. Each line starts with its line number.\n\n" + code + "</submission>");
+            prompt.HasStudentWork = true;
+        }
+
+        foreach (var (path, image) in images)
+        {
+            prompt.File($"Image in the student's submission: {path}", image);
+            prompt.Sent.Add($"Image: {path}");
             prompt.HasStudentWork = true;
         }
     }
@@ -279,10 +322,9 @@ public class GradingService : IGradingService
                 prompt.File($"The student's attached file: {content.Name}", new FilePart(content.Name, content.MimeType!, bytes));
                 prompt.Sent.Add($"Student file: {content.Name}");
             }
-            else if (_documentReader.ReadText(bytes) is { } text)
+            else if (_documentReader.Read(bytes) is { } document)
             {
-                prompt.Text($"<student_document name=\"{content.Name}\">\n{text}\n</student_document>");
-                prompt.Sent.Add($"Student file: {content.Name} (as text)");
+                AddDocument(prompt, "student_document", "Student file", content.Name, document);
             }
             else
             {
@@ -292,6 +334,29 @@ public class GradingService : IGradingService
 
             prompt.HasStudentWork = true;
         }
+    }
+
+    // A Word document as its text, then the pictures embedded in it (often code screenshots), each labelled with the
+    // "[image N]" marker that shows where it sits in the text, so the model knows which picture belongs to which task.
+    private static void AddDocument(Prompt prompt, string tag, string sentLabel, string name, ReadDocument document)
+    {
+        prompt.Text($"<{tag} name=\"{name}\">\n{document.Text}\n</{tag}>");
+
+        var images = 0;
+        for (var i = 0; i < document.Images.Count; i++)
+        {
+            var image = document.Images[i];
+            if (!prompt.FitsFiles(image.Content.Length))
+            {
+                prompt.Skip($"{sentLabel}: [image {i + 1}] in '{name}' (too large)");
+                continue;
+            }
+
+            prompt.File($"[image {i + 1}] in {name}:", new FilePart($"{name} [image {i + 1}]", image.MediaType, image.Content));
+            images++;
+        }
+
+        prompt.Sent.Add(images == 0 ? $"{sentLabel}: {name} (as text)" : $"{sentLabel}: {name} (as text, {images} images)");
     }
 
     private static byte[]? ReadAll(Stream? stream)

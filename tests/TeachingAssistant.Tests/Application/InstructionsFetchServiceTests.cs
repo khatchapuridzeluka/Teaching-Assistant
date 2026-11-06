@@ -177,6 +177,6 @@ public class InstructionsFetchServiceTests
     {
         public bool CanRead(string fileName, string? mediaType) => fileName.EndsWith(".docx", StringComparison.OrdinalIgnoreCase);
 
-        public string? ReadText(byte[] content) => "text";
+        public ReadDocument? Read(byte[] content) => new("text", []);
     }
 }

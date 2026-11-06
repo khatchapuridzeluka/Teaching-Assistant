@@ -17,8 +17,9 @@ public class GradingServiceTests
     private readonly FakeInstructionsStore _instructions = new();
     private readonly FakeStorage _storage = new();
     private readonly RecordingModel _model = new();
+    private readonly FakeWordReader _wordReader = new();
 
-    private GradingService Service() => new(_store, _instructions, _storage, new FakeWordReader(), _model);
+    private GradingService Service() => new(_store, _instructions, _storage, _wordReader, _model);
 
     [Fact]
     public async Task Grade_SendsStoredInstructionsFirst_ThenCodeAndStudentFiles()
@@ -77,6 +78,28 @@ public class GradingServiceTests
     }
 
     [Fact]
+    public async Task Grade_SendsThePicturesInWordInstructions_RightAfterTheirText()
+    {
+        // Instructions often paste the code as IDE screenshots; without them the model cannot check the drawings.
+        _instructions.Store(null, Stored("Homework_1.docx", DocxType, Encoding.UTF8.GetBytes("Task 1\n[image 1]\nTask 2\n[image 2]")));
+        _wordReader.Images.Add(new DocumentImage("image1.png", "image/png", [1]));
+        _wordReader.Images.Add(new DocumentImage("image2.png", "image/png", [2]));
+        var versionId = _store.AddVersion(Content(ContentKind.CodeArchive, "hw.zip", "application/zip"));
+        _storage.Code["Main.java"] = "class Main {}";
+
+        var result = await Service().GradeVersionAsync(versionId, TestContext.Current.CancellationToken);
+
+        var parts = _model.Parts!;
+        var instructionsAt = parts.FindIndex(p => p is TextPart t && t.Text.StartsWith("<instructions_document"));
+        var codeAt = parts.FindIndex(p => p is TextPart t && t.Text.Contains("<submission>"));
+        var images = parts.OfType<FilePart>().ToList();
+        Assert.Equal(["Homework_1.docx [image 1]", "Homework_1.docx [image 2]"], images.Select(i => i.Name));
+        Assert.All(images, image => Assert.InRange(parts.IndexOf(image), instructionsAt + 1, codeAt - 1));
+        Assert.Contains(parts, p => p is TextPart { Text: "[image 2] in Homework_1.docx:" });
+        Assert.Equal(["Instructions: Homework_1.docx (as text, 2 images)", "Code: Main.java"], result!.SentFiles);
+    }
+
+    [Fact]
     public async Task Grade_NeverSendsTheStudentsName()
     {
         _instructions.Store("Write a zoo.");
@@ -90,17 +113,38 @@ public class GradingServiceTests
     }
 
     [Fact]
-    public async Task Grade_SkipsBinaryFilesInTheCode()
+    public async Task Grade_SkipsBinaryFilesInTheCode_ThatAreNotImages()
     {
         _instructions.Store("Write a zoo.");
         var versionId = _store.AddVersion(Content(ContentKind.CodeArchive, "zoo.zip", "application/zip"));
         _storage.Code["Main.java"] = "class Main {}";
-        _storage.Code["diagram.png"] = "\0PNG";
+        _storage.Code["data.bin"] = "\0\u0001\u0002";
 
         var result = await Service().GradeVersionAsync(versionId, TestContext.Current.CancellationToken);
 
         Assert.Equal(["Code: Main.java"], result!.SentFiles);
-        Assert.Contains(result.SkippedFiles, s => s.StartsWith("diagram.png"));
+        Assert.Contains(result.SkippedFiles, s => s.StartsWith("data.bin"));
+    }
+
+    [Fact]
+    public async Task Grade_SendsImagesFromTheArchive_AsImagesAfterTheCode()
+    {
+        // Homework often asks for drawings (stack and heap diagrams) zipped together with the code.
+        _instructions.Store("Draw the stack and the heap.");
+        var versionId = _store.AddVersion(Content(ContentKind.CodeArchive, "hw.zip", "application/zip"));
+        _storage.Code["Main.java"] = "class Main {}";
+        _storage.Code["drawings/Task 1.png"] = "\0PNG";
+        _storage.Code["drawings/Task 2.JPG"] = "\0JPG";
+
+        var result = await Service().GradeVersionAsync(versionId, TestContext.Current.CancellationToken);
+
+        var images = _model.Parts!.OfType<FilePart>().ToList();
+        Assert.Equal([("drawings/Task 1.png", "image/png"), ("drawings/Task 2.JPG", "image/jpeg")],
+            images.Select(i => (i.Name, i.MediaType)));
+        var codeAt = _model.Parts!.FindIndex(p => p is TextPart t && t.Text.Contains("<submission>"));
+        Assert.True(codeAt < _model.Parts!.IndexOf(images[0]));
+        Assert.Contains(_model.Parts!, p => p is TextPart { Text: "Image in the student's submission: drawings/Task 1.png" });
+        Assert.Equal(["Code: Main.java", "Image: drawings/Task 1.png", "Image: drawings/Task 2.JPG"], result!.SentFiles);
     }
 
     [Fact]
@@ -224,12 +268,15 @@ public class GradingServiceTests
             throw new NotSupportedException();
     }
 
-    // Treats a .docx's bytes as its text; the real format is tested in WordDocumentReaderTests.
+    // Treats a .docx's bytes as its text and returns the configured images; the real format is tested in
+    // WordDocumentReaderTests.
     private sealed class FakeWordReader : IDocumentReader
     {
+        public List<DocumentImage> Images { get; } = [];
+
         public bool CanRead(string fileName, string? mediaType) => fileName.EndsWith(".docx", StringComparison.OrdinalIgnoreCase);
 
-        public string? ReadText(byte[] content) => Encoding.UTF8.GetString(content);
+        public ReadDocument? Read(byte[] content) => new(Encoding.UTF8.GetString(content), Images);
     }
 
     private sealed class RecordingModel : ILanguageModel

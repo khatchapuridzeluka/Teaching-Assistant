@@ -25,7 +25,7 @@ This project automates the drafting, not the deciding:
 | **Classroom ingestion** | Connects a teacher's Google account (read-only OAuth), lists courses, assignments and submissions, and fetches turned-in work into stored versions (snapshots); unchanged submissions are skipped. The same fetch stores the assignment's instructions (task statement and attached files) as versions too, downloading them again only when they change | Listing ✅ · fetch & versions ✅ · instructions stored ✅ |
 | **Submission formats** | Zip/rar/7z archives of `.java` files, loose files, documents, images, or GitHub repository links | Drive files stored ✅ · zip/rar/7z/tar extraction ✅ · GitHub cloning planned |
 | **Sandboxed checks** | Compiles and runs student code in Docker (JDK 17–27), collecting compiler warnings, static analysis and test results before any AI judgment | Planned |
-| **Rubric grading** | Claude grades against a layered rubric: base rubric → per-assignment extensions → the teacher's policy rules | First version ✅: "Grade with AI" sends one stored version (code, PDFs, images; Word .docx as text) with the assignment's stored instructions (saved by the fetch; no Classroom calls while grading) to Claude Opus 5.5 (`Anthropic:GradingModel`) and shows a Markdown draft review; reads the code only, not saved yet · structured scores, saving, base rubric and policy rules planned |
+| **Rubric grading** | Claude grades against a layered rubric: base rubric → per-assignment extensions → the teacher's policy rules | First version ✅: "Grade with AI" sends one stored version (code, PDFs, images, including drawings inside the submitted archive; Word .docx as text plus the pictures embedded in it, such as code screenshots) with the assignment's stored instructions (saved by the fetch; no Classroom calls while grading) to Claude Opus 5.5 (`Anthropic:GradingModel`) and shows a Markdown draft review; reads the code only, not saved yet · structured scores, saving, base rubric and policy rules planned |
 | **Batch calibration** | Calibrates scores across the class and clusters common mistakes, so one explanation covers many students | Planned |
 | **Resubmissions** | Detects new versions, grades the diff, reports fixed / remaining / new mistakes; tracks initial and final scores | Planned |
 | **Teacher UI** | Courses, assignments with task statements, submissions table, "Fetch from Classroom", preview of stored submissions (extracted code in a read-only Monaco viewer, image gallery, PDFs, exported Google Docs and Word .docx files inline, downloads), re-extraction, Google connection and model check | Initial version ✅ |
@@ -70,7 +70,7 @@ src/
     Google/                              OAuth, Classroom adapter, Drive adapter (file metadata and download)
     Persistence/                         EF Core DbContext, entity mappings, migrations, submission store
     Storage/                             submission files on disk (versions written atomically), code extraction
-    Documents/                           reads the text of Word .docx files (instructions, reports) for the model
+    Documents/                           reads Word .docx files (instructions, reports) for the model: text plus embedded pictures
   TeachingAssistant.WebAPI/
     Controllers/                         HTTP endpoints
     Extensions/                          service registration

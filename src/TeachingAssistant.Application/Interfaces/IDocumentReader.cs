@@ -1,8 +1,10 @@
+using TeachingAssistant.Application.Models;
+
 namespace TeachingAssistant.Application.Interfaces;
 
 /// <summary>
-/// Reads the text of documents the model cannot take as files (Word .docx), so they can be sent as text instead.
-/// Teachers' instruction files in Classroom are usually Word documents.
+/// Reads documents the model cannot take as files (Word .docx), so they can be sent as text plus images instead.
+/// Teachers' instruction files in Classroom are usually Word documents, often with code pasted as screenshots.
 /// </summary>
 public interface IDocumentReader
 {
@@ -10,8 +12,8 @@ public interface IDocumentReader
     bool CanRead(string fileName, string? mediaType);
 
     /// <summary>
-    /// The document's text: paragraphs on their own lines, table rows with cells separated by " | ".
-    /// Null when the file is damaged or not really such a document.
+    /// The document's text (paragraphs on their own lines, table rows with cells separated by " | ") and the images
+    /// embedded in it, each marked in the text where it appears. Null when the file is damaged or not really such a document.
     /// </summary>
-    string? ReadText(byte[] content);
+    ReadDocument? Read(byte[] content);
 }
