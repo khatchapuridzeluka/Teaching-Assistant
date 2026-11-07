@@ -10,7 +10,8 @@ namespace TeachingAssistant.Application.Services;
 /// Stores an assignment's instructions once per change. It compares what the source reports now (title, task statement,
 /// maximum points, and each attached file's revision, read without downloading) with the latest stored version, and only
 /// when something differs downloads the files into a new version. Only files the grader can use are downloaded: PDFs,
-/// images and documents it can read as text (Word); links and videos are recorded but not stored.
+/// images and documents it can read as text (Word); links and videos are recorded but not stored. When nothing changed,
+/// the latest version's files are still checked on disk, and any that are missing are downloaded again in place.
 /// </summary>
 public class InstructionsFetchService : IInstructionsFetchService
 {
@@ -46,7 +47,8 @@ public class InstructionsFetchService : IInstructionsFetchService
         if (existing is { LatestVersion: { } latest }
             && !existing.HasChanged(assignment.Title, assignment.Description, assignment.MaxPoints, current.Select(c => c.Fingerprint)))
         {
-            return new InstructionsFetchResult(latest.Number, IsNew: false, []);
+            // Unchanged at the source, but the database alone does not prove the files are on disk.
+            return new InstructionsFetchResult(latest.Number, IsNew: false, await RestoreMissingAsync(latest, current, cancellationToken));
         }
 
         var instructions = existing ?? new AssignmentInstructions(SubmissionSource.GoogleClassroom, courseId, assignment.Id,
@@ -75,6 +77,33 @@ public class InstructionsFetchService : IInstructionsFetchService
             await _store.SaveChangesAsync(cancellationToken);
             return new InstructionsFetchResult(version.Number, IsNew: true, problems);
         }
+    }
+
+    // Downloads again every stored file of the version that is missing on disk, under the name the database records.
+    // The source has not changed (the caller checked), so the same bytes come back. Returns what was restored.
+    private async Task<List<string>> RestoreMissingAsync(
+        InstructionsVersion version, List<CurrentMaterial> current, CancellationToken cancellationToken)
+    {
+        var restored = new List<string>();
+        foreach (var content in version.Contents)
+        {
+            if (content.StoredName is not { } storedName || _storage.OriginalExists(version.StoragePath, storedName))
+            {
+                continue;
+            }
+
+            var file = current.FirstOrDefault(c => c.Fingerprint.ExternalId == content.ExternalId)?.File;
+            if (file is null)
+            {
+                continue; // cannot happen while unchanged; nothing to download from
+            }
+
+            await _storage.RestoreOriginalAsync(version.StoragePath, storedName,
+                stream => _fileSource.DownloadAsync(file, stream, cancellationToken), cancellationToken);
+            restored.Add($"'{content.Name}' was missing from storage and was downloaded again (v{version.Number}).");
+        }
+
+        return restored;
     }
 
     // What each material is right now, read without downloading: a Drive file's revision, or the link itself.

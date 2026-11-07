@@ -62,6 +62,45 @@ public class SubmissionFetchServiceTests
     }
 
     [Fact]
+    public async Task UnchangedSubmission_WithAFileMissingOnDisk_IsRestoredInPlace_NotAsANewVersion()
+    {
+        _files.Add("file-1", "homework.zip", "md5-a");
+        _source.Add("sub-1", "Ana K.", "TURNED_IN", DriveAttachment("file-1"));
+        await FetchAsync();
+        var path = Assert.Single(Assert.Single(_store.Submissions).Versions).StoragePath;
+        _storage.LostOriginals[$"{path}/homework.zip"] = true;
+        _files.Downloads = 0;
+
+        var summary = await FetchAsync();
+
+        // The student did not resubmit: still one version, counted as unchanged, its file downloaded again and the code
+        // rebuilt from it, and the teacher is told.
+        Assert.Equal((1, 0), (summary.Unchanged, summary.NewVersions));
+        Assert.Single(Assert.Single(_store.Submissions).Versions);
+        Assert.Equal([$"{path}/homework.zip"], _storage.Restored);
+        Assert.Equal([path], _storage.ReExtracted);
+        Assert.Equal(1, _files.Downloads);
+        Assert.Contains(summary.Problems, p => p.Detail.Contains("missing from storage; downloaded again"));
+    }
+
+    [Fact]
+    public async Task UnchangedSubmission_WithItsCodeFolderMissing_IsExtractedAgain_WithoutDownloading()
+    {
+        _files.Add("file-1", "homework.zip", "md5-a");
+        _source.Add("sub-1", "Ana K.", "TURNED_IN", DriveAttachment("file-1"));
+        await FetchAsync();
+        var path = Assert.Single(Assert.Single(_store.Submissions).Versions).StoragePath;
+        _storage.LostCode[path] = true;
+        _files.Downloads = 0;
+
+        var summary = await FetchAsync();
+
+        Assert.Equal([path], _storage.ReExtracted);
+        Assert.Equal(0, _files.Downloads);
+        Assert.Contains(summary.Problems, p => p.Detail.Contains("extracted again"));
+    }
+
+    [Fact]
     public async Task ReplacedFile_BecomesVersionTwo()
     {
         _files.Add("file-1", "homework.zip", "md5-a");
@@ -275,10 +314,33 @@ public class SubmissionFetchServiceTests
 
         public Stream? OpenOriginal(string versionPath, string storedName) => throw new NotSupportedException();
 
-        public Task<CodeExtraction> ReExtractAsync(string versionPath, IReadOnlyList<ExtractableFile> files, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
+        // Committed files a test marks as gone from disk ("{version path}/{stored name}"), and versions whose code/ is gone.
+        public ConcurrentDictionary<string, bool> LostOriginals { get; } = [];
+        public ConcurrentDictionary<string, bool> LostCode { get; } = [];
+        public ConcurrentBag<string> Restored { get; } = [];
+        public ConcurrentBag<string> ReExtracted { get; } = [];
 
-        public IReadOnlyList<CodeFile> ListCode(string versionPath) => throw new NotSupportedException();
+        public bool OriginalExists(string versionPath, string storedName) =>
+            Committed.TryGetValue(versionPath, out var files) && files.Contains(storedName)
+            && !LostOriginals.ContainsKey($"{versionPath}/{storedName}");
+
+        public async Task RestoreOriginalAsync(string versionPath, string storedName, Func<Stream, Task> write, CancellationToken cancellationToken = default)
+        {
+            await write(new MemoryStream());
+            LostOriginals.TryRemove($"{versionPath}/{storedName}", out _);
+            Restored.Add($"{versionPath}/{storedName}");
+        }
+
+        public Task<CodeExtraction> ReExtractAsync(string versionPath, IReadOnlyList<ExtractableFile> files, CancellationToken cancellationToken = default)
+        {
+            LostCode.TryRemove(versionPath, out _);
+            ReExtracted.Add(versionPath);
+            var code = files.Where(f => f.Kind is ContentKind.CodeArchive or ContentKind.SourceFile).Select(f => f.StoredName).ToList();
+            return Task.FromResult(new CodeExtraction(code.Count > 0 ? "code-hash" : null, code.Count, code, []));
+        }
+
+        public IReadOnlyList<CodeFile> ListCode(string versionPath) =>
+            LostCode.ContainsKey(versionPath) ? [] : [new CodeFile("Main.java", 10)];
 
         public Stream? OpenCode(string versionPath, string relativePath) => throw new NotSupportedException();
 

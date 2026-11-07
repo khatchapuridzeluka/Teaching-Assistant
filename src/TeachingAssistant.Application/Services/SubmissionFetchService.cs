@@ -99,6 +99,12 @@ public class SubmissionFetchService : ISubmissionFetchService
             if (result.Version is not { } version)
             {
                 unchanged++;
+                if (result.Repair is { } repair)
+                {
+                    // The files were restored in phase 1; record the rebuilt code on the same version.
+                    submission.LatestVersion!.RecordExtraction(repair.ContentHash, repair.ExtractedStoredNames, ExtractionDetail(repair));
+                }
+
                 continue;
             }
 
@@ -174,13 +180,76 @@ public class SubmissionFetchService : ISubmissionFetchService
 
         if (!submission.HasChanged(current.Select(c => c.Fingerprint)))
         {
-            return new StudentResult(item, submission, existing is null, null, problems);
+            // Unchanged at the source, but the database alone does not prove the files are on disk.
+            var repair = await RepairLatestAsync(submission, item, current, problems, cancellationToken);
+            return new StudentResult(item, submission, existing is null, null, problems, repair);
         }
 
         var version = await TryStoreFilesAsync(submission, item, current, problems, cancellationToken);
         return version is null
             ? StudentResult.Skipped(item, problems)
             : new StudentResult(item, submission, existing is null, version, problems);
+    }
+
+    // Brings the latest version's folder back in line with the database, in place: originals missing on disk are
+    // downloaded again under their recorded names (the source is unchanged, so the bytes are the same), and the code
+    // folder is rebuilt when originals came back or the code is gone. Not a new version: the student did not resubmit.
+    // Only touches the disk; the new extraction is recorded on the version in phase 2. Null when nothing was missing or
+    // a download failed (then the problem is reported and the next fetch tries again).
+    private async Task<CodeExtraction?> RepairLatestAsync(
+        Submission submission, SubmissionResponse item, List<CurrentContent> current,
+        List<FetchProblem> problems, CancellationToken cancellationToken)
+    {
+        if (submission.LatestVersion is not { } version)
+        {
+            return null;
+        }
+
+        var missing = version.Contents
+            .Where(c => c.StoredName is not null && !_storage.OriginalExists(version.StoragePath, c.StoredName))
+            .ToList();
+        var codeMissing = version.ContentHash is not null && _storage.ListCode(version.StoragePath).Count == 0;
+        if (missing.Count == 0 && !codeMissing)
+        {
+            return null;
+        }
+
+        try
+        {
+            foreach (var content in missing)
+            {
+                var file = current.FirstOrDefault(c => c.Fingerprint.ExternalId == content.ExternalId)?.File;
+                if (file is null)
+                {
+                    continue; // cannot happen while unchanged; nothing to download from
+                }
+
+                await _storage.RestoreOriginalAsync(version.StoragePath, content.StoredName!,
+                    stream => LimitedAsync(async () =>
+                    {
+                        await _fileSource.DownloadAsync(file, stream, cancellationToken);
+                        return true;
+                    }, cancellationToken),
+                    cancellationToken);
+            }
+        }
+        catch (Exception ex) when (ex is SubmissionSourceNotFoundException or SubmissionSourceUnavailableException)
+        {
+            problems.Add(new FetchProblem(item.StudentName,
+                $"v{version.Number} has files missing from storage, and downloading them again failed: {ex.Message} " +
+                "Retried on the next fetch."));
+            return null;
+        }
+
+        var extraction = await _storage.ReExtractAsync(version.StoragePath, version.Contents
+            .Where(c => c.StoredName is not null)
+            .Select(c => new ExtractableFile(c.StoredName!, c.Kind))
+            .ToList(), cancellationToken);
+
+        problems.Add(new FetchProblem(item.StudentName, missing.Count > 0
+            ? $"v{version.Number}: {string.Join(", ", missing.Select(c => $"'{c.Name}'"))} missing from storage; downloaded again."
+            : $"v{version.Number}: extracted code was missing from storage; extracted again."));
+        return extraction;
     }
 
     // What the source reports now for each attachment, read in parallel without downloading. Null when an attachment
@@ -363,9 +432,10 @@ public class SubmissionFetchService : ISubmissionFetchService
         List<VersionContent> Contents, CodeExtraction Extraction);
 
     // The outcome of phase 1 for one student. Submission is null when the student was skipped;
-    // Version is null when nothing changed.
+    // Version is null when nothing changed. Repair is set when the unchanged latest version's files were restored.
     private sealed record StudentResult(
-        SubmissionResponse Item, Submission? Submission, bool IsNew, PreparedVersion? Version, List<FetchProblem> Problems)
+        SubmissionResponse Item, Submission? Submission, bool IsNew, PreparedVersion? Version, List<FetchProblem> Problems,
+        CodeExtraction? Repair = null)
     {
         public static StudentResult Skipped(SubmissionResponse item, List<FetchProblem> problems) =>
             new(item, null, false, null, problems);

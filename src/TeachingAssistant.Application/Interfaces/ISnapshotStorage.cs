@@ -33,6 +33,19 @@ public interface ISnapshotStorage
     Stream? OpenOriginal(string versionPath, string storedName);
 
     /// <summary>
+    /// Whether a stored original is really on disk. The database can say a file is stored while its folder was deleted,
+    /// moved, or never written; fetch uses this to find such files and download them again.
+    /// </summary>
+    bool OriginalExists(string versionPath, string storedName);
+
+    /// <summary>
+    /// Writes one original of an existing version again under the same stored name, so the database's records keep
+    /// pointing at it. <paramref name="write"/> fills the content; the file only replaces anything at that name once
+    /// it is complete. Never writes outside the storage root.
+    /// </summary>
+    Task RestoreOriginalAsync(string versionPath, string storedName, Func<Stream, Task> write, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Rebuilds a stored version's code/ folder from its originals (nothing is downloaded). The old code/ is only
     /// replaced once the new one is complete.
     /// </summary>

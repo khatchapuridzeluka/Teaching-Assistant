@@ -58,6 +58,29 @@ public class InstructionsFetchServiceTests
     }
 
     [Fact]
+    public async Task UnchangedInstructions_WithAFileMissingOnDisk_AreRestoredInPlace()
+    {
+        // The database says v1 is stored, but its folder is gone (deleted by hand, or never written).
+        _files.Add("doc-1", "Homework_2.docx", DocxType, "md5-a");
+        await FetchAsync(Assignment(Drive("doc-1")));
+        _storage.OnDisk.Clear();
+
+        var second = await FetchAsync(Assignment(Drive("doc-1")));
+
+        // Same version (nothing changed at the source), the file is back under its recorded name, and it is reported.
+        Assert.Equal((1, false), (second.VersionNumber, second.IsNew));
+        Assert.Single(_store.Saved!.Versions);
+        Assert.Equal(["instructions/Java II/Homework 2/v1/Homework_2.docx"], _storage.Restored);
+        Assert.Contains(second.Problems, p => p.Contains("missing from storage"));
+        Assert.Equal(2, _files.Downloads);
+
+        // Once restored, the next fetch downloads nothing.
+        var third = await FetchAsync(Assignment(Drive("doc-1")));
+        Assert.Empty(third.Problems);
+        Assert.Equal(2, _files.Downloads);
+    }
+
+    [Fact]
     public async Task ReplacedFile_BecomesVersionTwo()
     {
         _files.Add("doc-1", "Homework_2.docx", DocxType, "md5-a");
@@ -135,6 +158,19 @@ public class InstructionsFetchServiceTests
     {
         public List<string> Stored { get; } = [];
 
+        // What is on "disk", as "{version path}/{stored name}"; a test removes entries to simulate a lost folder.
+        public HashSet<string> OnDisk { get; } = [];
+        public List<string> Restored { get; } = [];
+
+        public bool OriginalExists(string versionPath, string storedName) => OnDisk.Contains($"{versionPath}/{storedName}");
+
+        public async Task RestoreOriginalAsync(string versionPath, string storedName, Func<Stream, Task> write, CancellationToken cancellationToken = default)
+        {
+            await write(new MemoryStream());
+            OnDisk.Add($"{versionPath}/{storedName}");
+            Restored.Add($"{versionPath}/{storedName}");
+        }
+
         public string GetInstructionsFolder(string courseName, string assignmentTitle, string assignmentId) =>
             $"instructions/{courseName}/{assignmentTitle}";
 
@@ -161,6 +197,7 @@ public class InstructionsFetchServiceTests
             {
                 await write(new MemoryStream());
                 storage.Stored.Add(fileName);
+                storage.OnDisk.Add($"{path}/{fileName}");
                 return fileName;
             }
 

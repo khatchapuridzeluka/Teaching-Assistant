@@ -42,16 +42,52 @@ public class FileSystemSnapshotStorage(IOptions<StorageOptions> options) : ISnap
 
     public Stream? OpenOriginal(string versionPath, string storedName)
     {
-        var root = Path.GetFullPath(_root);
-        var path = Path.GetFullPath(Path.Combine(root, versionPath, "original", storedName));
-
         // The arguments come from our database, but check anyway: never serve anything outside the storage root.
-        if (!path.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) || !File.Exists(path))
+        var path = OriginalPath(versionPath, storedName);
+        if (path is null || !File.Exists(path))
         {
             return null;
         }
 
         return new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 81920, useAsync: true);
+    }
+
+    public bool OriginalExists(string versionPath, string storedName) =>
+        OriginalPath(versionPath, storedName) is { } path && File.Exists(path);
+
+    public async Task RestoreOriginalAsync(
+        string versionPath, string storedName, Func<Stream, Task> write, CancellationToken cancellationToken = default)
+    {
+        var path = OriginalPath(versionPath, storedName)
+                   ?? throw new ArgumentException($"'{storedName}' is outside the storage root.", nameof(storedName));
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+
+        // Written beside the target and moved over it when complete, so a failed download never leaves half a file.
+        var temp = $"{path}.{Guid.NewGuid():N}.part";
+        try
+        {
+            await using (var stream = new FileStream(temp, FileMode.CreateNew))
+            {
+                await write(stream);
+            }
+
+            File.Move(temp, path, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(temp))
+            {
+                File.Delete(temp);
+            }
+        }
+    }
+
+    // The full path of a stored original, or null when the arguments would point outside the storage root.
+    private string? OriginalPath(string versionPath, string storedName)
+    {
+        var root = Path.GetFullPath(_root);
+        var path = Path.GetFullPath(Path.Combine(root, versionPath, OriginalFolder, storedName));
+        return path.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) ? path : null;
     }
 
     public Task<CodeExtraction> ReExtractAsync(

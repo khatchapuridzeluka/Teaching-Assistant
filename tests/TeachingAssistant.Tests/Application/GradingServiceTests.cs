@@ -307,6 +307,11 @@ public class GradingServiceTests
         public Stream? OpenCode(string versionPath, string relativePath) =>
             Code.TryGetValue(relativePath, out var text) ? new MemoryStream(Encoding.UTF8.GetBytes(text)) : null;
 
+        public bool OriginalExists(string versionPath, string storedName) => throw new NotSupportedException();
+
+        public Task RestoreOriginalAsync(string versionPath, string storedName, Func<Stream, Task> write, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public Stream? OpenOriginal(string versionPath, string storedName) =>
             Originals.TryGetValue(storedName, out var bytes) ? new MemoryStream(bytes) : null;
 
