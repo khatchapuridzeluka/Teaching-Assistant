@@ -57,13 +57,13 @@ public class SubmissionFetchService : ISubmissionFetchService
 
     public async Task<FetchSummary> FetchAsync(string courseId, string assignmentId, CancellationToken cancellationToken = default)
     {
-        var listed = await _submissionSource.GetSubmissionsAsync(courseId, assignmentId, cancellationToken);
-
-        // The course and the assignment: names for the folders, and the assignment's instructions to store.
+        // The submissions, plus the course and the assignment (names for the folders, and the assignment's instructions
+        // to store). None of the three depends on another, so they are requested at the same time.
+        var listedCall = _submissionSource.GetSubmissionsAsync(courseId, assignmentId, cancellationToken);
         var courseCall = _submissionSource.GetCourseAsync(courseId, cancellationToken);
         var assignmentCall = _submissionSource.GetAssignmentAsync(courseId, assignmentId, cancellationToken);
-        await Task.WhenAll(courseCall, assignmentCall);
-        var (course, assignment) = (await courseCall, await assignmentCall);
+        await Task.WhenAll(listedCall, courseCall, assignmentCall);
+        var (listed, course, assignment) = (await listedCall, await courseCall, await assignmentCall);
         var names = new FolderNames(course.Name, assignment.Title);
 
         // Instructions first: grading needs them, and they are one small download. A failure here is reported but does

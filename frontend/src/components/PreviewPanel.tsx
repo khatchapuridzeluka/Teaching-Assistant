@@ -58,14 +58,14 @@ export function PreviewPanel({
     // Full screen: the whole window is for reading the submission. Close or Escape returns to the table.
     <div className="fixed inset-0 z-40 flex">
       <aside className="flex h-full w-full flex-col bg-paper">
-        <header className="flex items-center justify-between gap-4 border-b border-line bg-white px-6 py-4">
+        <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-line bg-white px-4 py-3 sm:px-6 sm:py-4">
           <div className="min-w-0">
             <div className="truncate text-[15px] font-bold">{submission.studentName}</div>
             <div className="text-xs text-ink-muted">
               Fetched {formatDate(version.fetchedAt)} · turned in {formatDate(version.turnedInAt)} · our stored copy
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {chip && <Chip tone={chip.tone}>{chip.label}</Chip>}
             {submission.versions.map((v) => (
               <button
@@ -82,7 +82,7 @@ export function PreviewPanel({
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto px-6 py-5">
+        <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
           <div className="flex flex-col gap-6">
             {version.extractionDetail && (
               <div className="rounded-[10px] border border-line border-l-4 border-l-ink bg-white px-4 py-2.5 text-xs">
@@ -115,7 +115,7 @@ export function PreviewPanel({
 
             {pdfs.map((file) => (
               <Section key={file.id} title={file.name} action={<DownloadLink file={file} />}>
-                <iframe src={storedFileUrl(file.id)} title={file.name} className="h-[640px] w-full rounded-[10px] border border-line bg-white" />
+                <iframe src={storedFileUrl(file.id)} title={file.name} className="h-[70dvh] w-full rounded-[10px] border border-line bg-white sm:h-[640px]" />
               </Section>
             ))}
 

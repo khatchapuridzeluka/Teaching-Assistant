@@ -36,7 +36,7 @@ export function InstructionsPage() {
 
       {state.materials.length > 0 && (
         // Fills the window below the statement; the document scrolls inside it.
-        <Card className="flex h-[calc(100vh-150px)] min-h-[480px] flex-col overflow-hidden">
+        <Card className="flex h-[calc(100dvh-150px)] min-h-[420px] flex-col overflow-hidden">
           <InstructionsViewer courseId={courseId} assignmentId={assignmentId} materials={state.materials} initial={state.main} />
         </Card>
       )}

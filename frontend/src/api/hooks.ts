@@ -1,4 +1,4 @@
-import { skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { skipToken, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type GradingResult, unwrap } from "./client";
 
 // One hook per endpoint. Components only call these; no fetch logic lives in pages.
@@ -140,6 +140,18 @@ export const useReview = (versionId: string | undefined) =>
     queryFn: skipToken,
     staleTime: Infinity,
     gcTime: Infinity,
+  });
+
+// The session's reviews of many versions at once (for counts and list badges); same cache entries as useReview.
+export const useReviews = (versionIds: string[]) =>
+  useQueries({
+    queries: versionIds.map((versionId) => ({
+      queryKey: ["reviews", versionId],
+      queryFn: skipToken,
+      staleTime: Infinity,
+      gcTime: Infinity,
+    })),
+    combine: (results) => new Map(versionIds.map((id, i) => [id, results[i]?.data as GradingResult | undefined])),
   });
 
 // Downloads a stored file's bytes for viewers that lay the file out in the browser (Word documents).

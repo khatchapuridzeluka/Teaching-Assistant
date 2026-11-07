@@ -28,13 +28,15 @@ export function AssignmentsPage() {
           {assignments.data.length === 0 ? (
             <EmptyState>This course has no published assignments.</EmptyState>
           ) : (
+            // Scrolls sideways on a phone rather than squeezing the columns; the long statement column hides there.
+            <div className="overflow-x-auto">
             <table className="w-full border-collapse">
               <thead>
                 <tr className="border-b border-line text-left text-[11px] uppercase tracking-[0.06em] text-ink-muted">
                   <th className="px-[18px] py-2.5 font-semibold">Assignment</th>
                   <th className="px-[18px] py-2.5 font-semibold">Due</th>
                   <th className="px-[18px] py-2.5 font-semibold">Points</th>
-                  <th className="px-[18px] py-2.5 font-semibold">Task statement</th>
+                  <th className="hidden px-[18px] py-2.5 font-semibold md:table-cell">Task statement</th>
                   <th />
                 </tr>
               </thead>
@@ -48,7 +50,7 @@ export function AssignmentsPage() {
                     </td>
                     <td className="whitespace-nowrap px-[18px] py-2.5 text-ink-muted">{formatDate(assignment.dueAt)}</td>
                     <td className="px-[18px] py-2.5 font-semibold tabular-nums">{assignment.maxPoints ?? "–"}</td>
-                    <td className="max-w-[420px] px-[18px] py-2.5 text-ink-muted">
+                    <td className="hidden max-w-[420px] px-[18px] py-2.5 text-ink-muted md:table-cell">
                       <span className="line-clamp-1">{assignment.description || "No description (task may be in an attached file)"}</span>
                     </td>
                     <td className="px-[18px] py-2.5 text-right">
@@ -63,6 +65,7 @@ export function AssignmentsPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </Card>
       )}

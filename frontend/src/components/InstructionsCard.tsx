@@ -4,7 +4,7 @@ import { type Assignment, type InstructionsFile, instructionsFileUrl } from "../
 import { useInstructions, useInstructionsFileBlob } from "../api/hooks";
 import { formatDate } from "../format";
 import { DocxView } from "./DocxPreview";
-import { Button, Card, Chip } from "./ui";
+import { Button, Chip } from "./ui";
 
 type FileType = "pdf" | "docx" | "image" | "video" | "link" | "other";
 
@@ -123,80 +123,72 @@ export function InstructionsNotes({ state }: { state: InstructionsState }) {
 }
 
 /**
- * On the assignment page: the task statement on the left and the materials as a scrollable list on the right. A material
- * opens the instructions modal, where everything is previewed; the modal links on to the instructions page.
+ * On the assignment page: the instructions in one row — version, the statement's first line (click to read it all),
+ * and the materials as chips that open the instructions modal, where everything is previewed.
  */
-export function InstructionsCard({ courseId, assignment }: { courseId: string; assignment: Assignment }) {
+export function InstructionsBar({ courseId, assignment }: { courseId: string; assignment: Assignment }) {
   const state = useInstructionMaterials(courseId, assignment);
-  const { text, materials } = state;
+  const { text, materials, stored, main } = state;
   const [expanded, setExpanded] = useState(false);
   const [open, setOpen] = useState<Material | null>(null);
-  const long = text.length > 320 || text.split("\n").length > 4;
 
   return (
-    <Card>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-[18px] py-[13px]">
-        <div className="flex min-w-0 flex-wrap items-center gap-2.5">
-          <h3 className="text-sm font-bold">Instructions</h3>
-          <InstructionsStatus state={state} />
+    <div className="border-y border-line">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 py-2.5 md:flex-nowrap">
+        <span className="shrink-0 text-[11px] font-bold uppercase tracking-[0.06em] text-ink-muted">Instructions</span>
+        {stored ? (
+          <Chip tone="tint">
+            v{stored.number} · stored {formatDate(stored.fetchedAt)}
+          </Chip>
+        ) : (
+          stored === null && <Chip tone="dashed">Not stored yet</Chip>
+        )}
+        <button
+          onClick={() => setExpanded(!expanded)}
+          aria-expanded={expanded}
+          title={expanded ? "Hide the task statement" : "Read the whole task statement"}
+          // A line of its own on phones, between the chip row and the links.
+          className="order-last w-full truncate text-left text-ink-muted hover:text-ink md:order-none md:w-auto md:min-w-[140px] md:flex-1"
+        >
+          {text || "No task statement; the task is in the attached materials."}
+        </button>
+        {/* The first few materials as chips (cut off when there is no room); the modal has all of them. */}
+        <div className="hidden min-w-0 shrink items-center gap-1.5 overflow-hidden lg:flex">
+          {materials.slice(0, 3).map((m) => (
+            <button
+              key={m.file.id}
+              onClick={() => setOpen(m)}
+              title={`${m.file.name} · ${m.storedUrl ? "sent to the AI" : "not sent to the AI"}`}
+              className="flex h-7 max-w-[170px] shrink-0 items-center gap-1.5 rounded-lg border border-line bg-white px-2 text-xs hover:border-accent"
+            >
+              <span className="text-[9px] font-bold tracking-wide text-accent">{typeLabel[m.type]}</span>
+              <span className="truncate">{m.file.name}</span>
+            </button>
+          ))}
         </div>
-        <Link to={instructionsPath(courseId, assignment.id)} className="text-xs font-semibold text-accent">
-          Open instructions page →
-        </Link>
+        <div className="flex shrink-0 items-center">
+          {materials.length > 0 && (
+            <button onClick={() => setOpen(main ?? null)} className="px-1.5 text-xs font-semibold text-accent">
+              {/* The chips are hidden on smaller screens, so there the link names all materials. */}
+              <span className="lg:hidden">Materials · {materials.length}</span>
+              <span className="hidden lg:inline">{materials.length > 3 ? `+${materials.length - 3} · View all` : "View all"}</span>
+            </button>
+          )}
+          <Link to={instructionsPath(courseId, assignment.id)} className="px-1.5 text-xs font-semibold text-accent" title="Open the instructions page">
+            Page →
+          </Link>
+        </div>
       </div>
       <InstructionsNotes state={state} />
-
-      <div className={`grid ${materials.length > 0 ? "lg:grid-cols-[minmax(0,1fr)_340px]" : ""}`}>
-        <div className="px-[18px] py-3.5">
-          {text ? (
-            <>
-              <p className={`whitespace-pre-wrap leading-relaxed ${long && !expanded ? "line-clamp-4" : ""}`}>{text}</p>
-              {long && (
-                <button onClick={() => setExpanded(!expanded)} className="mt-1.5 text-xs font-semibold text-accent">
-                  {expanded ? "Show less" : "Show all"}
-                </button>
-              )}
-            </>
-          ) : (
-            <p className="text-ink-muted">No task statement; the task is in the attached materials.</p>
-          )}
-        </div>
-
-        {materials.length > 0 && (
-          <div className="flex flex-col border-t border-line lg:border-l lg:border-t-0">
-            <div className="px-[18px] pb-1.5 pt-3 text-[11px] font-bold uppercase tracking-[0.06em] text-ink-muted">
-              Materials · {materials.length}
-            </div>
-            {/* Scrolls instead of stretching the card when there are many materials. */}
-            <ul className="flex max-h-[148px] flex-col gap-1.5 overflow-y-auto px-[18px] pb-3">
-              {materials.map((m) => (
-                <li key={m.file.id}>
-                  <button
-                    onClick={() => setOpen(m)}
-                    className="flex w-full items-center gap-2.5 rounded-lg border border-line bg-white px-2.5 py-1.5 text-left hover:border-accent"
-                  >
-                    <span className="flex h-7 w-11 shrink-0 items-center justify-center rounded-md bg-accent-tint text-[9px] font-bold tracking-wide text-accent">
-                      {typeLabel[m.type]}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-xs font-semibold">{m.file.name}</span>
-                      <span className="block truncate text-[11px] text-ink-muted">
-                        {m.storedUrl ? `Sent to the AI · ${formatSize(m.file.sizeBytes)}` : "Not sent to the AI"}
-                      </span>
-                    </span>
-                    <span className="text-xs font-semibold text-accent">View</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </div>
-
+      {expanded && (
+        <p className="mb-3 max-h-[220px] overflow-y-auto whitespace-pre-wrap rounded-[10px] border border-line bg-white px-[18px] py-3 leading-relaxed">
+          {text || "No task statement; the task is in the attached materials."}
+        </p>
+      )}
       {open && (
         <InstructionsModal courseId={courseId} assignment={assignment} state={state} initial={open} onClose={() => setOpen(null)} />
       )}
-    </Card>
+    </div>
   );
 }
 
@@ -225,15 +217,15 @@ function InstructionsModal({
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-ink/50 p-6" onClick={onClose}>
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-ink/50 p-2 sm:p-6" onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"
         aria-label={`${assignment.title} instructions`}
         onClick={(e) => e.stopPropagation()}
-        className="flex h-[88vh] w-full max-w-[1100px] flex-col overflow-hidden rounded-xl border border-line bg-white shadow-xl"
+        className="flex h-[94dvh] w-full max-w-[1100px] flex-col overflow-hidden rounded-xl border border-line bg-white shadow-xl sm:h-[88vh]"
       >
-        <header className="flex items-center justify-between gap-4 border-b border-line px-[18px] py-3">
+        <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-line px-4 py-3 sm:px-[18px]">
           <div className="flex min-w-0 flex-wrap items-center gap-2.5">
             <b className="truncate text-[15px]">{assignment.title} · instructions</b>
             <InstructionsStatus state={state} />

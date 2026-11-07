@@ -73,7 +73,8 @@ export function CodeBrowser({
   }
 
   return (
-    <div className={`flex overflow-hidden rounded-[10px] border border-line bg-white ${className}`}>
+    // Very narrow (a phone): the file list sits above the code instead of beside it.
+    <div className={`@container flex flex-col overflow-hidden rounded-[10px] border border-line bg-white @lg:flex-row ${className}`}>
       <FileList files={files.data} selected={selected} onSelect={setSelected} mistakes={mistakes} />
       <div className="flex min-w-0 flex-1 flex-col">
         {selected && (
@@ -111,7 +112,8 @@ function FileList({
   }, [files]);
 
   return (
-    <nav className="w-[230px] shrink-0 overflow-y-auto border-r border-line py-2">
+    // Narrower when the code has little room (the file names truncate; the full path is in the tooltip).
+    <nav className="max-h-[132px] w-full shrink-0 overflow-y-auto border-b border-line py-2 @lg:max-h-none @lg:w-[160px] @lg:border-b-0 @lg:border-r @2xl:w-[220px]">
       {groups.map(([folder, folderFiles]) => (
         <div key={folder} className="mb-1">
           {folder && <div className="truncate px-3 pb-0.5 pt-2 text-[10px] font-bold uppercase tracking-[0.06em] text-ink-muted">{folder}/</div>}

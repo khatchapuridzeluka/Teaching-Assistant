@@ -7,6 +7,7 @@ export type Assignment = components["schemas"]["AssignmentResponse"];
 export type Submission = components["schemas"]["SubmissionResponse"];
 export type Attachment = components["schemas"]["SubmissionAttachment"];
 export type FetchSummary = components["schemas"]["FetchSummary"];
+export type FetchProblem = components["schemas"]["FetchProblem"];
 export type GoogleStatus = components["schemas"]["GoogleConnectionStatus"];
 export type ModelHealth = components["schemas"]["ModelHealthResponse"];
 export type StoredSubmission = components["schemas"]["StoredSubmissionResponse"];

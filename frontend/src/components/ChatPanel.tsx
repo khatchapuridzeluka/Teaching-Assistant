@@ -57,7 +57,7 @@ export function ChatPanel({ page, onClose }: { page: string | null; onClose: () 
   }
 
   return (
-    <aside className="flex w-[400px] shrink-0 flex-col border-l border-line bg-white">
+    <aside className="flex h-full w-full max-w-[400px] shrink-0 flex-col border-l border-line bg-white xl:w-[400px]">
       <header className="flex items-center justify-between gap-3 border-b border-line px-[18px] py-3.5">
         <div className="min-w-0">
           <div className="text-sm font-bold">Ask agent</div>

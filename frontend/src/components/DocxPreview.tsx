@@ -31,20 +31,44 @@ export function DocxView({ blob, className = "max-h-[720px]" }: { blob: UseQuery
     let cancelled = false;
     setFailed(false);
 
+    // Word pages have a fixed width (A4 is about 800px); in a narrower viewer (a phone) they are scaled down to fit
+    // instead of scrolling sideways. Never scaled up.
+    const fit = () => {
+      const page = host.querySelector<HTMLElement>("section.docx");
+      if (!page) {
+        return;
+      }
+      // The page plus the grey margin around it; the page is centred, so its overflow would be cut off on both sides.
+      const wrapper = host.querySelector<HTMLElement>(".docx-wrapper");
+      const margin = wrapper ? parseFloat(getComputedStyle(wrapper).paddingLeft) * 2 : 0;
+      const needed = page.offsetWidth + margin;
+      const available = target.clientWidth;
+      host.style.zoom = needed > available ? String(available / needed) : "1";
+    };
+    const observer = new ResizeObserver(fit);
+    observer.observe(target);
+
     renderAsync(blob.data, host, host, {
       inWrapper: true, // grey background with page-like sheets, like Word
       breakPages: true,
       ignoreLastRenderedPageBreak: true,
       useBase64URL: true, // images as data URLs, so no object URLs to clean up
       renderAltChunks: false, // alt chunks embed raw HTML from the file; student files are untrusted
-    }).catch(() => {
-      if (!cancelled) {
-        setFailed(true);
-      }
-    });
+    })
+      .then(() => {
+        if (!cancelled) {
+          fit();
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setFailed(true);
+        }
+      });
 
     return () => {
       cancelled = true;
+      observer.disconnect();
       host.remove();
     };
   }, [blob.data]);

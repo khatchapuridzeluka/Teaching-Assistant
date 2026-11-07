@@ -72,7 +72,8 @@ export function CourseOverviewPage() {
               >
                 <span className="truncate font-semibold">{assignment.title}</span>
                 <span className="shrink-0 text-xs text-ink-muted">
-                  Due {formatDate(assignment.dueAt)} · {assignment.maxPoints ?? "–"} points
+                  Due {formatDate(assignment.dueAt)}
+                  <span className="hidden sm:inline"> · {assignment.maxPoints ?? "–"} points</span>
                 </span>
               </Link>
             </li>

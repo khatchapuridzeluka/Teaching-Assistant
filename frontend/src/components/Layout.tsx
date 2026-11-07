@@ -1,5 +1,5 @@
-import { type ReactNode, useState } from "react";
-import { Link, NavLink, Outlet, useMatch, useMatches } from "react-router";
+import { type ReactNode, useEffect, useState } from "react";
+import { Link, NavLink, Outlet, useLocation, useMatch, useMatches } from "react-router";
 import { useApiHealth, useAssignments, useCourses, useGoogleStatus } from "../api/hooks";
 import { coursePath, courseSections, workspaceSections } from "../navigation";
 import { ChatPanel } from "./ChatPanel";
@@ -16,22 +16,40 @@ const navClass = ({ isActive }: { isActive: boolean }) =>
 
 export function Layout() {
   const [chatOpen, setChatOpen] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
   const page = usePageDescription();
+  const location = useLocation();
+
+  // The drawer closes once a link in it was followed.
+  useEffect(() => {
+    setNavOpen(false);
+  }, [location.pathname]);
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <Sidebar />
+    <div className="flex h-dvh overflow-hidden">
+      {/* Wide screens: the sidebar is always there. Narrow: it opens as a drawer from the menu button. */}
+      <Sidebar className="hidden lg:flex" />
+      {navOpen && (
+        <div className="fixed inset-0 z-50 flex lg:hidden">
+          <div className="absolute inset-0 bg-ink/50" onClick={() => setNavOpen(false)} />
+          <Sidebar className="relative flex shadow-xl" />
+        </div>
+      )}
       <div className="flex min-w-0 flex-1 flex-col">
-        <TopBar chatOpen={chatOpen} onToggleChat={() => setChatOpen(!chatOpen)} />
-        <main className="flex-1 overflow-y-auto px-7 py-6">
+        <TopBar chatOpen={chatOpen} onToggleChat={() => setChatOpen(!chatOpen)} onOpenNav={() => setNavOpen(true)} />
+        <main className="flex-1 overflow-y-auto px-4 py-4 lg:px-7 lg:py-6">
           {/* Full width: tables and code need the room, and the agent panel narrows the page instead of covering it. */}
           <div className="flex flex-col gap-[18px]">
             <Outlet />
           </div>
         </main>
       </div>
-      {/* Hidden rather than removed when closed, so the conversation survives closing and navigating. */}
-      <div className={chatOpen ? "flex" : "hidden"}>
+      {/* Hidden rather than removed when closed, so the conversation survives closing and navigating. On wide screens
+          it narrows the page; on narrower ones it slides over it, and the backdrop closes it. */}
+      <div
+        className={chatOpen ? "fixed inset-0 z-50 flex justify-end bg-ink/40 xl:static xl:z-auto xl:bg-transparent" : "hidden"}
+        onClick={(e) => e.target === e.currentTarget && setChatOpen(false)}
+      >
         <ChatPanel page={page} onClose={() => setChatOpen(false)} />
       </div>
     </div>
@@ -60,14 +78,14 @@ const sectionClass = ({ isActive }: { isActive: boolean }) =>
     isActive ? "bg-accent font-semibold text-white" : "text-[#c4c6c7] hover:bg-ink-soft"
   }`;
 
-function Sidebar() {
+function Sidebar({ className = "" }: { className?: string }) {
   const courses = useCourses();
   const [coursesOpen, setCoursesOpen] = useState(true);
   // The course being viewed shows its sections; the others stay one line each.
   const currentCourseId = useMatch("/courses/:courseId/*")?.params.courseId;
 
   return (
-    <aside className="flex w-[232px] shrink-0 flex-col overflow-y-auto bg-ink px-3.5 py-5 text-paper">
+    <aside className={`w-[232px] shrink-0 flex-col overflow-y-auto bg-ink px-3.5 py-5 text-paper ${className}`}>
       <Link to="/" className="flex items-center gap-2.5 px-2 pb-[18px]">
         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-xs font-bold text-white">TA</span>
         <span>
@@ -179,7 +197,7 @@ export function AssignmentTitle({ courseId, assignmentId }: { courseId: string; 
   return <>{assignments.data?.find((a) => a.id === assignmentId)?.title ?? "Assignment"}</>;
 }
 
-function TopBar({ chatOpen, onToggleChat }: { chatOpen: boolean; onToggleChat: () => void }) {
+function TopBar({ chatOpen, onToggleChat, onOpenNav }: { chatOpen: boolean; onToggleChat: () => void; onOpenNav: () => void }) {
   const matches = useMatches();
   const health = useApiHealth();
   const crumbs = matches.flatMap((match) =>
@@ -187,23 +205,33 @@ function TopBar({ chatOpen, onToggleChat }: { chatOpen: boolean; onToggleChat: (
   );
 
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between border-b border-line bg-white px-7">
-      <nav className="flex min-w-0 items-center gap-2 text-xs text-ink-muted">
-        {crumbs.map((crumb, i) => (
-          <span key={i} className="flex items-center gap-2">
-            {i > 0 && <span>/</span>}
-            {crumb.to && i < crumbs.length - 1 ? (
-              <Link to={crumb.to} className="hover:text-ink">{crumb.label}</Link>
-            ) : (
-              <b className="truncate font-semibold text-ink">{crumb.label}</b>
-            )}
-          </span>
-        ))}
-      </nav>
+    <header className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-line bg-white px-4 lg:px-7">
+      <div className="flex min-w-0 items-center gap-3">
+        <button
+          onClick={onOpenNav}
+          aria-label="Open navigation"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-line text-base lg:hidden"
+        >
+          ☰
+        </button>
+        <nav className="flex min-w-0 items-center gap-2 overflow-hidden text-xs text-ink-muted">
+          {crumbs.map((crumb, i) => (
+            // On narrow screens only the last two crumbs are shown; the drawer has the rest.
+            <span key={i} className={`min-w-0 items-center gap-2 ${i < crumbs.length - 2 ? "hidden md:flex" : "flex"}`}>
+              {i > 0 && <span>/</span>}
+              {crumb.to && i < crumbs.length - 1 ? (
+                <Link to={crumb.to} className="truncate hover:text-ink">{crumb.label}</Link>
+              ) : (
+                <b className="truncate font-semibold text-ink">{crumb.label}</b>
+              )}
+            </span>
+          ))}
+        </nav>
+      </div>
       <div className="flex shrink-0 items-center gap-4">
-        <span className="flex items-center gap-2 text-xs text-ink-muted">
+        <span className="flex items-center gap-2 text-xs text-ink-muted" title={health.isSuccess ? "API online" : "API offline"}>
           <span className={`h-2 w-2 rounded-full ${health.isSuccess ? "bg-accent" : "bg-line"}`} />
-          {health.isSuccess ? "API online" : health.isLoading ? "Checking API…" : "API offline"}
+          <span className="hidden sm:inline">{health.isSuccess ? "API online" : health.isLoading ? "Checking API…" : "API offline"}</span>
         </span>
         <Button variant={chatOpen ? "outline" : "dark"} onClick={onToggleChat}>
           {chatOpen ? "Hide agent" : "Ask agent"}

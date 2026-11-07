@@ -64,12 +64,13 @@ export function CardHeader({ title, subtitle, actions }: { title: ReactNode; sub
 
 export function PageHeader({ title, subtitle, actions }: { title: ReactNode; subtitle?: ReactNode; actions?: ReactNode }) {
   return (
-    <div className="flex items-start justify-between gap-6">
+    // The actions move under the title when they do not fit next to it.
+    <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
       <div className="min-w-0">
-        <h1 className="text-[22px] font-bold tracking-tight">{title}</h1>
+        <h1 className="text-[20px] font-bold tracking-tight sm:text-[22px]">{title}</h1>
         {subtitle && <div className="mt-0.5 text-ink-muted">{subtitle}</div>}
       </div>
-      {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
   );
 }
