@@ -29,13 +29,8 @@ export const courseSections: Section[] = [
   {
     path: "students",
     label: "Students",
-    ready: false,
-    description: "Each student's work across assignments and how they grow over time.",
-    plans: [
-      "Score trend per student, initial and final scores side by side",
-      "Mistakes labelled new, repeated or fixed since earlier assignments",
-      "A short written overview of each student, drafted by the agent for you to edit",
-    ],
+    ready: true,
+    description: "Every student's grades per assignment, initial and final, and their overall score.",
   },
   {
     path: "gradebook",

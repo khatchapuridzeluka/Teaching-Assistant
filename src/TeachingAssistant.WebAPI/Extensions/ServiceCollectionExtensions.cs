@@ -44,6 +44,8 @@ public static class ServiceCollectionExtensions
             .UseSnakeCaseNamingConvention());
         services.AddScoped<ISubmissionStore, SubmissionStore>();
         services.AddScoped<IInstructionsStore, InstructionsStore>();
+        services.AddScoped<IStudentStore, StudentStore>();
+        services.AddScoped<ICourseAssignmentStore, CourseAssignmentStore>();
 
         services.Configure<StorageOptions>(configuration.GetSection(StorageOptions.SectionName));
         services.AddSingleton<ISnapshotStorage, FileSystemSnapshotStorage>();
@@ -104,6 +106,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IStoredSubmissionService, StoredSubmissionService>();
         services.AddScoped<IAgentChatService, AgentChatService>();
         services.AddScoped<IGradingService, GradingService>();
+        services.AddScoped<ICourseSyncService, CourseSyncService>();
+        services.AddScoped<IStudentService, StudentService>();
 
         return services;
     }

@@ -5,6 +5,7 @@ using TeachingAssistant.Application.Interfaces;
 using TeachingAssistant.Application.Interfaces.Services;
 using TeachingAssistant.Application.Models;
 using TeachingAssistant.Application.Services;
+using TeachingAssistant.Domain.Grading;
 using TeachingAssistant.Domain.Ingestion;
 
 namespace TeachingAssistant.Tests.Application;
@@ -117,7 +118,7 @@ public class SubmissionFetchServiceTests
     }
 
     [Fact]
-    public async Task NotTurnedIn_IsCountedButNotStored()
+    public async Task NotTurnedIn_IsRecordedWithoutFiles_SoMissingWorkIsKnown()
     {
         _files.Add("file-1", "draft.zip", "md5-a");
         _source.Add("sub-1", "Ana K.", "CREATED", DriveAttachment("file-1"));
@@ -125,8 +126,45 @@ public class SubmissionFetchServiceTests
         var summary = await FetchAsync();
 
         Assert.Equal(1, summary.NotSubmitted);
-        Assert.Empty(_store.Submissions);
+        var submission = Assert.Single(_store.Submissions);
+        Assert.Empty(submission.Versions);
+        Assert.Equal("CREATED", submission.State);
         Assert.Equal(0, _files.Downloads);
+    }
+
+    [Fact]
+    public async Task Fetch_CopiesGradesAndHistory_ForEveryStudent()
+    {
+        var returned = new DateTimeOffset(2026, 10, 25, 10, 0, 0, TimeSpan.Zero);
+        _files.Add("file-1", "homework.zip", "md5-a");
+        _source.Add("sub-1", "Ana K.", "TURNED_IN", DriveAttachment("file-1"));
+        _source.AddGraded("sub-2", "Gio M.", "RETURNED", 90,
+            new GradeChange(GradeEventKind.AssignedGrade, 70, 100, returned),
+            new GradeChange(GradeEventKind.AssignedGrade, 90, 100, returned.AddDays(4)));
+
+        await FetchAsync();
+
+        var graded = _store.Submissions.Single(s => s.ExternalSubmissionId == "sub-2");
+        Assert.Equal((70.0, 90.0), (graded.InitialGrade!.Value, graded.FinalGrade!.Value));
+        Assert.Equal("RETURNED", graded.State);
+        var ungraded = _store.Submissions.Single(s => s.ExternalSubmissionId == "sub-1");
+        Assert.Null(ungraded.FinalGrade);
+        Assert.Single(ungraded.Versions);
+    }
+
+    [Fact]
+    public async Task SubmissionRecordedBySync_GetsItsFirstFilesAsANewSubmission()
+    {
+        // A course sync recorded the submission (state and grade only) before any files were fetched.
+        _store.Submissions.Add(new Submission(SubmissionSource.GoogleClassroom, "course-1", "assignment-1", "user-sub-1",
+            "Ana K.", "sub-1", "submissions/Java II/Assignment 4/Ana K. (user-sub-1)", DateTimeOffset.UtcNow));
+        _files.Add("file-1", "homework.zip", "md5-a");
+        _source.Add("sub-1", "Ana K.", "TURNED_IN", DriveAttachment("file-1"));
+
+        var summary = await FetchAsync();
+
+        Assert.Equal((1, 0), (summary.NewSubmissions, summary.NewVersions));
+        Assert.Equal(1, Assert.Single(Assert.Single(_store.Submissions).Versions).Number);
     }
 
     [Fact]
@@ -156,7 +194,8 @@ public class SubmissionFetchServiceTests
 
         var summary = await FetchAsync();
 
-        Assert.Empty(_store.Submissions);
+        // Recorded for state and grade only: no version, no files.
+        Assert.Empty(Assert.Single(_store.Submissions).Versions);
         Assert.Empty(_storage.Committed);
         Assert.Equal(1, _storage.Discarded);
         Assert.Contains(summary.Problems, p => p.Detail.StartsWith("Download failed"));
@@ -206,7 +245,7 @@ public class SubmissionFetchServiceTests
 
         var summary = await FetchAsync();
 
-        Assert.Empty(_store.Submissions);
+        Assert.Empty(Assert.Single(_store.Submissions).Versions);
         Assert.Equal(0, _files.Downloads);
         Assert.Contains(summary.Problems, p => p.Detail.StartsWith("Could not read 'missing'"));
     }
@@ -245,8 +284,12 @@ public class SubmissionFetchServiceTests
         private readonly List<SubmissionResponse> _submissions = [];
 
         public void Add(string id, string student, string state, params SubmissionAttachment[] attachments) =>
-            _submissions.Add(new SubmissionResponse(id, $"user-{id}", student, state, false,
-                DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, attachments, null));
+            _submissions.Add(new SubmissionResponse(id, "assignment-1", $"user-{id}", student, state, false,
+                DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, attachments, null, null, []));
+
+        public void AddGraded(string id, string student, string state, double grade, params GradeChange[] history) =>
+            _submissions.Add(new SubmissionResponse(id, "assignment-1", $"user-{id}", student, state, false,
+                null, DateTimeOffset.UtcNow, [], null, grade, history));
 
         public Task<IReadOnlyList<SubmissionResponse>> GetSubmissionsAsync(string courseId, string assignmentId, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<SubmissionResponse>>(_submissions);
@@ -261,6 +304,12 @@ public class SubmissionFetchServiceTests
             throw new NotSupportedException();
 
         public Task<IReadOnlyList<AssignmentResponse>> GetAssignmentsAsync(string courseId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<SubmissionResponse>> GetCourseSubmissionsAsync(string courseId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<RosterStudent>> GetStudentsAsync(string courseId, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
     }
 
@@ -397,6 +446,9 @@ public class SubmissionFetchServiceTests
 
         public Task<IReadOnlyList<Submission>> GetByAssignmentAsync(SubmissionSource source, string assignmentId, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<Submission>>(Submissions.Where(s => s.AssignmentId == assignmentId).ToList());
+
+        public Task<IReadOnlyList<Submission>> GetByCourseAsync(SubmissionSource source, string courseId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
 
         public Task<StoredFileLocation?> FindStoredFileAsync(Guid contentId, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();

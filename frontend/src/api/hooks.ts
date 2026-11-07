@@ -24,6 +24,24 @@ export const useSubmissions = (courseId: string, assignmentId: string) =>
       ),
   });
 
+// A course's students with their grades per assignment and overall score, from our database (filled by a sync).
+export const useCourseStudents = (courseId: string) =>
+  useQuery({
+    queryKey: ["courses", courseId, "students"],
+    queryFn: () => unwrap(api.GET("/courses/{courseId}/students", { params: { path: { courseId } } })),
+  });
+
+// Copies the course's roster, assignments and grades from Classroom (no files); the students table then shows them.
+export const useSyncCourse = (courseId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => unwrap(api.POST("/courses/{courseId}/sync", { params: { path: { courseId } } })),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["courses", courseId, "students"] });
+    },
+  });
+};
+
 // What fetch has stored (our database), as opposed to the live Classroom list above.
 export const useStoredSubmissions = (courseId: string, assignmentId: string) =>
   useQuery({

@@ -13,6 +13,7 @@ import { CourseOverviewPage } from "./pages/CourseOverviewPage";
 import { CoursesPage } from "./pages/CoursesPage";
 import { InstructionsPage } from "./pages/InstructionsPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { StudentsPage } from "./pages/StudentsPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -62,6 +63,11 @@ const router = createBrowserRouter([
                 ],
               },
             ],
+          },
+          {
+            path: "students",
+            element: <StudentsPage />,
+            handle: { crumbs: () => [{ label: "Students" }] } satisfies CrumbHandle,
           },
           // Planned sections: a page that says what they will do.
           ...courseSections

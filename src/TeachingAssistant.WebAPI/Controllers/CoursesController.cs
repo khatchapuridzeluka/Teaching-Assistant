@@ -10,10 +10,25 @@ namespace TeachingAssistant.WebAPI.Controllers;
 public class CoursesController : ControllerBase
 {
     private readonly ICourseService _courseService;
+    private readonly ICourseSyncService _courseSyncService;
 
-    public CoursesController(ICourseService courseService)
+    public CoursesController(ICourseService courseService, ICourseSyncService courseSyncService)
     {
         _courseService = courseService;
+        _courseSyncService = courseSyncService;
+    }
+
+    /// <summary>
+    /// Copies the course's roster, assignments and every student's state and Classroom grades into the database; downloads no files and writes nothing to Classroom.
+    /// </summary>
+    /// <response code="200">Course synced; returns what changed</response>
+    /// <response code="404">Course not found in Google Classroom</response>
+    /// <response code="409">Google account not connected or authorization expired; call POST /auth/google/connect</response>
+    /// <response code="502">Google Classroom returned an error or could not be reached</response>
+    [HttpPost("{courseId}/sync")]
+    public async Task<ActionResult<CourseSyncSummary>> SyncAsync(string courseId, CancellationToken cancellationToken)
+    {
+        return Ok(await _courseSyncService.SyncAsync(courseId, cancellationToken));
     }
 
     /// <summary>

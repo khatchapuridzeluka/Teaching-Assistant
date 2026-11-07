@@ -1,3 +1,4 @@
+using TeachingAssistant.Domain.Grading;
 using TeachingAssistant.Domain.Ingestion;
 
 namespace TeachingAssistant.Tests.Domain;
@@ -68,6 +69,48 @@ public class SubmissionTests
         Assert.Equal(TimeSpan.Zero, version.FetchedAt.Offset);
         Assert.Equal(new DateTimeOffset(2026, 11, 5, 12, 0, 0, TimeSpan.Zero), version.FetchedAt);
     }
+
+    [Fact]
+    public void RecordStatus_CopiesGradesAndHistory_InitialAndFinalFollowTheHistory()
+    {
+        var submission = NewSubmission();
+
+        submission.RecordStatus("RETURNED", late: true, assignedGrade: 95,
+            [Assigned(95, Now.AddDays(5)), Assigned(70, Now)], Now.AddDays(6));
+
+        Assert.Equal(("RETURNED", true, 95.0), (submission.State, submission.Late, submission.AssignedGrade));
+        Assert.Equal([70.0, 95.0], submission.GradeEvents.Select(e => e.PointsEarned!.Value));
+        Assert.All(submission.GradeEvents, e => Assert.Equal(submission.Id, e.SubmissionId));
+        Assert.Equal(70, submission.InitialGrade);
+        Assert.Equal(95, submission.FinalGrade);
+    }
+
+    [Fact]
+    public void RecordStatus_WithTheSameHistory_KeepsTheExistingEvents()
+    {
+        var submission = NewSubmission();
+        submission.RecordStatus("RETURNED", false, 70, [Assigned(70, Now)], Now);
+        var first = submission.GradeEvents.Single();
+
+        submission.RecordStatus("RETURNED", false, 70, [Assigned(70, Now)], Now.AddHours(1));
+
+        Assert.Same(first, submission.GradeEvents.Single());
+        Assert.Equal(Now.AddHours(1), submission.StatusSyncedAt);
+    }
+
+    [Fact]
+    public void RecordStatus_WithANewGrade_ReplacesTheHistory()
+    {
+        var submission = NewSubmission();
+        submission.RecordStatus("RETURNED", false, 70, [Assigned(70, Now)], Now);
+
+        submission.RecordStatus("RETURNED", false, 90, [Assigned(70, Now), Assigned(90, Now.AddDays(2))], Now.AddDays(2));
+
+        Assert.Equal(2, submission.GradeEvents.Count);
+        Assert.Equal(90, submission.FinalGrade);
+    }
+
+    private static GradeEvent Assigned(double points, DateTimeOffset at) => new(GradeEventKind.AssignedGrade, points, 100, at);
 
     private static Submission NewSubmission() =>
         new(SubmissionSource.GoogleClassroom, "course-1", "assignment-1", "student-1", "Nino B.", "submission-1",

@@ -1,4 +1,5 @@
 using TeachingAssistant.Application.Contracts;
+using TeachingAssistant.Application.Models;
 
 namespace TeachingAssistant.Application.Interfaces;
 
@@ -20,4 +21,10 @@ public interface ISubmissionSource
     Task<AssignmentResponse> GetAssignmentAsync(string courseId, string assignmentId, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<SubmissionResponse>> GetSubmissionsAsync(string courseId, string assignmentId, CancellationToken cancellationToken = default);
+
+    /// <summary>Every student's submission to every assignment of a course, with grades (no files).</summary>
+    Task<IReadOnlyList<SubmissionResponse>> GetCourseSubmissionsAsync(string courseId, CancellationToken cancellationToken = default);
+
+    /// <summary>The students on a course's roster now.</summary>
+    Task<IReadOnlyList<RosterStudent>> GetStudentsAsync(string courseId, CancellationToken cancellationToken = default);
 }

@@ -16,7 +16,16 @@ public class SubmissionStore(AppDbContext db) : ISubmissionStore
         await db.Submissions
             .Include(s => s.Versions)
             .ThenInclude(v => v.Contents)
+            .Include(s => s.GradeEvents)
             .Where(s => s.Source == source && s.AssignmentId == assignmentId)
+            .AsSplitQuery()
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<Submission>> GetByCourseAsync(
+        SubmissionSource source, string courseId, CancellationToken cancellationToken = default) =>
+        await db.Submissions
+            .Include(s => s.GradeEvents)
+            .Where(s => s.Source == source && s.CourseId == courseId)
             .AsSplitQuery()
             .ToListAsync(cancellationToken);
 

@@ -9,11 +9,18 @@ namespace TeachingAssistant.Application.Interfaces;
 public interface ISubmissionStore
 {
     /// <summary>
-    /// Returns every stored submission of an assignment with all versions and their contents loaded.
+    /// Returns every stored submission of an assignment with all versions, their contents and the grade events loaded.
     /// Changes to the returned submissions are saved by <see cref="SaveChangesAsync"/>.
     /// </summary>
     Task<IReadOnlyList<Submission>> GetByAssignmentAsync(
         SubmissionSource source, string assignmentId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns every stored submission of a course with the grade events loaded, but not the versions: for syncing
+    /// state and grades only. Changes are saved by <see cref="SaveChangesAsync"/>.
+    /// </summary>
+    Task<IReadOnlyList<Submission>> GetByCourseAsync(
+        SubmissionSource source, string courseId, CancellationToken cancellationToken = default);
 
     /// <summary>Where a stored file is, by its content ID; null when there is no such content or it was not stored.</summary>
     Task<StoredFileLocation?> FindStoredFileAsync(Guid contentId, CancellationToken cancellationToken = default);

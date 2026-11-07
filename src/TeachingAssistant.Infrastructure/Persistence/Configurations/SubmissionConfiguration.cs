@@ -26,7 +26,19 @@ public class SubmissionConfiguration : IEntityTypeConfiguration<Submission>
             .OnDelete(DeleteBehavior.Cascade);
         builder.Navigation(s => s.Versions).UsePropertyAccessMode(PropertyAccessMode.Field);
 
+        builder.HasIndex(s => s.CourseId);
+        builder.HasIndex(s => s.StudentId);
+
+        builder.HasMany(s => s.GradeEvents)
+            .WithOne()
+            .HasForeignKey(e => e.SubmissionId)
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(s => s.GradeEvents).UsePropertyAccessMode(PropertyAccessMode.Field);
+
         builder.Ignore(s => s.LatestVersion);
         builder.Ignore(s => s.NextVersionNumber);
+        builder.Ignore(s => s.InitialGrade);
+        builder.Ignore(s => s.FinalGrade);
+        builder.Ignore(s => s.IsTurnedIn);
     }
 }

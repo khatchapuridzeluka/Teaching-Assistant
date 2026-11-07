@@ -119,6 +119,65 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/courses/{courseId}/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Copies the course's roster, assignments and every student's state and Classroom grades into the database; downloads no files and writes nothing to Classroom. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    courseId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Course synced; returns what changed */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CourseSyncSummary"];
+                    };
+                };
+                /** @description Course not found in Google Classroom */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Google account not connected or authorization expired; call POST /auth/google/connect */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Google Classroom returned an error or could not be reached */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/courses": {
         parameters: {
             query?: never;
@@ -573,6 +632,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/courses/{courseId}/students": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Returns the course's students with their state, initial and final grade per assignment and overall score, from the database (filled by POST /courses/{courseId}/sync). */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    courseId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Students retrieved successfully; empty lists before the first sync */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CourseStudentsResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/courses/{courseId}/assignments/{assignmentId}/submissions/stored": {
         parameters: {
             query?: never;
@@ -957,6 +1054,110 @@ export interface components {
             state: string;
             link?: string | null;
         };
+        /**
+         * @description One student of a course. Overall is final points over possible points; missing work counts as 0 once past its
+         *     deadline, work waiting for a grade and work not due yet are left out.
+         */
+        CourseStudentResponse: {
+            /**
+             * Format: uuid
+             * @description Our student ID.
+             */
+            id: string;
+            /** @description The student's Google user ID. */
+            externalUserId: string;
+            /** @description Name as Classroom shows it. */
+            name: string;
+            /** @description On the course's roster as of the last sync. */
+            active: boolean;
+            /**
+             * Format: int32
+             * @description Assignments handed in (turned in or returned).
+             */
+            turnedIn: number;
+            /**
+             * Format: int32
+             * @description Assignments not handed in and past their deadline.
+             */
+            missing: number;
+            /**
+             * Format: int32
+             * @description Assignments handed in late.
+             */
+            late: number;
+            /**
+             * Format: int32
+             * @description Assignments whose final grade is higher than the first one returned (fixed after a resubmission).
+             */
+            improved: number;
+            /**
+             * Format: double
+             * @description Null when nothing counts yet.
+             */
+            overallPercent?: number | null;
+            /**
+             * Format: double
+             * @description Final points earned over the counted assignments.
+             */
+            earned: number;
+            /**
+             * Format: double
+             * @description Maximum points of the counted assignments.
+             */
+            possible: number;
+            /** @description One per assignment, in the order of the assignments. */
+            results: components["schemas"]["StudentAssignmentResult"][];
+        };
+        /** @description A course's students with their results per assignment and overall, from our database (filled by a course sync). */
+        CourseStudentsResponse: {
+            /**
+             * Format: date-time
+             * @description When the course was last synced; null before the first sync.
+             */
+            syncedAt?: string | null;
+            /** @description The course's assignments, by deadline. */
+            assignments: components["schemas"]["StudentAssignmentColumn"][];
+            /** @description Students on the roster first, then those who left; by name. */
+            students: components["schemas"]["CourseStudentResponse"][];
+        };
+        /** @description What syncing a course did: roster, assignments, and every student's state and grade per assignment (no files). */
+        CourseSyncSummary: {
+            /**
+             * Format: int32
+             * @description Students on the roster now.
+             */
+            students: number;
+            /**
+             * Format: int32
+             * @description Students seen for the first time.
+             */
+            newStudents: number;
+            /**
+             * Format: int32
+             * @description Students no longer on the roster (kept, marked inactive).
+             */
+            leftStudents: number;
+            /**
+             * Format: int32
+             * @description Assignments in the course.
+             */
+            assignments: number;
+            /**
+             * Format: int32
+             * @description Submissions checked (every student × assignment the source lists).
+             */
+            submissions: number;
+            /**
+             * Format: int32
+             * @description Submissions recorded for the first time.
+             */
+            newSubmissions: number;
+            /**
+             * Format: int32
+             * @description Submissions that have a grade.
+             */
+            graded: number;
+        };
         /** @description What re-extracting an assignment's stored versions did. Problems lists archives that could not be extracted. */
         ExtractionSummary: {
             /** Format: int32 */
@@ -1008,6 +1209,25 @@ export interface components {
             state: components["schemas"]["GoogleConnectionState"];
             grantedScopes: string[];
             message?: string | null;
+        };
+        /** @description One change of a submission's grade in the source, e.g. the teacher returning the work with a grade. */
+        GradeChange: {
+            kind: components["schemas"]["GradeEventKind"];
+            /** Format: double */
+            pointsEarned?: number | null;
+            /** Format: double */
+            maxPoints?: number | null;
+            /** Format: date-time */
+            at: string;
+        };
+        /** @enum {string} */
+        GradeEventKind: "DraftGrade" | "AssignedGrade" | "MaxPoints" | "Other";
+        /** @description One grade the teacher returned to the student in Classroom. */
+        GradeReturn: {
+            /** Format: double */
+            points?: number | null;
+            /** Format: date-time */
+            at: string;
         };
         /**
          * @description The model's draft review of one stored version: Review is Markdown (score per task and short feedback), Mistakes are
@@ -1120,6 +1340,42 @@ export interface components {
             turnedInAt?: string | null;
             files: components["schemas"]["StoredFileResponse"][];
         };
+        /** @description One assignment as a column of the students table. */
+        StudentAssignmentColumn: {
+            id: string;
+            title: string;
+            /** Format: double */
+            maxPoints?: number | null;
+            /** Format: date-time */
+            dueAt?: string | null;
+        };
+        /** @description A student's result for one assignment; grades come from Classroom (initial = first returned, final = latest). */
+        StudentAssignmentResult: {
+            /** @description Classroom's assignment ID. */
+            assignmentId: string;
+            /** @description Classroom's submission ID (opens the student in the assignment workspace); null when there is none. */
+            submissionId?: string | null;
+            /** @description Classroom's state, e.g. CREATED, TURNED_IN, RETURNED; null when there is no submission. */
+            state?: string | null;
+            /** @description Handed in (turned in or returned). */
+            turnedIn: boolean;
+            /** @description Handed in after the deadline. */
+            late: boolean;
+            /** @description Not handed in and past the deadline: counts as 0. */
+            missing: boolean;
+            /**
+             * Format: double
+             * @description The first grade returned.
+             */
+            initialGrade?: number | null;
+            /**
+             * Format: double
+             * @description The latest grade returned.
+             */
+            finalGrade?: number | null;
+            /** @description Every grade the teacher returned, oldest first. */
+            returns: components["schemas"]["GradeReturn"][];
+        };
         /**
          * @description A file or link attached to a submission. FileId is set for Drive files and used to download them later;
          *     Url is the link itself (e.g. a GitHub repository) or the Drive file's web address.
@@ -1133,10 +1389,12 @@ export interface components {
         /**
          * @description One student's submission to an assignment, with its attachments as metadata (nothing is downloaded).
          *     State is the source's own state, e.g. NEW, CREATED, TURNED_IN, RETURNED or RECLAIMED_BY_STUDENT for Classroom.
-         *     TurnedInAt is the latest turn-in, so it moves forward when the student resubmits.
+         *     TurnedInAt is the latest turn-in, so it moves forward when the student resubmits. AssignedGrade is the grade the
+         *     student sees (given by the teacher in the source, never by this tool); GradeHistory lists every grade change.
          */
         SubmissionResponse: {
             id: string;
+            assignmentId: string;
             studentId: string;
             studentName: string;
             state: string;
@@ -1147,6 +1405,9 @@ export interface components {
             updatedAt?: string | null;
             attachments: components["schemas"]["SubmissionAttachment"][];
             link?: string | null;
+            /** Format: double */
+            assignedGrade?: number | null;
+            gradeHistory: components["schemas"]["GradeChange"][];
         };
         /** @enum {string} */
         VersionStatus: "Ready" | "PartiallySupported" | "Failed";

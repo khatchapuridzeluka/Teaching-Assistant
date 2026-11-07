@@ -22,6 +22,42 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("TeachingAssistant.Domain.Grading.GradeEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("GradedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("graded_at");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("kind");
+
+                    b.Property<double?>("MaxPoints")
+                        .HasColumnType("double precision")
+                        .HasColumnName("max_points");
+
+                    b.Property<double?>("PointsEarned")
+                        .HasColumnType("double precision")
+                        .HasColumnName("points_earned");
+
+                    b.Property<Guid>("SubmissionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("submission_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_grade_events");
+
+                    b.HasIndex("SubmissionId")
+                        .HasDatabaseName("ix_grade_events_submission_id");
+
+                    b.ToTable("grade_events", (string)null);
+                });
+
             modelBuilder.Entity("TeachingAssistant.Domain.Ingestion.AssignmentInstructions", b =>
                 {
                     b.Property<Guid>("Id")
@@ -60,6 +96,57 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_assignment_instructions_source_assignment_id");
 
                     b.ToTable("assignment_instructions", (string)null);
+                });
+
+            modelBuilder.Entity("TeachingAssistant.Domain.Ingestion.CourseAssignment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("CourseId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("course_id");
+
+                    b.Property<DateTimeOffset?>("DueAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("due_at");
+
+                    b.Property<string>("ExternalAssignmentId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("external_assignment_id");
+
+                    b.Property<double?>("MaxPoints")
+                        .HasColumnType("double precision")
+                        .HasColumnName("max_points");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("source");
+
+                    b.Property<DateTimeOffset>("SyncedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("synced_at");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("title");
+
+                    b.HasKey("Id")
+                        .HasName("pk_course_assignments");
+
+                    b.HasIndex("CourseId")
+                        .HasDatabaseName("ix_course_assignments_course_id");
+
+                    b.HasIndex("Source", "ExternalAssignmentId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_course_assignments_source_external_assignment_id");
+
+                    b.ToTable("course_assignments", (string)null);
                 });
 
             modelBuilder.Entity("TeachingAssistant.Domain.Ingestion.InstructionsContent", b =>
@@ -170,6 +257,10 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<double?>("AssignedGrade")
+                        .HasColumnType("double precision")
+                        .HasColumnName("assigned_grade");
+
                     b.Property<string>("AssignmentId")
                         .IsRequired()
                         .HasColumnType("text")
@@ -189,10 +280,22 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("external_submission_id");
 
+                    b.Property<bool>("Late")
+                        .HasColumnType("boolean")
+                        .HasColumnName("late");
+
                     b.Property<string>("Source")
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("source");
+
+                    b.Property<string>("State")
+                        .HasColumnType("text")
+                        .HasColumnName("state");
+
+                    b.Property<DateTimeOffset?>("StatusSyncedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("status_synced_at");
 
                     b.Property<string>("StorageFolder")
                         .IsRequired()
@@ -214,6 +317,12 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("AssignmentId")
                         .HasDatabaseName("ix_submissions_assignment_id");
+
+                    b.HasIndex("CourseId")
+                        .HasDatabaseName("ix_submissions_course_id");
+
+                    b.HasIndex("StudentId")
+                        .HasDatabaseName("ix_submissions_student_id");
 
                     b.HasIndex("Source", "ExternalSubmissionId")
                         .IsUnique()
@@ -345,6 +454,91 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
                     b.ToTable("version_contents", (string)null);
                 });
 
+            modelBuilder.Entity("TeachingAssistant.Domain.Profiling.Enrollment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("Active")
+                        .HasColumnType("boolean")
+                        .HasColumnName("active");
+
+                    b.Property<string>("CourseId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("course_id");
+
+                    b.Property<DateTimeOffset>("EnrolledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("enrolled_at");
+
+                    b.Property<DateTimeOffset>("LastSeenAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_seen_at");
+
+                    b.Property<Guid>("StudentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("student_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_enrollments");
+
+                    b.HasIndex("CourseId")
+                        .HasDatabaseName("ix_enrollments_course_id");
+
+                    b.HasIndex("StudentId", "CourseId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_enrollments_student_id_course_id");
+
+                    b.ToTable("enrollments", (string)null);
+                });
+
+            modelBuilder.Entity("TeachingAssistant.Domain.Profiling.Student", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("ExternalUserId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("external_user_id");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("source");
+
+                    b.HasKey("Id")
+                        .HasName("pk_students");
+
+                    b.HasIndex("Source", "ExternalUserId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_students_source_external_user_id");
+
+                    b.ToTable("students", (string)null);
+                });
+
+            modelBuilder.Entity("TeachingAssistant.Domain.Grading.GradeEvent", b =>
+                {
+                    b.HasOne("TeachingAssistant.Domain.Ingestion.Submission", null)
+                        .WithMany("GradeEvents")
+                        .HasForeignKey("SubmissionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_grade_events_submissions_submission_id");
+                });
+
             modelBuilder.Entity("TeachingAssistant.Domain.Ingestion.InstructionsContent", b =>
                 {
                     b.HasOne("TeachingAssistant.Domain.Ingestion.InstructionsVersion", null)
@@ -385,6 +579,16 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_version_contents_submission_versions_version_id");
                 });
 
+            modelBuilder.Entity("TeachingAssistant.Domain.Profiling.Enrollment", b =>
+                {
+                    b.HasOne("TeachingAssistant.Domain.Profiling.Student", null)
+                        .WithMany("Enrollments")
+                        .HasForeignKey("StudentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_enrollments_students_student_id");
+                });
+
             modelBuilder.Entity("TeachingAssistant.Domain.Ingestion.AssignmentInstructions", b =>
                 {
                     b.Navigation("Versions");
@@ -397,12 +601,19 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("TeachingAssistant.Domain.Ingestion.Submission", b =>
                 {
+                    b.Navigation("GradeEvents");
+
                     b.Navigation("Versions");
                 });
 
             modelBuilder.Entity("TeachingAssistant.Domain.Ingestion.SubmissionVersion", b =>
                 {
                     b.Navigation("Contents");
+                });
+
+            modelBuilder.Entity("TeachingAssistant.Domain.Profiling.Student", b =>
+                {
+                    b.Navigation("Enrollments");
                 });
 #pragma warning restore 612, 618
         }

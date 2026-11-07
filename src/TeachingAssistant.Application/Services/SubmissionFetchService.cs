@@ -10,6 +10,7 @@ namespace TeachingAssistant.Application.Services;
 /// <summary>
 /// Fetches an assignment's submissions: for each turned-in submission it compares what the source reports now
 /// with the latest stored version, and only when something changed downloads the files and records a new version.
+/// Every student's state and grades are recorded too, also for students who turned nothing in.
 /// Works in two phases: students are prepared in parallel (source calls, downloads, files on disk), then their
 /// results are recorded one by one, because the database context must not be used from several threads.
 /// </summary>
@@ -108,6 +109,8 @@ public class SubmissionFetchService : ISubmissionFetchService
                 continue;
             }
 
+            // A submission a course sync recorded has no versions yet: its first files make it new, too.
+            var first = submission.LatestVersion is null;
             var added = submission.AddVersion(version.Status, version.StatusDetail, contentHash: null, version.StoragePath,
                 result.Item.TurnedInAt, version.FetchedAt, version.Contents);
             added.RecordExtraction(version.Extraction.ContentHash, version.Extraction.ExtractedStoredNames,
@@ -116,6 +119,10 @@ public class SubmissionFetchService : ISubmissionFetchService
             if (result.IsNew)
             {
                 _store.Add(submission);
+            }
+
+            if (first)
+            {
                 newSubmissions++;
             }
             else
@@ -127,7 +134,33 @@ public class SubmissionFetchService : ISubmissionFetchService
             await _store.SaveChangesAsync(cancellationToken);
         }
 
-        await _store.SaveChangesAsync(cancellationToken); // student name updates on unchanged submissions
+        // State and grades for every student of the assignment, also those who turned nothing in (missing work counts
+        // as 0) and those skipped above: they are recorded without files.
+        var now = _timeProvider.GetUtcNow();
+        var byId = new Dictionary<string, Submission>(stored);
+        foreach (var result in results)
+        {
+            if (result.Submission is { } prepared)
+            {
+                byId[result.Item.Id] = prepared;
+            }
+        }
+
+        foreach (var item in listed)
+        {
+            if (!byId.TryGetValue(item.Id, out var submission))
+            {
+                submission = new Submission(SubmissionSource.GoogleClassroom, courseId, assignmentId, item.StudentId,
+                    item.StudentName, item.Id,
+                    _storage.GetSubmissionFolder(names.CourseName, names.AssignmentTitle, item.StudentName, item.StudentId), now);
+                _store.Add(submission);
+                byId[item.Id] = submission;
+            }
+
+            SubmissionStatus.Record(submission, item, now);
+        }
+
+        await _store.SaveChangesAsync(cancellationToken);
         return new FetchSummary(listed.Count, newSubmissions, newVersions, unchanged,
             listed.Count - turnedIn.Count, problems, instructions?.VersionNumber, instructions?.IsNew ?? false);
     }

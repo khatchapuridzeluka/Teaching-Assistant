@@ -5,6 +5,8 @@ using Google.Apis.Requests;
 using Google.Apis.Services;
 using TeachingAssistant.Application.Contracts;
 using TeachingAssistant.Application.Interfaces;
+using TeachingAssistant.Application.Models;
+using TeachingAssistant.Domain.Grading;
 
 namespace TeachingAssistant.Infrastructure.Google;
 
@@ -18,6 +20,9 @@ public class GoogleClassroomSource : ISubmissionSource
 
     // Items per page; Google may return fewer, so paging always follows the next-page token.
     private const int PageSize = 100;
+
+    // Classroom's course work ID for "all assignments of the course" when listing submissions.
+    private const string AllCourseWork = "-";
 
     private readonly GoogleAuthorization _authorization;
     private volatile Client? _client;
@@ -96,19 +101,66 @@ public class GoogleClassroomSource : ISubmissionSource
         // other, so both requests run at the same time.
         var namesCall = GetStudentNamesAsync(classroom, courseId, cancellationToken);
 
-        var request = classroom.Courses.CourseWork.StudentSubmissions.List(courseId, assignmentId);
-        request.PageSize = PageSize;
-
-        var submissionsCall = FetchAllAsync(request, (r, token) => r.PageToken = token,
-            (ListStudentSubmissionsResponse page) => (page.StudentSubmissions, page.NextPageToken), cancellationToken);
+        var submissionsCall = ListSubmissionsAsync(classroom, courseId, assignmentId, cancellationToken);
 
         await Task.WhenAll(namesCall, submissionsCall);
         var (names, submissions) = (await namesCall, await submissionsCall);
 
-        return submissions.Select(s => new SubmissionResponse(
-            s.Id, s.UserId, names.GetValueOrDefault(s.UserId, "Unknown student"), s.State, s.Late ?? false,
-            LastTurnedInAt(s), s.UpdateTimeDateTimeOffset, Attachments(s), s.AlternateLink)).ToList();
+        return submissions.Select(s => ToSubmission(s, names)).ToList();
     }
+
+    public async Task<IReadOnlyList<SubmissionResponse>> GetCourseSubmissionsAsync(string courseId, CancellationToken cancellationToken = default)
+    {
+        var classroom = await GetClassroomAsync(cancellationToken);
+
+        // "-" as the course work ID asks for every assignment of the course in one list: a class of 15 students with
+        // 5 assignments is one page.
+        var namesCall = GetStudentNamesAsync(classroom, courseId, cancellationToken);
+        var submissionsCall = ListSubmissionsAsync(classroom, courseId, AllCourseWork, cancellationToken);
+
+        await Task.WhenAll(namesCall, submissionsCall);
+        var (names, submissions) = (await namesCall, await submissionsCall);
+
+        return submissions.Select(s => ToSubmission(s, names)).ToList();
+    }
+
+    public async Task<IReadOnlyList<RosterStudent>> GetStudentsAsync(string courseId, CancellationToken cancellationToken = default)
+    {
+        var classroom = await GetClassroomAsync(cancellationToken);
+        var names = await GetStudentNamesAsync(classroom, courseId, cancellationToken);
+        return names.Select(n => new RosterStudent(n.Key, n.Value)).ToList();
+    }
+
+    private static Task<IList<StudentSubmission>> ListSubmissionsAsync(
+        ClassroomService classroom, string courseId, string courseWorkId, CancellationToken cancellationToken)
+    {
+        var request = classroom.Courses.CourseWork.StudentSubmissions.List(courseId, courseWorkId);
+        request.PageSize = PageSize;
+
+        return FetchAllAsync(request, (r, token) => r.PageToken = token,
+            (ListStudentSubmissionsResponse page) => (page.StudentSubmissions, page.NextPageToken), cancellationToken);
+    }
+
+    private static SubmissionResponse ToSubmission(StudentSubmission s, Dictionary<string, string> names) => new(
+        s.Id, s.CourseWorkId, s.UserId, names.GetValueOrDefault(s.UserId, "Unknown student"), s.State, s.Late ?? false,
+        LastTurnedInAt(s), s.UpdateTimeDateTimeOffset, Attachments(s), s.AlternateLink, s.AssignedGrade, GradeHistory(s));
+
+    // Every grade change Classroom recorded, oldest first. Grades are only read here; this app never writes them.
+    private static List<GradeChange> GradeHistory(StudentSubmission submission) =>
+        (submission.SubmissionHistory ?? [])
+            .Select(h => h.GradeHistory)
+            .Where(g => g?.GradeTimestampDateTimeOffset is not null)
+            .Select(g => new GradeChange(GradeKind(g!.GradeChangeType), g.PointsEarned, g.MaxPoints, g.GradeTimestampDateTimeOffset!.Value))
+            .OrderBy(g => g.At)
+            .ToList();
+
+    private static GradeEventKind GradeKind(string? changeType) => changeType switch
+    {
+        "ASSIGNED_GRADE_POINTS_EARNED_CHANGE" => GradeEventKind.AssignedGrade,
+        "DRAFT_GRADE_POINTS_EARNED_CHANGE" => GradeEventKind.DraftGrade,
+        "MAX_POINTS_CHANGE" => GradeEventKind.MaxPoints,
+        _ => GradeEventKind.Other,
+    };
 
     private static async Task<Dictionary<string, string>> GetStudentNamesAsync(
         ClassroomService classroom, string courseId, CancellationToken cancellationToken)

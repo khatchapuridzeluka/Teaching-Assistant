@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using TeachingAssistant.Domain.Grading;
 using TeachingAssistant.Domain.Ingestion;
+using TeachingAssistant.Domain.Profiling;
 
 namespace TeachingAssistant.Infrastructure.Persistence;
 
@@ -15,6 +17,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<AssignmentInstructions> AssignmentInstructions => Set<AssignmentInstructions>();
     public DbSet<InstructionsVersion> InstructionsVersions => Set<InstructionsVersion>();
     public DbSet<InstructionsContent> InstructionsContents => Set<InstructionsContent>();
+    public DbSet<GradeEvent> GradeEvents => Set<GradeEvent>();
+    public DbSet<Student> Students => Set<Student>();
+    public DbSet<Enrollment> Enrollments => Set<Enrollment>();
+    public DbSet<CourseAssignment> CourseAssignments => Set<CourseAssignment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder) =>
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
