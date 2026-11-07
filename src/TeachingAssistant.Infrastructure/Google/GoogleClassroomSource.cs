@@ -92,14 +92,18 @@ public class GoogleClassroomSource : ISubmissionSource
     {
         var classroom = await GetClassroomAsync(cancellationToken);
 
-        // Submissions only carry a user ID; names come from the course roster.
-        var names = await GetStudentNamesAsync(classroom, courseId, cancellationToken);
+        // Submissions only carry a user ID; names come from the course roster. The two lists do not depend on each
+        // other, so both requests run at the same time.
+        var namesCall = GetStudentNamesAsync(classroom, courseId, cancellationToken);
 
         var request = classroom.Courses.CourseWork.StudentSubmissions.List(courseId, assignmentId);
         request.PageSize = PageSize;
 
-        var submissions = await FetchAllAsync(request, (r, token) => r.PageToken = token,
+        var submissionsCall = FetchAllAsync(request, (r, token) => r.PageToken = token,
             (ListStudentSubmissionsResponse page) => (page.StudentSubmissions, page.NextPageToken), cancellationToken);
+
+        await Task.WhenAll(namesCall, submissionsCall);
+        var (names, submissions) = (await namesCall, await submissionsCall);
 
         return submissions.Select(s => new SubmissionResponse(
             s.Id, s.UserId, names.GetValueOrDefault(s.UserId, "Unknown student"), s.State, s.Late ?? false,
