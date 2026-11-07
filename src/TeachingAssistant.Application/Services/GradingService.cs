@@ -11,7 +11,8 @@ namespace TeachingAssistant.Application.Services;
 /// <summary>
 /// Grades one stored version by reading: the assignment's instructions (as stored by the last fetch: the task statement
 /// and the files the teacher attached in Classroom) and the student's work go to the model in one message, and its
-/// Markdown review comes back. Nothing is read from the source here.
+/// review comes back as structured output: Markdown (score and feedback) plus a list of mistakes pointing at code lines.
+/// Nothing is read from the source here.
 /// PDFs and images are sent as files the model reads itself; Word documents are sent as their text.
 /// Instructions come first and the student's work last, so the shared part can be cached across a class later.
 /// The student's name is never sent.
@@ -65,13 +66,26 @@ public class GradingService : IGradingService
         - Some submitted files may be listed as not included; do not deduct points for content you could not see, but
           mention it.
 
-        Write the review in English, in Markdown, with exactly these sections:
+        Your answer has two parts, both in English.
+
+        "review" is Markdown with exactly these sections:
         1. **Score**: a table with one row per task (task, points awarded / maximum, a one-line reason), then the total,
            and the bonus separately if there is one.
-        2. **Mistakes**: one bullet per mistake: file and line (for example `Zoo.java:14`), what is wrong, and which
-           task it costs points in. Write "None" if there are none.
-        3. **Feedback**: two or three sentences the teacher can adapt for the student: what was done well and the most
+        2. **Feedback**: two or three sentences the teacher can adapt for the student: what was done well and the most
            important thing to improve.
+        Do not list the mistakes in the review; they go in "mistakes".
+
+        "mistakes" lists every mistake, one entry each, so the teacher sees it as a mark on the exact lines in a code
+        viewer:
+        - file: the path exactly as written in <file path="...">. startLine and endLine: the lines the mistake is on,
+          using the line numbers printed in front of each line; mark the few lines that show the problem (a field
+          declaration, the wrong condition), not a whole class or method.
+        - For a mistake that is not on specific lines (a missing class, a task not attempted, a problem in a drawing
+          or document), set file, startLine and endLine to null.
+        - severity: Major for wrong or missing functionality and broken rules from the instructions; Minor for small real
+          problems; Style for readability only.
+        - message: what is wrong and how to fix it in one or two sentences, and which task it costs points in.
+        - An empty list when there are no mistakes.
 
         Keep it concise; the teacher reviews a whole class.
         """;
@@ -141,8 +155,9 @@ public class GradingService : IGradingService
               string.Join("\n", prompt.Skipped.Select(s => $"- {s}")) +
               "\n\nGrade this submission against the instructions.");
 
-        var reply = await _languageModel.GradeAsync(SystemPrompt, prompt.Parts, cancellationToken);
-        return new GradingResponse(versionId, reply.Model, reply.Text, instructions.Number, prompt.Sent, prompt.Skipped);
+        var reply = await _languageModel.GradeAsync(SystemPrompt, prompt.Parts, GradingOutput.Schema, cancellationToken);
+        var (review, mistakes) = GradingOutput.Read(reply.Text, prompt.CodeLines);
+        return new GradingResponse(versionId, reply.Model, review, mistakes, instructions.Number, prompt.Sent, prompt.Skipped);
     }
 
     // The stored task statement and instruction files. PDFs and images go as files; Word documents (how most
@@ -261,6 +276,7 @@ public class GradingService : IGradingService
 
             code.AppendLine("</file>");
             prompt.Sent.Add($"Code: {file.Path}");
+            prompt.CodeLines[file.Path] = lines.Length;
         }
 
         if (code.Length > 0)
@@ -385,6 +401,10 @@ public class GradingService : IGradingService
         public List<PromptPart> Parts { get; } = [];
         public List<string> Sent { get; } = [];
         public List<string> Skipped { get; } = [];
+
+        // Every code file sent, with its number of lines: the mistakes' files and lines are checked against it.
+        public Dictionary<string, int> CodeLines { get; } = [];
+
         public bool HasInstructions { get; set; }
         public bool HasStudentWork { get; set; }
 

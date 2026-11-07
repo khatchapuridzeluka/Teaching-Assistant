@@ -30,7 +30,7 @@ export function CoursesPage() {
             </div>
             <div className="mt-5 flex items-center justify-between">
               <Link to={`/courses/${course.id}`} className="font-semibold text-accent">
-                Open assignments →
+                Open course →
               </Link>
               {course.link && (
                 <a href={course.link} target="_blank" rel="noreferrer" className="text-xs text-ink-muted hover:text-ink">

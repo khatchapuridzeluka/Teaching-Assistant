@@ -1,0 +1,382 @@
+import { useEffect, useState } from "react";
+import { Link } from "react-router";
+import { type Assignment, type InstructionsFile, instructionsFileUrl } from "../api/client";
+import { useInstructions, useInstructionsFileBlob } from "../api/hooks";
+import { formatDate } from "../format";
+import { DocxView } from "./DocxPreview";
+import { Button, Card, Chip } from "./ui";
+
+type FileType = "pdf" | "docx" | "image" | "video" | "link" | "other";
+
+// By type or by extension: Drive sometimes reports a generic type for uploaded files.
+function fileType(file: InstructionsFile): FileType {
+  const name = file.name.toLowerCase();
+  if (file.url != null) {
+    return "link";
+  }
+  if (file.mimeType === "application/pdf" || name.endsWith(".pdf")) {
+    return "pdf";
+  }
+  if (name.endsWith(".docx") || file.mimeType?.includes("wordprocessingml")) {
+    return "docx";
+  }
+  if (file.mimeType?.startsWith("image/")) {
+    return "image";
+  }
+  if (file.mimeType?.startsWith("video/") || /\.(mp4|mov|webm|mkv|avi)$/.test(name)) {
+    return "video";
+  }
+  return "other";
+}
+
+const typeLabel: Record<FileType, string> = { pdf: "PDF", docx: "DOCX", image: "IMG", video: "VIDEO", link: "LINK", other: "FILE" };
+
+/** Drive's embeddable player for a Drive file link (…/file/d/{id}/view → …/file/d/{id}/preview). */
+function drivePreviewUrl(url: string | null | undefined): string | null {
+  const id = url?.match(/\/file\/d\/([^/?#]+)/)?.[1];
+  return id ? `https://drive.google.com/file/d/${id}/preview` : null;
+}
+
+function formatSize(bytes: number | null | undefined): string {
+  if (bytes == null) {
+    return "";
+  }
+  return bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+/** One material with everything the viewer needs: our stored copy when there is one, otherwise Drive's link. */
+export type Material = { file: InstructionsFile; type: FileType; storedUrl: string | null; driveUrl: string | null };
+
+/** The page path of an assignment's instructions. */
+export const instructionsPath = (courseId: string, assignmentId: string) =>
+  `/courses/${courseId}/assignments/${assignmentId}/instructions`;
+
+/**
+ * The instructions as grading sees them: the stored version (or, before the first fetch, the live statement from
+ * Classroom) and its materials. Shared by the card, the modal and the instructions page.
+ */
+export function useInstructionMaterials(courseId: string, assignment: Assignment | undefined) {
+  const instructions = useInstructions(courseId, assignment?.id ?? "");
+  const stored = instructions.data;
+  const text = stored?.description ?? assignment?.description ?? "";
+  // Classroom's statement differs from what grading would send: the teacher edited it since the last fetch.
+  const changed = stored != null && assignment !== undefined && (stored.description ?? "") !== (assignment.description ?? "");
+
+  const materials: Material[] = (stored?.files ?? []).map((file) => ({
+    file,
+    type: fileType(file),
+    storedUrl: file.stored && assignment ? instructionsFileUrl(courseId, assignment.id, file.id) : null,
+    // Files we do not store (videos) still play from Drive, through Classroom's link for the material.
+    driveUrl: assignment?.materials.find((m) => m.title === file.name)?.url ?? null,
+  }));
+  // The task document first: what the student reads, and what grading sends.
+  const main = materials.find((m) => m.storedUrl && (m.type === "pdf" || m.type === "docx")) ?? materials[0];
+
+  return { instructions, stored, text, changed, materials, main };
+}
+
+type InstructionsState = ReturnType<typeof useInstructionMaterials>;
+
+/** The version chip and what the shown instructions are. */
+export function InstructionsStatus({ state }: { state: InstructionsState }) {
+  const { stored, instructions } = state;
+  return (
+    <>
+      {stored ? (
+        <Chip tone="tint">
+          v{stored.number} · stored {formatDate(stored.fetchedAt)}
+        </Chip>
+      ) : (
+        stored === null && <Chip tone="dashed">Not stored yet</Chip>
+      )}
+      <span className="text-xs text-ink-muted">
+        {stored
+          ? "Exactly what grading sends to the AI"
+          : instructions.isError
+            ? "Showing the live text from Classroom"
+            : "Live from Classroom · Fetch stores it for grading"}
+      </span>
+    </>
+  );
+}
+
+/** Load failures and Classroom edits since the stored version. */
+export function InstructionsNotes({ state }: { state: InstructionsState }) {
+  const { instructions, stored, changed } = state;
+  return (
+    <>
+      {instructions.isError && (
+        <div className="border-b border-line bg-paper/60 px-[18px] py-2 text-xs">
+          <b>Could not load the stored instructions</b>{" "}
+          <span className="text-ink-muted">
+            ({instructions.error.message}). If you just updated the app, restart the API. Grading is not affected.
+          </span>
+        </div>
+      )}
+      {changed && stored && (
+        <div className="border-b border-line bg-paper/60 px-[18px] py-2 text-xs">
+          <b>Changed in Classroom</b> <span className="text-ink-muted">since v{stored.number}. Fetch to store the new version.</span>
+        </div>
+      )}
+    </>
+  );
+}
+
+/**
+ * On the assignment page: the task statement on the left and the materials as a scrollable list on the right. A material
+ * opens the instructions modal, where everything is previewed; the modal links on to the instructions page.
+ */
+export function InstructionsCard({ courseId, assignment }: { courseId: string; assignment: Assignment }) {
+  const state = useInstructionMaterials(courseId, assignment);
+  const { text, materials } = state;
+  const [expanded, setExpanded] = useState(false);
+  const [open, setOpen] = useState<Material | null>(null);
+  const long = text.length > 320 || text.split("\n").length > 4;
+
+  return (
+    <Card>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-[18px] py-[13px]">
+        <div className="flex min-w-0 flex-wrap items-center gap-2.5">
+          <h3 className="text-sm font-bold">Instructions</h3>
+          <InstructionsStatus state={state} />
+        </div>
+        <Link to={instructionsPath(courseId, assignment.id)} className="text-xs font-semibold text-accent">
+          Open instructions page →
+        </Link>
+      </div>
+      <InstructionsNotes state={state} />
+
+      <div className={`grid ${materials.length > 0 ? "lg:grid-cols-[minmax(0,1fr)_340px]" : ""}`}>
+        <div className="px-[18px] py-3.5">
+          {text ? (
+            <>
+              <p className={`whitespace-pre-wrap leading-relaxed ${long && !expanded ? "line-clamp-4" : ""}`}>{text}</p>
+              {long && (
+                <button onClick={() => setExpanded(!expanded)} className="mt-1.5 text-xs font-semibold text-accent">
+                  {expanded ? "Show less" : "Show all"}
+                </button>
+              )}
+            </>
+          ) : (
+            <p className="text-ink-muted">No task statement; the task is in the attached materials.</p>
+          )}
+        </div>
+
+        {materials.length > 0 && (
+          <div className="flex flex-col border-t border-line lg:border-l lg:border-t-0">
+            <div className="px-[18px] pb-1.5 pt-3 text-[11px] font-bold uppercase tracking-[0.06em] text-ink-muted">
+              Materials · {materials.length}
+            </div>
+            {/* Scrolls instead of stretching the card when there are many materials. */}
+            <ul className="flex max-h-[148px] flex-col gap-1.5 overflow-y-auto px-[18px] pb-3">
+              {materials.map((m) => (
+                <li key={m.file.id}>
+                  <button
+                    onClick={() => setOpen(m)}
+                    className="flex w-full items-center gap-2.5 rounded-lg border border-line bg-white px-2.5 py-1.5 text-left hover:border-accent"
+                  >
+                    <span className="flex h-7 w-11 shrink-0 items-center justify-center rounded-md bg-accent-tint text-[9px] font-bold tracking-wide text-accent">
+                      {typeLabel[m.type]}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-xs font-semibold">{m.file.name}</span>
+                      <span className="block truncate text-[11px] text-ink-muted">
+                        {m.storedUrl ? `Sent to the AI · ${formatSize(m.file.sizeBytes)}` : "Not sent to the AI"}
+                      </span>
+                    </span>
+                    <span className="text-xs font-semibold text-accent">View</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+
+      {open && (
+        <InstructionsModal courseId={courseId} assignment={assignment} state={state} initial={open} onClose={() => setOpen(null)} />
+      )}
+    </Card>
+  );
+}
+
+/** A dialog over the assignment page with every material previewable; Escape or the backdrop closes it. */
+function InstructionsModal({
+  courseId,
+  assignment,
+  state,
+  initial,
+  onClose,
+}: {
+  courseId: string;
+  assignment: Assignment;
+  state: InstructionsState;
+  initial: Material;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-ink/50 p-6" onClick={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${assignment.title} instructions`}
+        onClick={(e) => e.stopPropagation()}
+        className="flex h-[88vh] w-full max-w-[1100px] flex-col overflow-hidden rounded-xl border border-line bg-white shadow-xl"
+      >
+        <header className="flex items-center justify-between gap-4 border-b border-line px-[18px] py-3">
+          <div className="flex min-w-0 flex-wrap items-center gap-2.5">
+            <b className="truncate text-[15px]">{assignment.title} · instructions</b>
+            <InstructionsStatus state={state} />
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <Link to={instructionsPath(courseId, assignment.id)}>
+              <Button small>Open as page</Button>
+            </Link>
+            <Button small onClick={onClose}>
+              Close
+            </Button>
+          </div>
+        </header>
+        <InstructionsViewer courseId={courseId} assignmentId={assignment.id} materials={state.materials} initial={initial} />
+      </div>
+    </div>
+  );
+}
+
+/** Tabs for every material, the selected one shown in the remaining height, and what grading does with it. */
+export function InstructionsViewer({
+  courseId,
+  assignmentId,
+  materials,
+  initial,
+}: {
+  courseId: string;
+  assignmentId: string;
+  materials: Material[];
+  initial: Material | undefined;
+}) {
+  const [selectedId, setSelectedId] = useState(initial?.file.id);
+  const selected = materials.find((m) => m.file.id === selectedId) ?? initial;
+
+  if (!selected) {
+    return <div className="px-[18px] py-10 text-center text-ink-muted">This assignment has no materials.</div>;
+  }
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      {/* Tabs scroll sideways when there are many materials. */}
+      <nav className="flex shrink-0 gap-1 overflow-x-auto bg-paper/50 px-[18px] pt-2" aria-label="Materials">
+        {materials.map((m) => {
+          const active = m.file.id === selected.file.id;
+          return (
+            <button
+              key={m.file.id}
+              onClick={() => setSelectedId(m.file.id)}
+              aria-pressed={active}
+              className={`flex shrink-0 items-center gap-1.5 rounded-t-lg border border-b-0 px-3 py-2 text-xs font-semibold ${
+                active ? "border-line bg-white text-ink" : "border-transparent text-ink-muted hover:text-ink"
+              }`}
+            >
+              <span className={`text-[9px] font-bold tracking-wide ${active ? "text-accent" : ""}`}>{typeLabel[m.type]}</span>
+              <span className="max-w-[240px] truncate">{m.file.name}</span>
+            </button>
+          );
+        })}
+      </nav>
+      <div className="min-h-0 flex-1 border-t border-line bg-paper">
+        <MaterialView key={selected.file.id} courseId={courseId} assignmentId={assignmentId} material={selected} />
+      </div>
+      <MaterialFooter courseId={courseId} assignmentId={assignmentId} material={selected} />
+    </div>
+  );
+}
+
+/** Shows one material in the space it is given: our stored copy when there is one, otherwise Drive's own player. */
+function MaterialView({ courseId, assignmentId, material }: { courseId: string; assignmentId: string; material: Material }) {
+  const { file, type, storedUrl, driveUrl } = material;
+  const drivePreview = drivePreviewUrl(driveUrl);
+
+  if (storedUrl && type === "pdf") {
+    return <iframe src={storedUrl} title={file.name} className="h-full w-full bg-white" />;
+  }
+  if (storedUrl && type === "docx") {
+    // Rendered in the browser from the stored .docx, the same file grading reads; no PDF conversion needed.
+    return <InstructionsDocx courseId={courseId} assignmentId={assignmentId} file={file} />;
+  }
+  if (storedUrl && type === "image") {
+    return (
+      <div className="flex h-full items-center justify-center p-4">
+        <img src={storedUrl} alt={file.name} className="max-h-full max-w-full rounded-lg border border-line bg-white object-contain" />
+      </div>
+    );
+  }
+  if (drivePreview) {
+    // Drive's player: needs the browser to be signed in to a Google account that can see the file.
+    return <iframe src={drivePreview} title={file.name} allow="autoplay; fullscreen" className="h-full w-full bg-black" />;
+  }
+
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center text-ink-muted">
+      <div className="font-semibold text-ink">{file.name}</div>
+      <div className="text-xs">{type === "link" ? "Web pages open in a new tab." : "This file cannot be shown in the page."}</div>
+      {file.url && (
+        <a href={file.url} target="_blank" rel="noreferrer">
+          <Button small>Open link ↗</Button>
+        </a>
+      )}
+      {storedUrl && (
+        <a href={instructionsFileUrl(courseId, assignmentId, file.id, true)}>
+          <Button small>Download</Button>
+        </a>
+      )}
+    </div>
+  );
+}
+
+/** What happens to the material in grading, and where else it can be opened. */
+function MaterialFooter({ courseId, assignmentId, material }: { courseId: string; assignmentId: string; material: Material }) {
+  const { file, storedUrl, driveUrl } = material;
+  const sent = storedUrl !== null && file.status !== "Unsupported";
+
+  return (
+    <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-line px-[18px] py-2 text-xs">
+      <span className="text-ink-muted">
+        {sent ? (
+          <>
+            <b className="text-accent">Sent to the AI</b> with every grading · our stored copy · {formatSize(file.sizeBytes)}
+          </>
+        ) : (
+          <>
+            <b className="text-ink">Not sent to the AI</b> · {file.url ? "a web link" : "videos and unsupported files are not stored"}
+          </>
+        )}
+      </span>
+      <span className="flex gap-3">
+        {storedUrl && (
+          <a href={instructionsFileUrl(courseId, assignmentId, file.id, true)} className="font-semibold text-accent">
+            Download
+          </a>
+        )}
+        {driveUrl && (
+          <a href={driveUrl} target="_blank" rel="noreferrer" className="font-semibold text-accent">
+            Open in Drive ↗
+          </a>
+        )}
+      </span>
+    </div>
+  );
+}
+
+function InstructionsDocx({ courseId, assignmentId, file }: { courseId: string; assignmentId: string; file: InstructionsFile }) {
+  return <DocxView blob={useInstructionsFileBlob(courseId, assignmentId, file.id)} className="h-full rounded-none border-0" />;
+}

@@ -1,5 +1,6 @@
 import { renderAsync } from "docx-preview";
 import { useEffect, useRef, useState } from "react";
+import type { UseQueryResult } from "@tanstack/react-query";
 import type { StoredFile } from "../api/client";
 import { useStoredFileBlob } from "../api/hooks";
 import { ErrorPanel, Spinner } from "./ui";
@@ -9,7 +10,11 @@ import { ErrorPanel, Spinner } from "./ui";
  * the server. Display only: what the grader reads from documents is prepared by the backend.
  */
 export function DocxPreview({ file }: { file: StoredFile }) {
-  const blob = useStoredFileBlob(file.id);
+  return <DocxView blob={useStoredFileBlob(file.id)} />;
+}
+
+/** Renders a Word document from any loaded blob (a student's file or an assignment's instructions). */
+export function DocxView({ blob, className = "max-h-[720px]" }: { blob: UseQueryResult<Blob>; className?: string }) {
   const container = useRef<HTMLDivElement>(null);
   const [failed, setFailed] = useState(false);
 
@@ -49,7 +54,7 @@ export function DocxPreview({ file }: { file: StoredFile }) {
   }
 
   return (
-    <div className="max-h-[720px] overflow-auto rounded-[10px] border border-line bg-white">
+    <div className={`overflow-auto rounded-[10px] border border-line bg-white ${className}`}>
       {blob.isLoading && (
         <div className="px-4 py-3">
           <Spinner label="Loading document…" />

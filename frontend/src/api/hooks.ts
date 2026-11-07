@@ -45,11 +45,40 @@ export const useFetchSubmissions = (courseId: string, assignmentId: string) => {
           params: { path: { courseId, assignmentId } },
         }),
       ),
-    // Refreshes both the live list and the stored versions.
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["courses", courseId, "assignments", assignmentId, "submissions"] }),
+    // Refreshes the live list, the stored versions and the stored instructions (fetch stores those first).
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["courses", courseId, "assignments", assignmentId, "submissions"] });
+      void queryClient.invalidateQueries({ queryKey: ["courses", courseId, "assignments", assignmentId, "instructions"] });
+    },
   });
 };
+
+// The newest stored instructions (what grading sends), or null before the first fetch.
+export const useInstructions = (courseId: string, assignmentId: string) =>
+  useQuery({
+    queryKey: ["courses", courseId, "assignments", assignmentId, "instructions"],
+    // 204 (no body) means "not fetched yet"; any error, including a 404, is a real failure and is shown as one.
+    queryFn: async () =>
+      (await unwrap(
+        api.GET("/courses/{courseId}/assignments/{assignmentId}/instructions", {
+          params: { path: { courseId, assignmentId } },
+        }),
+      )) ?? null,
+  });
+
+// One stored instructions file as a blob, for viewers that render in the page (Word documents).
+export const useInstructionsFileBlob = (courseId: string, assignmentId: string, fileId: string) =>
+  useQuery({
+    queryKey: ["courses", courseId, "assignments", assignmentId, "instructions", "files", fileId],
+    queryFn: () =>
+      unwrap(
+        api.GET("/courses/{courseId}/assignments/{assignmentId}/instructions/files/{contentId}", {
+          params: { path: { courseId, assignmentId, contentId: fileId } },
+          parseAs: "blob",
+        }),
+      ),
+    staleTime: Infinity, // a stored version's files never change
+  });
 
 export const useReExtract = (courseId: string, assignmentId: string) => {
   const queryClient = useQueryClient();
@@ -79,13 +108,14 @@ export const useCodeFiles = (versionId: string, enabled: boolean) =>
 export const useCodeFileText = (versionId: string, path: string | null) =>
   useQuery({
     queryKey: ["versions", versionId, "code", path],
-    queryFn: () =>
-      unwrap(
+    // An empty file (students do turn those in) has no body, which the client reads as undefined; show it as "".
+    queryFn: async () =>
+      (await unwrap(
         api.GET("/versions/{versionId}/code/file", {
           params: { path: { versionId }, query: { path: path! } },
           parseAs: "text",
         }),
-      ),
+      )) ?? "",
     enabled: path !== null,
     staleTime: Infinity, // a stored version's code never changes until it is re-extracted
   });

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams } from "react-router";
-import type { Attachment, ExtractionSummary, FetchSummary, StoredSubmission, Submission } from "../api/client";
+import type { Attachment, ExtractionSummary, FetchSummary, StoredSubmission, StoredVersion, Submission } from "../api/client";
 import {
   useAssignments,
   useFetchSubmissions,
@@ -11,9 +11,10 @@ import {
   useSubmissions,
 } from "../api/hooks";
 import { GradingPanel } from "../components/GradingPanel";
+import { InstructionsCard } from "../components/InstructionsCard";
 import { PreviewPanel } from "../components/PreviewPanel";
 import { Avatar, Button, Card, CardHeader, Chip, type ChipTone, EmptyState, ErrorPanel, PageHeader, Spinner } from "../components/ui";
-import { formatDate, initials } from "../format";
+import { formatDate, formatDay, initials } from "../format";
 
 // GET …/submissions, GET …/submissions/stored and POST …/submissions/fetch
 export function AssignmentPage() {
@@ -23,29 +24,41 @@ export function AssignmentPage() {
   const stored = useStoredSubmissions(courseId, assignmentId);
   const fetch = useFetchSubmissions(courseId, assignmentId);
   const extract = useReExtract(courseId, assignmentId);
-  const [previewing, setPreviewing] = useState<StoredSubmission | null>(null);
+  const [previewing, setPreviewing] = useState<{ submission: StoredSubmission; versionId: string } | null>(null);
   const grade = useGradeVersion();
-  const [reviewing, setReviewing] = useState<{ submission: StoredSubmission; versionId: string; versionNumber: number } | null>(null);
+  const [reviewing, setReviewing] = useState<{ submission: StoredSubmission; version: StoredVersion } | null>(null);
+  const [sort, setSort] = useState<Sort>({ key: "status", descending: false });
+  const [filter, setFilter] = useState<Filter>("all");
+  // The version picked per student (by stored submission ID); the newest one when nothing is picked.
+  const [pickedVersions, setPickedVersions] = useState<Record<string, string>>({});
   // The version being graded right now, if any: one grading at a time.
   const gradingVersionId = grade.isPending ? grade.variables : undefined;
 
-  // Opens the review panel for the newest stored version and, when asked, grades it. Grading starts from the click
+  // Opens the review panel for the picked version and, when asked, grades it. Grading starts from the click
   // (not from the panel), so it is sent exactly once.
-  function openReview(stored: StoredSubmission, gradeNow: boolean) {
-    const latest = stored.versions[0];
-    if (!latest) {
-      return;
-    }
-    setReviewing({ submission: stored, versionId: latest.id, versionNumber: latest.number });
+  function openReview(submission: StoredSubmission, version: StoredVersion, gradeNow: boolean) {
+    setReviewing({ submission, version });
     if (gradeNow) {
-      grade.mutate(latest.id);
+      grade.mutate(version.id);
     }
+  }
+
+  // Clicking the sorted column flips its direction; another column starts ascending.
+  function sortBy(key: SortKey) {
+    setSort((current) => ({ key, descending: current.key === key ? !current.descending : false }));
   }
 
   // Stored copies are matched to the live list by the Classroom submission ID.
   const storedById = new Map(stored.data?.map((s) => [s.externalSubmissionId, s]));
 
-  const turnedIn = submissions.data?.filter((s) => s.state === "TURNED_IN" || s.state === "RETURNED").length ?? 0;
+  const all = submissions.data ?? [];
+  const counts: Record<Filter, number> = {
+    all: all.length,
+    returned: all.filter(filters.returned.matches).length,
+    turnedIn: all.filter(filters.turnedIn.matches).length,
+    missing: all.filter(filters.missing.matches).length,
+  };
+  const rows = sortSubmissions(all.filter(filters[filter].matches), sort);
 
   return (
     <>
@@ -55,7 +68,7 @@ export function AssignmentPage() {
           assignment && (
             <>
               Due {formatDate(assignment.dueAt)} · {assignment.maxPoints ?? "–"} points
-              {submissions.data && ` · ${turnedIn} of ${submissions.data.length} turned in`}
+              {submissions.data && ` · ${counts.returned + counts.turnedIn} of ${all.length} turned in`}
             </>
           )
         }
@@ -82,7 +95,7 @@ export function AssignmentPage() {
         }
       />
 
-      {assignment?.description && <TaskStatement text={assignment.description} />}
+      {assignment && <InstructionsCard courseId={courseId} assignment={assignment} />}
 
       {fetch.isPending && (
         <Card className="px-[18px] py-3.5">
@@ -97,49 +110,89 @@ export function AssignmentPage() {
       {submissions.isLoading && <Spinner />}
       {submissions.isError && <ErrorPanel error={submissions.error} />}
       {submissions.data && (
-        <Card>
-          <CardHeader title="Submissions" subtitle="Live from Classroom. Fetch stores turned-in work as versions." />
-          {submissions.data.length === 0 ? (
-            <EmptyState>No students in this assignment yet.</EmptyState>
+        // A container: the table adapts to its own width (narrower while the agent panel is open), not the window's.
+        <Card className="@container">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-[18px] py-[13px]">
+            <div className="min-w-0">
+              <h3 className="text-sm font-bold">Submissions</h3>
+              <div className="text-xs text-ink-muted">Live from Classroom. Fetch stores turned-in work as versions.</div>
+            </div>
+            <div className="flex rounded-lg border border-line bg-paper p-0.5" role="tablist" aria-label="Filter submissions">
+              {(Object.keys(filters) as Filter[]).map((key) => (
+                <button
+                  key={key}
+                  role="tab"
+                  aria-selected={filter === key}
+                  onClick={() => setFilter(key)}
+                  className={`flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold ${
+                    filter === key ? "bg-white text-ink shadow-sm" : "text-ink-muted hover:text-ink"
+                  }`}
+                >
+                  {filters[key].label}
+                  <span className={filter === key ? "text-accent" : ""}>{counts[key]}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          {rows.length === 0 ? (
+            <EmptyState>{all.length === 0 ? "No students in this assignment yet." : "No submissions match this filter."}</EmptyState>
           ) : (
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="border-b border-line text-left text-[11px] uppercase tracking-[0.06em] text-ink-muted">
-                  <th className="px-[18px] py-2.5 font-semibold">Student</th>
-                  <th className="px-[18px] py-2.5 font-semibold">Status</th>
-                  <th className="px-[18px] py-2.5 font-semibold">Turned in</th>
-                  <th className="px-[18px] py-2.5 font-semibold">Attachments</th>
-                  <th className="px-[18px] py-2.5 font-semibold">Stored copy</th>
-                </tr>
-              </thead>
-              <tbody>
-                {submissions.data.map((submission) => (
-                  <SubmissionRow
-                    key={submission.id}
-                    submission={submission}
-                    stored={storedById.get(submission.id)}
-                    onPreview={setPreviewing}
-                    onGrade={(stored) => openReview(stored, true)}
-                    onOpenReview={(stored) => openReview(stored, false)}
-                    gradingVersionId={gradingVersionId}
-                  />
-                ))}
-              </tbody>
-            </table>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="border-b border-line bg-paper/50 text-left text-[11px] uppercase tracking-[0.06em] text-ink-muted">
+                    <SortHeader label="Student" sortKey="student" sort={sort} onSort={sortBy} />
+                    <SortHeader label="Status" sortKey="status" sort={sort} onSort={sortBy} />
+                    <SortHeader label="Turned in" sortKey="turnedIn" sort={sort} onSort={sortBy} className="hidden @5xl:table-cell" />
+                    <th className="px-[18px] py-2.5 font-semibold">Version</th>
+                    <th className="px-[18px] py-2.5 font-semibold">
+                      <span className="sr-only">Actions</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((submission, i) => {
+                    const storedSubmission = storedById.get(submission.id);
+                    const previous = rows[i - 1];
+                    return (
+                      <SubmissionRow
+                        key={submission.id}
+                        submission={submission}
+                        stored={storedSubmission}
+                        // A thicker divider where the students without turned-in work begin.
+                        firstMissing={!hasWork(submission) && previous !== undefined && hasWork(previous)}
+                        pickedVersionId={storedSubmission ? pickedVersions[storedSubmission.id] : undefined}
+                        onPickVersion={(storedId, versionId) => setPickedVersions((p) => ({ ...p, [storedId]: versionId }))}
+                        onPreview={(s, version) => setPreviewing({ submission: s, versionId: version.id })}
+                        onGrade={(s, version) => openReview(s, version, true)}
+                        onOpenReview={(s, version) => openReview(s, version, false)}
+                        gradingVersionId={gradingVersionId}
+                      />
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </Card>
       )}
 
-      {previewing && <PreviewPanel submission={previewing} onClose={() => setPreviewing(null)} />}
+      {previewing && (
+        <PreviewPanel
+          submission={previewing.submission}
+          initialVersionId={previewing.versionId}
+          onClose={() => setPreviewing(null)}
+        />
+      )}
       {reviewing && (
         <GradingPanel
           submission={reviewing.submission}
-          versionId={reviewing.versionId}
-          versionNumber={reviewing.versionNumber}
-          pending={gradingVersionId === reviewing.versionId}
+          versionId={reviewing.version.id}
+          versionNumber={reviewing.version.number}
+          pending={gradingVersionId === reviewing.version.id}
           // Only this version's failure; a failed grading of another student is not shown here.
-          error={grade.isError && grade.variables === reviewing.versionId ? grade.error : null}
-          onRegrade={() => grade.mutate(reviewing.versionId)}
+          error={grade.isError && grade.variables === reviewing.version.id ? grade.error : null}
+          onRegrade={() => grade.mutate(reviewing.version.id)}
           regradeDisabled={grade.isPending}
           onClose={() => setReviewing(null)}
         />
@@ -148,20 +201,76 @@ export function AssignmentPage() {
   );
 }
 
-function TaskStatement({ text }: { text: string }) {
-  const [open, setOpen] = useState(false);
-  const long = text.length > 280;
+type SortKey = "student" | "status" | "turnedIn";
+type Sort = { key: SortKey; descending: boolean };
+
+// Returned work first, then work waiting for grading, then reclaimed; students with nothing turned in are always last
+// (see sortSubmissions).
+const statusRank: Record<string, number> = { RETURNED: 0, TURNED_IN: 1, RECLAIMED_BY_STUDENT: 2 };
+
+/** Whether the student has turned in work (returned work counts: it was turned in first). */
+function hasWork(submission: Submission): boolean {
+  return submission.state === "TURNED_IN" || submission.state === "RETURNED";
+}
+
+function time(value: string | null | undefined): number {
+  return value ? new Date(value).getTime() : 0;
+}
+
+/**
+ * Sorts by the chosen column; ties go to the turn-in date (newest first), then the name. Students without turned-in
+ * work stay at the bottom in either direction, so the "–" rows never mix with the work to grade.
+ */
+function sortSubmissions(list: Submission[], sort: Sort): Submission[] {
+  const direction = sort.descending ? -1 : 1;
+  const byName = (a: Submission, b: Submission) => a.studentName.localeCompare(b.studentName);
+  const byNewest = (a: Submission, b: Submission) => time(b.turnedInAt) - time(a.turnedInAt);
+  const byColumn: Record<SortKey, (a: Submission, b: Submission) => number> = {
+    student: byName,
+    status: (a, b) => (statusRank[a.state] ?? 9) - (statusRank[b.state] ?? 9),
+    turnedIn: (a, b) => time(a.turnedInAt) - time(b.turnedInAt),
+  };
+
+  return [...list].sort((a, b) => {
+    const missing = Number(!hasWork(a)) - Number(!hasWork(b));
+    if (missing !== 0) {
+      return missing;
+    }
+    return direction * byColumn[sort.key](a, b) || byNewest(a, b) || byName(a, b);
+  });
+}
+
+type Filter = "all" | "returned" | "turnedIn" | "missing";
+
+const filters: Record<Filter, { label: string; matches: (s: Submission) => boolean }> = {
+  all: { label: "All", matches: () => true },
+  returned: { label: "Returned", matches: (s) => s.state === "RETURNED" },
+  turnedIn: { label: "Turned in", matches: (s) => s.state === "TURNED_IN" },
+  missing: { label: "Not submitted", matches: (s) => !hasWork(s) },
+};
+
+function SortHeader({
+  label,
+  sortKey,
+  sort,
+  onSort,
+  className = "",
+}: {
+  label: string;
+  sortKey: SortKey;
+  sort: Sort;
+  onSort: (key: SortKey) => void;
+  className?: string;
+}) {
+  const active = sort.key === sortKey;
 
   return (
-    <Card className="px-[18px] py-3.5">
-      <div className="mb-1 text-[11px] font-bold uppercase tracking-[0.06em] text-accent">Task statement</div>
-      <p className={`whitespace-pre-wrap ${long && !open ? "line-clamp-3" : ""}`}>{text}</p>
-      {long && (
-        <button onClick={() => setOpen(!open)} className="mt-1 text-xs font-semibold text-accent">
-          {open ? "Show less" : "Show all"}
-        </button>
-      )}
-    </Card>
+    <th className={`px-[18px] py-2.5 font-semibold ${className}`} aria-sort={active ? (sort.descending ? "descending" : "ascending") : "none"}>
+      <button onClick={() => onSort(sortKey)} className={`inline-flex items-center gap-1 uppercase tracking-[0.06em] hover:text-ink ${active ? "text-ink" : ""}`}>
+        {label}
+        <span className={active ? "" : "opacity-30"}>{active && sort.descending ? "↓" : "↑"}</span>
+      </button>
+    </th>
   );
 }
 
@@ -245,6 +354,9 @@ const stateChip: Record<string, { tone: ChipTone; label: string }> = {
 function SubmissionRow({
   submission,
   stored,
+  firstMissing,
+  pickedVersionId,
+  onPickVersion,
   onPreview,
   onGrade,
   onOpenReview,
@@ -252,73 +364,105 @@ function SubmissionRow({
 }: {
   submission: Submission;
   stored: StoredSubmission | undefined;
-  onPreview: (stored: StoredSubmission) => void;
-  onGrade: (stored: StoredSubmission) => void;
-  onOpenReview: (stored: StoredSubmission) => void;
+  firstMissing: boolean;
+  pickedVersionId: string | undefined;
+  onPickVersion: (storedId: string, versionId: string) => void;
+  onPreview: (stored: StoredSubmission, version: StoredVersion) => void;
+  onGrade: (stored: StoredSubmission, version: StoredVersion) => void;
+  onOpenReview: (stored: StoredSubmission, version: StoredVersion) => void;
   gradingVersionId: string | undefined;
 }) {
   const state = stateChip[submission.state] ?? { tone: "muted" as const, label: submission.state };
-  const latest = stored?.versions[0];
-  const turnedIn = submission.state === "TURNED_IN" || submission.state === "RETURNED";
-  const hasReview = useReview(latest?.id).data !== undefined;
-  const gradingThis = latest !== undefined && gradingVersionId === latest.id;
+  const working = hasWork(submission);
+  const version = stored?.versions.find((v) => v.id === pickedVersionId) ?? stored?.versions[0];
+  const hasReview = useReview(version?.id).data !== undefined;
+  const gradingThis = version !== undefined && gradingVersionId === version.id;
 
   return (
-    <tr className="border-b border-paper-dark align-top last:border-b-0">
-      <td className="px-[18px] py-2.5">
+    <tr className={`border-b border-paper-dark last:border-b-0 hover:bg-paper/40 ${firstMissing ? "border-t-2 border-t-line" : ""}`}>
+      <td className="px-[18px] py-3">
         <div className="flex items-center gap-2.5">
           <Avatar text={initials(submission.studentName)} />
-          <b>{submission.studentName}</b>
+          <div className="min-w-0">
+            <div className={`font-semibold ${working ? "" : "text-ink-muted"}`}>{submission.studentName}</div>
+            {submission.attachments.length > 0 && (
+              <div className="mt-0.5 flex flex-wrap gap-x-2.5 gap-y-0.5">
+                {submission.attachments.map((attachment, i) => (
+                  <AttachmentLink key={i} attachment={attachment} />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </td>
-      <td className="px-[18px] py-2.5">
-        <div className="flex flex-wrap gap-1.5 pt-1">
+      <td className="px-[18px] py-3">
+        <div className="flex flex-wrap gap-1.5">
           <Chip tone={state.tone}>{state.label}</Chip>
           {submission.late && <Chip tone="dashed">Late</Chip>}
         </div>
+        {/* When the table is narrow the turn-in date moves under the status. */}
+        {submission.turnedInAt && <div className="mt-1 text-[11px] text-ink-muted @5xl:hidden">{formatDate(submission.turnedInAt)}</div>}
       </td>
-      <td className="whitespace-nowrap px-[18px] py-2.5 pt-3.5 text-ink-muted">{formatDate(submission.turnedInAt)}</td>
-      <td className="px-[18px] py-2.5">
-        {submission.attachments.length === 0 ? (
-          <span className="block pt-1 text-ink-muted">–</span>
+      <td className="hidden whitespace-nowrap px-[18px] py-3 text-ink-muted @5xl:table-cell">{formatDate(submission.turnedInAt)}</td>
+      <td className="whitespace-nowrap px-[18px] py-3">
+        {stored && version ? (
+          <VersionPicker stored={stored} version={version} onPick={(id) => onPickVersion(stored.id, id)} />
         ) : (
-          <div className="flex flex-wrap gap-1.5 pt-0.5">
-            {submission.attachments.map((attachment, i) => (
-              <AttachmentLink key={i} attachment={attachment} />
-            ))}
-          </div>
+          <span className="text-xs text-ink-muted">{working ? "Not fetched yet" : "–"}</span>
         )}
       </td>
-      <td className="whitespace-nowrap px-[18px] py-2.5">
-        {stored && latest ? (
-          <div className="flex items-center gap-2 pt-0.5">
-            <Button small variant="primary" onClick={() => onPreview(stored)}>
+      <td className="whitespace-nowrap px-[18px] py-3">
+        {stored && version && (
+          <div className="flex items-center justify-end gap-2">
+            <Button small onClick={() => onPreview(stored, version)} title={`Open v${version.number} from our stored copy`}>
               Preview
             </Button>
             {/* A review or a running grading opens the panel; otherwise this grades. One grading at a time. */}
             {hasReview || gradingThis ? (
-              <Button small onClick={() => onOpenReview(stored)} title="Show the AI review next to the code">
+              <Button small variant="dark" onClick={() => onOpenReview(stored, version)} title="Show the AI review next to the code">
                 {gradingThis ? "Grading…" : "AI review"}
               </Button>
             ) : (
               <Button
                 small
-                onClick={() => onGrade(stored)}
+                variant="primary"
+                onClick={() => onGrade(stored, version)}
                 disabled={gradingVersionId !== undefined}
-                title="Send this version and the assignment's instructions to the AI for a draft review"
+                title={`Send v${version.number} and the assignment's instructions to the AI for a draft review`}
               >
                 Grade with AI
               </Button>
             )}
-            <span className="text-xs text-ink-muted">
-              v{latest.number} · {latest.files.filter((f) => f.stored).length} files
-            </span>
           </div>
-        ) : (
-          <span className="block pt-1 text-xs text-ink-muted">{turnedIn ? "Fetch to preview" : "–"}</span>
         )}
       </td>
     </tr>
+  );
+}
+
+/** The stored versions of one student, newest first; the picked one is what Preview and Grade use. */
+function VersionPicker({ stored, version, onPick }: { stored: StoredSubmission; version: StoredVersion; onPick: (versionId: string) => void }) {
+  const files = version.files.filter((f) => f.stored).length;
+
+  return (
+    <div className="flex items-center gap-2">
+      <select
+        value={version.id}
+        onChange={(e) => onPick(e.target.value)}
+        aria-label={`Version of ${stored.studentName}'s submission`}
+        title={`Fetched ${formatDate(version.fetchedAt)}`}
+        className="h-7 cursor-pointer rounded-lg border border-line bg-white pl-2 pr-1 text-xs font-semibold hover:border-accent"
+      >
+        {stored.versions.map((v, i) => (
+          <option key={v.id} value={v.id}>
+            {`v${v.number} · ${formatDay(v.fetchedAt)}${i === 0 ? " (latest)" : ""}`}
+          </option>
+        ))}
+      </select>
+      <span className="hidden text-xs text-ink-muted @5xl:inline">
+        {files} {files === 1 ? "file" : "files"}
+      </span>
+    </div>
   );
 }
 
@@ -327,14 +471,14 @@ const attachmentLabel: Record<Attachment["kind"], string> = { DriveFile: "Drive"
 function AttachmentLink({ attachment }: { attachment: Attachment }) {
   const content = (
     <>
-      <span className="text-[10px] font-bold uppercase text-ink-muted">{attachmentLabel[attachment.kind]}</span>
-      <span className="max-w-[220px] truncate">{attachment.title}</span>
+      <span className="text-[9px] font-bold uppercase tracking-wide">{attachmentLabel[attachment.kind]}</span>
+      <span className="max-w-[200px] truncate">{attachment.title}</span>
     </>
   );
-  const className = "inline-flex items-center gap-1.5 rounded-lg border border-line bg-white px-2.5 py-1 text-xs font-semibold";
+  const className = "inline-flex items-center gap-1 text-xs text-ink-muted";
 
   return attachment.url ? (
-    <a href={attachment.url} target="_blank" rel="noreferrer" className={`${className} hover:border-accent`}>
+    <a href={attachment.url} target="_blank" rel="noreferrer" className={`${className} hover:text-accent hover:underline`}>
       {content}
     </a>
   ) : (

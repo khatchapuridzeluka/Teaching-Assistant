@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Anthropic;
 using Anthropic.Exceptions;
 using Anthropic.Models.Beta;
@@ -73,8 +74,12 @@ public class ClaudeLanguageModel : ILanguageModel
     }
 
     public async Task<LanguageModelReply> GradeAsync(
-        string systemPrompt, IReadOnlyList<PromptPart> parts, CancellationToken cancellationToken = default)
+        string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default)
     {
+        // Structured output: the API constrains the reply to this JSON Schema, so it parses into the caller's records.
+        var schema = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(outputSchema)
+            ?? throw new ArgumentException("The output schema is empty.", nameof(outputSchema));
+
         try
         {
             // The beta endpoint only for refusal fallbacks: if a safety classifier declines (rare for homework, but it
@@ -84,7 +89,11 @@ public class ClaudeLanguageModel : ILanguageModel
                 Model = _options.GradingModel,
                 MaxTokens = _options.GradingMaxTokens,
                 // Grading is judgement-heavy; the default effort on this model is medium.
-                OutputConfig = new Beta.BetaOutputConfig { Effort = Beta.Effort.High },
+                OutputConfig = new Beta.BetaOutputConfig
+                {
+                    Effort = Beta.Effort.High,
+                    Format = new Beta.BetaJsonOutputFormat { Schema = schema },
+                },
                 Betas = [AnthropicBeta.ServerSideFallback2026_06_01],
                 Fallbacks = new List<Beta.BetaFallbackParam> { new(Model.ClaudeOpus4_8) },
                 System = systemPrompt,
@@ -96,12 +105,14 @@ public class ClaudeLanguageModel : ILanguageModel
                 throw new LanguageModelUnavailableException("The model declined to grade this submission.");
             }
 
-            var text = string.Concat(response.Content.Select(b => b.Value).OfType<Beta.BetaTextBlock>().Select(t => t.Text)).Trim();
             if (response.StopReason == "max_tokens")
             {
-                text += "\n\n_The review was cut off at the length limit (Anthropic:GradingMaxTokens)._";
+                // Cut-off JSON cannot be parsed; a clear message beats half a review.
+                throw new LanguageModelUnavailableException(
+                    "The review was cut off at the length limit. Raise Anthropic:GradingMaxTokens and grade again.");
             }
 
+            var text = string.Concat(response.Content.Select(b => b.Value).OfType<Beta.BetaTextBlock>().Select(t => t.Text)).Trim();
             return new LanguageModelReply(response.Model, text);
         }
         catch (Exception ex) when (Translate(ex, _options.GradingModel) is { } translated)

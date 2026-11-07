@@ -35,3 +35,12 @@ body {
 .markdown table { @apply block max-w-full overflow-x-auto border-collapse text-[12px]; }
 .markdown th, .markdown td { @apply border border-line px-2 py-1 text-left; }
 .markdown blockquote { @apply border-l-2 border-line pl-3 text-ink-muted; }
+
+/* Mistake marks in the code viewer (CodeBrowser): a dot in the gutter and a tinted line, coloured by severity. */
+.mistake-glyph { cursor: pointer; }
+.mistake-glyph-Major { background: radial-gradient(circle, #dc2626 0 4px, transparent 4.5px); }
+.mistake-glyph-Minor { background: radial-gradient(circle, #d97706 0 4px, transparent 4.5px); }
+.mistake-glyph-Style { background: radial-gradient(circle, #64748b 0 4px, transparent 4.5px); }
+.mistake-line-Major { background: rgb(220 38 38 / 0.08); }
+.mistake-line-Minor { background: rgb(217 119 6 / 0.08); }
+.mistake-line-Style { background: rgb(100 116 139 / 0.08); }

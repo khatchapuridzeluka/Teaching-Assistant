@@ -4,16 +4,20 @@ import { CourseName } from "../components/Layout";
 import { Card, EmptyState, ErrorPanel, PageHeader, Spinner } from "../components/ui";
 import { formatDate } from "../format";
 
-// GET /courses/{courseId}/assignments
-export function CoursePage() {
+// GET /courses/{courseId}/assignments: the course's Assignments section.
+export function AssignmentsPage() {
   const { courseId = "" } = useParams();
   const assignments = useAssignments(courseId);
 
   return (
     <>
       <PageHeader
-        title={<CourseName courseId={courseId} />}
-        subtitle="Published assignments, newest first. Open one to see and fetch its submissions."
+        title="Assignments"
+        subtitle={
+          <>
+            <CourseName courseId={courseId} /> · published assignments, newest first. Open one to see and fetch its submissions.
+          </>
+        }
       />
 
       {assignments.isLoading && <Spinner />}

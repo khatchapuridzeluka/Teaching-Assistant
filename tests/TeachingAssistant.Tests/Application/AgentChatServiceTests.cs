@@ -143,7 +143,7 @@ public class AgentChatServiceTests
         }
 
         public Task<LanguageModelReply> GradeAsync(
-            string systemPrompt, IReadOnlyList<PromptPart> parts, CancellationToken cancellationToken = default) =>
+            string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
     }
 }

@@ -1,6 +1,7 @@
 import { type ReactNode, useState } from "react";
-import { Link, NavLink, Outlet, useMatches } from "react-router";
+import { Link, NavLink, Outlet, useMatch, useMatches } from "react-router";
 import { useApiHealth, useAssignments, useCourses, useGoogleStatus } from "../api/hooks";
+import { coursePath, courseSections, workspaceSections } from "../navigation";
 import { ChatPanel } from "./ChatPanel";
 import { Button } from "./ui";
 
@@ -23,7 +24,8 @@ export function Layout() {
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar chatOpen={chatOpen} onToggleChat={() => setChatOpen(!chatOpen)} />
         <main className="flex-1 overflow-y-auto px-7 py-6">
-          <div className="mx-auto flex max-w-[1180px] flex-col gap-[18px]">
+          {/* Full width: tables and code need the room, and the agent panel narrows the page instead of covering it. */}
+          <div className="flex flex-col gap-[18px]">
             <Outlet />
           </div>
         </main>
@@ -52,11 +54,20 @@ function usePageDescription(): string | null {
   return null;
 }
 
+// A course's sections, nested under the course in the sidebar.
+const sectionClass = ({ isActive }: { isActive: boolean }) =>
+  `flex items-center justify-between gap-2 rounded-[6px] px-2.5 py-1.5 text-xs ${
+    isActive ? "bg-accent font-semibold text-white" : "text-[#c4c6c7] hover:bg-ink-soft"
+  }`;
+
 function Sidebar() {
   const courses = useCourses();
+  const [coursesOpen, setCoursesOpen] = useState(true);
+  // The course being viewed shows its sections; the others stay one line each.
+  const currentCourseId = useMatch("/courses/:courseId/*")?.params.courseId;
 
   return (
-    <aside className="flex w-[232px] shrink-0 flex-col bg-ink px-3.5 py-5 text-paper">
+    <aside className="flex w-[232px] shrink-0 flex-col overflow-y-auto bg-ink px-3.5 py-5 text-paper">
       <Link to="/" className="flex items-center gap-2.5 px-2 pb-[18px]">
         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-xs font-bold text-white">TA</span>
         <span>
@@ -66,20 +77,72 @@ function Sidebar() {
       </Link>
 
       <div className="px-2.5 pb-1.5 pt-3.5 text-[10px] uppercase tracking-[0.08em] text-[#8a8d8f]">Workspace</div>
-      <NavLink to="/" end className={navClass}>Courses</NavLink>
-      <NavLink to="/settings" className={navClass}>Settings</NavLink>
 
-      <div className="px-2.5 pb-1.5 pt-3.5 text-[10px] uppercase tracking-[0.08em] text-[#8a8d8f]">Courses</div>
-      {courses.data?.map((course) => (
-        <NavLink key={course.id} to={`/courses/${course.id}`} className={navClass}>
-          <span className="truncate">{course.name}</span>
+      {/* Courses: the label opens the list of all courses, the arrow folds the course list away. */}
+      <div className="flex items-center gap-1">
+        <NavLink to="/" end className={(state) => `${navClass(state)} flex-1`}>Courses</NavLink>
+        <button
+          onClick={() => setCoursesOpen(!coursesOpen)}
+          aria-expanded={coursesOpen}
+          aria-label={coursesOpen ? "Hide courses" : "Show courses"}
+          className="flex h-8 w-7 shrink-0 items-center justify-center rounded-[7px] text-[#a9abac] hover:bg-ink-soft hover:text-white"
+        >
+          {coursesOpen ? "▾" : "▸"}
+        </button>
+      </div>
+
+      {coursesOpen && (
+        <div className="mb-1 ml-3 flex flex-col gap-0.5 border-l border-ink-soft pl-2">
+          {courses.isLoading && <div className="px-2.5 py-1 text-[11px] text-[#a9abac]">Loading…</div>}
+          {courses.isError && <div className="px-2.5 py-1 text-[11px] text-[#a9abac]">Connect Google to see courses</div>}
+          {courses.data?.map((course) => {
+            const current = course.id === currentCourseId;
+            return (
+              <div key={course.id}>
+                <Link
+                  to={coursePath(course.id)}
+                  className={`block truncate rounded-[6px] px-2.5 py-1.5 text-[13px] ${
+                    current ? "font-semibold text-white" : "text-[#d4d5d6] hover:bg-ink-soft"
+                  }`}
+                >
+                  {course.name}
+                </Link>
+                {current && (
+                  <div className="mb-1 ml-2 flex flex-col gap-0.5">
+                    {courseSections.map((section) => (
+                      <NavLink key={section.path} to={coursePath(course.id, section.path)} end={section.path === ""} className={sectionClass}>
+                        <span className="truncate">{section.label}</span>
+                        {!section.ready && <SoonBadge />}
+                      </NavLink>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {workspaceSections.map((section) => (
+        <NavLink key={section.path} to={`/${section.path}`} className={navClass}>
+          <span>{section.label}</span>
+          {!section.ready && <SoonBadge />}
         </NavLink>
       ))}
-      {courses.isError && <div className="px-2.5 text-[11px] text-[#a9abac]">Connect Google to see courses</div>}
+      <NavLink to="/settings" className={navClass}>Settings</NavLink>
 
       <div className="flex-1" />
       <GoogleCard />
     </aside>
+  );
+}
+
+// Marks sections that open a "planned" page instead of a working one.
+function SoonBadge() {
+  return (
+    <span className="shrink-0 rounded-full border border-[#5a5f63] px-1.5 text-[9px] font-semibold uppercase tracking-[0.06em] text-[#8a8d8f]">
+      Soon
+    </span>
   );
 }
 

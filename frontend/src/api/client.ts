@@ -15,7 +15,10 @@ export type StoredFile = components["schemas"]["StoredFileResponse"];
 
 export type CodeFile = components["schemas"]["CodeFileResponse"];
 export type GradingResult = components["schemas"]["GradingResponse"];
+export type CodeMistake = components["schemas"]["CodeMistake"];
 export type ExtractionSummary = components["schemas"]["ExtractionSummary"];
+export type StoredInstructions = components["schemas"]["StoredInstructionsResponse"];
+export type InstructionsFile = components["schemas"]["InstructionsFileResponse"];
 
 /** URL of one extracted file of a version; path comes from the version's code list. */
 export const codeFileUrl = (versionId: string, path: string) =>
@@ -24,6 +27,10 @@ export const codeFileUrl = (versionId: string, path: string) =>
 /** URL of a stored file: shown in the browser, or saved under the student's file name when download is true. */
 export const storedFileUrl = (fileId: string, download = false) =>
   `/api/stored-files/${fileId}${download ? "?download=true" : ""}`;
+
+/** URL of a stored instructions file of an assignment, shown in the browser or downloaded under its name. */
+export const instructionsFileUrl = (courseId: string, assignmentId: string, fileId: string, download = false) =>
+  `/api/courses/${courseId}/assignments/${assignmentId}/instructions/files/${fileId}${download ? "?download=true" : ""}`;
 
 // "/api" is forwarded to the ASP.NET API by the Vite dev server (see vite.config.ts).
 export const api = createClient<paths>({ baseUrl: "/api" });

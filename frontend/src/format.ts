@@ -11,6 +11,14 @@ export function formatDate(value: string | null | undefined): string {
   });
 }
 
+// The date alone, for compact places such as the version picker.
+export function formatDay(value: string | null | undefined): string {
+  if (!value) {
+    return "–";
+  }
+  return new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
 export function initials(name: string): string {
   return name
     .split(/\s+/)

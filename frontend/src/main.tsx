@@ -5,9 +5,13 @@ import { createBrowserRouter, RouterProvider } from "react-router";
 import "./index.css";
 import "./monaco";
 import { AssignmentTitle, CourseName, type CrumbHandle, Layout } from "./components/Layout";
-import { CoursesPage } from "./pages/CoursesPage";
-import { CoursePage } from "./pages/CoursePage";
+import { courseSections, workspaceSections } from "./navigation";
 import { AssignmentPage } from "./pages/AssignmentPage";
+import { AssignmentsPage } from "./pages/AssignmentsPage";
+import { ComingSoonPage } from "./pages/ComingSoonPage";
+import { CourseOverviewPage } from "./pages/CourseOverviewPage";
+import { CoursesPage } from "./pages/CoursesPage";
+import { InstructionsPage } from "./pages/InstructionsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 
 const queryClient = new QueryClient({
@@ -24,23 +28,56 @@ const router = createBrowserRouter([
     children: [
       { path: "/", element: <CoursesPage /> },
       {
+        // A course opens on its overview; each section is a page below it (see navigation.ts).
         path: "/courses/:courseId",
         handle: {
           crumbs: ({ courseId }) => [{ label: <CourseName courseId={courseId!} />, to: `/courses/${courseId}` }],
         } satisfies CrumbHandle,
         children: [
-          { index: true, element: <CoursePage /> },
+          { index: true, element: <CourseOverviewPage /> },
           {
-            path: "assignments/:assignmentId",
-            element: <AssignmentPage />,
+            path: "assignments",
             handle: {
-              crumbs: ({ courseId, assignmentId }) => [
-                { label: <AssignmentTitle courseId={courseId!} assignmentId={assignmentId!} /> },
-              ],
+              crumbs: ({ courseId }) => [{ label: "Assignments", to: `/courses/${courseId}/assignments` }],
             } satisfies CrumbHandle,
+            children: [
+              { index: true, element: <AssignmentsPage /> },
+              {
+                path: ":assignmentId",
+                handle: {
+                  crumbs: ({ courseId, assignmentId }) => [
+                    {
+                      label: <AssignmentTitle courseId={courseId!} assignmentId={assignmentId!} />,
+                      to: `/courses/${courseId}/assignments/${assignmentId}`,
+                    },
+                  ],
+                } satisfies CrumbHandle,
+                children: [
+                  { index: true, element: <AssignmentPage /> },
+                  {
+                    path: "instructions",
+                    element: <InstructionsPage />,
+                    handle: { crumbs: () => [{ label: "Instructions" }] } satisfies CrumbHandle,
+                  },
+                ],
+              },
+            ],
           },
+          // Planned sections: a page that says what they will do.
+          ...courseSections
+            .filter((section) => !section.ready)
+            .map((section) => ({
+              path: section.path,
+              element: <ComingSoonPage section={section} />,
+              handle: { crumbs: () => [{ label: section.label }] } satisfies CrumbHandle,
+            })),
         ],
       },
+      ...workspaceSections.map((section) => ({
+        path: `/${section.path}`,
+        element: <ComingSoonPage section={section} />,
+        handle: { crumbs: () => [{ label: section.label }] } satisfies CrumbHandle,
+      })),
       {
         path: "/settings",
         element: <SettingsPage />,

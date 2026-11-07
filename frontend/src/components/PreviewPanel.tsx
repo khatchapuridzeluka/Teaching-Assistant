@@ -21,8 +21,17 @@ const versionChip: Record<string, { tone: ChipTone; label: string }> = {
  * Shows a stored submission from our own copy (not Google Drive): the extracted code in a viewer, images as a gallery,
  * PDFs (including exported Google Docs) and Word documents (.docx) inline, and everything else as a download.
  */
-export function PreviewPanel({ submission, onClose }: { submission: StoredSubmission; onClose: () => void }) {
-  const [versionId, setVersionId] = useState(submission.versions[0]?.id);
+export function PreviewPanel({
+  submission,
+  initialVersionId,
+  onClose,
+}: {
+  submission: StoredSubmission;
+  /** The version picked in the table; the newest one when not given. */
+  initialVersionId?: string;
+  onClose: () => void;
+}) {
+  const [versionId, setVersionId] = useState(initialVersionId ?? submission.versions[0]?.id);
   const [enlarged, setEnlarged] = useState<StoredFile | null>(null);
   const version = submission.versions.find((v) => v.id === versionId) ?? submission.versions[0];
 

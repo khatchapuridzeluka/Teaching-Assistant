@@ -100,6 +100,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ISubmissionService, SubmissionService>();
         services.AddScoped<ISubmissionFetchService, SubmissionFetchService>();
         services.AddScoped<IInstructionsFetchService, InstructionsFetchService>();
+        services.AddScoped<IInstructionsService, InstructionsService>();
         services.AddScoped<IStoredSubmissionService, StoredSubmissionService>();
         services.AddScoped<IAgentChatService, AgentChatService>();
         services.AddScoped<IGradingService, GradingService>();

@@ -4,6 +4,7 @@ using TeachingAssistant.Application.Exceptions;
 using TeachingAssistant.Application.Interfaces;
 using TeachingAssistant.Application.Models;
 using TeachingAssistant.Application.Services;
+using TeachingAssistant.Domain.Grading;
 using TeachingAssistant.Domain.Ingestion;
 
 namespace TeachingAssistant.Tests.Application;
@@ -61,6 +62,59 @@ public class GradingServiceTests
         Assert.Contains(_model.Parts!, p => p is TextPart t && t.Text.Contains("<student_document name=\"notes.docx\">\nMy report"));
         Assert.Contains(result.SkippedFiles, s => s.Contains("demo.mp4"));
         Assert.Contains(result.SkippedFiles, s => s.Contains("screen.mp4"));
+    }
+
+    [Fact]
+    public async Task Grade_ReturnsMistakes_WithFilesAndLinesCheckedAgainstTheSentCode()
+    {
+        _instructions.Store("Write a zoo.");
+        var versionId = _store.AddVersion(Content(ContentKind.CodeArchive, "zoo.zip", "application/zip"));
+        _storage.Code["src/Zoo.java"] = "public class Zoo {\n    public int size;\n    void feed() {}\n}";
+        _storage.Code["src/Main.java"] = "class Main {}";
+        _model.Reply =
+            """
+            {
+              "review": "## Score\n90/100",
+              "mistakes": [
+                { "file": "src/Zoo.java", "startLine": 2, "endLine": 2, "severity": "Major", "category": "Encapsulation", "message": " Field is public. " },
+                { "file": "Zoo.java", "startLine": 3, "endLine": 99, "severity": "Minor", "category": "Naming", "message": "Unclear name." },
+                { "file": "src/Zoo.java", "startLine": 40, "endLine": 41, "severity": "Style", "category": "Readability", "message": "Lines that do not exist." },
+                { "file": "Other.java", "startLine": 1, "endLine": 1, "severity": "Major", "category": "Correctness", "message": "A file that was not sent." },
+                { "file": null, "startLine": null, "endLine": null, "severity": "Major", "category": "MissingRequirement", "message": "Task 3 is missing." }
+              ]
+            }
+            """;
+
+        var result = await Service().GradeVersionAsync(versionId, TestContext.Current.CancellationToken);
+
+        Assert.Contains("\"enum\"", _model.Schema);
+        Assert.Equal("## Score\n90/100", result!.Review);
+        Assert.Equal(
+        [
+            // As given, trimmed.
+            new CodeMistake("src/Zoo.java", 2, 2, MistakeSeverity.Major, MistakeCategory.Encapsulation, "Field is public."),
+            // The file name alone matches the one file with that name; the end line is kept inside the file (4 lines).
+            new CodeMistake("src/Zoo.java", 3, 4, MistakeSeverity.Minor, MistakeCategory.Naming, "Unclear name."),
+            // Lines outside the file are dropped, the file is kept.
+            new CodeMistake("src/Zoo.java", null, null, MistakeSeverity.Style, MistakeCategory.Readability, "Lines that do not exist."),
+            // A file that was not sent is dropped with its lines: the mistake stays, about the submission as a whole.
+            new CodeMistake(null, null, null, MistakeSeverity.Major, MistakeCategory.Correctness, "A file that was not sent."),
+            new CodeMistake(null, null, null, MistakeSeverity.Major, MistakeCategory.MissingRequirement, "Task 3 is missing."),
+        ], result.Mistakes);
+    }
+
+    [Fact]
+    public async Task Grade_ShowsAReplyThatIsNotTheExpectedJson_AsTheReview()
+    {
+        _instructions.Store("Write a zoo.");
+        var versionId = _store.AddVersion(Content(ContentKind.CodeArchive, "zoo.zip", "application/zip"));
+        _storage.Code["Main.java"] = "class Main {}";
+        _model.Reply = "Plain text review";
+
+        var result = await Service().GradeVersionAsync(versionId, TestContext.Current.CancellationToken);
+
+        Assert.Equal("Plain text review", result!.Review);
+        Assert.Empty(result.Mistakes);
     }
 
     [Fact]
@@ -284,14 +338,20 @@ public class GradingServiceTests
         public string? System { get; private set; }
         public List<PromptPart>? Parts { get; private set; }
 
+        public string? Schema { get; private set; }
+
+        // What the model answers: structured output, as the real API returns it.
+        public string Reply { get; set; } = """{ "review": "The review", "mistakes": [] }""";
+
         public string ModelId => "fake-model";
 
         public Task<LanguageModelReply> GradeAsync(
-            string systemPrompt, IReadOnlyList<PromptPart> parts, CancellationToken cancellationToken = default)
+            string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default)
         {
             System = systemPrompt;
             Parts = parts.ToList();
-            return Task.FromResult(new LanguageModelReply("fake-grader", "The review"));
+            Schema = outputSchema;
+            return Task.FromResult(new LanguageModelReply("fake-grader", Reply));
         }
 
         public Task<LanguageModelReply> CompleteAsync(string prompt, CancellationToken cancellationToken = default) =>

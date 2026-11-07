@@ -384,6 +384,103 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/courses/{courseId}/assignments/{assignmentId}/instructions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Returns the newest stored instructions of an assignment (task statement and materials), as grading sends them. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    courseId: string;
+                    assignmentId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Stored instructions retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StoredInstructionsResponse"];
+                    };
+                };
+                /** @description Nothing stored yet; fetch from Classroom first */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/courses/{courseId}/assignments/{assignmentId}/instructions/files/{contentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Returns a stored instructions file: shown in the browser (PDF, images) or, with download=true, saved under its name. */
+        get: {
+            parameters: {
+                query?: {
+                    download?: boolean;
+                };
+                header?: never;
+                path: {
+                    courseId: string;
+                    assignmentId: string;
+                    contentId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The file's content with its type */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": string;
+                        "application/json": string;
+                        "text/json": string;
+                    };
+                };
+                /** @description No stored instructions file with this ID in this assignment */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health/model": {
         parameters: {
             query?: never;
@@ -827,8 +924,26 @@ export interface components {
             /** Format: int64 */
             sizeBytes: number;
         };
+        /**
+         * @description One mistake found by the model. File is a path from GET /versions/{id}/code, and StartLine/EndLine (1-based,
+         *     inclusive) are lines that exist in that file; both were checked against the stored code. File is null for a mistake
+         *     about the submission as a whole (for example a missing class), and the lines are null when the model's lines did not
+         *     fit the file.
+         */
+        CodeMistake: {
+            file?: string | null;
+            /** Format: int32 */
+            startLine?: number | null;
+            /** Format: int32 */
+            endLine?: number | null;
+            severity: components["schemas"]["MistakeSeverity"];
+            category: components["schemas"]["MistakeCategory"];
+            message: string;
+        };
         /** @enum {string} */
         ContentKind: "CodeArchive" | "SourceFile" | "Repository" | "Document" | "Image" | "Other";
+        /** @enum {string} */
+        ContentOrigin: "Drive" | "GitHub" | "Link" | "Upload";
         /** @enum {string} */
         ContentStatus: "Stored" | "Extracted" | "Unsupported" | "TooLarge";
         /**
@@ -895,21 +1010,43 @@ export interface components {
             message?: string | null;
         };
         /**
-         * @description The model's draft review of one stored version (Markdown: score per task, mistakes, short feedback). A draft for the
-         *     teacher, not saved yet. InstructionsVersion is the stored version of the assignment's instructions it was graded
-         *     against. SentFiles lists everything the model was given (instructions and student files); SkippedFiles lists what was
-         *     left out and why, so the teacher can judge whether the review saw the whole submission.
+         * @description The model's draft review of one stored version: Review is Markdown (score per task and short feedback), Mistakes are
+         *     the individual mistakes, each pointing at lines of the code where it can. A draft for the teacher, not saved yet.
+         *     InstructionsVersion is the stored version of the assignment's instructions it was graded against. SentFiles lists
+         *     everything the model was given (instructions and student files); SkippedFiles lists what was left out and why, so the
+         *     teacher can judge whether the review saw the whole submission.
          */
         GradingResponse: {
             /** Format: uuid */
             versionId: string;
             model: string;
             review: string;
+            mistakes: components["schemas"]["CodeMistake"][];
             /** Format: int32 */
             instructionsVersion: number;
             sentFiles: string[];
             skippedFiles: string[];
         };
+        /**
+         * @description One material of the instructions. Stored is true when the file is served by
+         *     GET /courses/{courseId}/assignments/{assignmentId}/instructions/files/{id}; Url is set for links (not stored).
+         */
+        InstructionsFileResponse: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            origin: components["schemas"]["ContentOrigin"];
+            mimeType?: string | null;
+            /** Format: int64 */
+            sizeBytes?: number | null;
+            status: components["schemas"]["ContentStatus"];
+            stored: boolean;
+            url?: string | null;
+        };
+        /** @enum {string} */
+        MistakeCategory: "Correctness" | "MissingRequirement" | "Encapsulation" | "Design" | "ErrorHandling" | "Naming" | "Readability" | "Other";
+        /** @enum {string} */
+        MistakeSeverity: "Major" | "Minor" | "Style";
         /** @description Result of a test call to the grading model. Reply is null and Error is set when the call failed. */
         ModelHealthResponse: {
             healthy: boolean;
@@ -933,6 +1070,25 @@ export interface components {
             sizeBytes?: number | null;
             status: components["schemas"]["ContentStatus"];
             stored: boolean;
+        };
+        /**
+         * @description The newest stored version of an assignment's instructions: the task statement and materials as they were when
+         *     fetched, which is exactly what grading sends to the model. VersionCount is how many versions are stored.
+         */
+        StoredInstructionsResponse: {
+            /** Format: uuid */
+            versionId: string;
+            /** Format: int32 */
+            number: number;
+            /** Format: int32 */
+            versionCount: number;
+            title: string;
+            description?: string | null;
+            /** Format: double */
+            maxPoints?: number | null;
+            /** Format: date-time */
+            fetchedAt: string;
+            files: components["schemas"]["InstructionsFileResponse"][];
         };
         /**
          * @description A submission as stored by fetch, with every version and its files. ExternalSubmissionId is the source's

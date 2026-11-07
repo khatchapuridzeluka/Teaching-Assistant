@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import Editor from "@monaco-editor/react";
-import { type CodeFile, codeFileUrl } from "../api/client";
+import Editor, { type OnMount } from "@monaco-editor/react";
+import { type CodeFile, type CodeMistake, codeFileUrl } from "../api/client";
 import { useCodeFileText, useCodeFiles } from "../api/hooks";
 import { ErrorPanel, Spinner } from "./ui";
 
@@ -14,11 +14,31 @@ const imageExtensions = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp", "sv
 
 const extension = (path: string) => path.split(".").pop()?.toLowerCase() ?? "";
 
+type Severity = CodeMistake["severity"];
+
+// Colours of the marks in the editor (see the mistake-* classes in index.css); the most severe first.
+const severityOrder: Severity[] = ["Major", "Minor", "Style"];
+export const severityColor: Record<Severity, string> = { Major: "#dc2626", Minor: "#d97706", Style: "#64748b" };
+
+/** A request to show a line: changing key scrolls there again even when the line is the same. */
+export type CodeFocus = { file: string; line: number; key: number };
+
 /**
  * The extracted code of one version: a file list on the left, the selected file on the right (read-only).
+ * Mistakes with lines are marked in the editor: a coloured dot in the gutter and a tinted line, the message on hover.
  * className sets the height; by default a fixed 560px, "h-full" to fill a column.
  */
-export function CodeBrowser({ versionId, className = "h-[560px]" }: { versionId: string; className?: string }) {
+export function CodeBrowser({
+  versionId,
+  className = "h-[560px]",
+  mistakes = [],
+  focus,
+}: {
+  versionId: string;
+  className?: string;
+  mistakes?: CodeMistake[];
+  focus?: CodeFocus;
+}) {
   const files = useCodeFiles(versionId, true);
   const [selected, setSelected] = useState<string | null>(null);
 
@@ -35,6 +55,13 @@ export function CodeBrowser({ versionId, className = "h-[560px]" }: { versionId:
     setSelected((main ?? source ?? files.data[0]!).path);
   }, [files.data, selected]);
 
+  // A mistake picked in the review opens its file.
+  useEffect(() => {
+    if (focus) {
+      setSelected(focus.file);
+    }
+  }, [focus]);
+
   if (files.isLoading) {
     return <Spinner label="Loading code…" />;
   }
@@ -47,15 +74,32 @@ export function CodeBrowser({ versionId, className = "h-[560px]" }: { versionId:
 
   return (
     <div className={`flex overflow-hidden rounded-[10px] border border-line bg-white ${className}`}>
-      <FileList files={files.data} selected={selected} onSelect={setSelected} />
+      <FileList files={files.data} selected={selected} onSelect={setSelected} mistakes={mistakes} />
       <div className="flex min-w-0 flex-1 flex-col">
-        {selected && <FileView versionId={versionId} path={selected} />}
+        {selected && (
+          <FileView
+            versionId={versionId}
+            path={selected}
+            mistakes={mistakes.filter((m) => m.file === selected && m.startLine != null)}
+            focus={focus?.file === selected ? focus : undefined}
+          />
+        )}
       </div>
     </div>
   );
 }
 
-function FileList({ files, selected, onSelect }: { files: CodeFile[]; selected: string | null; onSelect: (path: string) => void }) {
+function FileList({
+  files,
+  selected,
+  onSelect,
+  mistakes,
+}: {
+  files: CodeFile[];
+  selected: string | null;
+  onSelect: (path: string) => void;
+  mistakes: CodeMistake[];
+}) {
   // Group by folder so nested projects (src/library/…) read like a tree.
   const groups = useMemo(() => {
     const byFolder = new Map<string, CodeFile[]>();
@@ -73,16 +117,27 @@ function FileList({ files, selected, onSelect }: { files: CodeFile[]; selected: 
           {folder && <div className="truncate px-3 pb-0.5 pt-2 text-[10px] font-bold uppercase tracking-[0.06em] text-ink-muted">{folder}/</div>}
           {folderFiles.map((file) => {
             const name = file.path.slice(file.path.lastIndexOf("/") + 1);
+            const own = mistakes.filter((m) => m.file === file.path);
+            // The file's count takes the colour of its most severe mistake.
+            const worst = severityOrder.find((s) => own.some((m) => m.severity === s));
             return (
               <button
                 key={file.path}
                 onClick={() => onSelect(file.path)}
-                title={file.path}
-                className={`block w-full truncate px-3 py-1 text-left text-xs ${
+                title={own.length > 0 ? `${file.path} · ${own.length} mistake(s)` : file.path}
+                className={`flex w-full items-center justify-between gap-2 px-3 py-1 text-left text-xs ${
                   file.path === selected ? "bg-accent-tint font-bold text-accent" : "hover:bg-paper"
                 }`}
               >
-                {name}
+                <span className="truncate">{name}</span>
+                {worst && (
+                  <span
+                    className="shrink-0 rounded-full px-1.5 text-[10px] font-bold leading-4 text-white"
+                    style={{ backgroundColor: severityColor[worst] }}
+                  >
+                    {own.length}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -92,14 +147,66 @@ function FileList({ files, selected, onSelect }: { files: CodeFile[]; selected: 
   );
 }
 
-function FileView({ versionId, path }: { versionId: string; path: string }) {
+type MonacoEditor = Parameters<OnMount>[0];
+type Monaco = Parameters<OnMount>[1];
+
+function FileView({
+  versionId,
+  path,
+  mistakes,
+  focus,
+}: {
+  versionId: string;
+  path: string;
+  mistakes: CodeMistake[];
+  focus: CodeFocus | undefined;
+}) {
   const ext = extension(path);
   const isImage = imageExtensions.has(ext);
   const text = useCodeFileText(versionId, isImage ? null : path);
+  const [editor, setEditor] = useState<{ editor: MonacoEditor; monaco: Monaco } | null>(null);
+
+  // The marks: a dot in the gutter and a tinted line per mistake, its message shown when hovering either. Set again
+  // whenever the file's text or mistakes change, and removed when the file is closed.
+  useEffect(() => {
+    if (!editor || text.data === undefined) {
+      return;
+    }
+    const { editor: ed, monaco } = editor;
+    const collection = ed.createDecorationsCollection(
+      mistakes.map((m) => {
+        const hover = { value: `**${m.severity} · ${m.category}**\n\n${m.message}` };
+        return {
+          range: new monaco.Range(m.startLine!, 1, m.endLine ?? m.startLine!, 1),
+          options: {
+            isWholeLine: true,
+            className: `mistake-line-${m.severity}`,
+            glyphMarginClassName: `mistake-glyph mistake-glyph-${m.severity}`,
+            glyphMarginHoverMessage: hover,
+            hoverMessage: hover,
+            overviewRuler: { color: severityColor[m.severity], position: monaco.editor.OverviewRulerLane.Right },
+          },
+        };
+      }),
+    );
+    return () => collection.clear();
+  }, [editor, mistakes, text.data]);
+
+  // Scrolls to a mistake picked in the review.
+  useEffect(() => {
+    if (!editor || !focus || text.data === undefined) {
+      return;
+    }
+    editor.editor.revealLineInCenter(focus.line);
+    editor.editor.setPosition({ lineNumber: focus.line, column: 1 });
+  }, [editor, focus, text.data]);
 
   return (
     <>
-      <div className="truncate border-b border-line px-4 py-2 text-xs font-bold">{path}</div>
+      <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-2 text-xs">
+        <b className="truncate">{path}</b>
+        {mistakes.length > 0 && <span className="shrink-0 text-ink-muted">Hover a dot to read the mistake</span>}
+      </div>
       {isImage ? (
         <div className="flex min-h-0 flex-1 items-center justify-center bg-paper-dark p-4">
           <img src={codeFileUrl(versionId, path)} alt={path} className="max-h-full max-w-full object-contain" />
@@ -113,6 +220,7 @@ function FileView({ versionId, path }: { versionId: string; path: string }) {
           <Editor
             value={text.data ?? ""}
             language={languages[ext] ?? "plaintext"}
+            onMount={(ed, monaco) => setEditor({ editor: ed, monaco })}
             options={{
               readOnly: true,
               domReadOnly: true,
@@ -121,6 +229,7 @@ function FileView({ versionId, path }: { versionId: string; path: string }) {
               scrollBeyondLastLine: false,
               renderLineHighlight: "none",
               automaticLayout: true,
+              glyphMargin: true, // room for the mistake dots
             }}
           />
         </div>
