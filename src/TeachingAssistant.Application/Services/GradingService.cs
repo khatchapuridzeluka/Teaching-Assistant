@@ -4,6 +4,7 @@ using TeachingAssistant.Application.Exceptions;
 using TeachingAssistant.Application.Interfaces;
 using TeachingAssistant.Application.Interfaces.Services;
 using TeachingAssistant.Application.Models;
+using TeachingAssistant.Domain.Grading;
 using TeachingAssistant.Domain.Ingestion;
 
 namespace TeachingAssistant.Application.Services;
@@ -55,8 +56,9 @@ public class GradingService : IGradingService
           many points each is worth. Follow that breakdown exactly. If the instructions give no points, split the
           assignment's maximum points across the tasks sensibly and say that you did.
         - You only see the source code; it has not been compiled or run. Judge behaviour by reading the code carefully.
-          When the instructions give an expected output, trace the code to check whether it would print exactly that,
-          and say "likely" when you cannot be sure.
+          When the instructions give an expected output, trace the code to check whether it would produce the same
+          values and behaviour, and say "likely" when you cannot be sure. Small differences in the printed text itself
+          do not count (see the grading policy below).
         - Deduct points only for real problems measured against the instructions: missing or wrong functionality, rules
           the instructions state (for example that fields must be private), and clear design mistakes for this course
           level. Do not deduct for style choices the instructions do not mention, and do not invent requirements.
@@ -66,7 +68,19 @@ public class GradingService : IGradingService
         - Some submitted files may be listed as not included; do not deduct points for content you could not see, but
           mention it.
 
-        Your answer has two parts, both in English.
+        Grading policy (the teacher's own rules; they override the general rules above):
+        - Trivial issues never cost points. The teacher wants students judged on whether their program works and is
+          designed well, not punished for polish. Trivial means: the wording, spacing, punctuation, capitalization or
+          labels of printed text (as long as the printed values are right); comments (missing, too few, or with typos);
+          unused imports; and unused or unnecessary variables. Still list each one in "mistakes" with severity Style, so
+          the student sees it as a suggestion, and say in the message that no points were deducted.
+        - Names fixed by the instructions: when the instructions specify the exact name of a variable or method and the
+          student used a different one, deduct 3 points for each such name (a misspelling or different capitalization
+          counts as different). The teacher relies on these names, for example to test the code. List each one with
+          severity Minor and say in the message that it cost 3 points and in which task. Names the instructions do not
+          fix are the student's choice: a poor name there is a Style suggestion that costs nothing.
+
+        Your answer is in English and has these parts.
 
         "review" is Markdown with exactly these sections:
         1. **Score**: a table with one row per task (task, points awarded / maximum, a one-line reason), then the total,
@@ -74,6 +88,10 @@ public class GradingService : IGradingService
         2. **Feedback**: two or three sentences the teacher can adapt for the student: what was done well and the most
            important thing to improve.
         Do not list the mistakes in the review; they go in "mistakes".
+
+        "score", "maxScore" and "bonus" repeat the Score section as numbers, so the teacher's lists can show and compare
+        them: the total awarded (without the bonus), the maximum it is out of, and the bonus awarded (null when there
+        is none). They must match the review exactly.
 
         "mistakes" lists every mistake, one entry each, so the teacher sees it as a mark on the exact lines in a code
         viewer:
@@ -83,8 +101,10 @@ public class GradingService : IGradingService
         - For a mistake that is not on specific lines (a missing class, a task not attempted, a problem in a drawing
           or document), set file, startLine and endLine to null.
         - severity: Major for wrong or missing functionality and broken rules from the instructions; Minor for small real
-          problems; Style for readability only.
-        - message: what is wrong and how to fix it in one or two sentences, and which task it costs points in.
+          problems that cost points (including a name fixed by the instructions); Style for suggestions that cost no
+          points (readability, and every trivial issue from the grading policy).
+        - message: what is wrong and how to fix it in one or two sentences, and which task it costs points in, or that
+          it cost no points (always the case for Style).
         - An empty list when there are no mistakes.
 
         Keep it concise; the teacher reviews a whole class.
@@ -95,19 +115,25 @@ public class GradingService : IGradingService
     private readonly ISnapshotStorage _storage;
     private readonly IDocumentReader _documentReader;
     private readonly ILanguageModel _languageModel;
+    private readonly IGradingStore _gradings;
+    private readonly TimeProvider _timeProvider;
 
     public GradingService(
         ISubmissionStore store,
         IInstructionsStore instructionsStore,
         ISnapshotStorage storage,
         IDocumentReader documentReader,
-        ILanguageModel languageModel)
+        ILanguageModel languageModel,
+        IGradingStore gradings,
+        TimeProvider timeProvider)
     {
         _store = store;
         _instructionsStore = instructionsStore;
         _storage = storage;
         _documentReader = documentReader;
         _languageModel = languageModel;
+        _gradings = gradings;
+        _timeProvider = timeProvider;
     }
 
     public async Task<GradingResponse?> GradeVersionAsync(Guid versionId, CancellationToken cancellationToken = default)
@@ -156,8 +182,16 @@ public class GradingService : IGradingService
               "\n\nGrade this submission against the instructions.");
 
         var reply = await _languageModel.GradeAsync(SystemPrompt, prompt.Parts, GradingOutput.Schema, cancellationToken);
-        var (review, mistakes) = GradingOutput.Read(reply.Text, prompt.CodeLines);
-        return new GradingResponse(versionId, reply.Model, review, mistakes, instructions.Number, prompt.Sent, prompt.Skipped);
+        var read = GradingOutput.Read(reply.Text, prompt.CodeLines);
+
+        // Saved as a draft right away: the grading is paid for, and the teacher decides about it later.
+        var grading = new AiGrading(versionId, reply.Model, read.Review, read.Score, read.MaxScore, read.Bonus,
+            instructions.Number, prompt.Sent, prompt.Skipped, reply.Text,
+            read.Mistakes.Select(m => new GradingMistake(m.File, m.StartLine, m.EndLine, m.Severity, m.Category, m.Message)),
+            _timeProvider.GetUtcNow());
+        _gradings.Add(grading);
+        await _gradings.SaveChangesAsync(cancellationToken);
+        return GradingDraftService.ToResponse(grading);
     }
 
     // The stored task statement and instruction files. PDFs and images go as files; Word documents (how most

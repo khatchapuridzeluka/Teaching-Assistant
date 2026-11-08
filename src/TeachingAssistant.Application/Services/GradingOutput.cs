@@ -26,6 +26,18 @@ internal static class GradingOutput
               "type": "string",
               "description": "The review in Markdown with the Score and Feedback sections."
             },
+            "score": {
+              "anyOf": [{ "type": "number" }, { "type": "null" }],
+              "description": "Total points awarded, the same total as in the Score section, without the bonus."
+            },
+            "maxScore": {
+              "anyOf": [{ "type": "number" }, { "type": "null" }],
+              "description": "The maximum points the score is out of (the assignment's maximum)."
+            },
+            "bonus": {
+              "anyOf": [{ "type": "number" }, { "type": "null" }],
+              "description": "Bonus points awarded, kept apart from the score; null when the assignment has no bonus or none was earned."
+            },
             "mistakes": {
               "type": "array",
               "description": "Every mistake, one entry each.",
@@ -49,14 +61,14 @@ internal static class GradingOutput
                   "category": { "type": "string", "enum": {{Categories}} },
                   "message": {
                     "type": "string",
-                    "description": "What is wrong and how to fix it, one or two sentences, and which task it costs points in."
+                    "description": "What is wrong and how to fix it, one or two sentences, and which task it costs points in, or that it cost no points (always for Style)."
                   }
                 },
                 "required": ["file", "startLine", "endLine", "severity", "category", "message"]
               }
             }
           },
-          "required": ["review", "mistakes"]
+          "required": ["review", "score", "maxScore", "bonus", "mistakes"]
         }
         """;
 
@@ -68,9 +80,9 @@ internal static class GradingOutput
 
     /// <summary>
     /// Reads the model's reply. codeLines maps every code file that was sent to its number of lines. A reply that is not
-    /// the expected JSON (structured output makes that rare) is shown as the review itself, with no mistakes.
+    /// the expected JSON (structured output makes that rare) is shown as the review itself, with no score or mistakes.
     /// </summary>
-    public static (string Review, IReadOnlyList<CodeMistake> Mistakes) Read(string reply, IReadOnlyDictionary<string, int> codeLines)
+    public static ReadReply Read(string reply, IReadOnlyDictionary<string, int> codeLines)
     {
         Reply? parsed;
         try
@@ -84,14 +96,14 @@ internal static class GradingOutput
 
         if (parsed?.Review is null)
         {
-            return (reply, []);
+            return new ReadReply(reply, null, null, null, []);
         }
 
         var mistakes = (parsed.Mistakes ?? [])
             .Where(m => !string.IsNullOrWhiteSpace(m.Message))
             .Select(m => Locate(m, codeLines))
             .ToList();
-        return (parsed.Review, mistakes);
+        return new ReadReply(parsed.Review, parsed.Score, parsed.MaxScore, parsed.Bonus, mistakes);
     }
 
     // Keeps the model's file and lines only where they exist in the code that was sent.
@@ -129,7 +141,10 @@ internal static class GradingOutput
         return bySuffix.Count == 1 ? bySuffix[0] : null;
     }
 
-    private sealed record Reply(string? Review, List<ReplyMistake>? Mistakes);
+    /// <summary>The model's answer as records: review text, score numbers and checked mistakes.</summary>
+    public sealed record ReadReply(string Review, double? Score, double? MaxScore, double? Bonus, IReadOnlyList<CodeMistake> Mistakes);
+
+    private sealed record Reply(string? Review, double? Score, double? MaxScore, double? Bonus, List<ReplyMistake>? Mistakes);
 
     private sealed record ReplyMistake(
         string? File, int? StartLine, int? EndLine, MistakeSeverity Severity, MistakeCategory Category, string? Message);

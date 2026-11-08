@@ -22,6 +22,82 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("TeachingAssistant.Domain.Grading.AiGrading", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<double?>("Bonus")
+                        .HasColumnType("double precision")
+                        .HasColumnName("bonus");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("DiscardedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("discarded_at");
+
+                    b.Property<int>("InstructionsVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("instructions_version");
+
+                    b.Property<double?>("MaxScore")
+                        .HasColumnType("double precision")
+                        .HasColumnName("max_score");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("model");
+
+                    b.Property<string>("RawOutput")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("raw_output");
+
+                    b.Property<string>("Review")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("review");
+
+                    b.Property<double?>("Score")
+                        .HasColumnType("double precision")
+                        .HasColumnName("score");
+
+                    b.PrimitiveCollection<string[]>("SentFiles")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("sent_files");
+
+                    b.PrimitiveCollection<string[]>("SkippedFiles")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("skipped_files");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("VersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("version_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_gradings");
+
+                    b.HasIndex("Status", "CreatedAt")
+                        .HasDatabaseName("ix_gradings_status_created_at");
+
+                    b.HasIndex("VersionId", "CreatedAt")
+                        .HasDatabaseName("ix_gradings_version_id_created_at");
+
+                    b.ToTable("gradings", (string)null);
+                });
+
             modelBuilder.Entity("TeachingAssistant.Domain.Grading.GradeEvent", b =>
                 {
                     b.Property<Guid>("Id")
@@ -56,6 +132,56 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_grade_events_submission_id");
 
                     b.ToTable("grade_events", (string)null);
+                });
+
+            modelBuilder.Entity("TeachingAssistant.Domain.Grading.GradingMistake", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("category");
+
+                    b.Property<int?>("EndLine")
+                        .HasColumnType("integer")
+                        .HasColumnName("end_line");
+
+                    b.Property<string>("File")
+                        .HasColumnType("text")
+                        .HasColumnName("file");
+
+                    b.Property<Guid>("GradingId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("grading_id");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("message");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<string>("Severity")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("severity");
+
+                    b.Property<int?>("StartLine")
+                        .HasColumnType("integer")
+                        .HasColumnName("start_line");
+
+                    b.HasKey("Id")
+                        .HasName("pk_grading_mistakes");
+
+                    b.HasIndex("GradingId")
+                        .HasDatabaseName("ix_grading_mistakes_grading_id");
+
+                    b.ToTable("grading_mistakes", (string)null);
                 });
 
             modelBuilder.Entity("TeachingAssistant.Domain.Ingestion.AssignmentInstructions", b =>
@@ -529,6 +655,16 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
                     b.ToTable("students", (string)null);
                 });
 
+            modelBuilder.Entity("TeachingAssistant.Domain.Grading.AiGrading", b =>
+                {
+                    b.HasOne("TeachingAssistant.Domain.Ingestion.SubmissionVersion", null)
+                        .WithMany()
+                        .HasForeignKey("VersionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_gradings_submission_versions_version_id");
+                });
+
             modelBuilder.Entity("TeachingAssistant.Domain.Grading.GradeEvent", b =>
                 {
                     b.HasOne("TeachingAssistant.Domain.Ingestion.Submission", null)
@@ -537,6 +673,16 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_grade_events_submissions_submission_id");
+                });
+
+            modelBuilder.Entity("TeachingAssistant.Domain.Grading.GradingMistake", b =>
+                {
+                    b.HasOne("TeachingAssistant.Domain.Grading.AiGrading", null)
+                        .WithMany("Mistakes")
+                        .HasForeignKey("GradingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_grading_mistakes_gradings_grading_id");
                 });
 
             modelBuilder.Entity("TeachingAssistant.Domain.Ingestion.InstructionsContent", b =>
@@ -587,6 +733,11 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_enrollments_students_student_id");
+                });
+
+            modelBuilder.Entity("TeachingAssistant.Domain.Grading.AiGrading", b =>
+                {
+                    b.Navigation("Mistakes");
                 });
 
             modelBuilder.Entity("TeachingAssistant.Domain.Ingestion.AssignmentInstructions", b =>

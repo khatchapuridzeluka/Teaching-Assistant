@@ -19,8 +19,49 @@ public class GradingServiceTests
     private readonly FakeStorage _storage = new();
     private readonly RecordingModel _model = new();
     private readonly FakeWordReader _wordReader = new();
+    private readonly FakeGradingStore _gradings = new();
 
-    private GradingService Service() => new(_store, _instructions, _storage, _wordReader, _model);
+    private GradingService Service() => new(_store, _instructions, _storage, _wordReader, _model, _gradings, TimeProvider.System);
+
+    [Fact]
+    public async Task Grade_SavesTheWholeAnswerAsADraft_WithTheScoreAsNumbers()
+    {
+        _instructions.Store("Write a zoo.");
+        var versionId = _store.AddVersion(Content(ContentKind.CodeArchive, "zoo.zip", "application/zip"));
+        _storage.Code["Main.java"] = "class Main {\n}";
+        _model.Reply =
+            """
+            { "review": "## Score: 86/100 (+5 bonus)", "score": 86, "maxScore": 100, "bonus": 5,
+              "mistakes": [
+                { "file": "Main.java", "startLine": 1, "endLine": 1, "severity": "Minor", "category": "Naming", "message": "Name." },
+                { "file": null, "startLine": null, "endLine": null, "severity": "Style", "category": "Readability", "message": "Comments." }
+              ] }
+            """;
+
+        var result = await Service().GradeVersionAsync(versionId, TestContext.Current.CancellationToken);
+
+        var saved = Assert.Single(_gradings.Saved);
+        Assert.Equal((GradingStatus.Draft, versionId), (saved.Status, saved.VersionId));
+        Assert.Equal((86.0, 100.0, 5.0), (saved.Score!.Value, saved.MaxScore!.Value, saved.Bonus!.Value));
+        Assert.Equal(_model.Reply, saved.RawOutput);
+        Assert.Equal([0, 1], saved.Mistakes.Select(m => m.Position));
+        Assert.Equal(saved.Id, result!.Id);
+        Assert.Equal(86, result.Score);
+        Assert.Equal(2, result.Mistakes.Count);
+    }
+
+    [Fact]
+    public async Task Grade_GradingTwice_SavesTwoDrafts()
+    {
+        _instructions.Store("Write a zoo.");
+        var versionId = _store.AddVersion(Content(ContentKind.CodeArchive, "zoo.zip", "application/zip"));
+        _storage.Code["Main.java"] = "class Main {}";
+
+        await Service().GradeVersionAsync(versionId, TestContext.Current.CancellationToken);
+        await Service().GradeVersionAsync(versionId, TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, _gradings.Saved.Count);
+    }
 
     [Fact]
     public async Task Grade_SendsStoredInstructionsFirst_ThenCodeAndStudentFiles()
@@ -339,6 +380,26 @@ public class GradingServiceTests
         public bool CanRead(string fileName, string? mediaType) => fileName.EndsWith(".docx", StringComparison.OrdinalIgnoreCase);
 
         public ReadDocument? Read(byte[] content) => new(Encoding.UTF8.GetString(content), Images);
+    }
+
+    private sealed class FakeGradingStore : IGradingStore
+    {
+        public List<AiGrading> Saved { get; } = [];
+
+        public void Add(AiGrading grading) => Saved.Add(grading);
+
+        public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task<IReadOnlyList<AiGrading>> GetByVersionsAsync(IReadOnlyCollection<Guid> versionIds, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<AiGrading?> FindAsync(Guid gradingId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<GradingSummary>> GetSummariesAsync(
+            SubmissionSource source, string courseId, string? assignmentId, string? studentId,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 
     private sealed class RecordingModel : ILanguageModel

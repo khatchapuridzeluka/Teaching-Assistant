@@ -21,6 +21,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Student> Students => Set<Student>();
     public DbSet<Enrollment> Enrollments => Set<Enrollment>();
     public DbSet<CourseAssignment> CourseAssignments => Set<CourseAssignment>();
+    public DbSet<AiGrading> Gradings => Set<AiGrading>();
+    public DbSet<GradingMistake> GradingMistakes => Set<GradingMistake>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder) =>
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);

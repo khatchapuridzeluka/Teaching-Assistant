@@ -21,6 +21,7 @@ export type StoredFile = components["schemas"]["StoredFileResponse"];
 
 export type CodeFile = components["schemas"]["CodeFileResponse"];
 export type GradingResult = components["schemas"]["GradingResponse"];
+export type AssignmentGrading = components["schemas"]["AssignmentGradingResponse"];
 export type CodeMistake = components["schemas"]["CodeMistake"];
 export type ExtractionSummary = components["schemas"]["ExtractionSummary"];
 export type StoredInstructions = components["schemas"]["StoredInstructionsResponse"];

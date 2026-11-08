@@ -357,7 +357,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Sends a stored version and its assignment's stored instructions to the model and returns the draft review (not saved); can take a minute. */
+        /** Sends a stored version and its assignment's stored instructions to the model, saves the answer as a new draft and returns it; can take a minute. */
         post: {
             parameters: {
                 query?: never;
@@ -369,7 +369,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Draft review, with the instructions version used and the files that were sent and skipped */
+                /** @description The saved draft, with the instructions version used and the files that were sent and skipped */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -394,6 +394,173 @@ export interface paths {
                 };
                 /** @description Model unreachable, returned an error, or declined */
                 503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/versions/{versionId}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Returns the current draft of a version: its newest saved grading that was not discarded. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    versionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The current draft */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GradingResponse"];
+                    };
+                };
+                /** @description The version has no draft yet */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/versions/{versionId}/gradings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Returns every saved grading of a version, drafts and discarded, newest first. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    versionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Gradings retrieved successfully; empty when the version was never graded */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GradingResponse"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/courses/{courseId}/assignments/{assignmentId}/gradings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Returns every saved grading of an assignment's stored versions, newest first, with the student, score and mistake counts. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    courseId: string;
+                    assignmentId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Gradings retrieved successfully; empty when nothing was graded */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AssignmentGradingResponse"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/gradings/{gradingId}/discard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Discards a draft; it stays in the version's history and is no longer its current draft. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    gradingId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The discarded grading */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GradingResponse"];
+                    };
+                };
+                /** @description No grading with this ID */
+                404: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -967,6 +1134,37 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /**
+         * @description One saved grading in an assignment's list of drafts: who and which version, the score and how many mistakes of each
+         *     severity. Current is true for the newest draft of its version (the one the workspace shows).
+         */
+        AssignmentGradingResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            versionId: string;
+            /** Format: int32 */
+            versionNumber: number;
+            submissionId: string;
+            studentName: string;
+            status: components["schemas"]["GradingStatus"];
+            current: boolean;
+            /** Format: double */
+            score?: number | null;
+            /** Format: double */
+            maxScore?: number | null;
+            /** Format: double */
+            bonus?: number | null;
+            /** Format: int32 */
+            major: number;
+            /** Format: int32 */
+            minor: number;
+            /** Format: int32 */
+            style: number;
+            model: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        /**
          * @description A published assignment in a course. Description is the task statement as written in the source.
          *     DueAt is in UTC and null when the assignment has no due date. MaxPoints is null for ungraded work.
          *     Materials are the files and links the teacher attached to the assignment, usually the instructions and grading
@@ -1230,23 +1428,35 @@ export interface components {
             at: string;
         };
         /**
-         * @description The model's draft review of one stored version: Review is Markdown (score per task and short feedback), Mistakes are
-         *     the individual mistakes, each pointing at lines of the code where it can. A draft for the teacher, not saved yet.
-         *     InstructionsVersion is the stored version of the assignment's instructions it was graded against. SentFiles lists
-         *     everything the model was given (instructions and student files); SkippedFiles lists what was left out and why, so the
-         *     teacher can judge whether the review saw the whole submission.
+         * @description One saved AI grading of a stored version (a draft for the teacher; never written to Classroom). Review is Markdown
+         *     (score per task and short feedback); Score, MaxScore and Bonus repeat it as numbers; Mistakes point at lines of the
+         *     code where they can. InstructionsVersion is the stored instructions version it was graded against. SentFiles lists
+         *     everything the model was given; SkippedFiles what was left out and why.
          */
         GradingResponse: {
             /** Format: uuid */
+            id: string;
+            /** Format: uuid */
             versionId: string;
+            status: components["schemas"]["GradingStatus"];
             model: string;
             review: string;
+            /** Format: double */
+            score?: number | null;
+            /** Format: double */
+            maxScore?: number | null;
+            /** Format: double */
+            bonus?: number | null;
             mistakes: components["schemas"]["CodeMistake"][];
             /** Format: int32 */
             instructionsVersion: number;
             sentFiles: string[];
             skippedFiles: string[];
+            /** Format: date-time */
+            createdAt: string;
         };
+        /** @enum {string} */
+        GradingStatus: "Draft" | "Discarded";
         /**
          * @description One material of the instructions. Stored is true when the file is served by
          *     GET /courses/{courseId}/assignments/{assignmentId}/instructions/files/{id}; Url is set for links (not stored).

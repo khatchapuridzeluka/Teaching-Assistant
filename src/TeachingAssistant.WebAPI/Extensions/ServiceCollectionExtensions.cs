@@ -46,6 +46,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IInstructionsStore, InstructionsStore>();
         services.AddScoped<IStudentStore, StudentStore>();
         services.AddScoped<ICourseAssignmentStore, CourseAssignmentStore>();
+        services.AddScoped<IGradingStore, GradingStore>();
 
         services.Configure<StorageOptions>(configuration.GetSection(StorageOptions.SectionName));
         services.AddSingleton<ISnapshotStorage, FileSystemSnapshotStorage>();
@@ -106,6 +107,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IStoredSubmissionService, StoredSubmissionService>();
         services.AddScoped<IAgentChatService, AgentChatService>();
         services.AddScoped<IGradingService, GradingService>();
+        services.AddScoped<IGradingDraftService, GradingDraftService>();
         services.AddScoped<ICourseSyncService, CourseSyncService>();
         services.AddScoped<IStudentService, StudentService>();
 

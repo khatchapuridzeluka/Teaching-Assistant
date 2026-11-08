@@ -18,7 +18,7 @@ export function StudentsPage() {
   const students = useCourseStudents(courseId);
   const sync = useSyncCourse(courseId);
   const [query, setQuery] = useState("");
-  const [sort, setSort] = useState<SortOption>("name");
+  const [sort, setSort] = useState<SortOption>("turnedIn");
   const [filter, setFilter] = useState<Filter>("all");
   const [tableOpen, setTableOpen] = useState(false);
   // The selected student lives in the URL (?student=), so a refresh or the back button keeps it.
@@ -150,7 +150,7 @@ export function StudentsPage() {
 
       {tableOpen && data && (
         <GradeTableModal
-          students={sortStudents(all, "name")}
+          students={sortStudents(all, "turnedIn")}
           assignments={data.assignments}
           onPick={(student) => {
             select(student);
@@ -165,9 +165,10 @@ export function StudentsPage() {
 
 // ——— The student list ———
 
-type SortOption = "name" | "best" | "worst" | "missing";
+type SortOption = "turnedIn" | "name" | "best" | "worst" | "missing";
 
 const sortLabels: Record<SortOption, string> = {
+  turnedIn: "Most turned in",
   name: "Name",
   best: "Overall: highest",
   worst: "Overall: lowest",
@@ -183,7 +184,10 @@ const filters: Record<Filter, { label: string; matches: (s: CourseStudent) => bo
   left: { label: "Left course", matches: (s) => !s.active },
 };
 
-/** Students who left the course always come last; students without a score sort after those with one. */
+/**
+ * Students who left the course always come last; students without a score sort after those with one. "Most turned in"
+ * (the default) breaks ties by the higher overall score, then by name.
+ */
 function sortStudents(list: CourseStudent[], sort: SortOption): CourseStudent[] {
   const byName = (a: CourseStudent, b: CourseStudent) => a.name.localeCompare(b.name);
 
@@ -193,6 +197,9 @@ function sortStudents(list: CourseStudent[], sort: SortOption): CourseStudent[] 
     }
     if (sort === "missing") {
       return b.missing - a.missing || byName(a, b);
+    }
+    if (sort === "turnedIn") {
+      return b.turnedIn - a.turnedIn || (b.overallPercent ?? -1) - (a.overallPercent ?? -1) || byName(a, b);
     }
     if (sort === "best" || sort === "worst") {
       const [x, y] = [a.overallPercent ?? null, b.overallPercent ?? null];

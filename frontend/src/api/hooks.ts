@@ -1,5 +1,5 @@
-import { skipToken, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, type GradingResult, unwrap } from "./client";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { api, unwrap } from "./client";
 
 // One hook per endpoint. Components only call these; no fetch logic lives in pages.
 
@@ -138,39 +138,62 @@ export const useCodeFileText = (versionId: string, path: string | null) =>
     staleTime: Infinity, // a stored version's code never changes until it is re-extracted
   });
 
-// Sends one stored version to the model for a draft review. Costs tokens and can take a minute, so it only runs when
-// the teacher clicks. Nothing is saved on the server yet: the review is kept in this browser session (see useReview),
-// so closing the panel or changing pages does not lose it; a page refresh does.
+// Sends one stored version to the model; the API saves the answer as a new draft and returns it. Costs tokens and can
+// take a minute, so it only runs when the teacher clicks.
 export const useGradeVersion = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (versionId: string) =>
       unwrap(api.POST("/versions/{versionId}/grade", { params: { path: { versionId } } })),
-    onSuccess: (review, versionId) => queryClient.setQueryData(["reviews", versionId], review),
+    onSuccess: (review, versionId) => {
+      queryClient.setQueryData(["reviews", versionId], review);
+      void queryClient.invalidateQueries({ predicate: (query) => query.queryKey.includes("gradings") });
+    },
   });
 };
 
-// The latest AI review of a version in this browser session, or undefined before it is graded. Never fetched from the
-// API (there is nothing stored there yet): only useGradeVersion fills it, and it is kept until the page is refreshed.
+// The current saved draft of a version (its newest grading that was not discarded), or null when it has none.
 export const useReview = (versionId: string | undefined) =>
-  useQuery<GradingResult>({
+  useQuery({
     queryKey: ["reviews", versionId],
-    queryFn: skipToken,
-    staleTime: Infinity,
-    gcTime: Infinity,
+    // 204 (no body) means "not graded yet".
+    queryFn: async () =>
+      (await unwrap(api.GET("/versions/{versionId}/review", { params: { path: { versionId: versionId! } } }))) ?? null,
+    enabled: versionId !== undefined,
   });
 
-// The session's reviews of many versions at once (for counts and list badges); same cache entries as useReview.
-export const useReviews = (versionIds: string[]) =>
-  useQueries({
-    queries: versionIds.map((versionId) => ({
-      queryKey: ["reviews", versionId],
-      queryFn: skipToken,
-      staleTime: Infinity,
-      gcTime: Infinity,
-    })),
-    combine: (results) => new Map(versionIds.map((id, i) => [id, results[i]?.data as GradingResult | undefined])),
+// Every saved grading of a version, drafts and discarded, newest first.
+export const useVersionGradings = (versionId: string | undefined) =>
+  useQuery({
+    queryKey: ["versions", versionId, "gradings"],
+    queryFn: () => unwrap(api.GET("/versions/{versionId}/gradings", { params: { path: { versionId: versionId! } } })),
+    enabled: versionId !== undefined,
   });
+
+// Every saved grading of an assignment, newest first, with student, score and mistake counts.
+export const useAssignmentGradings = (courseId: string, assignmentId: string) =>
+  useQuery({
+    queryKey: ["courses", courseId, "assignments", assignmentId, "gradings"],
+    queryFn: () =>
+      unwrap(
+        api.GET("/courses/{courseId}/assignments/{assignmentId}/gradings", {
+          params: { path: { courseId, assignmentId } },
+        }),
+      ),
+  });
+
+// Throws a draft away; it stays in the history and the version's current draft becomes the previous one, if any.
+export const useDiscardGrading = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (gradingId: string) =>
+      unwrap(api.POST("/gradings/{gradingId}/discard", { params: { path: { gradingId } } })),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["reviews"] });
+      void queryClient.invalidateQueries({ predicate: (query) => query.queryKey.includes("gradings") });
+    },
+  });
+};
 
 // Downloads a stored file's bytes for viewers that lay the file out in the browser (Word documents).
 export const useStoredFileBlob = (fileId: string) =>

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { CodeMistake, StoredFile, StoredSubmission, StoredVersion, Submission } from "../api/client";
-import { useReview } from "../api/hooks";
+import { useDiscardGrading, useReview, useVersionGradings } from "../api/hooks";
 import { formatDate, formatDay, initials } from "../format";
 import { CodeBrowser, type CodeFocus, severityColor } from "./CodeBrowser";
 import { Avatar, Button, Chip, type ChipTone, ErrorPanel, Spinner } from "./ui";
@@ -25,7 +25,8 @@ export function hasWork(submission: Submission): boolean {
  * The right side of the assignment page: one student's picked version with its files, the AI draft and the code.
  * Review and code sit side by side when there is room, and become two tabs when there is not (e.g. with the agent
  * panel open); a mistake picked in the review opens its line in the code. "Expand" gives the pane the whole window.
- * Display only: grading is started by onGrade (POST /versions/{id}/grade) and the review comes from useReview.
+ * Display only: grading is started by onGrade (POST /versions/{id}/grade), which saves a draft; the current draft and
+ * the earlier ones come from the API (useReview, useVersionGradings), and Discard throws one away.
  */
 export function SubmissionDetail({
   submission,
@@ -53,7 +54,17 @@ export function SubmissionDetail({
   /** Another grading is running (one at a time). */
   gradeDisabled: boolean;
 }) {
-  const review = useReview(version?.id).data;
+  // The saved drafts: the current one (newest not discarded) is shown; earlier ones can be picked from the history.
+  const current = useReview(version?.id).data ?? undefined;
+  const history = useVersionGradings(version?.id).data ?? [];
+  const discard = useDiscardGrading();
+  const [viewingId, setViewingId] = useState<string | null>(null);
+  const review = (viewingId ? history.find((g) => g.id === viewingId) : undefined) ?? current;
+
+  // A new grading (or a discard) changes the current draft: show it.
+  useEffect(() => {
+    setViewingId(null);
+  }, [current?.id]);
   const [focus, setFocus] = useState<CodeFocus>();
   const [tab, setTab] = useState<"review" | "code">("review");
   const [expanded, setExpanded] = useState(false);
@@ -176,7 +187,45 @@ export function SubmissionDetail({
                   <div>
                     <div className="mb-2 flex flex-wrap items-center gap-2">
                       <h3 className="text-[11px] font-bold uppercase tracking-[0.06em] text-accent">AI draft</h3>
-                      <Chip tone="dashed">Kept until you refresh the page</Chip>
+                      {review.status === "Discarded" ? (
+                        <Chip tone="muted">Discarded</Chip>
+                      ) : (
+                        <Chip tone="tint">Saved {formatDate(review.createdAt)}</Chip>
+                      )}
+                      {review.score != null && (
+                        <b className="tabular-nums">
+                          {points(review.score)} / {review.maxScore ?? "–"}
+                          {review.bonus ? <span className="font-normal text-ink-muted"> +{points(review.bonus)} bonus</span> : null}
+                        </b>
+                      )}
+                      <span className="ml-auto flex items-center gap-2">
+                        {history.length > 1 && (
+                          <select
+                            value={review.id}
+                            onChange={(e) => setViewingId(e.target.value)}
+                            aria-label="Saved drafts of this version"
+                            className="h-7 cursor-pointer rounded-lg border border-line bg-white pl-2 pr-1 text-xs font-semibold hover:border-accent"
+                          >
+                            {history.map((g) => (
+                              <option key={g.id} value={g.id}>
+                                {`${formatDate(g.createdAt)}${g.score != null ? ` · ${points(g.score)}` : ""}${
+                                  g.id === current?.id ? " · current" : g.status === "Discarded" ? " · discarded" : " · earlier"
+                                }`}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                        {review.status === "Draft" && (
+                          <Button
+                            small
+                            onClick={() => discard.mutate(review.id)}
+                            disabled={discard.isPending}
+                            title="Throw this draft away; it stays in the history and the previous draft becomes current"
+                          >
+                            {discard.isPending ? "Discarding…" : "Discard"}
+                          </Button>
+                        )}
+                      </span>
                     </div>
                     <div className="markdown rounded-[10px] border border-line bg-white px-5 py-4">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>{review.review}</ReactMarkdown>
@@ -334,4 +383,8 @@ function MistakeList({ mistakes, onShow }: { mistakes: CodeMistake[]; onShow: (f
       </ul>
     </section>
   );
+}
+
+function points(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
