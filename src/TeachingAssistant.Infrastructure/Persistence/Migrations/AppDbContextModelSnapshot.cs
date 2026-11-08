@@ -580,6 +580,118 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
                     b.ToTable("version_contents", (string)null);
                 });
 
+            modelBuilder.Entity("TeachingAssistant.Domain.Jobs.Job", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AssignmentId")
+                        .HasColumnType("text")
+                        .HasColumnName("assignment_id");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<bool>("CancelRequested")
+                        .HasColumnType("boolean")
+                        .HasColumnName("cancel_requested");
+
+                    b.Property<string>("CourseId")
+                        .HasColumnType("text")
+                        .HasColumnName("course_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DedupKey")
+                        .HasColumnType("text")
+                        .HasColumnName("dedup_key");
+
+                    b.Property<string>("Error")
+                        .HasColumnType("text")
+                        .HasColumnName("error");
+
+                    b.Property<DateTimeOffset?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("finished_at");
+
+                    b.Property<string>("LockedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("locked_by");
+
+                    b.Property<DateTimeOffset?>("LockedUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("locked_until");
+
+                    b.Property<int>("MaxAttempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_attempts");
+
+                    b.Property<Guid?>("ParentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parent_id");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("payload");
+
+                    b.Property<int?>("ProgressDone")
+                        .HasColumnType("integer")
+                        .HasColumnName("progress_done");
+
+                    b.Property<int?>("ProgressTotal")
+                        .HasColumnType("integer")
+                        .HasColumnName("progress_total");
+
+                    b.Property<string>("Result")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("result");
+
+                    b.Property<DateTimeOffset>("RunAfter")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("run_after");
+
+                    b.Property<DateTimeOffset?>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("type");
+
+                    b.HasKey("Id")
+                        .HasName("pk_jobs");
+
+                    b.HasIndex("AssignmentId")
+                        .HasDatabaseName("ix_jobs_assignment_id");
+
+                    b.HasIndex("CourseId")
+                        .HasDatabaseName("ix_jobs_course_id");
+
+                    b.HasIndex("DedupKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_jobs_dedup_key")
+                        .HasFilter("status IN ('Queued', 'Running')");
+
+                    b.HasIndex("ParentId")
+                        .HasDatabaseName("ix_jobs_parent_id");
+
+                    b.HasIndex("Status", "RunAfter")
+                        .HasDatabaseName("ix_jobs_status_run_after");
+
+                    b.ToTable("jobs", (string)null);
+                });
+
             modelBuilder.Entity("TeachingAssistant.Domain.Profiling.Enrollment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -743,6 +855,15 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_version_contents_submission_versions_version_id");
+                });
+
+            modelBuilder.Entity("TeachingAssistant.Domain.Jobs.Job", b =>
+                {
+                    b.HasOne("TeachingAssistant.Domain.Jobs.Job", null)
+                        .WithMany()
+                        .HasForeignKey("ParentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("fk_jobs_jobs_parent_id");
                 });
 
             modelBuilder.Entity("TeachingAssistant.Domain.Profiling.Enrollment", b =>

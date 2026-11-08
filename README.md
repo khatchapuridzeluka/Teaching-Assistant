@@ -62,6 +62,7 @@ src/
     Ingestion/                           submissions, versions (snapshots), content, change detection, course assignments
     Grading/                             grade history and the initial/final score rules, mistake enums
     Profiling/                           students, enrollments, overall score rule
+    Jobs/                                background jobs (queued work such as grading and fetching) and their life cycle
   TeachingAssistant.Application/
     Contracts/                           what the API returns
     Interfaces/                          ports (ILanguageModel, ISubmissionSource)
