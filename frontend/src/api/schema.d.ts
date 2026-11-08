@@ -753,6 +753,191 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/versions/{versionId}/grade/queue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Queues an AI grading of a stored version and returns the job at once; the worker grades it in the background and saves the draft. Quick checks (version exists, instructions stored, something gradable) run before queuing; if the version is already queued or being graded, that job is returned. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    versionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Grading queued (or already queued); follow it with GET /jobs/{jobId} */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["JobResponse"];
+                    };
+                };
+                /** @description Nothing to grade, instructions not stored yet (fetch first), or no instructions the model can read */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description No stored version with this ID */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/{jobId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Returns a background job: its status, progress, error and, for a finished grading, the draft it produced. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    jobId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Job retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["JobResponse"];
+                    };
+                };
+                /** @description No job with this ID */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/courses/{courseId}/assignments/{assignmentId}/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Returns an assignment's recent background jobs, newest first, so the page can show what is queued, running or failed. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    courseId: string;
+                    assignmentId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Jobs retrieved successfully; empty when there are none */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["JobResponse"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/{jobId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancels a job: a queued one at once, a running one at the worker's next check. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    jobId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Cancel recorded; returns the job */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["JobResponse"];
+                    };
+                };
+                /** @description No job with this ID */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health/model": {
         parameters: {
             query?: never;
@@ -1241,11 +1426,6 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /**
-         * @description One saved grading in a list of drafts: which assignment, student and version, the score and how many mistakes of each
-         *     severity. Current is true for the newest draft of its version (the one the workspace shows). StudentId is the
-         *     student's Google user ID.
-         */
         AssignmentGradingResponse: {
             /** Format: uuid */
             id: string;
@@ -1275,12 +1455,6 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
         };
-        /**
-         * @description A published assignment in a course. Description is the task statement as written in the source.
-         *     DueAt is in UTC and null when the assignment has no due date. MaxPoints is null for ungraded work.
-         *     Materials are the files and links the teacher attached to the assignment, usually the instructions and grading
-         *     scheme (e.g. a PDF); the grader reads them.
-         */
         AssignmentResponse: {
             id: string;
             courseId: string;
@@ -1296,46 +1470,26 @@ export interface components {
             link?: string | null;
             materials: components["schemas"]["SubmissionAttachment"][];
         };
-        /**
-         * @description What a submission attachment is.
-         * @enum {string}
-         */
+        /** @enum {string} */
         AttachmentKind: "DriveFile" | "Link" | "Other";
-        /** @description One message of a chat conversation. */
         ChatMessage: {
             role: components["schemas"]["ChatRole"];
             text: string;
         };
-        /**
-         * @description A chat turn from the teacher: the conversation so far (oldest first, ending with the teacher's new message)
-         *     and where in the app the teacher is, e.g. "Assignment 'Assignment 4' in course 'Java II N2'". The page
-         *     description holds no student data.
-         */
         ChatRequest: {
             messages: components["schemas"]["ChatMessage"][];
             page?: string | null;
         };
-        /** @description The assistant's reply to a chat turn (Markdown). */
         ChatResponse: {
             text: string;
         };
-        /**
-         * @description Who wrote a chat message.
-         * @enum {string}
-         */
+        /** @enum {string} */
         ChatRole: "User" | "Assistant";
-        /** @description One extracted file in a version's code folder. Path uses forward slashes and is passed back to read the file. */
         CodeFileResponse: {
             path: string;
             /** Format: int64 */
             sizeBytes: number;
         };
-        /**
-         * @description One mistake found by the model. File is a path from GET /versions/{id}/code, and StartLine/EndLine (1-based,
-         *     inclusive) are lines that exist in that file; both were checked against the stored code. File is null for a mistake
-         *     about the submission as a whole (for example a missing class), and the lines are null when the model's lines did not
-         *     fit the file.
-         */
         CodeMistake: {
             file?: string | null;
             /** Format: int32 */
@@ -1352,10 +1506,6 @@ export interface components {
         ContentOrigin: "Drive" | "GitHub" | "Link" | "Upload";
         /** @enum {string} */
         ContentStatus: "Stored" | "Extracted" | "Unsupported" | "TooLarge";
-        /**
-         * @description A course the teacher teaches. State is the source's own state, e.g. ACTIVE or ARCHIVED for Classroom.
-         *     Link opens the course in its source (Classroom) when available.
-         */
         CourseResponse: {
             id: string;
             name: string;
@@ -1363,121 +1513,54 @@ export interface components {
             state: string;
             link?: string | null;
         };
-        /**
-         * @description One student of a course. Overall is final points over possible points; missing work counts as 0 once past its
-         *     deadline, work waiting for a grade and work not due yet are left out.
-         */
         CourseStudentResponse: {
-            /**
-             * Format: uuid
-             * @description Our student ID.
-             */
+            /** Format: uuid */
             id: string;
-            /** @description The student's Google user ID. */
             externalUserId: string;
-            /** @description Name as Classroom shows it. */
             name: string;
-            /** @description On the course's roster as of the last sync. */
             active: boolean;
-            /**
-             * Format: int32
-             * @description Assignments handed in (turned in or returned).
-             */
+            /** Format: int32 */
             turnedIn: number;
-            /**
-             * Format: int32
-             * @description Assignments not handed in and past their deadline.
-             */
+            /** Format: int32 */
             missing: number;
-            /**
-             * Format: int32
-             * @description Assignments handed in late.
-             */
+            /** Format: int32 */
             late: number;
-            /**
-             * Format: int32
-             * @description Assignments whose final grade is higher than the first one returned (fixed after a resubmission).
-             */
+            /** Format: int32 */
             improved: number;
-            /**
-             * Format: double
-             * @description Null when nothing counts yet.
-             */
+            /** Format: double */
             overallPercent?: number | null;
-            /**
-             * Format: double
-             * @description Final points earned over the counted assignments.
-             */
+            /** Format: double */
             earned: number;
-            /**
-             * Format: double
-             * @description Maximum points of the counted assignments.
-             */
+            /** Format: double */
             possible: number;
-            /** @description One per assignment, in the order of the assignments. */
             results: components["schemas"]["StudentAssignmentResult"][];
         };
-        /** @description A course's students with their results per assignment and overall, from our database (filled by a course sync). */
         CourseStudentsResponse: {
-            /**
-             * Format: date-time
-             * @description When the course was last synced; null before the first sync.
-             */
+            /** Format: date-time */
             syncedAt?: string | null;
-            /** @description The course's assignments, by deadline. */
             assignments: components["schemas"]["StudentAssignmentColumn"][];
-            /** @description Students on the roster first, then those who left; by name. */
             students: components["schemas"]["CourseStudentResponse"][];
         };
-        /** @description What syncing a course did: roster, assignments, and every student's state and grade per assignment (no files). */
         CourseSyncSummary: {
-            /**
-             * Format: int32
-             * @description Students on the roster now.
-             */
+            /** Format: int32 */
             students: number;
-            /**
-             * Format: int32
-             * @description Students seen for the first time.
-             */
+            /** Format: int32 */
             newStudents: number;
-            /**
-             * Format: int32
-             * @description Students no longer on the roster (kept, marked inactive).
-             */
+            /** Format: int32 */
             leftStudents: number;
-            /**
-             * Format: int32
-             * @description Assignments in the course.
-             */
+            /** Format: int32 */
             assignments: number;
-            /**
-             * Format: int32
-             * @description Submissions checked (every student × assignment the source lists).
-             */
+            /** Format: int32 */
             submissions: number;
-            /**
-             * Format: int32
-             * @description Submissions recorded for the first time.
-             */
+            /** Format: int32 */
             newSubmissions: number;
-            /**
-             * Format: int32
-             * @description Submissions that have a grade.
-             */
+            /** Format: int32 */
             graded: number;
-            /**
-             * Format: int32
-             * @description Profile photos stored, replaced or removed because they changed.
-             */
+            /** Format: int32 */
             photosUpdated: number;
-            /**
-             * Format: int32
-             * @description Photos that could not be downloaded (tried again on the next sync).
-             */
+            /** Format: int32 */
             photosFailed: number;
         };
-        /** @description What re-extracting an assignment's stored versions did. Problems lists archives that could not be extracted. */
         ExtractionSummary: {
             /** Format: int32 */
             versions: number;
@@ -1485,20 +1568,10 @@ export interface components {
             versionsWithCode: number;
             problems: components["schemas"]["FetchProblem"][];
         };
-        /**
-         * @description Something a fetch could not handle for one student, e.g. an unsupported attachment or a failed download. For a
-         *     problem with the assignment's instructions, StudentName is "Instructions".
-         */
         FetchProblem: {
             studentName: string;
             detail: string;
         };
-        /**
-         * @description What one fetch of an assignment did. Unchanged submissions were already stored and were not downloaded again.
-         *     NotSubmitted counts students who have not turned anything in. Problems lists what needs the teacher's attention.
-         *     InstructionsVersion is the stored version of the assignment's instructions used for grading (null when none could be
-         *     stored); NewInstructions is true when this fetch stored it because the instructions changed (or were stored for the first time).
-         */
         FetchSummary: {
             /** Format: int32 */
             submissions: number;
@@ -1515,21 +1588,13 @@ export interface components {
             instructionsVersion?: number | null;
             newInstructions: boolean;
         };
-        /**
-         * @description Connection state of the teacher's Google account.
-         * @enum {string}
-         */
+        /** @enum {string} */
         GoogleConnectionState: "NotConfigured" | "NotConnected" | "Connected" | "ReconnectRequired";
-        /**
-         * @description Whether the app can read Google Classroom and Drive on the teacher's behalf.
-         *     Message explains what to do when the state is not Connected.
-         */
         GoogleConnectionStatus: {
             state: components["schemas"]["GoogleConnectionState"];
             grantedScopes: string[];
             message?: string | null;
         };
-        /** @description One change of a submission's grade in the source, e.g. the teacher returning the work with a grade. */
         GradeChange: {
             kind: components["schemas"]["GradeEventKind"];
             /** Format: double */
@@ -1541,19 +1606,12 @@ export interface components {
         };
         /** @enum {string} */
         GradeEventKind: "DraftGrade" | "AssignedGrade" | "MaxPoints" | "Other";
-        /** @description One grade the teacher returned to the student in Classroom. */
         GradeReturn: {
             /** Format: double */
             points?: number | null;
             /** Format: date-time */
             at: string;
         };
-        /**
-         * @description One saved AI grading of a stored version (a draft for the teacher; never written to Classroom). Review is Markdown
-         *     (score per task and short feedback); Score, MaxScore and Bonus repeat it as numbers; Mistakes point at lines of the
-         *     code where they can. InstructionsVersion is the stored instructions version it was graded against. SentFiles lists
-         *     everything the model was given; SkippedFiles what was left out and why.
-         */
         GradingResponse: {
             /** Format: uuid */
             id: string;
@@ -1578,10 +1636,6 @@ export interface components {
         };
         /** @enum {string} */
         GradingStatus: "Draft" | "Discarded";
-        /**
-         * @description One material of the instructions. Stored is true when the file is served by
-         *     GET /courses/{courseId}/assignments/{assignmentId}/instructions/files/{id}; Url is set for links (not stored).
-         */
         InstructionsFileResponse: {
             /** Format: uuid */
             id: string;
@@ -1594,11 +1648,42 @@ export interface components {
             stored: boolean;
             url?: string | null;
         };
+        JobResponse: {
+            /** Format: uuid */
+            id: string;
+            type: components["schemas"]["JobType"];
+            status: components["schemas"]["JobStatus"];
+            /** Format: uuid */
+            versionId?: string | null;
+            /** Format: uuid */
+            gradingId?: string | null;
+            /** Format: int32 */
+            progressDone?: number | null;
+            /** Format: int32 */
+            progressTotal?: number | null;
+            error?: string | null;
+            /** Format: int32 */
+            attempts: number;
+            /** Format: int32 */
+            maxAttempts: number;
+            cancelRequested: boolean;
+            /** Format: date-time */
+            runAfter: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            startedAt?: string | null;
+            /** Format: date-time */
+            finishedAt?: string | null;
+        };
+        /** @enum {string} */
+        JobStatus: "Queued" | "Running" | "Succeeded" | "Failed" | "Canceled";
+        /** @enum {string} */
+        JobType: "GradeVersion" | "GradeAssignment" | "FetchAssignment" | "SyncCourse" | "ReExtract";
         /** @enum {string} */
         MistakeCategory: "Correctness" | "MissingRequirement" | "Encapsulation" | "Design" | "ErrorHandling" | "Naming" | "Readability" | "Other";
         /** @enum {string} */
         MistakeSeverity: "Major" | "Minor" | "Style";
-        /** @description Result of a test call to the grading model. Reply is null and Error is set when the call failed. */
         ModelHealthResponse: {
             healthy: boolean;
             model: string;
@@ -1617,10 +1702,6 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
-        /**
-         * @description One piece of content in a version. Name is what the student called it. Stored is false when nothing was saved
-         *     (unsupported or too large); otherwise the content is served by GET /stored-files/{id}.
-         */
         StoredFileResponse: {
             /** Format: uuid */
             id: string;
@@ -1632,10 +1713,6 @@ export interface components {
             status: components["schemas"]["ContentStatus"];
             stored: boolean;
         };
-        /**
-         * @description The newest stored version of an assignment's instructions: the task statement and materials as they were when
-         *     fetched, which is exactly what grading sends to the model. VersionCount is how many versions are stored.
-         */
         StoredInstructionsResponse: {
             /** Format: uuid */
             versionId: string;
@@ -1651,10 +1728,6 @@ export interface components {
             fetchedAt: string;
             files: components["schemas"]["InstructionsFileResponse"][];
         };
-        /**
-         * @description A submission as stored by fetch, with every version and its files. ExternalSubmissionId is the source's
-         *     submission ID, matching SubmissionResponse.Id from the live list.
-         */
         StoredSubmissionResponse: {
             /** Format: uuid */
             id: string;
@@ -1662,10 +1735,6 @@ export interface components {
             studentName: string;
             versions: components["schemas"]["StoredVersionResponse"][];
         };
-        /**
-         * @description One stored version (v1, v2, …). StatusDetail explains what could not be stored; HasCode is true when code was
-         *     extracted into the version's code folder (see GET /versions/{id}/code); ExtractionDetail explains what could not be extracted.
-         */
         StoredVersionResponse: {
             /** Format: uuid */
             id: string;
@@ -1681,7 +1750,6 @@ export interface components {
             turnedInAt?: string | null;
             files: components["schemas"]["StoredFileResponse"][];
         };
-        /** @description One assignment as a column of the students table. */
         StudentAssignmentColumn: {
             id: string;
             title: string;
@@ -1690,49 +1758,25 @@ export interface components {
             /** Format: date-time */
             dueAt?: string | null;
         };
-        /** @description A student's result for one assignment; grades come from Classroom (initial = first returned, final = latest). */
         StudentAssignmentResult: {
-            /** @description Classroom's assignment ID. */
             assignmentId: string;
-            /** @description Classroom's submission ID (opens the student in the assignment workspace); null when there is none. */
             submissionId?: string | null;
-            /** @description Classroom's state, e.g. CREATED, TURNED_IN, RETURNED; null when there is no submission. */
             state?: string | null;
-            /** @description Handed in (turned in or returned). */
             turnedIn: boolean;
-            /** @description Handed in after the deadline. */
             late: boolean;
-            /** @description Not handed in and past the deadline: counts as 0. */
             missing: boolean;
-            /**
-             * Format: double
-             * @description The first grade returned.
-             */
+            /** Format: double */
             initialGrade?: number | null;
-            /**
-             * Format: double
-             * @description The latest grade returned.
-             */
+            /** Format: double */
             finalGrade?: number | null;
-            /** @description Every grade the teacher returned, oldest first. */
             returns: components["schemas"]["GradeReturn"][];
         };
-        /**
-         * @description A file or link attached to a submission. FileId is set for Drive files and used to download them later;
-         *     Url is the link itself (e.g. a GitHub repository) or the Drive file's web address.
-         */
         SubmissionAttachment: {
             kind: components["schemas"]["AttachmentKind"];
             title: string;
             url?: string | null;
             fileId?: string | null;
         };
-        /**
-         * @description One student's submission to an assignment, with its attachments as metadata (nothing is downloaded).
-         *     State is the source's own state, e.g. NEW, CREATED, TURNED_IN, RETURNED or RECLAIMED_BY_STUDENT for Classroom.
-         *     TurnedInAt is the latest turn-in, so it moves forward when the student resubmits. AssignedGrade is the grade the
-         *     student sees (given by the teacher in the source, never by this tool); GradeHistory lists every grade change.
-         */
         SubmissionResponse: {
             id: string;
             assignmentId: string;

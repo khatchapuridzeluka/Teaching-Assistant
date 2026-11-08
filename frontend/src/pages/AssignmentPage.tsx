@@ -1,10 +1,13 @@
-import { type KeyboardEvent, type ReactNode, useEffect, useState } from "react";
+import { type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useParams, useSearchParams } from "react-router";
-import type { AssignmentGrading, ExtractionSummary, FetchProblem, FetchSummary, StoredSubmission, StoredVersion, Submission } from "../api/client";
+import type { AssignmentGrading, ExtractionSummary, FetchProblem, FetchSummary, JobInfo, StoredSubmission, StoredVersion, Submission } from "../api/client";
 import {
   useAssignments,
   useFetchSubmissions,
-  useGradeVersion,
+  useAssignmentJobs,
+  useCancelJob,
+  useQueueGrading,
   useReExtract,
   useAssignmentGradings,
   useStoredSubmissions,
@@ -23,7 +26,10 @@ export function AssignmentPage() {
   const stored = useStoredSubmissions(courseId, assignmentId);
   const fetch = useFetchSubmissions(courseId, assignmentId);
   const extract = useReExtract(courseId, assignmentId);
-  const grade = useGradeVersion();
+  const queue = useQueueGrading(courseId, assignmentId);
+  const cancel = useCancelJob(courseId, assignmentId);
+  const jobs = useAssignmentJobs(courseId, assignmentId);
+  const queryClient = useQueryClient();
   const [previewing, setPreviewing] = useState<{ submission: StoredSubmission; versionId: string } | null>(null);
   const [sort, setSort] = useState<SortOption>("status");
   const [filter, setFilter] = useState<Filter>("all");
@@ -31,7 +37,25 @@ export function AssignmentPage() {
   const [pickedVersions, setPickedVersions] = useState<Record<string, string>>({});
   const [searchParams, setSearchParams] = useSearchParams();
   const [showDetail, setShowDetail] = useState(false);
-  const gradingVersionId = grade.isPending ? grade.variables : undefined;
+  const latestJob = new Map<string, JobInfo>();
+  for (const job of jobs.data ?? []) {
+    if (job.versionId && !latestJob.has(job.versionId)) {
+      latestJob.set(job.versionId, job);
+    }
+  }
+  const activeJobs = [...latestJob.values()].filter((job) => job.status === "Queued" || job.status === "Running");
+  const gradingVersionIds = new Map(activeJobs.map((job) => [job.versionId!, job.status]));
+
+  const activeIds = useRef(new Set<string>());
+  useEffect(() => {
+    const now = new Set(activeJobs.map((job) => job.id));
+    const finished = [...activeIds.current].some((id) => !now.has(id));
+    activeIds.current = now;
+    if (finished) {
+      void queryClient.invalidateQueries({ queryKey: ["reviews"] });
+      void queryClient.invalidateQueries({ predicate: (query) => query.queryKey.includes("gradings") });
+    }
+  });
 
   const storedById = new Map(stored.data?.map((s) => [s.externalSubmissionId, s]));
   const pickedVersion = (s: StoredSubmission | undefined) => s?.versions.find((v) => v.id === pickedVersions[s.id]) ?? s?.versions[0];
@@ -153,7 +177,7 @@ export function AssignmentPage() {
             versionOf={versionOf}
             reviews={reviews}
             storedById={storedById}
-            gradingVersionId={gradingVersionId}
+            gradingVersionIds={gradingVersionIds}
           />
           {selected ? (
             <div className={`min-w-0 flex-1 ${showDetail ? "flex" : "hidden @2xl/workspace:flex"}`}>
@@ -165,10 +189,11 @@ export function AssignmentPage() {
               version={selectedVersion}
               onPickVersion={(versionId) => selectedStored && setPickedVersions((p) => ({ ...p, [selectedStored.id]: versionId }))}
               onPreview={() => selectedStored && selectedVersion && setPreviewing({ submission: selectedStored, versionId: selectedVersion.id })}
-              onGrade={() => selectedVersion && grade.mutate(selectedVersion.id)}
-              grading={selectedVersion !== undefined && gradingVersionId === selectedVersion.id}
-              gradingError={grade.isError && grade.variables === selectedVersion?.id ? grade.error : null}
-              gradeDisabled={grade.isPending}
+              onGrade={() => selectedVersion && queue.mutate(selectedVersion.id)}
+              job={selectedVersion ? latestJob.get(selectedVersion.id) : undefined}
+              queuing={queue.isPending && queue.variables === selectedVersion?.id}
+              queueError={queue.isError && queue.variables === selectedVersion?.id ? queue.error : null}
+              onCancel={(jobId) => cancel.mutate(jobId)}
             />
             </div>
           ) : (
@@ -272,7 +297,7 @@ function StudentList({
   versionOf,
   reviews,
   storedById,
-  gradingVersionId,
+  gradingVersionIds,
 }: {
   hidden: boolean;
   rows: Submission[];
@@ -288,7 +313,7 @@ function StudentList({
   versionOf: Map<string, StoredVersion | undefined>;
   reviews: Map<string, AssignmentGrading>;
   storedById: Map<string, StoredSubmission>;
-  gradingVersionId: string | undefined;
+  gradingVersionIds: Map<string, string>;
 }) {
   function onKeyDown(e: KeyboardEvent<HTMLUListElement>) {
     if (e.key !== "ArrowDown" && e.key !== "ArrowUp") {
@@ -385,8 +410,10 @@ function StudentList({
                   </span>
                   <span className="flex shrink-0 flex-col items-end gap-1">
                     <Chip tone={state.tone}>{state.label}</Chip>
-                    {gradingVersionId !== undefined && gradingVersionId === version?.id ? (
-                      <span className="text-[11px] font-semibold text-accent">Grading…</span>
+                    {version && gradingVersionIds.has(version.id) ? (
+                      <span className="text-[11px] font-semibold text-accent">
+                        {gradingVersionIds.get(version.id) === "Queued" ? "Queued…" : "Grading…"}
+                      </span>
                     ) : review ? (
                       <span className="text-[11px] font-semibold text-accent">
                         Draft {review.score != null ? `${points(review.score)}/${review.maxScore ?? "–"}` : ""} · {mistakeCount(review)}{" "}

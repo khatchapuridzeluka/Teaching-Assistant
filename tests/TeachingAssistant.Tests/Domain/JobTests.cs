@@ -78,12 +78,15 @@ public class JobTests
     }
 
     [Fact]
-    public void RetryDelay_Doubles_UpToTenMinutes()
+    public void RetryDelay_FollowsTheList_AndStaysAtTheLastWait()
     {
         Assert.Equal(TimeSpan.FromSeconds(30), Job.RetryDelay(1));
         Assert.Equal(TimeSpan.FromMinutes(1), Job.RetryDelay(2));
         Assert.Equal(TimeSpan.FromMinutes(2), Job.RetryDelay(3));
+        Assert.Equal(TimeSpan.FromMinutes(5), Job.RetryDelay(4));
+        Assert.Equal(TimeSpan.FromMinutes(10), Job.RetryDelay(5));
         Assert.Equal(TimeSpan.FromMinutes(10), Job.RetryDelay(8));
+        Assert.Equal(TimeSpan.FromSeconds(30), Job.RetryDelay(0));
         Assert.Equal(TimeSpan.FromMinutes(10), Job.RetryDelay(50));
     }
 

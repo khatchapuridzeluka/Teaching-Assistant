@@ -1,10 +1,13 @@
 using TeachingAssistant.Application.Contracts;
+using TeachingAssistant.Application.Models;
 
 namespace TeachingAssistant.Application.Interfaces.Services;
 
 public interface IGradingService
 {
     Task<GradingResponse?> GradeVersionAsync(Guid versionId, CancellationToken cancellationToken = default);
+
+    Task<GradableVersion?> CheckAsync(Guid versionId, CancellationToken cancellationToken = default);
 }
 
 public interface IGradingDraftService

@@ -140,6 +140,39 @@ export const useGradeVersion = () => {
   });
 };
 
+export const useQueueGrading = (courseId: string, assignmentId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (versionId: string) =>
+      unwrap(api.POST("/versions/{versionId}/grade/queue", { params: { path: { versionId } } })),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["courses", courseId, "assignments", assignmentId, "jobs"] });
+    },
+  });
+};
+
+const isActive = (status: string) => status === "Queued" || status === "Running";
+
+export const useAssignmentJobs = (courseId: string, assignmentId: string) =>
+  useQuery({
+    queryKey: ["courses", courseId, "assignments", assignmentId, "jobs"],
+    queryFn: () =>
+      unwrap(
+        api.GET("/courses/{courseId}/assignments/{assignmentId}/jobs", { params: { path: { courseId, assignmentId } } }),
+      ),
+    refetchInterval: (query) => (query.state.data?.some((job) => isActive(job.status)) ? 2000 : false),
+  });
+
+export const useCancelJob = (courseId: string, assignmentId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (jobId: string) => unwrap(api.POST("/jobs/{jobId}/cancel", { params: { path: { jobId } } })),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["courses", courseId, "assignments", assignmentId, "jobs"] });
+    },
+  });
+};
+
 export const useReview = (versionId: string | undefined) =>
   useQuery({
     queryKey: ["reviews", versionId],

@@ -2,9 +2,14 @@ namespace TeachingAssistant.Domain.Jobs;
 
 public class Job
 {
-    public static readonly TimeSpan FirstRetryDelay = TimeSpan.FromSeconds(30);
-
-    public static readonly TimeSpan MaxRetryDelay = TimeSpan.FromMinutes(10);
+    private static readonly TimeSpan[] RetryDelays =
+    [
+        TimeSpan.FromSeconds(30),
+        TimeSpan.FromMinutes(1),
+        TimeSpan.FromMinutes(2),
+        TimeSpan.FromMinutes(5),
+        TimeSpan.FromMinutes(10),
+    ];
 
     private Job()
     {
@@ -86,9 +91,17 @@ public class Job
 
     public static TimeSpan RetryDelay(int failedAttempts)
     {
-        var doublings = Math.Clamp(failedAttempts - 1, 0, 30);
-        var delay = FirstRetryDelay * Math.Pow(2, doublings);
-        return delay < MaxRetryDelay ? delay : MaxRetryDelay;
+        if (failedAttempts < 1)
+        {
+            return RetryDelays[0];
+        }
+
+        if (failedAttempts > RetryDelays.Length)
+        {
+            return RetryDelays[^1];
+        }
+
+        return RetryDelays[failedAttempts - 1];
     }
 
     public void Start(string workerId, DateTimeOffset now, TimeSpan lease)

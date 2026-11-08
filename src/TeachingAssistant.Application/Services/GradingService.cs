@@ -120,7 +120,34 @@ public class GradingService : IGradingService
         _timeProvider = timeProvider;
     }
 
+    public async Task<GradableVersion?> CheckAsync(Guid versionId, CancellationToken cancellationToken = default)
+    {
+        var prepared = await PrepareAsync(versionId, cancellationToken);
+        return prepared is null ? null : new GradableVersion(prepared.Submission.CourseId, prepared.Submission.AssignmentId);
+    }
+
     public async Task<GradingResponse?> GradeVersionAsync(Guid versionId, CancellationToken cancellationToken = default)
+    {
+        var prepared = await PrepareAsync(versionId, cancellationToken);
+        if (prepared is null)
+        {
+            return null;
+        }
+
+        var (_, instructions, prompt) = prepared;
+        var reply = await _languageModel.GradeAsync(SystemPrompt, prompt.Parts, GradingOutput.Schema, cancellationToken);
+        var read = GradingOutput.Read(reply.Text, prompt.CodeLines);
+
+        var grading = new AiGrading(versionId, reply.Model, read.Review, read.Score, read.MaxScore, read.Bonus,
+            instructions.Number, prompt.Sent, prompt.Skipped, reply.Text,
+            read.Mistakes.Select(m => new GradingMistake(m.File, m.StartLine, m.EndLine, m.Severity, m.Category, m.Message)),
+            _timeProvider.GetUtcNow());
+        _gradings.Add(grading);
+        await _gradings.SaveChangesAsync(cancellationToken);
+        return GradingDraftService.ToResponse(grading);
+    }
+
+    private async Task<Prepared?> PrepareAsync(Guid versionId, CancellationToken cancellationToken)
     {
         var submission = await _store.FindByVersionAsync(versionId, cancellationToken);
         if (submission is null)
@@ -162,17 +189,10 @@ public class GradingService : IGradingService
               string.Join("\n", prompt.Skipped.Select(s => $"- {s}")) +
               "\n\nGrade this submission against the instructions.");
 
-        var reply = await _languageModel.GradeAsync(SystemPrompt, prompt.Parts, GradingOutput.Schema, cancellationToken);
-        var read = GradingOutput.Read(reply.Text, prompt.CodeLines);
-
-        var grading = new AiGrading(versionId, reply.Model, read.Review, read.Score, read.MaxScore, read.Bonus,
-            instructions.Number, prompt.Sent, prompt.Skipped, reply.Text,
-            read.Mistakes.Select(m => new GradingMistake(m.File, m.StartLine, m.EndLine, m.Severity, m.Category, m.Message)),
-            _timeProvider.GetUtcNow());
-        _gradings.Add(grading);
-        await _gradings.SaveChangesAsync(cancellationToken);
-        return GradingDraftService.ToResponse(grading);
+        return new Prepared(submission, instructions, prompt);
     }
+
+    private sealed record Prepared(Submission Submission, InstructionsVersion Instructions, Prompt Prompt);
 
     private void AddInstructions(Prompt prompt, InstructionsVersion instructions)
     {

@@ -6,13 +6,16 @@ using Microsoft.OpenApi;
 using Serilog;
 using TeachingAssistant.Application.Interfaces;
 using TeachingAssistant.Application.Interfaces.Services;
+using TeachingAssistant.Application.Jobs;
 using TeachingAssistant.Application.Services;
 using TeachingAssistant.Infrastructure.Documents;
 using TeachingAssistant.Infrastructure.Google;
+using TeachingAssistant.Infrastructure.Jobs;
 using TeachingAssistant.Infrastructure.LanguageModel;
 using TeachingAssistant.Infrastructure.Persistence;
 using TeachingAssistant.Infrastructure.Storage;
 using TeachingAssistant.WebAPI.ExceptionHandling;
+using TeachingAssistant.WebAPI.Jobs;
 
 namespace TeachingAssistant.WebAPI.Extensions;
 
@@ -29,6 +32,7 @@ public static class ServiceCollectionExtensions
         services.AddLanguageModel(configuration);
         services.AddGoogle(configuration);
         services.AddPersistence(configuration);
+        services.AddJobs(configuration);
 
         return services;
     }
@@ -43,6 +47,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IStudentStore, StudentStore>();
         services.AddScoped<ICourseAssignmentStore, CourseAssignmentStore>();
         services.AddScoped<IGradingStore, GradingStore>();
+        services.AddScoped<IJobStore, JobStore>();
 
         services.Configure<StorageOptions>(configuration.GetSection(StorageOptions.SectionName));
         services.AddSingleton<ISnapshotStorage, FileSystemSnapshotStorage>();
@@ -86,6 +91,16 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
+    public static IServiceCollection AddJobs(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.Configure<JobOptions>(configuration.GetSection(JobOptions.SectionName));
+        services.AddSingleton<JobSignal>();
+        services.AddSingleton<IJobSignal>(sp => sp.GetRequiredService<JobSignal>());
+        services.AddHostedService<JobWorker>();
+
+        return services;
+    }
+
     public static IServiceCollection AddApplicationServices(this IServiceCollection services)
     {
         services.AddSingleton(TimeProvider.System);
@@ -100,6 +115,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAgentChatService, AgentChatService>();
         services.AddScoped<IGradingService, GradingService>();
         services.AddScoped<IGradingDraftService, GradingDraftService>();
+        services.AddScoped<IJobService, JobService>();
+        services.AddScoped<IJobProcessor, JobProcessor>();
+        services.AddScoped<IJobHandler, GradeVersionJobHandler>();
         services.AddScoped<ICourseSyncService, CourseSyncService>();
         services.AddScoped<IStudentService, StudentService>();
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { CodeMistake, StoredFile, StoredSubmission, StoredVersion, Submission } from "../api/client";
+import type { CodeMistake, JobInfo, StoredFile, StoredSubmission, StoredVersion, Submission } from "../api/client";
 import { useDiscardGrading, useReview, useVersionGradings } from "../api/hooks";
 import { formatDate, formatDay, initials } from "../format";
 import { CodeBrowser, type CodeFocus, severityColor } from "./CodeBrowser";
@@ -26,9 +26,10 @@ export function SubmissionDetail({
   onPickVersion,
   onPreview,
   onGrade,
-  grading,
-  gradingError,
-  gradeDisabled,
+  job,
+  queuing,
+  queueError,
+  onCancel,
   onBack,
 }: {
   onBack: () => void;
@@ -38,15 +39,20 @@ export function SubmissionDetail({
   onPickVersion: (versionId: string) => void;
   onPreview: () => void;
   onGrade: () => void;
-  grading: boolean;
-  gradingError: unknown;
-  gradeDisabled: boolean;
+  job: JobInfo | undefined;
+  queuing: boolean;
+  queueError: unknown;
+  onCancel: (jobId: string) => void;
 }) {
   const current = useReview(version?.id).data ?? undefined;
   const history = useVersionGradings(version?.id).data ?? [];
   const discard = useDiscardGrading();
   const [viewingId, setViewingId] = useState<string | null>(null);
   const review = (viewingId ? history.find((g) => g.id === viewingId) : undefined) ?? current;
+  const grading = job !== undefined && (job.status === "Queued" || job.status === "Running");
+  const gradeDisabled = grading || queuing;
+  const jobFailed = job?.status === "Failed" && (!current || job.createdAt > current.createdAt);
+  const gradingError = queueError ?? (jobFailed ? new Error(job.error ?? "The grading failed.") : null);
 
   useEffect(() => {
     setViewingId(null);
@@ -110,7 +116,7 @@ export function SubmissionDetail({
                 disabled={gradeDisabled}
                 title={`Send v${version.number} and the assignment's instructions to the AI for a draft review`}
               >
-                {grading ? "Grading…" : review ? "Grade again" : "Grade with AI"}
+                {queuing ? "Queuing…" : grading ? (job.status === "Queued" ? "Queued…" : "Grading…") : review ? "Grade again" : "Grade with AI"}
               </Button>
             </>
           )}
@@ -163,7 +169,24 @@ export function SubmissionDetail({
                 </div>
               )}
               <FilesCard version={version} />
-              {grading && <Spinner label="Grading… the model reads the instructions and the code; this can take a minute." />}
+              {grading && (
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-[10px] border border-line bg-white px-4 py-3 text-xs">
+                  <Spinner
+                    label={
+                      job.status === "Queued"
+                        ? job.attempts > 0
+                          ? `Retrying soon (attempt ${job.attempts + 1} of ${job.maxAttempts}) after: ${job.error ?? "an error"}`
+                          : "Queued: waiting for a free grading slot…"
+                        : "Grading in the background… you can leave this page; the draft appears here when it is ready."
+                    }
+                  />
+                  {!job.cancelRequested && (
+                    <Button small onClick={() => onCancel(job.id)}>
+                      Cancel
+                    </Button>
+                  )}
+                </div>
+              )}
               {!grading && gradingError != null && <ErrorPanel error={gradingError} />}
               {review ? (
                 <div className={`flex flex-col gap-4 ${grading ? "opacity-50" : ""}`}>
