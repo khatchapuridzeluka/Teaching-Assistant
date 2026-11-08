@@ -1,6 +1,7 @@
 using TeachingAssistant.Application.Contracts;
 using TeachingAssistant.Application.Interfaces;
 using TeachingAssistant.Application.Interfaces.Services;
+using TeachingAssistant.Application.Models;
 using TeachingAssistant.Domain.Grading;
 using TeachingAssistant.Domain.Ingestion;
 using TeachingAssistant.Domain.Profiling;
@@ -16,14 +17,31 @@ public class StudentService : IStudentService
     private readonly IStudentStore _students;
     private readonly ICourseAssignmentStore _assignments;
     private readonly ISubmissionStore _submissions;
+    private readonly IStudentPhotoStorage _photos;
     private readonly TimeProvider _timeProvider;
 
-    public StudentService(IStudentStore students, ICourseAssignmentStore assignments, ISubmissionStore submissions, TimeProvider timeProvider)
+    public StudentService(
+        IStudentStore students, ICourseAssignmentStore assignments, ISubmissionStore submissions, IStudentPhotoStorage photos,
+        TimeProvider timeProvider)
     {
         _students = students;
         _assignments = assignments;
         _submissions = submissions;
+        _photos = photos;
         _timeProvider = timeProvider;
+    }
+
+    public async Task<StudentPhoto?> OpenPhotoAsync(string externalUserId, CancellationToken cancellationToken = default)
+    {
+        var student = (await _students.FindByExternalIdsAsync(SubmissionSource.GoogleClassroom, [externalUserId], cancellationToken))
+            .FirstOrDefault();
+        if (student is not { PhotoStoredName: { } storedName, PhotoHash: { } hash })
+        {
+            return null;
+        }
+
+        var stream = _photos.Open(storedName);
+        return stream is null ? null : new StudentPhoto(stream, student.PhotoContentType ?? "image/jpeg", hash);
     }
 
     public async Task<CourseStudentsResponse> GetCourseStudentsAsync(string courseId, CancellationToken cancellationToken = default)

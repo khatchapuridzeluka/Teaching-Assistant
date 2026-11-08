@@ -883,6 +883,68 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/students/{userId}/photo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Returns a student's profile photo from our stored copy (by their Google user ID); the browser revalidates it by its hash (ETag), so an unchanged photo is not sent again. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    userId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The photo */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "image/jpeg": string;
+                        "image/png": string;
+                        "image/webp": string;
+                        "image/gif": string;
+                        "application/json": string;
+                    };
+                };
+                /** @description The browser's copy is still current */
+                304: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description The student has no stored photo (show initials instead) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "image/jpeg": components["schemas"]["ProblemDetails"];
+                        "image/png": components["schemas"]["ProblemDetails"];
+                        "image/webp": components["schemas"]["ProblemDetails"];
+                        "image/gif": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/courses/{courseId}/assignments/{assignmentId}/submissions/stored": {
         parameters: {
             query?: never;
@@ -1404,6 +1466,16 @@ export interface components {
              * @description Submissions that have a grade.
              */
             graded: number;
+            /**
+             * Format: int32
+             * @description Profile photos stored, replaced or removed because they changed.
+             */
+            photosUpdated: number;
+            /**
+             * Format: int32
+             * @description Photos that could not be downloaded (tried again on the next sync).
+             */
+            photosFailed: number;
         };
         /** @description What re-extracting an assignment's stored versions did. Problems lists archives that could not be extracted. */
         ExtractionSummary: {
@@ -1534,6 +1606,16 @@ export interface components {
             latencyMs: number;
             reply?: string | null;
             error?: string | null;
+        };
+        ProblemDetails: {
+            type?: string | null;
+            title?: string | null;
+            /** Format: int32 */
+            status?: number | null;
+            detail?: string | null;
+            instance?: string | null;
+        } & {
+            [key: string]: unknown;
         };
         /**
          * @description One piece of content in a version. Name is what the student called it. Stored is false when nothing was saved

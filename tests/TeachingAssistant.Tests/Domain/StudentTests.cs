@@ -38,5 +38,44 @@ public class StudentTests
         Assert.True(student.IsEnrolledIn("course-1"));
     }
 
+    [Fact]
+    public void NeedsPhoto_WhenThereIsOneAndNoCopy_OrTheUrlChanged_OrTheCopyIsOld()
+    {
+        var student = NewStudent();
+
+        Assert.False(student.NeedsPhoto(null, Now)); // no photo in the source
+        Assert.True(student.NeedsPhoto("https://photo/a", Now)); // no copy yet
+
+        student.RecordPhoto("https://photo/a", "hash-a", "u1.jpg", "image/jpeg", Now);
+        Assert.False(student.NeedsPhoto("https://photo/a", Now.AddDays(1)));
+        Assert.True(student.NeedsPhoto("https://photo/b", Now.AddDays(1)));
+        Assert.True(student.NeedsPhoto("https://photo/a", Now + Student.PhotoRecheckAfter + TimeSpan.FromHours(1)));
+    }
+
+    [Fact]
+    public void RecordPhoto_SameBytesBehindANewUrl_IsNotAChange()
+    {
+        var student = NewStudent();
+        Assert.True(student.RecordPhoto("https://photo/a", "hash-a", "u1.jpg", "image/jpeg", Now));
+
+        var changed = student.RecordPhoto("https://photo/a2", "hash-a", "u1.jpg", "image/jpeg", Now.AddDays(2));
+
+        Assert.False(changed);
+        Assert.Equal("https://photo/a2", student.PhotoUrl);
+        Assert.Equal(Now.AddDays(2), student.PhotoFetchedAt);
+        Assert.True(student.RecordPhoto("https://photo/b", "hash-b", "u1.jpg", "image/jpeg", Now.AddDays(3)));
+    }
+
+    [Fact]
+    public void RemovePhoto_ForgetsEverything()
+    {
+        var student = NewStudent();
+        student.RecordPhoto("https://photo/a", "hash-a", "u1.jpg", "image/jpeg", Now);
+
+        student.RemovePhoto();
+
+        Assert.Equal((null, null, null), (student.PhotoUrl, student.PhotoHash, student.PhotoStoredName));
+    }
+
     private static Student NewStudent() => new(SubmissionSource.GoogleClassroom, "user-1", "Nino B.", Now);
 }

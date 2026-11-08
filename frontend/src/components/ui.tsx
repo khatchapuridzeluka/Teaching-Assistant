@@ -1,6 +1,6 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { type ButtonHTMLAttributes, type ReactNode, useEffect, useState } from "react";
 import { Link } from "react-router";
-import { ApiError } from "../api/client";
+import { ApiError, studentPhotoUrl } from "../api/client";
 
 type ButtonVariant = "primary" | "dark" | "outline";
 
@@ -106,7 +106,37 @@ export function ErrorPanel({ error }: { error: unknown }) {
   );
 }
 
-export function Avatar({ text }: { text: string }) {
+// Students whose photo failed to load (none stored): not asked again until the next sync clears this.
+const missingPhotos = new Set<string>();
+
+/** Called after a course sync: photos may have been added, so ask again. */
+export function forgetMissingPhotos() {
+  missingPhotos.clear();
+}
+
+/** The student's stored photo (by Google user ID) when there is one, otherwise their initials. */
+export function Avatar({ text, userId }: { text: string; userId?: string }) {
+  const [failed, setFailed] = useState(() => !userId || missingPhotos.has(userId));
+
+  useEffect(() => {
+    setFailed(!userId || missingPhotos.has(userId));
+  }, [userId]);
+
+  if (userId && !failed) {
+    return (
+      <img
+        src={studentPhotoUrl(userId)}
+        alt=""
+        loading="lazy"
+        onError={() => {
+          missingPhotos.add(userId);
+          setFailed(true);
+        }}
+        className="h-[30px] w-[30px] shrink-0 rounded-full bg-accent-tint object-cover"
+      />
+    );
+  }
+
   return (
     <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-accent-tint text-[11px] font-bold text-accent">
       {text}

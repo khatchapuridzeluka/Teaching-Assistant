@@ -50,6 +50,7 @@ public static class ServiceCollectionExtensions
 
         services.Configure<StorageOptions>(configuration.GetSection(StorageOptions.SectionName));
         services.AddSingleton<ISnapshotStorage, FileSystemSnapshotStorage>();
+        services.AddSingleton<IStudentPhotoStorage, FileSystemPhotoStorage>();
         services.AddSingleton<IDocumentReader, WordDocumentReader>();
 
         return services;
@@ -139,6 +140,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IGoogleConnectionService, GoogleConnectionService>();
         services.AddSingleton<ISubmissionSource, GoogleClassroomSource>();
         services.AddSingleton<IRemoteFileSource, GoogleDriveFileSource>();
+        services.AddHttpClient<IStudentPhotoSource, GooglePhotoSource>(client => client.Timeout = TimeSpan.FromSeconds(15));
 
         return services;
     }

@@ -27,6 +27,7 @@ const scopeNames: Record<string, string> = {
   "https://www.googleapis.com/auth/classroom.courses.readonly": "See your Classroom courses",
   "https://www.googleapis.com/auth/classroom.coursework.students.readonly": "See coursework and student submissions",
   "https://www.googleapis.com/auth/classroom.rosters.readonly": "See class rosters",
+  "https://www.googleapis.com/auth/classroom.profile.photos": "See students' profile photos",
   "https://www.googleapis.com/auth/drive.readonly": "Download submitted Drive files",
 };
 

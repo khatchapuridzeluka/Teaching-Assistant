@@ -337,7 +337,7 @@ function OverviewCard({
         {rows.map((row) => (
           <li key={row.id}>
             <button onClick={row.onOpen} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-paper/60">
-              {avatars && <Avatar text={initials(row.label)} />}
+              {avatars && <Avatar text={initials(row.label)} userId={row.id} />}
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-semibold">{row.label}</span>
                 <span className="block truncate text-[11px] text-ink-muted">
@@ -383,7 +383,7 @@ function FocusHeader({
   if (student) {
     return (
       <div className="flex items-center gap-2.5">
-        <Avatar text={initials(student.name)} />
+        <Avatar text={initials(student.name)} userId={student.id} />
         <div className="min-w-0">
           <b className="block truncate text-sm">{student.name}</b>
           <span className="text-[11px] text-ink-muted">
@@ -435,7 +435,7 @@ function DraftRow({
           selected ? "border-l-accent bg-accent-tint/60" : "border-l-transparent hover:bg-paper/60"
         } ${draft.status === "Discarded" ? "text-ink-muted" : ""}`}
       >
-        {!leadWithAssignment && <Avatar text={initials(draft.studentName)} />}
+        {!leadWithAssignment && <Avatar text={initials(draft.studentName)} userId={draft.studentId} />}
         <span className="min-w-0 flex-1">
           <span className="block truncate font-semibold">{leadWithAssignment ? assignmentTitle : draft.studentName}</span>
           <span className="block truncate text-[11px] text-ink-muted">
@@ -490,7 +490,7 @@ function DraftDetail({
           ← All drafts
         </button>
         <div className="flex min-w-0 items-center gap-3">
-          <Avatar text={initials(draft.studentName)} />
+          <Avatar text={initials(draft.studentName)} userId={draft.studentId} />
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <b className="truncate text-[15px]">{draft.studentName}</b>

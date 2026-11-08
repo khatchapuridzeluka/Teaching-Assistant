@@ -59,9 +59,12 @@ export function ChatPanel({ page, onClose }: { page: string | null; onClose: () 
   return (
     <aside className="flex h-full w-full max-w-[400px] shrink-0 flex-col border-l border-line bg-white xl:w-[400px]">
       <header className="flex items-center justify-between gap-3 border-b border-line px-[18px] py-3.5">
-        <div className="min-w-0">
-          <div className="text-sm font-bold">Ask agent</div>
-          <div className="truncate text-[11px] text-ink-muted">{page ?? "General question"}</div>
+        <div className="flex min-w-0 items-center gap-2.5">
+          <AgentMark size="h-7 w-7" text="text-[11px]" />
+          <div className="min-w-0">
+            <div className="text-sm font-bold">Ask agent</div>
+            <div className="truncate text-[11px] text-ink-muted">{page ?? "General question"}</div>
+          </div>
         </div>
         <div className="flex shrink-0 gap-1.5">
           <Button small onClick={clear} disabled={waiting || turns.length === 0}>New chat</Button>
@@ -96,21 +99,26 @@ export function ChatPanel({ page, onClose }: { page: string | null; onClose: () 
                   {turn.text}
                 </div>
               ) : (
-                <div
-                  key={i}
-                  className={`min-w-0 rounded-xl rounded-bl-sm px-3.5 py-3 ${turn.error ? "border border-l-4 border-line border-l-ink bg-white" : "bg-paper"}`}
-                >
-                  <div className="mb-1.5 text-[11px] font-bold uppercase tracking-[0.06em] text-accent">Agent</div>
-                  <div className="markdown">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{turn.text}</ReactMarkdown>
+                // The agent speaks with the app's mark beside its reply; errors keep their ink border to stand out.
+                <div key={i} className="flex min-w-0 items-start gap-2">
+                  <AgentMark size="mt-0.5 h-6 w-6" />
+                  <div
+                    className={`min-w-0 flex-1 rounded-xl rounded-tl-sm px-3.5 py-3 ${turn.error ? "border border-l-4 border-line border-l-ink bg-white" : "bg-paper"}`}
+                  >
+                    <div className="markdown">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{turn.text}</ReactMarkdown>
+                    </div>
                   </div>
                 </div>
               ),
             )}
             {waiting && (
-              <div className="flex items-center gap-2 rounded-xl rounded-bl-sm bg-paper px-3.5 py-3 text-ink-muted">
-                <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-line border-t-accent" />
-                Thinking…
+              <div className="flex items-start gap-2">
+                <AgentMark size="mt-0.5 h-6 w-6" />
+                <div className="flex items-center gap-2 rounded-xl rounded-tl-sm bg-paper px-3.5 py-3 text-ink-muted">
+                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-line border-t-accent" />
+                  Thinking…
+                </div>
               </div>
             )}
             <div ref={bottom} />
@@ -153,5 +161,20 @@ export function ChatPanel({ page, onClose }: { page: string | null; onClose: () 
         </div>
       </form>
     </aside>
+  );
+}
+
+/**
+ * The agent's own mark: the "TA" monogram. The app's checked-code mark stays for the tab and the sidebar, so the agent
+ * is told apart from the app around it.
+ */
+function AgentMark({ size, text = "text-[10px]" }: { size: string; text?: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`flex shrink-0 items-center justify-center rounded-md bg-accent font-bold text-white ${size} ${text}`}
+    >
+      TA
+    </span>
   );
 }

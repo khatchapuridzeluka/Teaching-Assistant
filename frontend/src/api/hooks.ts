@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, unwrap } from "./client";
+import { forgetMissingPhotos } from "../components/ui";
 
 // One hook per endpoint. Components only call these; no fetch logic lives in pages.
 
@@ -37,6 +38,7 @@ export const useSyncCourse = (courseId: string) => {
   return useMutation({
     mutationFn: () => unwrap(api.POST("/courses/{courseId}/sync", { params: { path: { courseId } } })),
     onSuccess: () => {
+      forgetMissingPhotos(); // new photos may have been stored
       void queryClient.invalidateQueries({ queryKey: ["courses", courseId, "students"] });
     },
   });

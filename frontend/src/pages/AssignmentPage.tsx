@@ -406,7 +406,7 @@ function StudentList({
                     isSelected ? "border-l-accent bg-accent-tint/60" : "border-l-transparent hover:bg-paper/60"
                   }`}
                 >
-                  <Avatar text={initials(submission.studentName)} />
+                  <Avatar text={initials(submission.studentName)} userId={submission.studentId} />
                   <span className="min-w-0 flex-1">
                     <span className={`block truncate font-semibold ${working ? "" : "text-ink-muted"}`}>{submission.studentName}</span>
                     <span className="block truncate text-[11px] text-ink-muted">

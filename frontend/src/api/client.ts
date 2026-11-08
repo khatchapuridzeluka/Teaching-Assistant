@@ -27,6 +27,9 @@ export type ExtractionSummary = components["schemas"]["ExtractionSummary"];
 export type StoredInstructions = components["schemas"]["StoredInstructionsResponse"];
 export type InstructionsFile = components["schemas"]["InstructionsFileResponse"];
 
+/** URL of a student's stored profile photo, by their Google user ID (404 when there is none). */
+export const studentPhotoUrl = (userId: string) => `/api/students/${encodeURIComponent(userId)}/photo`;
+
 /** URL of one extracted file of a version; path comes from the version's code list. */
 export const codeFileUrl = (versionId: string, path: string) =>
   `/api/versions/${versionId}/code/file?path=${encodeURIComponent(path)}`;

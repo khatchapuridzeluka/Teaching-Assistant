@@ -87,7 +87,8 @@ function Sidebar({ className = "" }: { className?: string }) {
   return (
     <aside className={`w-[232px] shrink-0 flex-col overflow-y-auto bg-ink px-3.5 py-5 text-paper ${className}`}>
       <Link to="/" className="flex items-center gap-2.5 px-2 pb-[18px]">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-xs font-bold text-white">TA</span>
+        {/* The same mark as the browser tab icon (public/favicon.svg). */}
+        <img src="/favicon.svg" alt="" className="h-8 w-8 shrink-0" />
         <span>
           <b className="block text-sm text-white">Teaching Assistant</b>
           <span className="text-[11px] text-[#a9abac]">Grading agent</span>

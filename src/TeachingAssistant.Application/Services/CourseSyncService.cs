@@ -1,4 +1,6 @@
+using System.Security.Cryptography;
 using TeachingAssistant.Application.Contracts;
+using TeachingAssistant.Application.Exceptions;
 using TeachingAssistant.Application.Interfaces;
 using TeachingAssistant.Application.Interfaces.Services;
 using TeachingAssistant.Domain.Ingestion;
@@ -10,7 +12,9 @@ namespace TeachingAssistant.Application.Services;
 /// Copies a whole course from the source in a few requests and without downloading files: the roster (students and
 /// enrollments), the assignments (maximum points and deadlines) and every student's state and grade history for every
 /// assignment. Profiles and scores then read our database only. The source stays the owner: grades are only read.
-/// Students who left the roster are kept, inactive, so their past work stays readable.
+/// Students who left the roster are kept, inactive, so their past work stays readable. Profile photos are downloaded
+/// only when new or changed (see <see cref="Student.NeedsPhoto"/>) and kept as one local copy per student; a photo that
+/// cannot be downloaded never fails the sync.
 /// </summary>
 public class CourseSyncService : ICourseSyncService
 {
@@ -19,7 +23,12 @@ public class CourseSyncService : ICourseSyncService
     private readonly ICourseAssignmentStore _assignments;
     private readonly ISubmissionStore _submissions;
     private readonly ISnapshotStorage _storage;
+    private readonly IStudentPhotoSource _photoSource;
+    private readonly IStudentPhotoStorage _photoStorage;
     private readonly TimeProvider _timeProvider;
+
+    // Photo downloads at once: small files from Google's image servers.
+    private const int MaxParallelPhotos = 4;
 
     public CourseSyncService(
         ISubmissionSource source,
@@ -27,6 +36,8 @@ public class CourseSyncService : ICourseSyncService
         ICourseAssignmentStore assignments,
         ISubmissionStore submissions,
         ISnapshotStorage storage,
+        IStudentPhotoSource photoSource,
+        IStudentPhotoStorage photoStorage,
         TimeProvider timeProvider)
     {
         _source = source;
@@ -34,6 +45,8 @@ public class CourseSyncService : ICourseSyncService
         _assignments = assignments;
         _submissions = submissions;
         _storage = storage;
+        _photoSource = photoSource;
+        _photoStorage = photoStorage;
         _timeProvider = timeProvider;
     }
 
@@ -50,7 +63,8 @@ public class CourseSyncService : ICourseSyncService
 
         // The database is read and written one step at a time: the stores share one database context.
         await SyncAssignmentsAsync(courseId, assignments, now, cancellationToken);
-        var (newStudents, leftStudents) = await SyncRosterAsync(courseId, roster, now, cancellationToken);
+        var (newStudents, leftStudents, students) = await SyncRosterAsync(courseId, roster, now, cancellationToken);
+        var photos = await SyncPhotosAsync(roster, students, now, cancellationToken);
 
         var titles = assignments.ToDictionary(a => a.Id, a => a.Title);
         var stored = (await _submissions.GetByCourseAsync(SubmissionSource.GoogleClassroom, courseId, cancellationToken))
@@ -84,7 +98,8 @@ public class CourseSyncService : ICourseSyncService
         }
 
         await _submissions.SaveChangesAsync(cancellationToken);
-        return new CourseSyncSummary(roster.Count, newStudents, leftStudents, assignments.Count, checkedCount, newSubmissions, graded);
+        return new CourseSyncSummary(roster.Count, newStudents, leftStudents, assignments.Count, checkedCount, newSubmissions, graded,
+            photos.Updated, photos.Failed);
     }
 
     private async Task SyncAssignmentsAsync(
@@ -107,8 +122,67 @@ public class CourseSyncService : ICourseSyncService
         }
     }
 
-    // Returns how many students are new and how many left the roster.
-    private async Task<(int New, int Left)> SyncRosterAsync(
+    // Downloads the photos that are new or changed (in parallel: network only), then records them one by one. Returns how
+    // many stored photos changed and how many could not be downloaded (tried again on the next sync).
+    private async Task<(int Updated, int Failed)> SyncPhotosAsync(
+        IReadOnlyList<Models.RosterStudent> roster, Dictionary<string, Student> students, DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var updated = 0;
+
+        // No photo in the source any more: forget ours.
+        foreach (var entry in roster.Where(r => r.PhotoUrl is null))
+        {
+            var student = students[entry.Id];
+            if (student.PhotoStoredName is { } old)
+            {
+                _photoStorage.Delete(old);
+                student.RemovePhoto();
+                updated++;
+            }
+        }
+
+        var wanted = roster.Where(r => students[r.Id].NeedsPhoto(r.PhotoUrl, now)).ToList();
+        var downloaded = new DownloadedPhoto?[wanted.Count];
+        await Parallel.ForEachAsync(
+            Enumerable.Range(0, wanted.Count),
+            new ParallelOptions { MaxDegreeOfParallelism = MaxParallelPhotos, CancellationToken = cancellationToken },
+            async (i, token) =>
+            {
+                try
+                {
+                    downloaded[i] = await _photoSource.DownloadAsync(wanted[i].PhotoUrl!, token);
+                }
+                catch (SubmissionSourceUnavailableException)
+                {
+                    downloaded[i] = null; // keep the old photo, if any; tried again on the next sync
+                }
+            });
+
+        for (var i = 0; i < wanted.Count; i++)
+        {
+            if (downloaded[i] is not { } photo)
+            {
+                continue;
+            }
+
+            var student = students[wanted[i].Id];
+            var hash = Convert.ToHexStringLower(SHA256.HashData(photo.Bytes));
+            // The same bytes behind a new URL (or a re-check) keep the stored file; only a real change writes it.
+            var storedName = hash == student.PhotoHash && student.PhotoStoredName is { } existing
+                ? existing
+                : await _photoStorage.SaveAsync(student.ExternalUserId, photo, cancellationToken);
+            if (student.RecordPhoto(wanted[i].PhotoUrl!, hash, storedName, photo.ContentType, now))
+            {
+                updated++;
+            }
+        }
+
+        return (updated, downloaded.Count(d => d is null));
+    }
+
+    // Returns how many students are new and how many left the roster, and the roster's students by source user ID.
+    private async Task<(int New, int Left, Dictionary<string, Student> Students)> SyncRosterAsync(
         string courseId, IReadOnlyList<Models.RosterStudent> roster, DateTimeOffset now, CancellationToken cancellationToken)
     {
         var ids = roster.Select(s => s.Id).ToList();
@@ -139,6 +213,6 @@ public class CourseSyncService : ICourseSyncService
             student.LeaveCourse(courseId);
         }
 
-        return (created, left.Count);
+        return (created, left.Count, known);
     }
 }

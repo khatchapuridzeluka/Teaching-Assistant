@@ -640,6 +640,26 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("name");
 
+                    b.Property<string>("PhotoContentType")
+                        .HasColumnType("text")
+                        .HasColumnName("photo_content_type");
+
+                    b.Property<DateTimeOffset?>("PhotoFetchedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("photo_fetched_at");
+
+                    b.Property<string>("PhotoHash")
+                        .HasColumnType("text")
+                        .HasColumnName("photo_hash");
+
+                    b.Property<string>("PhotoStoredName")
+                        .HasColumnType("text")
+                        .HasColumnName("photo_stored_name");
+
+                    b.Property<string>("PhotoUrl")
+                        .HasColumnType("text")
+                        .HasColumnName("photo_url");
+
                     b.Property<string>("Source")
                         .IsRequired()
                         .HasColumnType("text")

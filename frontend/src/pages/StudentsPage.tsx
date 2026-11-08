@@ -319,7 +319,7 @@ function StudentList({
                     isSelected ? "border-l-accent bg-accent-tint/60" : "border-l-transparent hover:bg-paper/60"
                   }`}
                 >
-                  <Avatar text={initials(student.name)} />
+                  <Avatar text={initials(student.name)} userId={student.externalUserId} />
                   <span className="min-w-0 flex-1">
                     <span className={`block truncate font-semibold ${student.active ? "" : "text-ink-muted"}`}>{student.name}</span>
                     <span className="block truncate text-[11px] text-ink-muted">
@@ -366,7 +366,7 @@ function StudentProfile({
           ← All students
         </button>
         <div className="flex min-w-0 items-center gap-3">
-          <Avatar text={initials(student.name)} />
+          <Avatar text={initials(student.name)} userId={student.externalUserId} />
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <b className="truncate text-[15px]">{student.name}</b>

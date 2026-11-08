@@ -10,6 +10,8 @@ namespace TeachingAssistant.Application.Contracts;
 /// <param name="Submissions">Submissions checked (every student × assignment the source lists).</param>
 /// <param name="NewSubmissions">Submissions recorded for the first time.</param>
 /// <param name="Graded">Submissions that have a grade.</param>
+/// <param name="PhotosUpdated">Profile photos stored, replaced or removed because they changed.</param>
+/// <param name="PhotosFailed">Photos that could not be downloaded (tried again on the next sync).</param>
 public record CourseSyncSummary(
     int Students,
     int NewStudents,
@@ -17,4 +19,6 @@ public record CourseSyncSummary(
     int Assignments,
     int Submissions,
     int NewSubmissions,
-    int Graded);
+    int Graded,
+    int PhotosUpdated,
+    int PhotosFailed);

@@ -127,8 +127,38 @@ public class GoogleClassroomSource : ISubmissionSource
     public async Task<IReadOnlyList<RosterStudent>> GetStudentsAsync(string courseId, CancellationToken cancellationToken = default)
     {
         var classroom = await GetClassroomAsync(cancellationToken);
-        var names = await GetStudentNamesAsync(classroom, courseId, cancellationToken);
-        return names.Select(n => new RosterStudent(n.Key, n.Value)).ToList();
+        var request = classroom.Courses.Students.List(courseId);
+        request.PageSize = PageSize;
+
+        var students = await FetchAllAsync(request, (r, token) => r.PageToken = token,
+            (ListStudentsResponse page) => (page.Students, page.NextPageToken), cancellationToken);
+
+        return students
+            .Select(s => new RosterStudent(s.UserId, s.Profile?.Name?.FullName ?? s.UserId, PhotoUrl(s.Profile?.PhotoUrl)))
+            .ToList();
+    }
+
+    // Classroom's photo URL in a fixed small size, or null for none and for Google's default picture. Photos need the
+    // classroom.profile.photos scope; without it the URL is simply missing.
+    private static string? PhotoUrl(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url) || url.Contains("default-user", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var absolute = url.StartsWith("//", StringComparison.Ordinal) ? "https:" + url : url;
+
+        // Newer photo URLs (…/a/ACg8oc…) take a size option at the end (=s100, =s96-c): ask for 128 pixels. Older ones end
+        // in a file name (…/photo.jpg) where an appended option breaks the link, so they are used as given.
+        const string sizeOption = "=s\\d+(-[a-z]+)?$";
+        if (System.Text.RegularExpressions.Regex.IsMatch(absolute, sizeOption))
+        {
+            return System.Text.RegularExpressions.Regex.Replace(absolute, sizeOption, "=s128-c");
+        }
+
+        var lastSegment = absolute[(absolute.LastIndexOf('/') + 1)..];
+        return lastSegment.Contains('.') || lastSegment.Contains('=') ? absolute : absolute + "=s128-c";
     }
 
     private static Task<IList<StudentSubmission>> ListSubmissionsAsync(

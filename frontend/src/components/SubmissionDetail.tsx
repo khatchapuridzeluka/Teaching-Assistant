@@ -100,7 +100,7 @@ export function SubmissionDetail({
           </button>
         )}
         <div className="flex min-w-0 items-center gap-3">
-          <Avatar text={initials(submission.studentName)} />
+          <Avatar text={initials(submission.studentName)} userId={submission.studentId} />
           <div className="min-w-0">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               <b className="truncate text-[15px]">{submission.studentName}</b>

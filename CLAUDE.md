@@ -155,7 +155,7 @@ When a change affects anything `README.md` describes (features and their status,
 
 ## Privacy
 
-Anonymize student IDs before sending anything to an LLM. Use anonymized or synthetic data on Demo Day.
+The program owners approved real student data for the MVP and Demo Day (sensitive data reaching the LLM is acceptable at this stage). Still send the model only what grading needs: never names, emails or photos. For later scale, consider a local model or anonymizing again before anything goes to an LLM. Student photos are stored locally (one copy per student, no history) and never sent to the model.
 
 ## Timeline
 

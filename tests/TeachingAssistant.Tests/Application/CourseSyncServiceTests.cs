@@ -16,10 +16,80 @@ public class CourseSyncServiceTests
     private readonly FakeStudentStore _students = new();
     private readonly FakeAssignmentStore _assignments = new();
     private readonly FakeSubmissionStore _submissions = new();
+    private readonly FakePhotos _photos = new();
 
     private Task<CourseSyncSummary> SyncAsync() =>
-        new CourseSyncService(_source, _students, _assignments, _submissions, new FakeStorage(), TimeProvider.System)
+        new CourseSyncService(_source, _students, _assignments, _submissions, new FakeStorage(), _photos, _photos, TimeProvider.System)
             .SyncAsync("course-1", TestContext.Current.CancellationToken);
+
+    [Fact]
+    public async Task Photos_AreDownloadedOnce_AndOnlyAgainWhenTheUrlChanges()
+    {
+        _source.Assignment("a1", "Assignment 1", 100);
+        _source.Student("u1", "Ana K.", "https://photo/ana-1");
+        _source.Student("u2", "Gio M."); // no photo: initials
+
+        var first = await SyncAsync();
+        var second = await SyncAsync();
+
+        Assert.Equal((1, 0), (first.PhotosUpdated, first.PhotosFailed));
+        Assert.Equal(0, second.PhotosUpdated);
+        Assert.Equal(["https://photo/ana-1"], _photos.Downloads);
+        var ana = _students.Students.Single(x => x.ExternalUserId == "u1");
+        Assert.Equal("u1.jpg", ana.PhotoStoredName);
+        Assert.NotNull(ana.PhotoHash);
+        Assert.Null(_students.Students.Single(x => x.ExternalUserId == "u2").PhotoStoredName);
+
+        // A new photo has a new URL: downloaded and stored again.
+        _source.Clear();
+        _source.Assignment("a1", "Assignment 1", 100);
+        _source.Student("u1", "Ana K.", "https://photo/ana-2");
+        _photos.Bytes["https://photo/ana-2"] = [9, 9, 9];
+        var third = await SyncAsync();
+
+        Assert.Equal(1, third.PhotosUpdated);
+        Assert.Equal(2, _photos.Saved);
+    }
+
+    [Fact]
+    public async Task Photos_SameImageBehindANewUrl_IsNotWrittenAgain()
+    {
+        _source.Assignment("a1", "Assignment 1", 100);
+        _source.Student("u1", "Ana K.", "https://photo/a");
+        await SyncAsync();
+
+        _source.Clear();
+        _source.Assignment("a1", "Assignment 1", 100);
+        _source.Student("u1", "Ana K.", "https://photo/a-resized"); // same bytes (FakePhotos default)
+        var summary = await SyncAsync();
+
+        Assert.Equal(0, summary.PhotosUpdated);
+        Assert.Equal(1, _photos.Saved);
+        Assert.Equal("https://photo/a-resized", _students.Students.Single().PhotoUrl);
+    }
+
+    [Fact]
+    public async Task Photos_RemovedInTheSource_AreDeleted_AndAFailedDownloadDoesNotFailTheSync()
+    {
+        _source.Assignment("a1", "Assignment 1", 100);
+        _source.Student("u1", "Ana K.", "https://photo/a");
+        _source.Student("u2", "Gio M.", "https://photo/broken");
+        _photos.Failing.Add("https://photo/broken");
+
+        var first = await SyncAsync();
+
+        Assert.Equal((1, 1), (first.PhotosUpdated, first.PhotosFailed));
+        Assert.Null(_students.Students.Single(x => x.ExternalUserId == "u2").PhotoStoredName);
+
+        _source.Clear();
+        _source.Assignment("a1", "Assignment 1", 100);
+        _source.Student("u1", "Ana K."); // photo removed in Google
+        _source.Student("u2", "Gio M.");
+        await SyncAsync();
+
+        Assert.Equal(["u1.jpg"], _photos.Deleted);
+        Assert.Null(_students.Students.Single(x => x.ExternalUserId == "u1").PhotoStoredName);
+    }
 
     [Fact]
     public async Task FirstSync_RecordsRosterAssignmentsAndEveryStudentsGrades()
@@ -34,7 +104,7 @@ public class CourseSyncServiceTests
 
         var summary = await SyncAsync();
 
-        Assert.Equal(new CourseSyncSummary(2, 2, 0, 2, 3, 3, 1), summary);
+        Assert.Equal(new CourseSyncSummary(2, 2, 0, 2, 3, 3, 1, 0, 0), summary);
         Assert.All(_students.Students, s => Assert.True(s.IsEnrolledIn("course-1")));
         Assert.Equal([100.0, 50.0], _assignments.Assignments.Select(a => a.MaxPoints!.Value));
 
@@ -130,7 +200,7 @@ public class CourseSyncServiceTests
         _source.Submission("s3", "a3", "u1", "CREATED", null);
         await SyncAsync();
 
-        var table = await new StudentService(_students, _assignments, _submissions, TimeProvider.System)
+        var table = await new StudentService(_students, _assignments, _submissions, _photos, TimeProvider.System)
             .GetCourseStudentsAsync("course-1", TestContext.Current.CancellationToken);
 
         Assert.Equal(["a1", "a2", "a3"], table.Assignments.Select(a => a.Id));
@@ -158,7 +228,7 @@ public class CourseSyncServiceTests
         public void Assignment(string id, string title, double maxPoints, DateTimeOffset? dueAt = null) =>
             _assignments.Add(new AssignmentResponse(id, "course-1", title, null, "ASSIGNMENT", maxPoints, dueAt, null, null, []));
 
-        public void Student(string id, string name) => _roster.Add(new RosterStudent(id, name));
+        public void Student(string id, string name, string? photoUrl = null) => _roster.Add(new RosterStudent(id, name, photoUrl));
 
         public void Submission(string id, string assignmentId, string userId, string state, double? grade, params GradeChange[] history) =>
             _submissions.Add(new SubmissionResponse(id, assignmentId, userId, _roster.FirstOrDefault(r => r.Id == userId)?.Name ?? userId,
@@ -246,6 +316,38 @@ public class CourseSyncServiceTests
 
         public Task<string?> FindVersionPathAsync(Guid versionId, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
+    }
+
+    // Both the photo source and the photo storage: every URL returns the same bytes unless set otherwise.
+    private sealed class FakePhotos : IStudentPhotoSource, IStudentPhotoStorage
+    {
+        public Dictionary<string, byte[]> Bytes { get; } = [];
+        public HashSet<string> Failing { get; } = [];
+        public List<string> Downloads { get; } = [];
+        public List<string> Deleted { get; } = [];
+        public int Saved { get; private set; }
+
+        public Task<DownloadedPhoto> DownloadAsync(string photoUrl, CancellationToken cancellationToken = default)
+        {
+            lock (Downloads) // photos download in parallel
+            {
+                Downloads.Add(photoUrl);
+            }
+
+            return Failing.Contains(photoUrl)
+                ? Task.FromException<DownloadedPhoto>(new TeachingAssistant.Application.Exceptions.SubmissionSourceUnavailableException("404"))
+                : Task.FromResult(new DownloadedPhoto(Bytes.GetValueOrDefault(photoUrl, [1, 2, 3]), "image/jpeg"));
+        }
+
+        public Task<string> SaveAsync(string externalUserId, DownloadedPhoto photo, CancellationToken cancellationToken = default)
+        {
+            Saved++;
+            return Task.FromResult($"{externalUserId}.jpg");
+        }
+
+        public Stream? Open(string storedName) => new MemoryStream([1, 2, 3]);
+
+        public void Delete(string storedName) => Deleted.Add(storedName);
     }
 
     private sealed class FakeStorage : ISnapshotStorage
