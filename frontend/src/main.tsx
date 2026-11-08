@@ -11,6 +11,7 @@ import { AssignmentsPage } from "./pages/AssignmentsPage";
 import { ComingSoonPage } from "./pages/ComingSoonPage";
 import { CourseOverviewPage } from "./pages/CourseOverviewPage";
 import { CoursesPage } from "./pages/CoursesPage";
+import { DraftsPage } from "./pages/DraftsPage";
 import { InstructionsPage } from "./pages/InstructionsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { StudentsPage } from "./pages/StudentsPage";
@@ -68,6 +69,11 @@ const router = createBrowserRouter([
             path: "students",
             element: <StudentsPage />,
             handle: { crumbs: () => [{ label: "Students" }] } satisfies CrumbHandle,
+          },
+          {
+            path: "drafts",
+            element: <DraftsPage />,
+            handle: { crumbs: () => [{ label: "AI drafts" }] } satisfies CrumbHandle,
           },
           // Planned sections: a page that says what they will do.
           ...courseSections

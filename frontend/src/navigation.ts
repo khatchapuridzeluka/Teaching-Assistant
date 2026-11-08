@@ -33,6 +33,12 @@ export const courseSections: Section[] = [
     description: "Every student's grades per assignment, initial and final, and their overall score.",
   },
   {
+    path: "drafts",
+    label: "AI drafts",
+    ready: true,
+    description: "Every AI-drafted review of the course, by assignment or by student; where you will edit and approve them.",
+  },
+  {
     path: "gradebook",
     label: "Gradebook",
     ready: false,

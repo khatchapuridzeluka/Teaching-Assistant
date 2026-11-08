@@ -344,7 +344,7 @@ function fileLabel(file: StoredFile): string {
 }
 
 /** The mistakes in the order the model found them; one with lines opens them in the code. */
-function MistakeList({ mistakes, onShow }: { mistakes: CodeMistake[]; onShow: (file: string, line: number) => void }) {
+export function MistakeList({ mistakes, onShow }: { mistakes: CodeMistake[]; onShow: (file: string, line: number) => void }) {
   if (mistakes.length === 0) {
     return <div className="rounded-[10px] border border-line bg-white px-4 py-3 text-xs text-ink-muted">No mistakes found.</div>;
   }

@@ -182,6 +182,25 @@ export const useAssignmentGradings = (courseId: string, assignmentId: string) =>
       ),
   });
 
+// A course's saved drafts as list rows, filtered by the API: by assignment, by student (Google user ID), or both. By
+// default only the current draft of each version; all = also earlier and discarded drafts.
+export const useCourseGradings = (
+  courseId: string,
+  filter: { assignmentId?: string; studentId?: string; all?: boolean } = {},
+) =>
+  useQuery({
+    queryKey: ["courses", courseId, "gradings", filter],
+    queryFn: () =>
+      unwrap(
+        api.GET("/courses/{courseId}/gradings", {
+          params: {
+            path: { courseId },
+            query: { assignmentId: filter.assignmentId, studentId: filter.studentId, all: filter.all },
+          },
+        }),
+      ),
+  });
+
 // Throws a draft away; it stays in the history and the version's current draft becomes the previous one, if any.
 export const useDiscardGrading = () => {
   const queryClient = useQueryClient();

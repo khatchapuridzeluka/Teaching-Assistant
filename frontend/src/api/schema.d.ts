@@ -490,6 +490,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/courses/{courseId}/gradings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Returns a course's saved gradings, newest first, with assignment, student, version, score and mistake counts; optionally one assignment's or one student's only, and by default only the current draft of each version. */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Only this assignment's gradings, when given. */
+                    assignmentId?: string;
+                    /** @description Only this student's gradings (their Google user ID), when given; combines with assignmentId. */
+                    studentId?: string;
+                    /** @description False (default): only the newest draft of each version; true: also earlier drafts and discarded ones. */
+                    all?: boolean;
+                };
+                header?: never;
+                path: {
+                    /** @description The course. */
+                    courseId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Gradings retrieved successfully; empty when nothing was graded */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AssignmentGradingResponse"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/courses/{courseId}/assignments/{assignmentId}/gradings": {
         parameters: {
             query?: never;
@@ -497,7 +543,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Returns every saved grading of an assignment's stored versions, newest first, with the student, score and mistake counts. */
+        /** Returns every saved grading of an assignment's stored versions (drafts, earlier drafts and discarded), newest first, with the student, score and mistake counts. */
         get: {
             parameters: {
                 query?: never;
@@ -1134,8 +1180,9 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /**
-         * @description One saved grading in an assignment's list of drafts: who and which version, the score and how many mistakes of each
-         *     severity. Current is true for the newest draft of its version (the one the workspace shows).
+         * @description One saved grading in a list of drafts: which assignment, student and version, the score and how many mistakes of each
+         *     severity. Current is true for the newest draft of its version (the one the workspace shows). StudentId is the
+         *     student's Google user ID.
          */
         AssignmentGradingResponse: {
             /** Format: uuid */
@@ -1144,7 +1191,9 @@ export interface components {
             versionId: string;
             /** Format: int32 */
             versionNumber: number;
+            assignmentId: string;
             submissionId: string;
+            studentId: string;
             studentName: string;
             status: components["schemas"]["GradingStatus"];
             current: boolean;
