@@ -4,7 +4,6 @@ using TeachingAssistant.Application.Interfaces.Services;
 
 namespace TeachingAssistant.Application.Services;
 
-// Pass-through for now; later it adds per-course grading status counts from our own database.
 public class CourseService : ICourseService
 {
     private readonly ISubmissionSource _submissionSource;

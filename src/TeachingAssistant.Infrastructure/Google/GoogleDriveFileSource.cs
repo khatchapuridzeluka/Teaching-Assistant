@@ -10,20 +10,14 @@ using DriveFile = Google.Apis.Drive.v3.Data.File;
 
 namespace TeachingAssistant.Infrastructure.Google;
 
-/// <summary>
-/// <see cref="IRemoteFileSource"/> backed by the Google Drive API, using the teacher's stored token (drive.readonly).
-/// Submission attachments in Classroom are Drive files; this reads their metadata and content.
-/// </summary>
 public class GoogleDriveFileSource : IRemoteFileSource
 {
     private const string ServiceName = "Google Drive";
     private const string GoogleAppsPrefix = "application/vnd.google-apps.";
     private const string PdfMimeType = "application/pdf";
 
-    // Only what we use; Drive returns a minimal set of fields unless asked.
     private const string MetadataFields = "id,name,mimeType,md5Checksum,size,modifiedTime,version";
 
-    // Documents made in Google's editors have no file bytes; Drive exports them. PDF is readable by the model as is.
     private static readonly FrozenSet<string> ExportableAsPdf = new[]
     {
         "application/vnd.google-apps.document",
@@ -67,7 +61,6 @@ public class GoogleDriveFileSource : IRemoteFileSource
                 ? await drive.Files.Export(file.Id, PdfMimeType).DownloadAsync(destination, cancellationToken)
                 : await DownloadUploadedFileAsync(drive, file.Id, destination, cancellationToken);
 
-            // Downloads report failure in the result instead of throwing; rethrow so it is translated like any Google error.
             if (progress.Status == DownloadStatus.Failed)
             {
                 ExceptionDispatchInfo.Throw(progress.Exception
@@ -96,7 +89,6 @@ public class GoogleDriveFileSource : IRemoteFileSource
             file.Name,
             file.MimeType,
             file.Size,
-            // Uploaded files have an md5 checksum; Google Docs don't, but their version number increases with every edit.
             file.Md5Checksum ?? $"version:{file.Version}",
             file.ModifiedTimeDateTimeOffset,
             exportedAsPdf && !file.Name.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) ? file.Name + ".pdf" : file.Name,
@@ -104,8 +96,6 @@ public class GoogleDriveFileSource : IRemoteFileSource
             IsDownloadable: !isGoogleApp || exportedAsPdf);
     }
 
-    // One client for all calls, so connections to Google stay open instead of a new handshake per request.
-    // Rebuilt only when the shared credential changes (after connect/disconnect).
     private async Task<DriveService> GetDriveAsync(CancellationToken cancellationToken)
     {
         var credential = await _authorization.GetCredentialAsync(cancellationToken);

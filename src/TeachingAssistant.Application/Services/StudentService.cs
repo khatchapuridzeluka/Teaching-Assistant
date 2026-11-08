@@ -8,10 +8,6 @@ using TeachingAssistant.Domain.Profiling;
 
 namespace TeachingAssistant.Application.Services;
 
-/// <summary>
-/// A course's students table: each student's state and grades per assignment and their overall score, computed from
-/// what the last course sync (or assignment fetch) stored. Reads the database only, so it is instant and works offline.
-/// </summary>
 public class StudentService : IStudentService
 {
     private readonly IStudentStore _students;
@@ -46,7 +42,6 @@ public class StudentService : IStudentService
 
     public async Task<CourseStudentsResponse> GetCourseStudentsAsync(string courseId, CancellationToken cancellationToken = default)
     {
-        // One after another: the stores share one database context.
         var students = await _students.GetByCourseAsync(SubmissionSource.GoogleClassroom, courseId, cancellationToken);
         var assignments = (await _assignments.GetByCourseAsync(SubmissionSource.GoogleClassroom, courseId, cancellationToken))
             .OrderBy(a => a.DueAt ?? DateTimeOffset.MaxValue)
@@ -77,7 +72,6 @@ public class StudentService : IStudentService
 
         foreach (var assignment in assignments)
         {
-            // No submission at all (e.g. the student joined after a sync) is treated like work never handed in.
             var submission = byAssignment.GetValueOrDefault(assignment.ExternalAssignmentId);
             var result = new AssignmentResult(assignment.MaxPoints, assignment.DueAt, submission?.FinalGrade, submission?.IsTurnedIn ?? false);
             scored.Add(result);

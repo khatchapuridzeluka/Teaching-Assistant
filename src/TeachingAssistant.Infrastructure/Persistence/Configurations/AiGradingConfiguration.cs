@@ -14,11 +14,8 @@ public class AiGradingConfiguration : IEntityTypeConfiguration<AiGrading>
         builder.Property(g => g.Id).ValueGeneratedNever();
         builder.Property(g => g.Status).HasConversion<string>();
 
-        // The model's answer as it came. Plain text, not jsonb: in the rare case the answer is not valid JSON it must
-        // still be saved.
         builder.Property(g => g.RawOutput).HasColumnType("text");
 
-        // A grading belongs to one stored version; deleting a version deletes its gradings.
         builder.HasOne<SubmissionVersion>()
             .WithMany()
             .HasForeignKey(g => g.VersionId)

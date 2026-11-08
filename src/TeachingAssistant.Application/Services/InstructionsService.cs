@@ -31,7 +31,6 @@ public class InstructionsService : IInstructionsService
         var files = latest.Contents
             .Select(c => new InstructionsFileResponse(
                 c.Id, c.Name, c.Origin, c.MimeType, c.SizeBytes, c.Status, c.StoredName is not null,
-                // Only links point somewhere useful; a Drive file ID is not a URL.
                 c.Origin == ContentOrigin.Drive ? null : c.ExternalId))
             .ToList();
 
@@ -41,7 +40,6 @@ public class InstructionsService : IInstructionsService
 
     public async Task<StoredFileContent?> OpenFileAsync(string assignmentId, Guid contentId, CancellationToken cancellationToken = default)
     {
-        // Looked up within the assignment, so a file ID from another assignment is not found here.
         var instructions = await _store.GetAsync(SubmissionSource.GoogleClassroom, assignmentId, cancellationToken);
         foreach (var version in instructions?.Versions ?? [])
         {

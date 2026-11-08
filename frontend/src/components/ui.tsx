@@ -26,7 +26,6 @@ export function Button({
   );
 }
 
-// Status is shown by fill and outline, not by extra colors (see the Figma foundations).
 export type ChipTone = "outline" | "tint" | "accent" | "ink" | "muted" | "dashed";
 
 const chipStyles: Record<ChipTone, string> = {
@@ -64,7 +63,6 @@ export function CardHeader({ title, subtitle, actions }: { title: ReactNode; sub
 
 export function PageHeader({ title, subtitle, actions }: { title: ReactNode; subtitle?: ReactNode; actions?: ReactNode }) {
   return (
-    // The actions move under the title when they do not fit next to it.
     <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
       <div className="min-w-0">
         <h1 className="text-[20px] font-bold tracking-tight sm:text-[22px]">{title}</h1>
@@ -88,7 +86,6 @@ export function EmptyState({ children }: { children: ReactNode }) {
   return <div className="px-[18px] py-10 text-center text-ink-muted">{children}</div>;
 }
 
-/** Shows an API error; for "not connected" it points to Settings, where the teacher can connect Google. */
 export function ErrorPanel({ error }: { error: unknown }) {
   const message = error instanceof Error ? error.message : "Something went wrong.";
   const notConnected = error instanceof ApiError && error.isNotConnected;
@@ -106,15 +103,12 @@ export function ErrorPanel({ error }: { error: unknown }) {
   );
 }
 
-// Students whose photo failed to load (none stored): not asked again until the next sync clears this.
 const missingPhotos = new Set<string>();
 
-/** Called after a course sync: photos may have been added, so ask again. */
 export function forgetMissingPhotos() {
   missingPhotos.clear();
 }
 
-/** The student's stored photo (by Google user ID) when there is one, otherwise their initials. */
 export function Avatar({ text, userId }: { text: string; userId?: string }) {
   const [failed, setFailed] = useState(() => !userId || missingPhotos.has(userId));
 

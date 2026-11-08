@@ -10,26 +10,17 @@ import { MistakeList } from "../components/SubmissionDetail";
 import { Avatar, Button, Card, Chip, EmptyState, ErrorPanel, PageHeader, Spinner } from "../components/ui";
 import { formatDate, initials } from "../format";
 
-/**
- * GET /courses/{courseId}/gradings (filtered by assignment and student), GET /versions/{id}/gradings, POST
- * /gradings/{id}/discard. Every saved AI draft of the course in one place: pick an assignment (top) and/or a student
- * (below), browse the drafts, open one next to its code. The place where drafts will be edited and approved later.
- * The filters and the selected draft live in the URL (?assignment=, ?student=, ?draft=).
- */
 export function DraftsPage() {
   const { courseId = "" } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const assignmentId = searchParams.get("assignment") ?? undefined;
   const studentId = searchParams.get("student") ?? undefined;
-  // First step: pick an assignment or a student (or all drafts); then the drafts open, filtered by that choice.
   const viewAll = searchParams.get("view") === "all";
   const overview = !assignmentId && !studentId && !viewAll;
   const [showAll, setShowAll] = useState(false);
-  // On a phone the list and the draft take turns.
   const [showDraft, setShowDraft] = useState(false);
 
   const assignments = useAssignments(courseId);
-  // Every current draft of the course, for the filter counts; the list itself is filtered by the API.
   const everything = useCourseGradings(courseId);
   const list = useCourseGradings(courseId, { assignmentId, studentId, all: showAll });
 
@@ -53,7 +44,6 @@ export function DraftsPage() {
     }, { replace: true });
   }
 
-  // From the overview into the drafts, filtered by one assignment or one student, or all of them.
   function choose(filter: { assignment?: string; student?: string }) {
     setSearchParams(() => {
       const params = new URLSearchParams();
@@ -76,8 +66,6 @@ export function DraftsPage() {
     setShowDraft(true);
   }
 
-  // The filter lists: assignments with drafts (counted within the picked student), students with drafts (counted within
-  // the picked assignment).
   const assignmentCounts = countBy(allDrafts.filter((d) => !studentId || d.studentId === studentId), (d) => d.assignmentId);
   const studentCounts = countBy(allDrafts.filter((d) => !assignmentId || d.assignmentId === assignmentId), (d) => d.studentId);
   const assignmentOptions = (assignments.data ?? []).filter((a) => allDrafts.some((d) => d.assignmentId === a.id));
@@ -139,14 +127,12 @@ export function DraftsPage() {
               }`}
             >
               <div className="flex shrink-0 flex-col gap-2 border-b border-line p-3">
-                {/* What was chosen in the overview, and a way to narrow it down within that choice. */}
                 <FocusHeader
                   student={studentId ? studentOptions.find((x) => x.id === studentId) : undefined}
                   assignmentTitle={!studentId && assignmentId ? titles.get(assignmentId) : undefined}
                   drafts={allDrafts.filter((d) => (!studentId || d.studentId === studentId) && (studentId || !assignmentId || d.assignmentId === assignmentId))}
                 />
                 {studentId ? (
-                  // One student: narrow to one of their assignments.
                   assignmentOptions.filter((a) => (assignmentCounts.get(a.id) ?? 0) > 0).length > 1 && (
                     <select
                       value={assignmentId ?? ""}
@@ -165,7 +151,6 @@ export function DraftsPage() {
                     </select>
                   )
                 ) : assignmentId ? null : (
-                  // All drafts: narrow by assignment (top) and by student (below).
                   <div className="grid grid-cols-1 gap-2">
                     <select
                       value=""
@@ -249,11 +234,8 @@ export function DraftsPage() {
   );
 }
 
-// ——— The first step: choose an assignment or a student ———
-
 type Summary = { count: number; average: number | null; latest: string | null; major: number };
 
-/** Draft count, average AI score (share of the maximum), newest draft and major mistakes of a group of drafts. */
 function summarize(drafts: AssignmentGrading[]): Summary {
   const scored = drafts.filter((d) => d.score != null && d.maxScore);
   return {
@@ -365,9 +347,6 @@ function OverviewCard({
   );
 }
 
-// ——— Filters and list ———
-
-/** Names what the drafts view was opened for: one student, one assignment, or all drafts. */
 function FocusHeader({
   student,
   assignmentTitle,
@@ -458,9 +437,6 @@ function DraftRow({
   );
 }
 
-// ——— The selected draft ———
-
-/** One draft next to its code; the full grading is read from the version's history. */
 function DraftDetail({
   courseId,
   draft,
@@ -595,8 +571,6 @@ function DraftDetail({
     </section>
   );
 }
-
-// ——— Small pieces ———
 
 function plural(count: number, word: string): string {
   return `${count} ${word}${count === 1 ? "" : "s"}`;

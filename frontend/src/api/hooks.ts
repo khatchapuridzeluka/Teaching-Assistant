@@ -2,8 +2,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, unwrap } from "./client";
 import { forgetMissingPhotos } from "../components/ui";
 
-// One hook per endpoint. Components only call these; no fetch logic lives in pages.
-
 export const useCourses = () =>
   useQuery({ queryKey: ["courses"], queryFn: () => unwrap(api.GET("/courses")) });
 
@@ -11,7 +9,7 @@ export const useAssignments = (courseId: string) =>
   useQuery({
     queryKey: ["courses", courseId, "assignments"],
     queryFn: () => unwrap(api.GET("/courses/{courseId}/assignments", { params: { path: { courseId } } })),
-    enabled: courseId !== "", // pages without a course (Courses, Settings) don't ask
+    enabled: courseId !== "",
   });
 
 export const useSubmissions = (courseId: string, assignmentId: string) =>
@@ -25,26 +23,23 @@ export const useSubmissions = (courseId: string, assignmentId: string) =>
       ),
   });
 
-// A course's students with their grades per assignment and overall score, from our database (filled by a sync).
 export const useCourseStudents = (courseId: string) =>
   useQuery({
     queryKey: ["courses", courseId, "students"],
     queryFn: () => unwrap(api.GET("/courses/{courseId}/students", { params: { path: { courseId } } })),
   });
 
-// Copies the course's roster, assignments and grades from Classroom (no files); the students table then shows them.
 export const useSyncCourse = (courseId: string) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: () => unwrap(api.POST("/courses/{courseId}/sync", { params: { path: { courseId } } })),
     onSuccess: () => {
-      forgetMissingPhotos(); // new photos may have been stored
+      forgetMissingPhotos();
       void queryClient.invalidateQueries({ queryKey: ["courses", courseId, "students"] });
     },
   });
 };
 
-// What fetch has stored (our database), as opposed to the live Classroom list above.
 export const useStoredSubmissions = (courseId: string, assignmentId: string) =>
   useQuery({
     queryKey: ["courses", courseId, "assignments", assignmentId, "submissions", "stored"],
@@ -65,7 +60,6 @@ export const useFetchSubmissions = (courseId: string, assignmentId: string) => {
           params: { path: { courseId, assignmentId } },
         }),
       ),
-    // Refreshes the live list, the stored versions and the stored instructions (fetch stores those first).
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["courses", courseId, "assignments", assignmentId, "submissions"] });
       void queryClient.invalidateQueries({ queryKey: ["courses", courseId, "assignments", assignmentId, "instructions"] });
@@ -73,11 +67,9 @@ export const useFetchSubmissions = (courseId: string, assignmentId: string) => {
   });
 };
 
-// The newest stored instructions (what grading sends), or null before the first fetch.
 export const useInstructions = (courseId: string, assignmentId: string) =>
   useQuery({
     queryKey: ["courses", courseId, "assignments", assignmentId, "instructions"],
-    // 204 (no body) means "not fetched yet"; any error, including a 404, is a real failure and is shown as one.
     queryFn: async () =>
       (await unwrap(
         api.GET("/courses/{courseId}/assignments/{assignmentId}/instructions", {
@@ -86,7 +78,6 @@ export const useInstructions = (courseId: string, assignmentId: string) =>
       )) ?? null,
   });
 
-// One stored instructions file as a blob, for viewers that render in the page (Word documents).
 export const useInstructionsFileBlob = (courseId: string, assignmentId: string, fileId: string) =>
   useQuery({
     queryKey: ["courses", courseId, "assignments", assignmentId, "instructions", "files", fileId],
@@ -97,7 +88,7 @@ export const useInstructionsFileBlob = (courseId: string, assignmentId: string, 
           parseAs: "blob",
         }),
       ),
-    staleTime: Infinity, // a stored version's files never change
+    staleTime: Infinity,
   });
 
 export const useReExtract = (courseId: string, assignmentId: string) => {
@@ -109,7 +100,6 @@ export const useReExtract = (courseId: string, assignmentId: string) => {
           params: { path: { courseId, assignmentId } },
         }),
       ),
-    // Stored versions and every version's code list change.
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["courses", courseId, "assignments", assignmentId, "submissions"] });
       queryClient.invalidateQueries({ queryKey: ["versions"] });
@@ -124,11 +114,9 @@ export const useCodeFiles = (versionId: string, enabled: boolean) =>
     enabled,
   });
 
-// Reads one extracted file as text for the code viewer.
 export const useCodeFileText = (versionId: string, path: string | null) =>
   useQuery({
     queryKey: ["versions", versionId, "code", path],
-    // An empty file (students do turn those in) has no body, which the client reads as undefined; show it as "".
     queryFn: async () =>
       (await unwrap(
         api.GET("/versions/{versionId}/code/file", {
@@ -137,11 +125,9 @@ export const useCodeFileText = (versionId: string, path: string | null) =>
         }),
       )) ?? "",
     enabled: path !== null,
-    staleTime: Infinity, // a stored version's code never changes until it is re-extracted
+    staleTime: Infinity,
   });
 
-// Sends one stored version to the model; the API saves the answer as a new draft and returns it. Costs tokens and can
-// take a minute, so it only runs when the teacher clicks.
 export const useGradeVersion = () => {
   const queryClient = useQueryClient();
   return useMutation({
@@ -154,17 +140,14 @@ export const useGradeVersion = () => {
   });
 };
 
-// The current saved draft of a version (its newest grading that was not discarded), or null when it has none.
 export const useReview = (versionId: string | undefined) =>
   useQuery({
     queryKey: ["reviews", versionId],
-    // 204 (no body) means "not graded yet".
     queryFn: async () =>
       (await unwrap(api.GET("/versions/{versionId}/review", { params: { path: { versionId: versionId! } } }))) ?? null,
     enabled: versionId !== undefined,
   });
 
-// Every saved grading of a version, drafts and discarded, newest first.
 export const useVersionGradings = (versionId: string | undefined) =>
   useQuery({
     queryKey: ["versions", versionId, "gradings"],
@@ -172,7 +155,6 @@ export const useVersionGradings = (versionId: string | undefined) =>
     enabled: versionId !== undefined,
   });
 
-// Every saved grading of an assignment, newest first, with student, score and mistake counts.
 export const useAssignmentGradings = (courseId: string, assignmentId: string) =>
   useQuery({
     queryKey: ["courses", courseId, "assignments", assignmentId, "gradings"],
@@ -184,8 +166,6 @@ export const useAssignmentGradings = (courseId: string, assignmentId: string) =>
       ),
   });
 
-// A course's saved drafts as list rows, filtered by the API: by assignment, by student (Google user ID), or both. By
-// default only the current draft of each version; all = also earlier and discarded drafts.
 export const useCourseGradings = (
   courseId: string,
   filter: { assignmentId?: string; studentId?: string; all?: boolean } = {},
@@ -203,7 +183,6 @@ export const useCourseGradings = (
       ),
   });
 
-// Throws a draft away; it stays in the history and the version's current draft becomes the previous one, if any.
 export const useDiscardGrading = () => {
   const queryClient = useQueryClient();
   return useMutation({
@@ -216,13 +195,12 @@ export const useDiscardGrading = () => {
   });
 };
 
-// Downloads a stored file's bytes for viewers that lay the file out in the browser (Word documents).
 export const useStoredFileBlob = (fileId: string) =>
   useQuery({
     queryKey: ["stored-files", fileId],
     queryFn: () =>
       unwrap(api.GET("/stored-files/{contentId}", { params: { path: { contentId: fileId } }, parseAs: "blob" })),
-    staleTime: Infinity, // stored originals never change
+    staleTime: Infinity,
   });
 
 export const useGoogleStatus = () =>
@@ -252,6 +230,5 @@ export const useApiHealth = () =>
     retry: false,
   });
 
-// Sends a real prompt (costs tokens), so it only runs when the teacher clicks.
 export const useModelHealth = () =>
   useMutation({ mutationFn: () => unwrap(api.GET("/health/model")) });

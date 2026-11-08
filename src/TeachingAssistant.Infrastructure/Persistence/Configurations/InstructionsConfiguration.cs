@@ -4,8 +4,6 @@ using TeachingAssistant.Domain.Ingestion;
 
 namespace TeachingAssistant.Infrastructure.Persistence.Configurations;
 
-// Same rules as the submission mappings: IDs made in Domain, enums as text, versions and contents owned by their parent.
-
 public class AssignmentInstructionsConfiguration : IEntityTypeConfiguration<AssignmentInstructions>
 {
     public void Configure(EntityTypeBuilder<AssignmentInstructions> builder)
@@ -14,7 +12,6 @@ public class AssignmentInstructionsConfiguration : IEntityTypeConfiguration<Assi
         builder.Property(i => i.Id).ValueGeneratedNever();
         builder.Property(i => i.Source).HasConversion<string>();
 
-        // One record per assignment, so a re-fetch finds it instead of duplicating it.
         builder.HasIndex(i => new { i.Source, i.AssignmentId }).IsUnique();
 
         builder.HasMany(i => i.Versions)

@@ -8,7 +8,6 @@ import { Button, Chip } from "./ui";
 
 type FileType = "pdf" | "docx" | "image" | "video" | "link" | "other";
 
-// By type or by extension: Drive sometimes reports a generic type for uploaded files.
 function fileType(file: InstructionsFile): FileType {
   const name = file.name.toLowerCase();
   if (file.url != null) {
@@ -31,7 +30,6 @@ function fileType(file: InstructionsFile): FileType {
 
 const typeLabel: Record<FileType, string> = { pdf: "PDF", docx: "DOCX", image: "IMG", video: "VIDEO", link: "LINK", other: "FILE" };
 
-/** Drive's embeddable player for a Drive file link (…/file/d/{id}/view → …/file/d/{id}/preview). */
 function drivePreviewUrl(url: string | null | undefined): string | null {
   const id = url?.match(/\/file\/d\/([^/?#]+)/)?.[1];
   return id ? `https://drive.google.com/file/d/${id}/preview` : null;
@@ -44,32 +42,23 @@ function formatSize(bytes: number | null | undefined): string {
   return bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-/** One material with everything the viewer needs: our stored copy when there is one, otherwise Drive's link. */
 export type Material = { file: InstructionsFile; type: FileType; storedUrl: string | null; driveUrl: string | null };
 
-/** The page path of an assignment's instructions. */
 export const instructionsPath = (courseId: string, assignmentId: string) =>
   `/courses/${courseId}/assignments/${assignmentId}/instructions`;
 
-/**
- * The instructions as grading sees them: the stored version (or, before the first fetch, the live statement from
- * Classroom) and its materials. Shared by the card, the modal and the instructions page.
- */
 export function useInstructionMaterials(courseId: string, assignment: Assignment | undefined) {
   const instructions = useInstructions(courseId, assignment?.id ?? "");
   const stored = instructions.data;
   const text = stored?.description ?? assignment?.description ?? "";
-  // Classroom's statement differs from what grading would send: the teacher edited it since the last fetch.
   const changed = stored != null && assignment !== undefined && (stored.description ?? "") !== (assignment.description ?? "");
 
   const materials: Material[] = (stored?.files ?? []).map((file) => ({
     file,
     type: fileType(file),
     storedUrl: file.stored && assignment ? instructionsFileUrl(courseId, assignment.id, file.id) : null,
-    // Files we do not store (videos) still play from Drive, through Classroom's link for the material.
     driveUrl: assignment?.materials.find((m) => m.title === file.name)?.url ?? null,
   }));
-  // The task document first: what the student reads, and what grading sends.
   const main = materials.find((m) => m.storedUrl && (m.type === "pdf" || m.type === "docx")) ?? materials[0];
 
   return { instructions, stored, text, changed, materials, main };
@@ -77,7 +66,6 @@ export function useInstructionMaterials(courseId: string, assignment: Assignment
 
 type InstructionsState = ReturnType<typeof useInstructionMaterials>;
 
-/** The version chip and what the shown instructions are. */
 export function InstructionsStatus({ state }: { state: InstructionsState }) {
   const { stored, instructions } = state;
   return (
@@ -100,7 +88,6 @@ export function InstructionsStatus({ state }: { state: InstructionsState }) {
   );
 }
 
-/** Load failures and Classroom edits since the stored version. */
 export function InstructionsNotes({ state }: { state: InstructionsState }) {
   const { instructions, stored, changed } = state;
   return (
@@ -122,10 +109,6 @@ export function InstructionsNotes({ state }: { state: InstructionsState }) {
   );
 }
 
-/**
- * On the assignment page: the instructions in one row — version, the statement's first line (click to read it all),
- * and the materials as chips that open the instructions modal, where everything is previewed.
- */
 export function InstructionsBar({ courseId, assignment }: { courseId: string; assignment: Assignment }) {
   const state = useInstructionMaterials(courseId, assignment);
   const { text, materials, stored, main } = state;
@@ -147,12 +130,10 @@ export function InstructionsBar({ courseId, assignment }: { courseId: string; as
           onClick={() => setExpanded(!expanded)}
           aria-expanded={expanded}
           title={expanded ? "Hide the task statement" : "Read the whole task statement"}
-          // A line of its own on phones, between the chip row and the links.
           className="order-last w-full truncate text-left text-ink-muted hover:text-ink md:order-none md:w-auto md:min-w-[140px] md:flex-1"
         >
           {text || "No task statement; the task is in the attached materials."}
         </button>
-        {/* The first few materials as chips (cut off when there is no room); the modal has all of them. */}
         <div className="hidden min-w-0 shrink items-center gap-1.5 overflow-hidden lg:flex">
           {materials.slice(0, 3).map((m) => (
             <button
@@ -169,7 +150,6 @@ export function InstructionsBar({ courseId, assignment }: { courseId: string; as
         <div className="flex shrink-0 items-center">
           {materials.length > 0 && (
             <button onClick={() => setOpen(main ?? null)} className="px-1.5 text-xs font-semibold text-accent">
-              {/* The chips are hidden on smaller screens, so there the link names all materials. */}
               <span className="lg:hidden">Materials · {materials.length}</span>
               <span className="hidden lg:inline">{materials.length > 3 ? `+${materials.length - 3} · View all` : "View all"}</span>
             </button>
@@ -192,7 +172,6 @@ export function InstructionsBar({ courseId, assignment }: { courseId: string; as
   );
 }
 
-/** A dialog over the assignment page with every material previewable; Escape or the backdrop closes it. */
 function InstructionsModal({
   courseId,
   assignment,
@@ -245,7 +224,6 @@ function InstructionsModal({
   );
 }
 
-/** Tabs for every material, the selected one shown in the remaining height, and what grading does with it. */
 export function InstructionsViewer({
   courseId,
   assignmentId,
@@ -266,7 +244,6 @@ export function InstructionsViewer({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {/* Tabs scroll sideways when there are many materials. */}
       <nav className="flex shrink-0 gap-1 overflow-x-auto bg-paper/50 px-[18px] pt-2" aria-label="Materials">
         {materials.map((m) => {
           const active = m.file.id === selected.file.id;
@@ -293,7 +270,6 @@ export function InstructionsViewer({
   );
 }
 
-/** Shows one material in the space it is given: our stored copy when there is one, otherwise Drive's own player. */
 function MaterialView({ courseId, assignmentId, material }: { courseId: string; assignmentId: string; material: Material }) {
   const { file, type, storedUrl, driveUrl } = material;
   const drivePreview = drivePreviewUrl(driveUrl);
@@ -302,7 +278,6 @@ function MaterialView({ courseId, assignmentId, material }: { courseId: string; 
     return <iframe src={storedUrl} title={file.name} className="h-full w-full bg-white" />;
   }
   if (storedUrl && type === "docx") {
-    // Rendered in the browser from the stored .docx, the same file grading reads; no PDF conversion needed.
     return <InstructionsDocx courseId={courseId} assignmentId={assignmentId} file={file} />;
   }
   if (storedUrl && type === "image") {
@@ -313,7 +288,6 @@ function MaterialView({ courseId, assignmentId, material }: { courseId: string; 
     );
   }
   if (drivePreview) {
-    // Drive's player: needs the browser to be signed in to a Google account that can see the file.
     return <iframe src={drivePreview} title={file.name} allow="autoplay; fullscreen" className="h-full w-full bg-black" />;
   }
 
@@ -335,7 +309,6 @@ function MaterialView({ courseId, assignmentId, material }: { courseId: string; 
   );
 }
 
-/** What happens to the material in grading, and where else it can be opened. */
 function MaterialFooter({ courseId, assignmentId, material }: { courseId: string; assignmentId: string; material: Material }) {
   const { file, storedUrl, driveUrl } = material;
   const sent = storedUrl !== null && file.status !== "Unsupported";

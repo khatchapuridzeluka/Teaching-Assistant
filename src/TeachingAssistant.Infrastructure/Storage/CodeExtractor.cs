@@ -8,11 +8,6 @@ using TeachingAssistant.Domain.Ingestion;
 
 namespace TeachingAssistant.Infrastructure.Storage;
 
-/// <summary>
-/// Builds a version's code/ folder from its originals: archives (zip, rar, 7z, tar, gz) unpacked, source files copied,
-/// junk left out. Student archives are untrusted, so entries can never be written outside the folder and the total
-/// size and file count are limited by the bytes actually written, not by what the archive claims.
-/// </summary>
 public static class CodeExtractor
 {
     private const int MaxFiles = 5_000;
@@ -22,7 +17,6 @@ public static class CodeExtractor
     private static readonly FrozenSet<string> ArchiveExtensions =
         new[] { ".zip", ".rar", ".7z", ".tar", ".gz", ".tgz" }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
-    // IDE settings, version control, build output and OS files: never part of what the student wrote.
     private static readonly FrozenSet<string> JunkFolders =
         new[] { "__MACOSX", ".idea", ".vscode", ".vs", ".git", ".gradle", ".settings", ".metadata", "out", "bin", "obj", "target", "build", "node_modules" }
             .ToFrozenSet(StringComparer.OrdinalIgnoreCase);
@@ -33,7 +27,6 @@ public static class CodeExtractor
     private static readonly FrozenSet<string> JunkExtensions =
         new[] { ".class", ".jar", ".iml", ".exe", ".dll", ".o", ".obj", ".pdb" }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>Extracts into <paramref name="codeDirectory"/>, which is created if needed and should be empty.</summary>
     public static CodeExtraction Extract(
         string originalDirectory, string codeDirectory, IReadOnlyList<ExtractableFile> files, CancellationToken cancellationToken)
     {
@@ -60,7 +53,6 @@ public static class CodeExtractor
                 }
                 else
                 {
-                    // With several archives each gets its own folder, so equally named files cannot overwrite each other.
                     var target = archiveCount > 1
                         ? Path.Combine(codeDirectory, SafeSegment(Path.GetFileNameWithoutExtension(file.StoredName)))
                         : codeDirectory;
@@ -72,7 +64,6 @@ public static class CodeExtractor
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                // Remove what this file wrote before failing, so a half-extracted archive never counts as code.
                 budget.RollBackTo(checkpoint);
                 problems.Add($"Could not extract '{file.StoredName}': {Reason(ex)}");
             }
@@ -87,7 +78,6 @@ public static class CodeExtractor
         return new CodeExtraction(hash, fileCount, extracted, problems);
     }
 
-    /// <summary>Lists code/ as forward-slash relative paths, sorted.</summary>
     public static IReadOnlyList<CodeFile> List(string codeDirectory) =>
         Directory.Exists(codeDirectory)
             ? Directory.EnumerateFiles(codeDirectory, "*", SearchOption.AllDirectories)
@@ -115,7 +105,6 @@ public static class CodeExtractor
                 throw new InvalidDataException("the archive is password-protected.");
             }
 
-            // A single-file .gz has no name inside; use the archive's own name without .gz.
             var relative = SafeRelativePath(entry.Key ?? Path.GetFileNameWithoutExtension(archivePath));
             if (relative is null || IsJunk(relative))
             {
@@ -125,7 +114,7 @@ public static class CodeExtractor
             var destination = Path.GetFullPath(Path.Combine(root, relative));
             if (!destination.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
             {
-                continue; // would land outside the folder ("zip slip")
+                continue;
             }
 
             using var input = entry.OpenEntryStream();
@@ -133,7 +122,6 @@ public static class CodeExtractor
         }
     }
 
-    // Students sometimes zip a zip. Unpack archives found inside one level deep, next to where they were.
     private static void ExtractNestedArchives(string directory, Budget budget, List<string> problems, CancellationToken cancellationToken)
     {
         var nested = Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories)
@@ -151,7 +139,7 @@ public static class CodeExtractor
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                budget.RollBackTo(checkpoint); // the nested archive itself stays, so nothing is lost
+                budget.RollBackTo(checkpoint);
                 problems.Add($"Could not extract nested archive '{Path.GetFileName(path)}': {Reason(ex)}");
             }
         }
@@ -179,7 +167,6 @@ public static class CodeExtractor
         }
     }
 
-    // Splits an entry name into safe folder and file names; null for names that try to climb out ("..").
     private static string? SafeRelativePath(string entryName)
     {
         var segments = entryName.Split('/', '\\', StringSplitOptions.RemoveEmptyEntries)
@@ -206,11 +193,10 @@ public static class CodeExtractor
         var fileName = parts[^1];
         return parts[..^1].Any(JunkFolders.Contains)
                || JunkFiles.Contains(fileName)
-               || fileName.StartsWith("._", StringComparison.Ordinal) // macOS resource forks
+               || fileName.StartsWith("._", StringComparison.Ordinal)
                || JunkExtensions.Contains(Path.GetExtension(fileName));
     }
 
-    // One hash for the whole folder: same paths and same contents give the same hash, however the files were zipped.
     private static string? ComputeHash(string codeDirectory, out int fileCount)
     {
         var lines = new StringBuilder();
@@ -234,8 +220,6 @@ public static class CodeExtractor
         _ => "the file is damaged or not a supported archive.",
     };
 
-    // Limits across everything extracted for one version, counted from the bytes actually written.
-    // Also remembers the files written, so a failed archive's files can be removed again.
     private sealed class Budget
     {
         private readonly List<string> _written = [];

@@ -2,7 +2,6 @@ import { Link } from "react-router";
 import { useCourses } from "../api/hooks";
 import { Card, Chip, EmptyState, ErrorPanel, PageHeader, Spinner } from "../components/ui";
 
-// GET /courses
 export function CoursesPage() {
   const courses = useCourses();
 

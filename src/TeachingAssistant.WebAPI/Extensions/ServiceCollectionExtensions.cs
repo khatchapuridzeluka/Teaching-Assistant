@@ -18,10 +18,8 @@ namespace TeachingAssistant.WebAPI.Extensions;
 
 public static class ServiceCollectionExtensions
 {
-    // Everything the API needs, in one call from Program.cs.
     public static IServiceCollection AddServices(this IServiceCollection services, IConfiguration configuration)
     {
-        // Enums travel as names ("Connected"), not numbers, in JSON and Swagger.
         services.AddControllers()
             .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
         services.AddSerilogLogging(configuration);
@@ -35,8 +33,6 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
-    // Postgres via EF Core for records, the local disk for submission files.
-    // The connection string comes from user-secrets (ConnectionStrings:Postgres).
     public static IServiceCollection AddPersistence(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddDbContext<AppDbContext>(options => options
@@ -56,7 +52,6 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
-    // Serilog replaces the built-in logger; levels and sinks come from the "Serilog" config section.
     public static IServiceCollection AddSerilogLogging(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddSerilog((sp, logger) => logger
@@ -67,7 +62,6 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
-    // Errors are returned as ProblemDetails; known Application exceptions get their own status codes.
     public static IServiceCollection AddErrorHandling(this IServiceCollection services)
     {
         services.AddProblemDetails();
@@ -76,7 +70,6 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
-    // Swagger: XML doc comments from WebAPI (controllers) and Application (contracts) show up in the UI.
     public static IServiceCollection AddSwagger(this IServiceCollection services)
     {
         services.AddEndpointsApiExplorer();
@@ -86,8 +79,6 @@ public static class ServiceCollectionExtensions
             options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, "TeachingAssistant.WebAPI.xml"));
             options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, "TeachingAssistant.Application.xml"));
 
-            // Non-nullable C# properties become required in the spec, so the generated TypeScript types
-            // say "string" vs "string | null" exactly like the contracts.
             options.SupportNonNullableReferenceTypes();
             options.NonNullableReferenceTypesAsRequired();
         });
@@ -115,7 +106,6 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
-    // Language model (Claude). The API key comes from user-secrets or the ANTHROPIC_API_KEY env var.
     public static IServiceCollection AddLanguageModel(this IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<AnthropicOptions>(configuration.GetSection(AnthropicOptions.SectionName));
@@ -131,8 +121,6 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
-    // Google account connection (local "installed app" OAuth) and Classroom as a submission source.
-    // Client ID/secret come from user-secrets.
     public static IServiceCollection AddGoogle(this IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<GoogleOptions>(configuration.GetSection(GoogleOptions.SectionName));

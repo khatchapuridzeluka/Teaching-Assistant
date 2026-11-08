@@ -2,10 +2,6 @@ using System.Collections.Frozen;
 
 namespace TeachingAssistant.Domain.Ingestion;
 
-/// <summary>
-/// Decides what a submitted file is for grading, from its name and type. The extension decides first because
-/// sources report the same format under different types (Drive says application/x-zip-compressed for most zips).
-/// </summary>
 public static class ContentClassifier
 {
     private static readonly FrozenSet<string> ArchiveExtensions =
@@ -53,7 +49,6 @@ public static class ContentClassifier
             return ContentKind.Image;
         }
 
-        // No useful extension: fall back to the reported type.
         if (mimeType is null)
         {
             return ContentKind.Other;

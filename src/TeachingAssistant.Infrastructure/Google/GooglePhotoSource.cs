@@ -4,14 +4,8 @@ using TeachingAssistant.Application.Interfaces;
 
 namespace TeachingAssistant.Infrastructure.Google;
 
-/// <summary>
-/// <see cref="IStudentPhotoSource"/> over plain HTTP: Classroom's photo URLs point at Google's public image servers, so no
-/// token is needed. Only images up to a small size are accepted. A failed photo is logged with its status, since the sync
-/// itself only counts failures.
-/// </summary>
 public class GooglePhotoSource(HttpClient http, ILogger<GooglePhotoSource> logger) : IStudentPhotoSource
 {
-    // A 128-pixel profile photo is a few KB; anything far larger is not what we asked for.
     private const long MaxBytes = 2 * 1024 * 1024;
 
     public async Task<DownloadedPhoto> DownloadAsync(string photoUrl, CancellationToken cancellationToken = default)

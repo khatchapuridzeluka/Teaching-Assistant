@@ -12,10 +12,6 @@ using TeachingAssistant.Application.Models;
 
 namespace TeachingAssistant.Infrastructure.LanguageModel;
 
-/// <summary>
-/// <see cref="ILanguageModel"/> backed by Claude through the official Anthropic SDK.
-/// Translates SDK exceptions into <see cref="LanguageModelUnavailableException"/>.
-/// </summary>
 public class ClaudeLanguageModel : ILanguageModel
 {
     private readonly AnthropicClient _client;
@@ -37,7 +33,6 @@ public class ClaudeLanguageModel : ILanguageModel
             {
                 Model = _options.Model,
                 MaxTokens = _options.MaxTokens,
-                // Simple prompts don't need deep thinking; grading will get its own, stronger settings.
                 OutputConfig = new OutputConfig { Effort = Effort.Low },
                 Messages = [new UserMessageParam { Content = prompt }],
             }, cancellationToken);
@@ -76,19 +71,15 @@ public class ClaudeLanguageModel : ILanguageModel
     public async Task<LanguageModelReply> GradeAsync(
         string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default)
     {
-        // Structured output: the API constrains the reply to this JSON Schema, so it parses into the caller's records.
         var schema = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(outputSchema)
             ?? throw new ArgumentException("The output schema is empty.", nameof(outputSchema));
 
         try
         {
-            // The beta endpoint only for refusal fallbacks: if a safety classifier declines (rare for homework, but it
-            // would otherwise just stop), the API re-runs the same request on the fallback model within this call.
             var response = await _client.Beta.Messages.Create(new Beta.MessageCreateParams
             {
                 Model = _options.GradingModel,
                 MaxTokens = _options.GradingMaxTokens,
-                // Grading is judgement-heavy; the default effort on this model is medium.
                 OutputConfig = new Beta.BetaOutputConfig
                 {
                     Effort = Beta.Effort.High,
@@ -107,7 +98,6 @@ public class ClaudeLanguageModel : ILanguageModel
 
             if (response.StopReason == "max_tokens")
             {
-                // Cut-off JSON cannot be parsed; a clear message beats half a review.
                 throw new LanguageModelUnavailableException(
                     "The review was cut off at the length limit. Raise Anthropic:GradingMaxTokens and grade again.");
             }
@@ -140,7 +130,6 @@ public class ClaudeLanguageModel : ILanguageModel
         ? new UserMessageParam { Content = message.Text }
         : new AssistantMessageParam { Content = message.Text };
 
-    // Null for exceptions that are not about the Anthropic API; those are bugs and must surface as they are.
     private static LanguageModelUnavailableException? Translate(Exception ex, string model) => ex switch
     {
         AnthropicUnauthorizedException => new("Authentication failed: the Anthropic API key is missing or invalid.", ex),

@@ -4,7 +4,6 @@ using TeachingAssistant.Domain.Ingestion;
 
 namespace TeachingAssistant.Infrastructure.Persistence;
 
-/// <summary><see cref="ICourseAssignmentStore"/> on EF Core.</summary>
 public class CourseAssignmentStore(AppDbContext db) : ICourseAssignmentStore
 {
     public async Task<IReadOnlyList<CourseAssignment>> GetByCourseAsync(

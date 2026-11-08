@@ -5,17 +5,11 @@ using TeachingAssistant.Domain.Grading;
 
 namespace TeachingAssistant.Application.Services;
 
-/// <summary>
-/// The shape of the grading model's reply (a JSON Schema for structured output) and how the reply is read back: parsed
-/// into records, and every mistake's file and lines checked against the code that was actually sent, so the code viewer
-/// never points at a line that does not exist.
-/// </summary>
 internal static class GradingOutput
 {
     private static readonly string Severities = JsonSerializer.Serialize(Enum.GetNames<MistakeSeverity>());
     private static readonly string Categories = JsonSerializer.Serialize(Enum.GetNames<MistakeCategory>());
 
-    // Structured output needs additionalProperties: false on every object; nullable fields use anyOf with null.
     public static readonly string Schema =
         $$"""
         {
@@ -78,10 +72,6 @@ internal static class GradingOutput
         Converters = { new JsonStringEnumConverter() },
     };
 
-    /// <summary>
-    /// Reads the model's reply. codeLines maps every code file that was sent to its number of lines. A reply that is not
-    /// the expected JSON (structured output makes that rare) is shown as the review itself, with no score or mistakes.
-    /// </summary>
     public static ReadReply Read(string reply, IReadOnlyDictionary<string, int> codeLines)
     {
         Reply? parsed;
@@ -106,7 +96,6 @@ internal static class GradingOutput
         return new ReadReply(parsed.Review, parsed.Score, parsed.MaxScore, parsed.Bonus, mistakes);
     }
 
-    // Keeps the model's file and lines only where they exist in the code that was sent.
     private static CodeMistake Locate(ReplyMistake mistake, IReadOnlyDictionary<string, int> codeLines)
     {
         var file = ResolveFile(mistake.File, codeLines.Keys);
@@ -120,8 +109,6 @@ internal static class GradingOutput
         return new CodeMistake(file, start, end, mistake.Severity, mistake.Category, mistake.Message!.Trim());
     }
 
-    // The exact path, else the same path in another case, else the one file whose path ends with it (the model
-    // sometimes writes "Zoo.java" for "src/Zoo.java"). Null when nothing or more than one file matches.
     private static string? ResolveFile(string? path, IEnumerable<string> files)
     {
         if (string.IsNullOrWhiteSpace(path))
@@ -141,7 +128,6 @@ internal static class GradingOutput
         return bySuffix.Count == 1 ? bySuffix[0] : null;
     }
 
-    /// <summary>The model's answer as records: review text, score numbers and checked mistakes.</summary>
     public sealed record ReadReply(string Review, double? Score, double? MaxScore, double? Bonus, IReadOnlyList<CodeMistake> Mistakes);
 
     private sealed record Reply(string? Review, double? Score, double? MaxScore, double? Bonus, List<ReplyMistake>? Mistakes);

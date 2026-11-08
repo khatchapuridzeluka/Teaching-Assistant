@@ -9,33 +9,17 @@ using TeachingAssistant.Domain.Ingestion;
 
 namespace TeachingAssistant.Application.Services;
 
-/// <summary>
-/// Grades one stored version by reading: the assignment's instructions (as stored by the last fetch: the task statement
-/// and the files the teacher attached in Classroom) and the student's work go to the model in one message, and its
-/// review comes back as structured output: Markdown (score and feedback) plus a list of mistakes pointing at code lines.
-/// Nothing is read from the source here.
-/// PDFs and images are sent as files the model reads itself; Word documents are sent as their text.
-/// Instructions come first and the student's work last, so the shared part can be cached across a class later.
-/// The student's name is never sent.
-/// </summary>
 public class GradingService : IGradingService
 {
-    // Source files larger than this are not code a student wrote by hand (generated or data files).
     private const int MaxCodeFileBytes = 200_000;
 
-    // All code of one submission together: roughly 100k tokens, far above any homework.
     private const int MaxCodeChars = 400_000;
 
-    // Files the model reads itself (PDFs, images). The API takes 32 MB per request and files grow by a third as
-    // base64, so all files together stay well below that. Images have their own 5 MB limit at the API.
     private const long MaxFilesBytes = 20L * 1024 * 1024;
     private const long MaxImageBytes = 5L * 1024 * 1024;
 
-    // Images taken from one submission's archive. The API accepts many more; homework has a handful of drawings, and the
-    // cap keeps a folder of screenshots from crowding out the code.
     private const int MaxSubmissionImages = 20;
 
-    // Image files in the extracted code (drawings, diagrams, screenshots of output) the model can read, by extension.
     private static readonly Dictionary<string, string> ImageTypes = new(StringComparer.OrdinalIgnoreCase)
     {
         [".png"] = "image/png",
@@ -146,7 +130,6 @@ public class GradingService : IGradingService
 
         var version = submission.Versions.Single(v => v.Id == versionId);
 
-        // The instructions as stored by the last fetch: no calls to the source, and the same bytes for every student.
         var stored = await _instructionsStore.GetAsync(submission.Source, submission.AssignmentId, cancellationToken);
         if (stored?.LatestVersion is not { } instructions)
         {
@@ -157,7 +140,6 @@ public class GradingService : IGradingService
 
         var prompt = new Prompt();
 
-        // Shared by every student of the assignment: the task statement and the instruction files.
         AddInstructions(prompt, instructions);
         if (!prompt.HasInstructions)
         {
@@ -166,7 +148,6 @@ public class GradingService : IGradingService
                 "document, or write a task statement, then fetch again.");
         }
 
-        // This student's work.
         AddCode(prompt, version);
         AddStudentFiles(prompt, version);
         if (!prompt.HasStudentWork)
@@ -184,7 +165,6 @@ public class GradingService : IGradingService
         var reply = await _languageModel.GradeAsync(SystemPrompt, prompt.Parts, GradingOutput.Schema, cancellationToken);
         var read = GradingOutput.Read(reply.Text, prompt.CodeLines);
 
-        // Saved as a draft right away: the grading is paid for, and the teacher decides about it later.
         var grading = new AiGrading(versionId, reply.Model, read.Review, read.Score, read.MaxScore, read.Bonus,
             instructions.Number, prompt.Sent, prompt.Skipped, reply.Text,
             read.Mistakes.Select(m => new GradingMistake(m.File, m.StartLine, m.EndLine, m.Severity, m.Category, m.Message)),
@@ -194,8 +174,6 @@ public class GradingService : IGradingService
         return GradingDraftService.ToResponse(grading);
     }
 
-    // The stored task statement and instruction files. PDFs and images go as files; Word documents (how most
-    // instructions are written) as their text, read from the stored file.
     private void AddInstructions(Prompt prompt, InstructionsVersion instructions)
     {
         var task = new StringBuilder("<task>\n")
@@ -217,7 +195,6 @@ public class GradingService : IGradingService
         {
             if (content.StoredName is null)
             {
-                // Links and videos are recorded at fetch but never stored; too large files neither.
                 prompt.Skip(content.Status == ContentStatus.TooLarge
                     ? $"Instructions: '{content.Name}' (too large)"
                     : $"Instructions: '{content.Name}' (not a file the model can read)");
@@ -250,9 +227,6 @@ public class GradingService : IGradingService
         }
     }
 
-    // The extracted code as text, every file with its path and line numbers so the review can point at lines.
-    // Images in the extracted code (homework often asks for drawings, e.g. stack and heap diagrams) go as images right
-    // after the code, labelled with their path. Other binary files are skipped.
     private void AddCode(Prompt prompt, SubmissionVersion version)
     {
         var code = new StringBuilder();
@@ -289,7 +263,6 @@ public class GradingService : IGradingService
             var bytes = ReadAll(_storage.OpenCode(version.StoragePath, file.Path));
             if (bytes is null || IsBinary(bytes))
             {
-                // Other binary files in an archive (compiled leftovers, other formats) are not code.
                 prompt.Skip($"{file.Path} (not a text file)");
                 continue;
             }
@@ -327,8 +300,6 @@ public class GradingService : IGradingService
         }
     }
 
-    // Files the student attached besides code (reports, screenshots of output). Archives and source files are already
-    // in the code above; links and repositories have nothing stored yet and are reported as skipped.
     private void AddStudentFiles(Prompt prompt, SubmissionVersion version)
     {
         foreach (var content in version.Contents)
@@ -386,8 +357,6 @@ public class GradingService : IGradingService
         }
     }
 
-    // A Word document as its text, then the pictures embedded in it (often code screenshots), each labelled with the
-    // "[image N]" marker that shows where it sits in the text, so the model knows which picture belongs to which task.
     private static void AddDocument(Prompt prompt, string tag, string sentLabel, string name, ReadDocument document)
     {
         prompt.Text($"<{tag} name=\"{name}\">\n{document.Text}\n</{tag}>");
@@ -424,10 +393,8 @@ public class GradingService : IGradingService
         }
     }
 
-    // A zero byte in the first few KB means the file is not text.
     private static bool IsBinary(byte[] bytes) => Array.IndexOf(bytes, (byte)0, 0, Math.Min(bytes.Length, 8000)) >= 0;
 
-    // The message being built: parts in order, plus what was sent and skipped for the teacher.
     private sealed class Prompt
     {
         private long _fileBytes;
@@ -436,7 +403,6 @@ public class GradingService : IGradingService
         public List<string> Sent { get; } = [];
         public List<string> Skipped { get; } = [];
 
-        // Every code file sent, with its number of lines: the mistakes' files and lines are checked against it.
         public Dictionary<string, int> CodeLines { get; } = [];
 
         public bool HasInstructions { get; set; }
@@ -444,7 +410,6 @@ public class GradingService : IGradingService
 
         public void Text(string text) => Parts.Add(new TextPart(text));
 
-        // A short label first, so the model knows what each file is.
         public void File(string label, FilePart file)
         {
             Parts.Add(new TextPart(label));

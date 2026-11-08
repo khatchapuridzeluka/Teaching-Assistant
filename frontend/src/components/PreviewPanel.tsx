@@ -7,7 +7,6 @@ import { Button, Chip, type ChipTone } from "./ui";
 
 const docxMimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
-// By type or by extension: Drive sometimes reports a generic type (application/octet-stream) for uploaded files.
 const isPdf = (file: StoredFile) => file.mimeType === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
 const isDocx = (file: StoredFile) => file.mimeType === docxMimeType || file.name.toLowerCase().endsWith(".docx");
 
@@ -17,17 +16,12 @@ const versionChip: Record<string, { tone: ChipTone; label: string }> = {
   Failed: { tone: "ink", label: "Nothing stored" },
 };
 
-/**
- * Shows a stored submission from our own copy (not Google Drive): the extracted code in a viewer, images as a gallery,
- * PDFs (including exported Google Docs) and Word documents (.docx) inline, and everything else as a download.
- */
 export function PreviewPanel({
   submission,
   initialVersionId,
   onClose,
 }: {
   submission: StoredSubmission;
-  /** The version picked in the table; the newest one when not given. */
   initialVersionId?: string;
   onClose: () => void;
 }) {
@@ -35,7 +29,6 @@ export function PreviewPanel({
   const [enlarged, setEnlarged] = useState<StoredFile | null>(null);
   const version = submission.versions.find((v) => v.id === versionId) ?? submission.versions[0];
 
-  // Escape closes the enlarged image first, then the panel.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && (enlarged ? setEnlarged(null) : onClose());
     window.addEventListener("keydown", onKey);
@@ -55,7 +48,6 @@ export function PreviewPanel({
   const chip = versionChip[version.status];
 
   return (
-    // Full screen: the whole window is for reading the submission. Close or Escape returns to the table.
     <div className="fixed inset-0 z-40 flex">
       <aside className="flex h-full w-full flex-col bg-paper">
         <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-line bg-white px-4 py-3 sm:px-6 sm:py-4">

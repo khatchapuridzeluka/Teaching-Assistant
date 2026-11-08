@@ -4,10 +4,6 @@ using TeachingAssistant.Domain.Ingestion;
 
 namespace TeachingAssistant.Infrastructure.Persistence;
 
-/// <summary>
-/// <see cref="IInstructionsStore"/> on EF Core. Instructions are loaded with their whole version history, which is small
-/// and needed for change detection.
-/// </summary>
 public class InstructionsStore(AppDbContext db) : IInstructionsStore
 {
     public Task<AssignmentInstructions?> GetAsync(

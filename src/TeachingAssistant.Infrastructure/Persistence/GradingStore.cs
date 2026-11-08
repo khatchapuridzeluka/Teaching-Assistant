@@ -6,7 +6,6 @@ using TeachingAssistant.Domain.Ingestion;
 
 namespace TeachingAssistant.Infrastructure.Persistence;
 
-/// <summary><see cref="IGradingStore"/> on EF Core; gradings are always loaded with their mistakes.</summary>
 public class GradingStore(AppDbContext db) : IGradingStore
 {
     public async Task<IReadOnlyList<AiGrading>> GetByVersionsAsync(
@@ -23,8 +22,6 @@ public class GradingStore(AppDbContext db) : IGradingStore
             .Include(g => g.Mistakes)
             .SingleOrDefaultAsync(g => g.Id == gradingId, cancellationToken);
 
-    // gradings → submission_versions → submissions: the course, assignment and student live on the submission. The
-    // filters become WHERE clauses and the mistake counts subqueries, so only the list rows leave the database.
     public async Task<IReadOnlyList<GradingSummary>> GetSummariesAsync(
         SubmissionSource source, string courseId, string? assignmentId, string? studentId,
         CancellationToken cancellationToken = default)

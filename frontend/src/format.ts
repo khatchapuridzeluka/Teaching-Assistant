@@ -1,4 +1,3 @@
-// Dates come from the API in UTC; show them in the teacher's local time.
 export function formatDate(value: string | null | undefined): string {
   if (!value) {
     return "–";
@@ -11,7 +10,6 @@ export function formatDate(value: string | null | undefined): string {
   });
 }
 
-// The date alone, for compact places such as the version picker.
 export function formatDay(value: string | null | undefined): string {
   if (!value) {
     return "–";

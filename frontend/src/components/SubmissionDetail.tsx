@@ -7,7 +7,6 @@ import { formatDate, formatDay, initials } from "../format";
 import { CodeBrowser, type CodeFocus, severityColor } from "./CodeBrowser";
 import { Avatar, Button, Chip, type ChipTone, ErrorPanel, Spinner } from "./ui";
 
-// Classroom's states, shown with the chip styles from the design.
 export const stateChip: Record<string, { tone: ChipTone; label: string }> = {
   TURNED_IN: { tone: "tint", label: "Turned in" },
   RETURNED: { tone: "accent", label: "Returned" },
@@ -16,18 +15,10 @@ export const stateChip: Record<string, { tone: ChipTone; label: string }> = {
   NEW: { tone: "muted", label: "Not submitted" },
 };
 
-/** Whether the student has turned in work (returned work counts: it was turned in first). */
 export function hasWork(submission: Submission): boolean {
   return submission.state === "TURNED_IN" || submission.state === "RETURNED";
 }
 
-/**
- * The right side of the assignment page: one student's picked version with its files, the AI draft and the code.
- * Review and code sit side by side when there is room, and become two tabs when there is not (e.g. with the agent
- * panel open); a mistake picked in the review opens its line in the code. "Expand" gives the pane the whole window.
- * Display only: grading is started by onGrade (POST /versions/{id}/grade), which saves a draft; the current draft and
- * the earlier ones come from the API (useReview, useVersionGradings), and Discard throws one away.
- */
 export function SubmissionDetail({
   submission,
   stored,
@@ -40,7 +31,6 @@ export function SubmissionDetail({
   gradeDisabled,
   onBack,
 }: {
-  /** Back to the student list; the button only shows on phones, where the list and the student take turns. */
   onBack: () => void;
   submission: Submission;
   stored: StoredSubmission | undefined;
@@ -48,20 +38,16 @@ export function SubmissionDetail({
   onPickVersion: (versionId: string) => void;
   onPreview: () => void;
   onGrade: () => void;
-  /** This version is being graded right now. */
   grading: boolean;
   gradingError: unknown;
-  /** Another grading is running (one at a time). */
   gradeDisabled: boolean;
 }) {
-  // The saved drafts: the current one (newest not discarded) is shown; earlier ones can be picked from the history.
   const current = useReview(version?.id).data ?? undefined;
   const history = useVersionGradings(version?.id).data ?? [];
   const discard = useDiscardGrading();
   const [viewingId, setViewingId] = useState<string | null>(null);
   const review = (viewingId ? history.find((g) => g.id === viewingId) : undefined) ?? current;
 
-  // A new grading (or a discard) changes the current draft: show it.
   useEffect(() => {
     setViewingId(null);
   }, [current?.id]);
@@ -71,7 +57,6 @@ export function SubmissionDetail({
   const state = stateChip[submission.state] ?? { tone: "muted" as const, label: submission.state };
   const working = hasWork(submission);
 
-  // Escape leaves full screen.
   useEffect(() => {
     if (!expanded) {
       return;
@@ -91,7 +76,6 @@ export function SubmissionDetail({
   }
 
   return (
-    // A container: the layout follows this pane's own width (narrower while the agent panel is open).
     <section className={`@container flex min-h-0 min-w-0 flex-col ${expanded ? "fixed inset-0 z-40 bg-paper" : "flex-1"}`}>
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-white px-4 py-3 sm:px-5">
         {!expanded && (
@@ -152,7 +136,6 @@ export function SubmissionDetail({
         </div>
       ) : (
         <div className="flex min-h-0 flex-1 flex-col @4xl:flex-row">
-          {/* Narrow: two tabs. Wide: both columns, so a mistake and its line are visible together. */}
           <nav className="flex shrink-0 gap-1 border-b border-line bg-white px-4 sm:px-5 @4xl:hidden" aria-label="Review or code">
             {(["review", "code"] as const).map((key) => (
               <button
@@ -281,7 +264,6 @@ export function SubmissionDetail({
   );
 }
 
-/** The stored versions of one student, newest first; the picked one is what Preview and Grade use. */
 function VersionPicker({ stored, version, onPick }: { stored: StoredSubmission; version: StoredVersion; onPick: (versionId: string) => void }) {
   return (
     <select
@@ -307,7 +289,6 @@ const fileStatus: Record<StoredFile["status"], string> = {
   TooLarge: "Not stored · too large",
 };
 
-/** The version's attachments and what happened to each. */
 function FilesCard({ version }: { version: StoredVersion }) {
   return (
     <div className="rounded-[10px] border border-line bg-white">
@@ -343,7 +324,6 @@ function fileLabel(file: StoredFile): string {
   return extension && extension.length <= 4 ? extension : file.kind === "Image" ? "IMG" : "FILE";
 }
 
-/** The mistakes in the order the model found them; one with lines opens them in the code. */
 export function MistakeList({ mistakes, onShow }: { mistakes: CodeMistake[]; onShow: (file: string, line: number) => void }) {
   if (mistakes.length === 0) {
     return <div className="rounded-[10px] border border-line bg-white px-4 py-3 text-xs text-ink-muted">No mistakes found.</div>;

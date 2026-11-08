@@ -6,10 +6,6 @@ using TeachingAssistant.Application.Interfaces.Services;
 
 namespace TeachingAssistant.Infrastructure.Google;
 
-/// <summary>
-/// Local-development OAuth ("installed app" flow): the browser opens on the machine running the API,
-/// and the token is stored in a file. Replaced by a web redirect flow when deployed.
-/// </summary>
 public class GoogleConnectionService : IGoogleConnectionService
 {
     private static readonly TimeSpan ConnectTimeout = TimeSpan.FromMinutes(5);
@@ -44,7 +40,6 @@ public class GoogleConnectionService : IGoogleConnectionService
                 $"Missing scopes: {string.Join(", ", missing)}. Connect again and allow all requested access.");
         }
 
-        // A stored token can be dead (refresh tokens expire after ~7 days in Testing mode), so prove it works.
         try
         {
             var credential = new UserCredential(flow, GoogleAuthorization.UserKey, token);
@@ -67,7 +62,6 @@ public class GoogleConnectionService : IGoogleConnectionService
             return status;
         }
 
-        // The broker reuses any stored token without checking it, so drop a dead one first.
         await _authorization.TokenStore.DeleteAsync<TokenResponse>(GoogleAuthorization.UserKey);
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -79,7 +73,7 @@ public class GoogleConnectionService : IGoogleConnectionService
                 _authorization.ClientSecrets, GoogleAuthorization.Scopes, GoogleAuthorization.UserKey,
                 timeout.Token, _authorization.TokenStore);
 
-            _authorization.ResetCredential(); // API calls switch to the new token
+            _authorization.ResetCredential();
             _logger.LogInformation("Google account connected");
             return await GetStatusAsync(cancellationToken);
         }
@@ -115,23 +109,20 @@ public class GoogleConnectionService : IGoogleConnectionService
         }
         catch (TokenResponseException ex)
         {
-            // Already invalid at Google; still forget it locally.
             _logger.LogInformation("Google token was already invalid when revoking: {GoogleError}", ex.Error.Error);
         }
 
         await flow.DeleteTokenAsync(GoogleAuthorization.UserKey, cancellationToken);
-        _authorization.ResetCredential(); // API calls stop using the revoked token
+        _authorization.ResetCredential();
         _logger.LogInformation("Google account disconnected");
     }
 
-    // Google reports some granted scopes under an older alias of the name we requested.
     private static readonly Dictionary<string, string> ScopeAliases = new()
     {
         ["https://www.googleapis.com/auth/classroom.student-submissions.students.readonly"] =
             "https://www.googleapis.com/auth/classroom.coursework.students.readonly",
     };
 
-    // The granted scopes under the names we request, so they can be compared with GoogleAuthorization.Scopes.
     private static List<string> GrantedScopes(TokenResponse token) =>
         (token.Scope ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries)
             .Select(scope => ScopeAliases.GetValueOrDefault(scope, scope))

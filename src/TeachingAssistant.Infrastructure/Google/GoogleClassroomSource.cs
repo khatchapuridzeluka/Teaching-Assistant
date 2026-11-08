@@ -10,18 +10,12 @@ using TeachingAssistant.Domain.Grading;
 
 namespace TeachingAssistant.Infrastructure.Google;
 
-/// <summary>
-/// <see cref="ISubmissionSource"/> backed by the Google Classroom API, using the teacher's stored token.
-/// Translates Google errors into submission-source exceptions.
-/// </summary>
 public class GoogleClassroomSource : ISubmissionSource
 {
     private const string ServiceName = "Google Classroom";
 
-    // Items per page; Google may return fewer, so paging always follows the next-page token.
     private const int PageSize = 100;
 
-    // Classroom's course work ID for "all assignments of the course" when listing submissions.
     private const string AllCourseWork = "-";
 
     private readonly GoogleAuthorization _authorization;
@@ -37,7 +31,7 @@ public class GoogleClassroomSource : ISubmissionSource
         var classroom = await GetClassroomAsync(cancellationToken);
 
         var request = classroom.Courses.List();
-        request.TeacherId = "me"; // only courses the teacher teaches, not ones they're enrolled in
+        request.TeacherId = "me";
         request.PageSize = PageSize;
 
         var courses = await FetchAllAsync(request, (r, token) => r.PageToken = token,
@@ -58,7 +52,6 @@ public class GoogleClassroomSource : ISubmissionSource
     {
         var classroom = await GetClassroomAsync(cancellationToken);
 
-        // Without a state filter Classroom returns published work only, which is what students can submit to.
         var request = classroom.Courses.CourseWork.List(courseId);
         request.PageSize = PageSize;
 
@@ -82,8 +75,6 @@ public class GoogleClassroomSource : ISubmissionSource
         w.Id, w.CourseId, w.Title, w.Description, w.WorkType, w.MaxPoints,
         DueAt(w.DueDate, w.DueTime), w.CreationTimeDateTimeOffset, w.AlternateLink, Materials(w));
 
-    // The teacher's attachments on the assignment (instructions, grading scheme). Drive files are wrapped in a
-    // SharedDriveFile here, unlike student attachments.
     private static List<SubmissionAttachment> Materials(CourseWork courseWork) =>
         (courseWork.Materials ?? []).Select(m => m switch
         {
@@ -97,8 +88,6 @@ public class GoogleClassroomSource : ISubmissionSource
     {
         var classroom = await GetClassroomAsync(cancellationToken);
 
-        // Submissions only carry a user ID; names come from the course roster. The two lists do not depend on each
-        // other, so both requests run at the same time.
         var namesCall = GetStudentNamesAsync(classroom, courseId, cancellationToken);
 
         var submissionsCall = ListSubmissionsAsync(classroom, courseId, assignmentId, cancellationToken);
@@ -113,8 +102,6 @@ public class GoogleClassroomSource : ISubmissionSource
     {
         var classroom = await GetClassroomAsync(cancellationToken);
 
-        // "-" as the course work ID asks for every assignment of the course in one list: a class of 15 students with
-        // 5 assignments is one page.
         var namesCall = GetStudentNamesAsync(classroom, courseId, cancellationToken);
         var submissionsCall = ListSubmissionsAsync(classroom, courseId, AllCourseWork, cancellationToken);
 
@@ -138,8 +125,6 @@ public class GoogleClassroomSource : ISubmissionSource
             .ToList();
     }
 
-    // Classroom's photo URL in a fixed small size, or null for none and for Google's default picture. Photos need the
-    // classroom.profile.photos scope; without it the URL is simply missing.
     private static string? PhotoUrl(string? url)
     {
         if (string.IsNullOrWhiteSpace(url) || url.Contains("default-user", StringComparison.OrdinalIgnoreCase))
@@ -149,8 +134,6 @@ public class GoogleClassroomSource : ISubmissionSource
 
         var absolute = url.StartsWith("//", StringComparison.Ordinal) ? "https:" + url : url;
 
-        // Newer photo URLs (…/a/ACg8oc…) take a size option at the end (=s100, =s96-c): ask for 128 pixels. Older ones end
-        // in a file name (…/photo.jpg) where an appended option breaks the link, so they are used as given.
         const string sizeOption = "=s\\d+(-[a-z]+)?$";
         if (System.Text.RegularExpressions.Regex.IsMatch(absolute, sizeOption))
         {
@@ -175,7 +158,6 @@ public class GoogleClassroomSource : ISubmissionSource
         s.Id, s.CourseWorkId, s.UserId, names.GetValueOrDefault(s.UserId, "Unknown student"), s.State, s.Late ?? false,
         LastTurnedInAt(s), s.UpdateTimeDateTimeOffset, Attachments(s), s.AlternateLink, s.AssignedGrade, GradeHistory(s));
 
-    // Every grade change Classroom recorded, oldest first. Grades are only read here; this app never writes them.
     private static List<GradeChange> GradeHistory(StudentSubmission submission) =>
         (submission.SubmissionHistory ?? [])
             .Select(h => h.GradeHistory)
@@ -204,13 +186,6 @@ public class GoogleClassroomSource : ISubmissionSource
         return students.ToDictionary(s => s.UserId, s => s.Profile?.Name?.FullName ?? s.UserId);
     }
 
-    /// <summary>
-    /// Runs a Classroom list request page by page until there is no next page, and returns all items.
-    /// Classroom never returns a whole list at once: each page ends with a token that asks for the next one.
-    /// </summary>
-    /// <param name="request">The first request, with filters and page size already set.</param>
-    /// <param name="setPageToken">Puts the next page's token on the request (each request type has its own PageToken property).</param>
-    /// <param name="readPage">Takes the items and the next page's token out of one response.</param>
     private static Task<IList<TItem>> FetchAllAsync<TRequest, TResponse, TItem>(
         TRequest request,
         Action<TRequest, string?> setPageToken,
@@ -220,13 +195,12 @@ public class GoogleClassroomSource : ISubmissionSource
     {
         var streamer = new PageStreamer<TItem, TRequest, TResponse, string?>(
             setPageToken,
-            page => readPage(page).NextPageToken is { Length: > 0 } token ? token : null, // empty token = last page
+            page => readPage(page).NextPageToken is { Length: > 0 } token ? token : null,
             page => readPage(page).Items ?? []);
 
         return GoogleErrors.TranslateAsync(ServiceName, () => streamer.FetchAllAsync(request, cancellationToken));
     }
 
-    // The latest turn-in from the history; every resubmission adds a new TURNED_IN entry.
     private static DateTimeOffset? LastTurnedInAt(StudentSubmission submission) =>
         (submission.SubmissionHistory ?? [])
             .Select(h => h.StateHistory)
@@ -242,14 +216,11 @@ public class GoogleClassroomSource : ISubmissionSource
                 a.YouTubeVideo?.Title ?? a.Form?.Title ?? "Unsupported attachment", null, null),
         }).ToList();
 
-    // Classroom splits the deadline into a date and a time of day, both in UTC.
     private static DateTimeOffset? DueAt(Date? date, TimeOfDay? time) =>
         date is { Year: { } year, Month: { } month, Day: { } day }
             ? new DateTimeOffset(year, month, day, time?.Hours ?? 0, time?.Minutes ?? 0, 0, TimeSpan.Zero)
             : null;
 
-    // One client for all calls, so connections to Google stay open instead of a new handshake per request.
-    // Rebuilt only when the shared credential changes (after connect/disconnect).
     private async Task<ClassroomService> GetClassroomAsync(CancellationToken cancellationToken)
     {
         var credential = await _authorization.GetCredentialAsync(cancellationToken);

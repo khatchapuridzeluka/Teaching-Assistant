@@ -11,11 +11,6 @@ const suggestions = [
   "Write short feedback for a student who made all fields public",
 ];
 
-/**
- * The "Ask agent" chat docked on the right. Each question is sent with the conversation so far and the page you are on,
- * so the agent remembers earlier messages. The conversation lasts until "New chat" or until the tab is closed
- * (see useChatHistory). No tools yet.
- */
 export function ChatPanel({ page, onClose }: { page: string | null; onClose: () => void }) {
   const { turns, add, clear } = useChatHistory();
   const [input, setInput] = useState("");
@@ -23,7 +18,6 @@ export function ChatPanel({ page, onClose }: { page: string | null; onClose: () 
   const abort = useRef<AbortController | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
 
-  // Block body on purpose: an effect may only return a cleanup function, and newer browsers return a Promise here.
   useEffect(() => {
     bottom.current?.scrollIntoView({ block: "end" });
   }, [turns, waiting]);
@@ -35,8 +29,6 @@ export function ChatPanel({ page, onClose }: { page: string | null; onClose: () 
     }
 
     const prompt = { role: "User" as const, text: question };
-    // Everything said so far, without error notices: those are messages from the app, not from the agent.
-    // The API trims a long history itself, so the whole conversation is sent.
     const history = turns.filter((turn) => !turn.error).map(({ role, text }) => ({ role, text }));
     add(prompt);
     setInput("");
@@ -99,7 +91,6 @@ export function ChatPanel({ page, onClose }: { page: string | null; onClose: () 
                   {turn.text}
                 </div>
               ) : (
-                // The agent speaks with the app's mark beside its reply; errors keep their ink border to stand out.
                 <div key={i} className="flex min-w-0 items-start gap-2">
                   <AgentMark size="mt-0.5 h-6 w-6" />
                   <div
@@ -138,7 +129,6 @@ export function ChatPanel({ page, onClose }: { page: string | null; onClose: () 
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
-              // Enter sends; Shift+Enter adds a new line.
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
                 send(input);
@@ -164,10 +154,6 @@ export function ChatPanel({ page, onClose }: { page: string | null; onClose: () 
   );
 }
 
-/**
- * The agent's own mark: the "TA" monogram. The app's checked-code mark stays for the tab and the sidebar, so the agent
- * is told apart from the app around it.
- */
 function AgentMark({ size, text = "text-[10px]" }: { size: string; text?: string }) {
   return (
     <span

@@ -5,10 +5,6 @@ using TeachingAssistant.Domain.Profiling;
 
 namespace TeachingAssistant.Infrastructure.Persistence;
 
-/// <summary>
-/// EF Core context for the app's own data in Postgres. Entities are the Domain classes;
-/// how they map to tables lives in Configurations/, so Domain stays free of EF.
-/// </summary>
 public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
     public DbSet<Submission> Submissions => Set<Submission>();

@@ -7,22 +7,12 @@ using TeachingAssistant.Application.Models;
 
 namespace TeachingAssistant.Infrastructure.Documents;
 
-/// <summary>
-/// <see cref="IDocumentReader"/> for Word .docx files. A .docx is a zip: word/document.xml holds the text, and pictures
-/// are files under word/media/ that the text points to through word/_rels/document.xml.rels. This reads both with the
-/// framework's zip and XML classes, no Office library. Formatting is dropped, but paragraphs, list items and tables keep
-/// their structure as plain text, and each picture (often a code screenshot) is marked where it appears.
-/// Files can come from students, so the XML is read without DTDs, sizes are limited by the bytes actually read, and only
-/// pictures inside the file are used, never linked external ones.
-/// </summary>
 public class WordDocumentReader : IDocumentReader
 {
     private const string DocxMediaType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
-    // Characters read from one XML part at most: far above any homework text, small enough to stop a zip bomb.
     private const long MaxXmlCharacters = 20_000_000;
 
-    // The model's limit per image, and a cap on pictures per document (a handful of screenshots in practice).
     private const int MaxImageBytes = 5 * 1024 * 1024;
     private const int MaxImages = 30;
 
@@ -33,7 +23,6 @@ public class WordDocumentReader : IDocumentReader
     private static readonly XNamespace Mc = "http://schemas.openxmlformats.org/markup-compatibility/2006";
     private static readonly XNamespace Rels = "http://schemas.openxmlformats.org/package/2006/relationships";
 
-    // Picture formats the model can read. Others (emf, wmf, tiff) are marked as unreadable in the text.
     private static readonly Dictionary<string, string> ImageTypes = new(StringComparer.OrdinalIgnoreCase)
     {
         [".png"] = "image/png",
@@ -75,7 +64,7 @@ public class WordDocumentReader : IDocumentReader
         }
         catch (Exception ex) when (ex is InvalidDataException or XmlException)
         {
-            return null; // not a zip, or broken XML: not a readable .docx
+            return null;
         }
     }
 
@@ -96,7 +85,6 @@ public class WordDocumentReader : IDocumentReader
         return XDocument.Load(reader);
     }
 
-    // Relationship ID -> path of the picture inside the zip, for pictures stored in the file (not linked from outside).
     private static Dictionary<string, string> ImageTargets(ZipArchive zip)
     {
         var targets = new Dictionary<string, string>();
@@ -117,7 +105,6 @@ public class WordDocumentReader : IDocumentReader
         return targets;
     }
 
-    // Targets are relative to word/ ("media/image1.png"), or absolute within the zip ("/word/media/image1.png").
     private static string ZipPath(string target)
     {
         var path = target.StartsWith('/') ? target.TrimStart('/') : "word/" + target;
@@ -140,10 +127,8 @@ public class WordDocumentReader : IDocumentReader
         return string.Join('/', segments);
     }
 
-    // Walks the document in reading order, writing its text and collecting its pictures as they appear.
     private sealed class Walker(ZipArchive zip, Dictionary<string, string> imageTargets)
     {
-        // The same picture used twice gets the same number and is sent once.
         private readonly Dictionary<string, int> _numbers = [];
 
         public StringBuilder Text { get; } = new();
@@ -154,7 +139,6 @@ public class WordDocumentReader : IDocumentReader
             var text = new StringBuilder();
             foreach (var node in paragraph.Descendants())
             {
-                // Word stores an old-style copy of new content for old readers; reading both would repeat it.
                 if (node.Ancestors(Mc + "Fallback").Any())
                 {
                     continue;
@@ -182,7 +166,6 @@ public class WordDocumentReader : IDocumentReader
                 }
             }
 
-            // List items (bullets or numbering) keep a marker, so requirement lists stay readable.
             var isListItem = paragraph.Element(W + "pPr")?.Element(W + "numPr") is not null;
             return isListItem ? "- " + text : text.ToString();
         }
@@ -197,7 +180,6 @@ public class WordDocumentReader : IDocumentReader
             }
         }
 
-        // The marker for a picture in the text; the picture itself is added to Images when the model can read it.
         private string Image(string relationshipId)
         {
             if (_numbers.TryGetValue(relationshipId, out var known))
@@ -207,7 +189,7 @@ public class WordDocumentReader : IDocumentReader
 
             if (!imageTargets.TryGetValue(relationshipId, out var path) || zip.GetEntry(path) is not { } entry)
             {
-                return ""; // a linked or missing picture: nothing to show
+                return "";
             }
 
             if (!ImageTypes.TryGetValue(Path.GetExtension(path), out var mediaType))
@@ -231,7 +213,6 @@ public class WordDocumentReader : IDocumentReader
             return $"[image {Images.Count}]";
         }
 
-        // Reads at most MaxImageBytes, whatever size the zip claims; null when the picture is larger.
         private static byte[]? ReadLimited(ZipArchiveEntry entry)
         {
             using var stream = entry.Open();

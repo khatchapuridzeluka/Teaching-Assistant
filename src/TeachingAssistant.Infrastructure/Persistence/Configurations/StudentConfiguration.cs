@@ -12,7 +12,6 @@ public class StudentConfiguration : IEntityTypeConfiguration<Student>
         builder.Property(s => s.Id).ValueGeneratedNever();
         builder.Property(s => s.Source).HasConversion<string>();
 
-        // One record per person in the source, so a re-sync finds them instead of duplicating them.
         builder.HasIndex(s => new { s.Source, s.ExternalUserId }).IsUnique();
 
         builder.HasMany(s => s.Enrollments)
@@ -30,7 +29,6 @@ public class EnrollmentConfiguration : IEntityTypeConfiguration<Enrollment>
         builder.HasKey(e => e.Id);
         builder.Property(e => e.Id).ValueGeneratedNever();
 
-        // A student is in a course once.
         builder.HasIndex(e => new { e.StudentId, e.CourseId }).IsUnique();
         builder.HasIndex(e => e.CourseId);
     }

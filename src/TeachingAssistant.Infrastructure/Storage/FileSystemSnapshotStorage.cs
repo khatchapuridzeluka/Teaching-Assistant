@@ -4,15 +4,8 @@ using TeachingAssistant.Application.Models;
 
 namespace TeachingAssistant.Infrastructure.Storage;
 
-/// <summary>
-/// <see cref="ISnapshotStorage"/> on the local disk. Layout, readable when browsing:
-/// {Root}/submissions/{course}/{assignment}/{student} ({id})/v{n}/original/ (as downloaded) and code/ (extracted).
-/// Each version is written into {Root}/tmp/ first and moved into place on commit, so a crash or failed download
-/// never leaves a half-written version folder.
-/// </summary>
 public class FileSystemSnapshotStorage(IOptions<StorageOptions> options) : ISnapshotStorage
 {
-    // Characters of the student ID kept in the folder name; enough to tell same-named students apart.
     private const int StudentIdSuffixLength = 6;
 
     private const string OriginalFolder = "original";
@@ -42,7 +35,6 @@ public class FileSystemSnapshotStorage(IOptions<StorageOptions> options) : ISnap
 
     public Stream? OpenOriginal(string versionPath, string storedName)
     {
-        // The arguments come from our database, but check anyway: never serve anything outside the storage root.
         var path = OriginalPath(versionPath, storedName);
         if (path is null || !File.Exists(path))
         {
@@ -62,7 +54,6 @@ public class FileSystemSnapshotStorage(IOptions<StorageOptions> options) : ISnap
                    ?? throw new ArgumentException($"'{storedName}' is outside the storage root.", nameof(storedName));
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
 
-        // Written beside the target and moved over it when complete, so a failed download never leaves half a file.
         var temp = $"{path}.{Guid.NewGuid():N}.part";
         try
         {
@@ -82,7 +73,6 @@ public class FileSystemSnapshotStorage(IOptions<StorageOptions> options) : ISnap
         }
     }
 
-    // The full path of a stored original, or null when the arguments would point outside the storage root.
     private string? OriginalPath(string versionPath, string storedName)
     {
         var root = Path.GetFullPath(_root);
@@ -99,7 +89,6 @@ public class FileSystemSnapshotStorage(IOptions<StorageOptions> options) : ISnap
 
         try
         {
-            // Build the new code/ beside the old one and swap at the end, so a failure leaves the old code in place.
             var result = CodeExtractor.Extract(Path.Combine(versionDirectory, OriginalFolder), staging, files, cancellationToken);
             if (Directory.Exists(codeDirectory))
             {
@@ -126,7 +115,6 @@ public class FileSystemSnapshotStorage(IOptions<StorageOptions> options) : ISnap
         var codeDirectory = Path.GetFullPath(Path.Combine(_root, versionPath, CodeFolder));
         var path = Path.GetFullPath(Path.Combine(codeDirectory, relativePath));
 
-        // relativePath comes from the browser: only ever serve files inside this version's code/ folder.
         if (!path.StartsWith(codeDirectory + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) || !File.Exists(path))
         {
             return null;
@@ -135,12 +123,9 @@ public class FileSystemSnapshotStorage(IOptions<StorageOptions> options) : ISnap
         return new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 81920, useAsync: true);
     }
 
-    // Keeps names readable (including Georgian letters) but removes anything that is not valid in a file or folder
-    // name or could point outside the folder ("..", slashes).
     private static string SafeName(string name)
     {
         var invalid = Path.GetInvalidFileNameChars();
-        // Slashes are replaced (not cut off), so "OOP / Patterns" stays one readable folder name.
         var cleaned = new string(name
                 .Select(c => invalid.Contains(c) || c is '/' or '\\' || char.IsControl(c) ? '_' : c).ToArray())
             .Trim().Trim('.');
@@ -174,8 +159,6 @@ public class FileSystemSnapshotStorage(IOptions<StorageOptions> options) : ISnap
 
         public Task CommitAsync(CancellationToken cancellationToken = default)
         {
-            // A folder already at the final path is left over from a fetch whose database save failed
-            // (no version row points to it), so it is safe to replace.
             if (Directory.Exists(finalPath))
             {
                 Directory.Delete(finalPath, recursive: true);
@@ -197,8 +180,6 @@ public class FileSystemSnapshotStorage(IOptions<StorageOptions> options) : ISnap
             return ValueTask.CompletedTask;
         }
 
-        // Two attachments with the same name both get stored: "report.pdf", then "report (2).pdf".
-        // Locked because a version's files are downloaded in parallel.
         private string UniqueName(string name)
         {
             lock (_names)

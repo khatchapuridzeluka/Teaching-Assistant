@@ -5,10 +5,6 @@ using TeachingAssistant.Domain.Ingestion;
 
 namespace TeachingAssistant.Infrastructure.Persistence;
 
-/// <summary>
-/// <see cref="ISubmissionStore"/> on EF Core. Submissions are loaded with their whole version history,
-/// which is small (a few versions per student) and needed for change detection.
-/// </summary>
 public class SubmissionStore(AppDbContext db) : ISubmissionStore
 {
     public async Task<IReadOnlyList<Submission>> GetByAssignmentAsync(

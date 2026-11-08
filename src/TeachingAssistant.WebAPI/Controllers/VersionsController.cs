@@ -9,7 +9,6 @@ namespace TeachingAssistant.WebAPI.Controllers;
 [Route("versions/{versionId:guid}")]
 public class VersionsController : ControllerBase
 {
-    // Source code has no registered type; serve it as UTF-8 text so the browser and the code viewer read it correctly.
     private const string TextContentType = "text/plain; charset=utf-8";
 
     private static readonly FileExtensionContentTypeProvider ContentTypes = new();
@@ -52,8 +51,6 @@ public class VersionsController : ControllerBase
         return File(stream, ContentTypeFor(path));
     }
 
-    // Images, PDFs and the like keep their type; everything else (source code, unknown or "binary" defaults such as
-    // the built-in table's application/octet-stream for .java) is served as text.
     private static string ContentTypeFor(string path)
     {
         return ContentTypes.TryGetContentType(path, out var known)

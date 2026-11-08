@@ -4,7 +4,6 @@ using TeachingAssistant.Domain.Ingestion;
 
 namespace TeachingAssistant.Application.Services;
 
-/// <summary>Copies what the source reports about a submission (state, late, grade and its history) onto ours.</summary>
 internal static class SubmissionStatus
 {
     public static void Record(Submission submission, SubmissionResponse item, DateTimeOffset syncedAt)

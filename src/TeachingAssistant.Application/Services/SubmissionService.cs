@@ -4,7 +4,6 @@ using TeachingAssistant.Application.Interfaces.Services;
 
 namespace TeachingAssistant.Application.Services;
 
-// Pass-through for now; later it adds snapshots, version detection and grading status from our own database.
 public class SubmissionService : ISubmissionService
 {
     private readonly ISubmissionSource _submissionSource;

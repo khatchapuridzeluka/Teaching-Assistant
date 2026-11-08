@@ -16,12 +16,6 @@ import { hasWork, stateChip, SubmissionDetail } from "../components/SubmissionDe
 import { Avatar, Button, Card, Chip, ErrorPanel, PageHeader, Spinner } from "../components/ui";
 import { formatDate, formatDay, initials } from "../format";
 
-/**
- * GET …/submissions, GET …/submissions/stored, POST …/submissions/fetch and POST /versions/{id}/grade.
- * The teacher's workspace for one assignment: counts at the top, the instructions in one row, then the students on the
- * left and the selected student's submission (files, AI draft, code) on the right. The page fills the window, so each
- * pane scrolls on its own.
- */
 export function AssignmentPage() {
   const { courseId = "", assignmentId = "" } = useParams();
   const assignment = useAssignments(courseId).data?.find((a) => a.id === assignmentId);
@@ -34,22 +28,16 @@ export function AssignmentPage() {
   const [sort, setSort] = useState<SortOption>("status");
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
-  // The version picked per student (by stored submission ID); the newest one when nothing is picked.
   const [pickedVersions, setPickedVersions] = useState<Record<string, string>>({});
-  // The selected student lives in the URL (?student=), so a refresh or the back button keeps it.
   const [searchParams, setSearchParams] = useSearchParams();
-  // On a phone the list and the student take turns: picking a student shows them, "Students" goes back.
   const [showDetail, setShowDetail] = useState(false);
-  // The version being graded right now, if any: one grading at a time.
   const gradingVersionId = grade.isPending ? grade.variables : undefined;
 
-  // Stored copies are matched to the live list by the Classroom submission ID.
   const storedById = new Map(stored.data?.map((s) => [s.externalSubmissionId, s]));
   const pickedVersion = (s: StoredSubmission | undefined) => s?.versions.find((v) => v.id === pickedVersions[s.id]) ?? s?.versions[0];
 
   const all = submissions.data ?? [];
   const versionOf = new Map(all.map((s) => [s.id, pickedVersion(storedById.get(s.id))]));
-  // Saved drafts: the current one of each version (newest not discarded), for the list and the counts.
   const gradings = useAssignmentGradings(courseId, assignmentId);
   const reviews = new Map((gradings.data ?? []).filter((g) => g.current).map((g) => [g.versionId, g]));
   const [draftsOpen, setDraftsOpen] = useState(false);
@@ -66,7 +54,6 @@ export function AssignmentPage() {
     sortOptions[sort],
   );
 
-  // The selected student, even when the filter hides them; otherwise the first student in the list.
   const selected = all.find((s) => s.id === searchParams.get("student")) ?? rows[0];
   const selectedStored = selected && storedById.get(selected.id);
   const selectedVersion = selected && versionOf.get(selected.id);
@@ -86,8 +73,6 @@ export function AssignmentPage() {
   const pastDue = assignment?.dueAt != null && new Date(assignment.dueAt).getTime() < Date.now();
 
   return (
-    // Wide screens: the whole main area (window height minus the top bar and the page padding), only the panes scroll.
-    // Narrow screens: the page scrolls, and the workspace below the header is one screen tall.
     <div className="flex flex-col gap-3 lg:h-[calc(100dvh-112px)] lg:min-h-[640px]">
       <PageHeader
         title={assignment?.title ?? "Assignment"}
@@ -173,7 +158,6 @@ export function AssignmentPage() {
           {selected ? (
             <div className={`min-w-0 flex-1 ${showDetail ? "flex" : "hidden @2xl/workspace:flex"}`}>
             <SubmissionDetail
-              // A different student or version starts with a fresh review/code state.
               key={selectedVersion?.id ?? selected.id}
               onBack={() => setShowDetail(false)}
               submission={selected}
@@ -183,7 +167,6 @@ export function AssignmentPage() {
               onPreview={() => selectedStored && selectedVersion && setPreviewing({ submission: selectedStored, versionId: selectedVersion.id })}
               onGrade={() => selectedVersion && grade.mutate(selectedVersion.id)}
               grading={selectedVersion !== undefined && gradingVersionId === selectedVersion.id}
-              // Only this version's failure; a failed grading of another student is not shown here.
               gradingError={grade.isError && grade.variables === selectedVersion?.id ? grade.error : null}
               gradeDisabled={grade.isPending}
             />
@@ -201,7 +184,6 @@ export function AssignmentPage() {
         <DraftsModal
           drafts={gradings.data}
           onOpen={(draft) => {
-            // Open the student on the graded version; the workspace then shows that version's current draft.
             const student = all.find((s) => s.id === draft.submissionId);
             const storedSubmission = student && storedById.get(student.id);
             if (student && storedSubmission) {
@@ -219,7 +201,6 @@ export function AssignmentPage() {
 
 function Stat({ label, value, note }: { label: string; value: ReactNode; note: string }) {
   return (
-    // Two per row on phones (dividers between the columns and above the second row), four per row from md.
     <div className="min-w-0 border-line px-3 py-2.5 even:border-l [&:nth-child(n+3)]:border-t sm:px-4 md:[&:nth-child(n+3)]:border-t-0 md:[&:not(:first-child)]:border-l">
       <div className="text-xs text-ink-muted">{label}</div>
       <div className="flex items-baseline gap-2">
@@ -229,8 +210,6 @@ function Stat({ label, value, note }: { label: string; value: ReactNode; note: s
     </div>
   );
 }
-
-// ——— The student list ———
 
 type SortKey = "student" | "status" | "turnedIn";
 type Sort = { key: SortKey; descending: boolean };
@@ -244,18 +223,12 @@ const sortOptions: Record<SortOption, Sort> = {
 };
 const sortLabels: Record<SortOption, string> = { status: "Status", newest: "Newest first", oldest: "Oldest first", name: "Name" };
 
-// Returned work first, then work waiting for grading, then reclaimed; students with nothing turned in are always last
-// (see sortSubmissions).
 const statusRank: Record<string, number> = { RETURNED: 0, TURNED_IN: 1, RECLAIMED_BY_STUDENT: 2 };
 
 function time(value: string | null | undefined): number {
   return value ? new Date(value).getTime() : 0;
 }
 
-/**
- * Sorts by the chosen key; ties go to the turn-in date (newest first), then the name. Students without turned-in work
- * stay at the bottom in either direction, so they never mix with the work to grade.
- */
 function sortSubmissions(list: Submission[], sort: Sort): Submission[] {
   const direction = sort.descending ? -1 : 1;
   const byName = (a: Submission, b: Submission) => a.studentName.localeCompare(b.studentName);
@@ -301,7 +274,6 @@ function StudentList({
   storedById,
   gradingVersionId,
 }: {
-  /** On a phone, while a student is shown instead of the list. */
   hidden: boolean;
   rows: Submission[];
   counts: Record<Filter, number>;
@@ -318,7 +290,6 @@ function StudentList({
   storedById: Map<string, StoredSubmission>;
   gradingVersionId: string | undefined;
 }) {
-  // Up and down arrows move through the list, so grading a class is click, read, arrow down.
   function onKeyDown(e: KeyboardEvent<HTMLUListElement>) {
     if (e.key !== "ArrowDown" && e.key !== "ArrowUp") {
       return;
@@ -333,8 +304,6 @@ function StudentList({
   }
 
   return (
-    // Widths follow the workspace card, not the window, so the list gives room to the code when the agent is open.
-    // On a phone the list is the whole card.
     <aside
       className={`w-full shrink-0 flex-col bg-white @2xl/workspace:flex @2xl/workspace:w-[260px] @2xl/workspace:border-r @2xl/workspace:border-line @4xl/workspace:w-[300px] @7xl/workspace:w-[340px] ${
         hidden ? "hidden" : "flex"
@@ -395,7 +364,6 @@ function StudentList({
             return (
               <li
                 key={submission.id}
-                // A thicker divider where the students without turned-in work begin.
                 className={`border-b border-paper-dark ${!working && previous && hasWork(previous) ? "border-t-2 border-t-line" : ""}`}
               >
                 <button
@@ -439,8 +407,6 @@ function StudentList({
     </aside>
   );
 }
-
-// ——— Results of Fetch and Re-extract: one compact row, problems on demand ———
 
 function Banner({ children }: { children: ReactNode }) {
   return <div className="shrink-0 rounded-[10px] border border-line bg-white px-4 py-2.5 text-xs">{children}</div>;
@@ -506,8 +472,6 @@ function ResultBanner({ title, text, problems, onDismiss }: { title: string; tex
   );
 }
 
-// ——— Saved AI drafts ———
-
 function points(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
@@ -516,7 +480,6 @@ function mistakeCount(draft: AssignmentGrading): number {
   return draft.major + draft.minor + draft.style;
 }
 
-/** Every saved AI draft of the assignment. Current = the newest draft of its version, the one the workspace shows. */
 function DraftsModal({
   drafts,
   onOpen,

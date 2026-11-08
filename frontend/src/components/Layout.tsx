@@ -5,7 +5,6 @@ import { coursePath, courseSections, workspaceSections } from "../navigation";
 import { ChatPanel } from "./ChatPanel";
 import { Button } from "./ui";
 
-// Pages describe their breadcrumb via route handles; the top bar shows them.
 export type Crumb = { label: ReactNode; to?: string };
 export type CrumbHandle = { crumbs: (params: Record<string, string | undefined>) => Crumb[] };
 
@@ -20,14 +19,12 @@ export function Layout() {
   const page = usePageDescription();
   const location = useLocation();
 
-  // The drawer closes once a link in it was followed.
   useEffect(() => {
     setNavOpen(false);
   }, [location.pathname]);
 
   return (
     <div className="flex h-dvh overflow-hidden">
-      {/* Wide screens: the sidebar is always there. Narrow: it opens as a drawer from the menu button. */}
       <Sidebar className="hidden lg:flex" />
       {navOpen && (
         <div className="fixed inset-0 z-50 flex lg:hidden">
@@ -38,14 +35,11 @@ export function Layout() {
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar chatOpen={chatOpen} onToggleChat={() => setChatOpen(!chatOpen)} onOpenNav={() => setNavOpen(true)} />
         <main className="flex-1 overflow-y-auto px-4 py-4 lg:px-7 lg:py-6">
-          {/* Full width: tables and code need the room, and the agent panel narrows the page instead of covering it. */}
           <div className="flex flex-col gap-[18px]">
             <Outlet />
           </div>
         </main>
       </div>
-      {/* Hidden rather than removed when closed, so the conversation survives closing and navigating. On wide screens
-          it narrows the page; on narrower ones it slides over it, and the backdrop closes it. */}
       <div
         className={chatOpen ? "fixed inset-0 z-50 flex justify-end bg-ink/40 xl:static xl:z-auto xl:bg-transparent" : "hidden"}
         onClick={(e) => e.target === e.currentTarget && setChatOpen(false)}
@@ -56,7 +50,6 @@ export function Layout() {
   );
 }
 
-// Where the teacher is, in words, for the agent: course and assignment names only, never student data.
 function usePageDescription(): string | null {
   const matches = useMatches();
   const { courseId = "", assignmentId = "" } = (matches[matches.length - 1]?.params ?? {}) as Record<string, string | undefined>;
@@ -72,7 +65,6 @@ function usePageDescription(): string | null {
   return null;
 }
 
-// A course's sections, nested under the course in the sidebar.
 const sectionClass = ({ isActive }: { isActive: boolean }) =>
   `flex items-center justify-between gap-2 rounded-[6px] px-2.5 py-1.5 text-xs ${
     isActive ? "bg-accent font-semibold text-white" : "text-[#c4c6c7] hover:bg-ink-soft"
@@ -81,13 +73,11 @@ const sectionClass = ({ isActive }: { isActive: boolean }) =>
 function Sidebar({ className = "" }: { className?: string }) {
   const courses = useCourses();
   const [coursesOpen, setCoursesOpen] = useState(true);
-  // The course being viewed shows its sections; the others stay one line each.
   const currentCourseId = useMatch("/courses/:courseId/*")?.params.courseId;
 
   return (
     <aside className={`w-[232px] shrink-0 flex-col overflow-y-auto bg-ink px-3.5 py-5 text-paper ${className}`}>
       <Link to="/" className="flex items-center gap-2.5 px-2 pb-[18px]">
-        {/* The same mark as the browser tab icon (public/favicon.svg). */}
         <img src="/favicon.svg" alt="" className="h-8 w-8 shrink-0" />
         <span>
           <b className="block text-sm text-white">Teaching Assistant</b>
@@ -97,7 +87,6 @@ function Sidebar({ className = "" }: { className?: string }) {
 
       <div className="px-2.5 pb-1.5 pt-3.5 text-[10px] uppercase tracking-[0.08em] text-[#8a8d8f]">Workspace</div>
 
-      {/* Courses: the label opens the list of all courses, the arrow folds the course list away. */}
       <div className="flex items-center gap-1">
         <NavLink to="/" end className={(state) => `${navClass(state)} flex-1`}>Courses</NavLink>
         <button
@@ -156,7 +145,6 @@ function Sidebar({ className = "" }: { className?: string }) {
   );
 }
 
-// Marks sections that open a "planned" page instead of a working one.
 function SoonBadge() {
   return (
     <span className="shrink-0 rounded-full border border-[#5a5f63] px-1.5 text-[9px] font-semibold uppercase tracking-[0.06em] text-[#8a8d8f]">
@@ -187,7 +175,6 @@ function GoogleCard() {
   );
 }
 
-// Breadcrumb labels for IDs in the URL; the names come from the already cached lists.
 export function CourseName({ courseId }: { courseId: string }) {
   const courses = useCourses();
   return <>{courses.data?.find((c) => c.id === courseId)?.name ?? "Course"}</>;
@@ -217,7 +204,6 @@ function TopBar({ chatOpen, onToggleChat, onOpenNav }: { chatOpen: boolean; onTo
         </button>
         <nav className="flex min-w-0 items-center gap-2 overflow-hidden text-xs text-ink-muted">
           {crumbs.map((crumb, i) => (
-            // On narrow screens only the last two crumbs are shown; the drawer has the rest.
             <span key={i} className={`min-w-0 items-center gap-2 ${i < crumbs.length - 2 ? "hidden md:flex" : "flex"}`}>
               {i > 0 && <span>/</span>}
               {crumb.to && i < crumbs.length - 1 ? (

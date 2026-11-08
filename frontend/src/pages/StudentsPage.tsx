@@ -7,12 +7,6 @@ import { stateChip } from "../components/SubmissionDetail";
 import { Avatar, Button, Card, Chip, EmptyState, ErrorPanel, PageHeader, Spinner } from "../components/ui";
 import { formatDate, formatDay, initials } from "../format";
 
-/**
- * GET /courses/{courseId}/students and POST /courses/{courseId}/sync.
- * The course's students as a workspace: the class at the top, the students on the left and the selected student's
- * profile on the right (results per assignment, grade history, and what the profile will show later). Every number
- * comes from the API; this page only lays them out. The whole grade table opens as a modal.
- */
 export function StudentsPage() {
   const { courseId = "" } = useParams();
   const students = useCourseStudents(courseId);
@@ -21,9 +15,7 @@ export function StudentsPage() {
   const [sort, setSort] = useState<SortOption>("turnedIn");
   const [filter, setFilter] = useState<Filter>("all");
   const [tableOpen, setTableOpen] = useState(false);
-  // The selected student lives in the URL (?student=), so a refresh or the back button keeps it.
   const [searchParams, setSearchParams] = useSearchParams();
-  // On a phone the list and the profile take turns.
   const [showProfile, setShowProfile] = useState(false);
 
   const data = students.data;
@@ -54,7 +46,6 @@ export function StudentsPage() {
   }
 
   return (
-    // Wide screens: the page fills the window and only the panes scroll. Narrow: the page scrolls normally.
     <div className="flex flex-col gap-3 lg:h-[calc(100dvh-112px)] lg:min-h-[640px]">
       <PageHeader
         title="Students"
@@ -163,8 +154,6 @@ export function StudentsPage() {
   );
 }
 
-// ——— The student list ———
-
 type SortOption = "turnedIn" | "name" | "best" | "worst" | "missing";
 
 const sortLabels: Record<SortOption, string> = {
@@ -184,10 +173,6 @@ const filters: Record<Filter, { label: string; matches: (s: CourseStudent) => bo
   left: { label: "Left course", matches: (s) => !s.active },
 };
 
-/**
- * Students who left the course always come last; students without a score sort after those with one. "Most turned in"
- * (the default) breaks ties by the higher overall score, then by name.
- */
 function sortStudents(list: CourseStudent[], sort: SortOption): CourseStudent[] {
   const byName = (a: CourseStudent, b: CourseStudent) => a.name.localeCompare(b.name);
 
@@ -237,7 +222,6 @@ function StudentList({
   selectedId: string | undefined;
   onSelect: (student: CourseStudent, open?: boolean) => void;
 }) {
-  // Up and down arrows move through the list.
   function onKeyDown(e: KeyboardEvent<HTMLUListElement>) {
     if (e.key !== "ArrowDown" && e.key !== "ArrowUp") {
       return;
@@ -252,7 +236,6 @@ function StudentList({
   }
 
   return (
-    // Widths follow the workspace card; on a phone the list is the whole card.
     <aside
       className={`w-full shrink-0 flex-col bg-white @2xl/workspace:flex @2xl/workspace:w-[270px] @2xl/workspace:border-r @2xl/workspace:border-line @4xl/workspace:w-[310px] @7xl/workspace:w-[340px] ${
         hidden ? "hidden" : "flex"
@@ -308,7 +291,6 @@ function StudentList({
             return (
               <li
                 key={student.id}
-                // A thicker divider where the students who left the course begin.
                 className={`border-b border-paper-dark ${!student.active && previous?.active ? "border-t-2 border-t-line" : ""}`}
               >
                 <button
@@ -342,8 +324,6 @@ function StudentList({
   );
 }
 
-// ——— The selected student ———
-
 function StudentProfile({
   courseId,
   student,
@@ -359,7 +339,6 @@ function StudentProfile({
   const byAssignment = new Map(student.results.map((r) => [r.assignmentId, r]));
 
   return (
-    // A container: the layout follows this pane's own width.
     <section className="@container flex min-h-0 min-w-0 flex-1 flex-col">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-white px-4 py-3 sm:px-5">
         <button onClick={onBack} className="w-full text-left text-xs font-semibold text-accent @2xl/workspace:hidden">
@@ -436,10 +415,6 @@ function StudentProfile({
   );
 }
 
-/**
- * Final grade per assignment as a share of its points, with the first returned grade next to it when a fix raised it.
- * Bars can pass 100% (bonus points); the scale stretches to the highest bar.
- */
 function ScoreChart({ assignments, results }: { assignments: StudentAssignmentColumn[]; results: Map<string, StudentAssignmentResult> }) {
   const share = (value: number | null | undefined, max: number | null | undefined) =>
     value != null && max ? (value / max) * 100 : null;
@@ -536,7 +511,6 @@ function AssignmentRow({
   );
 }
 
-/** Final grade, the first one when a fix changed it, or why there is none. */
 function Grade({ result, maxPoints }: { result: StudentAssignmentResult | undefined; maxPoints: number | null | undefined }) {
   if (result?.finalGrade != null) {
     const changed = result.initialGrade != null && result.initialGrade !== result.finalGrade;
@@ -554,7 +528,6 @@ function Grade({ result, maxPoints }: { result: StudentAssignmentResult | undefi
   return <span className="text-xs text-ink-muted">{result?.turnedIn ? "No grade yet" : "–"}</span>;
 }
 
-/** What the profile will show once AI reviews are saved; shown so the teacher sees where this is going. */
 function ComingNext() {
   const plans = [
     {
@@ -587,7 +560,6 @@ function ComingNext() {
   );
 }
 
-/** One assignment of one student: status, every returned grade with its date, and a way into the submission. */
 function AssignmentModal({
   courseId,
   student,
@@ -679,7 +651,6 @@ function AssignmentModal({
   );
 }
 
-/** The whole class as one table: a student per row, an assignment per column. Picking a name opens their profile. */
 function GradeTableModal({
   students,
   assignments,
@@ -758,8 +729,6 @@ function GradeTableModal({
     </div>
   );
 }
-
-// ——— Small pieces ———
 
 function useEscape(onClose: () => void) {
   useEffect(() => {

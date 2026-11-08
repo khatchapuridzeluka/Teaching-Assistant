@@ -6,16 +6,8 @@ using TeachingAssistant.Domain.Ingestion;
 
 namespace TeachingAssistant.Application.Services;
 
-/// <summary>
-/// Stores an assignment's instructions once per change. It compares what the source reports now (title, task statement,
-/// maximum points, and each attached file's revision, read without downloading) with the latest stored version, and only
-/// when something differs downloads the files into a new version. Only files the grader can use are downloaded: PDFs,
-/// images and documents it can read as text (Word); links and videos are recorded but not stored. When nothing changed,
-/// the latest version's files are still checked on disk, and any that are missing are downloaded again in place.
-/// </summary>
 public class InstructionsFetchService : IInstructionsFetchService
 {
-    // Instruction files are a few pages; anything larger is not meant for grading.
     private const long MaxFileBytes = 20L * 1024 * 1024;
 
     private readonly IInstructionsStore _store;
@@ -47,7 +39,6 @@ public class InstructionsFetchService : IInstructionsFetchService
         if (existing is { LatestVersion: { } latest }
             && !existing.HasChanged(assignment.Title, assignment.Description, assignment.MaxPoints, current.Select(c => c.Fingerprint)))
         {
-            // Unchanged at the source, but the database alone does not prove the files are on disk.
             return new InstructionsFetchResult(latest.Number, IsNew: false, await RestoreMissingAsync(latest, current, cancellationToken));
         }
 
@@ -57,7 +48,6 @@ public class InstructionsFetchService : IInstructionsFetchService
         var problems = new List<string>();
         var contents = new List<InstructionsContent>();
 
-        // Files go to a private folder first and appear all at once on commit; a failed download leaves nothing behind.
         await using (var writer = _storage.BeginVersion(instructions.StorageFolder, instructions.NextVersionNumber))
         {
             foreach (var material in current)
@@ -79,8 +69,6 @@ public class InstructionsFetchService : IInstructionsFetchService
         }
     }
 
-    // Downloads again every stored file of the version that is missing on disk, under the name the database records.
-    // The source has not changed (the caller checked), so the same bytes come back. Returns what was restored.
     private async Task<List<string>> RestoreMissingAsync(
         InstructionsVersion version, List<CurrentMaterial> current, CancellationToken cancellationToken)
     {
@@ -95,7 +83,7 @@ public class InstructionsFetchService : IInstructionsFetchService
             var file = current.FirstOrDefault(c => c.Fingerprint.ExternalId == content.ExternalId)?.File;
             if (file is null)
             {
-                continue; // cannot happen while unchanged; nothing to download from
+                continue;
             }
 
             await _storage.RestoreOriginalAsync(version.StoragePath, storedName,
@@ -106,7 +94,6 @@ public class InstructionsFetchService : IInstructionsFetchService
         return restored;
     }
 
-    // What each material is right now, read without downloading: a Drive file's revision, or the link itself.
     private async Task<List<CurrentMaterial>> DescribeAsync(
         IReadOnlyList<SubmissionAttachment> materials, CancellationToken cancellationToken)
     {
@@ -120,7 +107,6 @@ public class InstructionsFetchService : IInstructionsFetchService
             }
             else
             {
-                // Links, videos and forms: nothing to download; the URL (or the title, when there is none) identifies them.
                 var id = material.Url ?? material.Title;
                 current.Add(new CurrentMaterial(new ContentFingerprint(ContentOrigin.Link, id, id), material.Title, null));
             }
@@ -145,7 +131,7 @@ public class InstructionsFetchService : IInstructionsFetchService
 
         if (!usable)
         {
-            status = ContentStatus.Unsupported; // e.g. a video: kept as a record, not used for grading
+            status = ContentStatus.Unsupported;
         }
         else if (file.SizeBytes > MaxFileBytes)
         {
@@ -163,6 +149,5 @@ public class InstructionsFetchService : IInstructionsFetchService
             file.SizeBytes, storedName, status);
     }
 
-    // One material as the source reports it now. File is set for Drive files.
     private sealed record CurrentMaterial(ContentFingerprint Fingerprint, string Title, RemoteFile? File);
 }

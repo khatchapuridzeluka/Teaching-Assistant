@@ -29,7 +29,6 @@ public class InstructionsController : ControllerBase
         var instructions = await _instructionsService.GetLatestAsync(assignmentId, cancellationToken);
         if (instructions is null)
         {
-            // Not an error: the assignment simply has not been fetched. A 404 would look like a missing endpoint.
             return NoContent();
         }
 

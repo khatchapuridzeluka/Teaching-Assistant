@@ -46,7 +46,6 @@ public class StudentsController : ControllerBase
             return NotFound();
         }
 
-        // Cached by the browser but checked each time: a changed photo has a new hash and shows at once.
         Response.Headers.CacheControl = "private, no-cache";
         return File(photo.Content, photo.ContentType, lastModified: null, entityTag: new EntityTagHeaderValue($"\"{photo.Hash}\""));
     }

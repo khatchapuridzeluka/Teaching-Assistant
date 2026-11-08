@@ -4,10 +4,6 @@ using TeachingAssistant.Application.Exceptions;
 
 namespace TeachingAssistant.WebAPI.ExceptionHandling;
 
-/// <summary>
-/// Turns known Application exceptions into ProblemDetails responses with a fitting status code,
-/// so controllers don't need try/catch. Anything else falls through to the default 500.
-/// </summary>
 public class ApplicationExceptionHandler : IExceptionHandler
 {
     private readonly IProblemDetailsService _problemDetailsService;

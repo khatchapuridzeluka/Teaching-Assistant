@@ -4,8 +4,6 @@ using TeachingAssistant.Application.Interfaces.Services;
 
 namespace TeachingAssistant.WebAPI.Controllers;
 
-// Everything about grading lives here. No shared route prefix: grading actions belong to different resources
-// (a version today; later an assignment for "grade all" and a grading for edit and approve), so each action has its full route.
 [ApiController]
 [Produces("application/json")]
 public class GradingController : ControllerBase

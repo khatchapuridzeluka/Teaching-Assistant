@@ -1,18 +1,11 @@
-// The app's sections in one place: the sidebar, the course overview and the routes all read these lists, so adding a
-// section means adding one entry here. "ready: false" sections open a "planned" page that says what they will do.
-
 export type Section = {
-  /** Path below /courses/{courseId} (course sections) or from the root (workspace sections); "" is the course overview. */
   path: string;
   label: string;
   ready: boolean;
-  /** One sentence for the overview card and the planned page: what the teacher gets from it. */
   description: string;
-  /** For planned sections: what it will show, a few short points. */
   plans?: string[];
 };
 
-/** What every course has. */
 export const courseSections: Section[] = [
   {
     path: "",
@@ -80,7 +73,6 @@ export const courseSections: Section[] = [
   },
 ];
 
-/** Across all courses, shown under Courses in the sidebar. */
 export const workspaceSections: Section[] = [
   {
     path: "review",
@@ -106,6 +98,5 @@ export const workspaceSections: Section[] = [
   },
 ];
 
-/** Link to a course section; the overview is the course's own URL. */
 export const coursePath = (courseId: string, sectionPath = "") =>
   sectionPath ? `/courses/${courseId}/${sectionPath}` : `/courses/${courseId}`;

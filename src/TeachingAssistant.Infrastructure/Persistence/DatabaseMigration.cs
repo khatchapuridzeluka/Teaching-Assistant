@@ -4,10 +4,6 @@ using Microsoft.Extensions.Logging;
 
 namespace TeachingAssistant.Infrastructure.Persistence;
 
-/// <summary>
-/// Brings the database up to date with the EF Core migrations. Called at startup in development only, so a new migration
-/// never shows up as a "relation does not exist" error; creates the database when it does not exist yet.
-/// </summary>
 public static class DatabaseMigration
 {
     public static async Task MigrateDatabaseAsync(this IServiceProvider services, CancellationToken cancellationToken = default)

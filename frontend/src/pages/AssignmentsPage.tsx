@@ -4,7 +4,6 @@ import { CourseName } from "../components/Layout";
 import { Card, EmptyState, ErrorPanel, PageHeader, Spinner } from "../components/ui";
 import { formatDate } from "../format";
 
-// GET /courses/{courseId}/assignments: the course's Assignments section.
 export function AssignmentsPage() {
   const { courseId = "" } = useParams();
   const assignments = useAssignments(courseId);
@@ -28,7 +27,6 @@ export function AssignmentsPage() {
           {assignments.data.length === 0 ? (
             <EmptyState>This course has no published assignments.</EmptyState>
           ) : (
-            // Scrolls sideways on a phone rather than squeezing the columns; the long statement column hides there.
             <div className="overflow-x-auto">
             <table className="w-full border-collapse">
               <thead>

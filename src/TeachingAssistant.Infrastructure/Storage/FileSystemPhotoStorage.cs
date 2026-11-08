@@ -3,10 +3,6 @@ using TeachingAssistant.Application.Interfaces;
 
 namespace TeachingAssistant.Infrastructure.Storage;
 
-/// <summary>
-/// <see cref="IStudentPhotoStorage"/> on the local disk: {Root}/students/{user id}.{ext}, next to the submissions. A new
-/// photo is written beside the old one and moved over it, so a failed write never leaves a broken file.
-/// </summary>
 public class FileSystemPhotoStorage(IOptions<StorageOptions> options) : IStudentPhotoStorage
 {
     private const string Folder = "students";
@@ -23,7 +19,6 @@ public class FileSystemPhotoStorage(IOptions<StorageOptions> options) : IStudent
 
     public async Task<string> SaveAsync(string externalUserId, DownloadedPhoto photo, CancellationToken cancellationToken = default)
     {
-        // The user ID comes from Google (digits); keep only safe characters anyway.
         var id = new string(externalUserId.Where(char.IsLetterOrDigit).ToArray());
         if (id.Length == 0)
         {
@@ -34,7 +29,6 @@ public class FileSystemPhotoStorage(IOptions<StorageOptions> options) : IStudent
         var folder = Path.Combine(_root, Folder);
         Directory.CreateDirectory(folder);
 
-        // A different extension than before (png instead of jpg) leaves the old file behind; remove it.
         foreach (var old in Directory.EnumerateFiles(folder, id + ".*").Where(f => Path.GetFileName(f) != storedName))
         {
             File.Delete(old);
@@ -75,7 +69,6 @@ public class FileSystemPhotoStorage(IOptions<StorageOptions> options) : IStudent
         }
     }
 
-    // Only a plain file name inside the photos folder; never a path elsewhere.
     private string? PathOf(string storedName) =>
         storedName.Length == 0 || storedName != Path.GetFileName(storedName) ? null : Path.Combine(_root, Folder, storedName);
 }

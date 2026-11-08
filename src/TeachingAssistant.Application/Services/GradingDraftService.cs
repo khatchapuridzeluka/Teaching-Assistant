@@ -6,11 +6,6 @@ using TeachingAssistant.Domain.Ingestion;
 
 namespace TeachingAssistant.Application.Services;
 
-/// <summary>
-/// Reads saved AI gradings back (the current draft of a version, its history, a course's or an assignment's drafts) and
-/// discards them.
-/// The current draft of a version is its newest grading that was not discarded.
-/// </summary>
 public class GradingDraftService : IGradingDraftService
 {
     private readonly IGradingStore _gradings;
@@ -38,8 +33,6 @@ public class GradingDraftService : IGradingDraftService
     public async Task<IReadOnlyList<AssignmentGradingResponse>> GetByCourseAsync(
         string courseId, string? assignmentId, string? studentId, bool includeAll, CancellationToken cancellationToken = default)
     {
-        // Every grading in scope, so "current" (the newest draft of each version) is known even when earlier ones are hidden.
-        // A version belongs to one student and one assignment, so filtering never splits a version's gradings.
         var rows = await _gradings.GetSummariesAsync(SubmissionSource.GoogleClassroom, courseId, assignmentId, studentId, cancellationToken);
         var current = rows
             .Where(r => r.Status == GradingStatus.Draft)

@@ -5,7 +5,6 @@ using TeachingAssistant.Domain.Profiling;
 
 namespace TeachingAssistant.Infrastructure.Persistence;
 
-/// <summary><see cref="IStudentStore"/> on EF Core; students are always loaded with all their enrollments.</summary>
 public class StudentStore(AppDbContext db) : IStudentStore
 {
     public async Task<IReadOnlyList<Student>> FindByExternalIdsAsync(

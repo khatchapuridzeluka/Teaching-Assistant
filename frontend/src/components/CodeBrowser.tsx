@@ -16,18 +16,11 @@ const extension = (path: string) => path.split(".").pop()?.toLowerCase() ?? "";
 
 type Severity = CodeMistake["severity"];
 
-// Colours of the marks in the editor (see the mistake-* classes in index.css); the most severe first.
 const severityOrder: Severity[] = ["Major", "Minor", "Style"];
 export const severityColor: Record<Severity, string> = { Major: "#dc2626", Minor: "#d97706", Style: "#64748b" };
 
-/** A request to show a line: changing key scrolls there again even when the line is the same. */
 export type CodeFocus = { file: string; line: number; key: number };
 
-/**
- * The extracted code of one version: a file list on the left, the selected file on the right (read-only).
- * Mistakes with lines are marked in the editor: a coloured dot in the gutter and a tinted line, the message on hover.
- * className sets the height; by default a fixed 560px, "h-full" to fill a column.
- */
 export function CodeBrowser({
   versionId,
   className = "h-[560px]",
@@ -42,7 +35,6 @@ export function CodeBrowser({
   const files = useCodeFiles(versionId, true);
   const [selected, setSelected] = useState<string | null>(null);
 
-  // Open the most likely entry point first: Main.java, else the first source file.
   useEffect(() => {
     if (!files.data || files.data.length === 0) {
       return;
@@ -55,7 +47,6 @@ export function CodeBrowser({
     setSelected((main ?? source ?? files.data[0]!).path);
   }, [files.data, selected]);
 
-  // A mistake picked in the review opens its file.
   useEffect(() => {
     if (focus) {
       setSelected(focus.file);
@@ -73,7 +64,6 @@ export function CodeBrowser({
   }
 
   return (
-    // Very narrow (a phone): the file list sits above the code instead of beside it.
     <div className={`@container flex flex-col overflow-hidden rounded-[10px] border border-line bg-white @lg:flex-row ${className}`}>
       <FileList files={files.data} selected={selected} onSelect={setSelected} mistakes={mistakes} />
       <div className="flex min-w-0 flex-1 flex-col">
@@ -101,7 +91,6 @@ function FileList({
   onSelect: (path: string) => void;
   mistakes: CodeMistake[];
 }) {
-  // Group by folder so nested projects (src/library/…) read like a tree.
   const groups = useMemo(() => {
     const byFolder = new Map<string, CodeFile[]>();
     for (const file of files) {
@@ -112,7 +101,6 @@ function FileList({
   }, [files]);
 
   return (
-    // Narrower when the code has little room (the file names truncate; the full path is in the tooltip).
     <nav className="max-h-[132px] w-full shrink-0 overflow-y-auto border-b border-line py-2 @lg:max-h-none @lg:w-[160px] @lg:border-b-0 @lg:border-r @2xl:w-[220px]">
       {groups.map(([folder, folderFiles]) => (
         <div key={folder} className="mb-1">
@@ -120,7 +108,6 @@ function FileList({
           {folderFiles.map((file) => {
             const name = file.path.slice(file.path.lastIndexOf("/") + 1);
             const own = mistakes.filter((m) => m.file === file.path);
-            // The file's count takes the colour of its most severe mistake.
             const worst = severityOrder.find((s) => own.some((m) => m.severity === s));
             return (
               <button
@@ -168,8 +155,6 @@ function FileView({
   const text = useCodeFileText(versionId, isImage ? null : path);
   const [editor, setEditor] = useState<{ editor: MonacoEditor; monaco: Monaco } | null>(null);
 
-  // The marks: a dot in the gutter and a tinted line per mistake, its message shown when hovering either. Set again
-  // whenever the file's text or mistakes change, and removed when the file is closed.
   useEffect(() => {
     if (!editor || text.data === undefined) {
       return;
@@ -194,7 +179,6 @@ function FileView({
     return () => collection.clear();
   }, [editor, mistakes, text.data]);
 
-  // Scrolls to a mistake picked in the review.
   useEffect(() => {
     if (!editor || !focus || text.data === undefined) {
       return;
@@ -231,7 +215,7 @@ function FileView({
               scrollBeyondLastLine: false,
               renderLineHighlight: "none",
               automaticLayout: true,
-              glyphMargin: true, // room for the mistake dots
+              glyphMargin: true,
             }}
           />
         </div>

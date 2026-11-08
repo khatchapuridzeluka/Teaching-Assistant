@@ -1,7 +1,6 @@
 import { Card, Chip, PageHeader } from "../components/ui";
 import type { Section } from "../navigation";
 
-/** A section that is planned but not built yet: what it will do, so the navigation already shows the whole product. */
 export function ComingSoonPage({ section }: { section: Section }) {
   return (
     <>

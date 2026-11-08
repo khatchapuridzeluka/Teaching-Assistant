@@ -18,7 +18,6 @@ import { StudentsPage } from "./pages/StudentsPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    // Classroom data changes slowly; avoid refetching on every window focus.
     queries: { staleTime: 60_000, refetchOnWindowFocus: false, retry: 1 },
   },
 });
@@ -30,7 +29,6 @@ const router = createBrowserRouter([
     children: [
       { path: "/", element: <CoursesPage /> },
       {
-        // A course opens on its overview; each section is a page below it (see navigation.ts).
         path: "/courses/:courseId",
         handle: {
           crumbs: ({ courseId }) => [{ label: <CourseName courseId={courseId!} />, to: `/courses/${courseId}` }],
@@ -75,7 +73,6 @@ const router = createBrowserRouter([
             element: <DraftsPage />,
             handle: { crumbs: () => [{ label: "AI drafts" }] } satisfies CrumbHandle,
           },
-          // Planned sections: a page that says what they will do.
           ...courseSections
             .filter((section) => !section.ready)
             .map((section) => ({

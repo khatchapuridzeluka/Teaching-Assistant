@@ -2,7 +2,6 @@ import { useConnectGoogle, useDisconnectGoogle, useGoogleStatus, useModelHealth 
 import type { GoogleStatus } from "../api/client";
 import { Button, Card, CardHeader, Chip, type ChipTone, ErrorPanel, PageHeader, Spinner } from "../components/ui";
 
-// GET /auth/google/status, POST /auth/google/connect, POST /auth/google/disconnect, GET /health/model
 export function SettingsPage() {
   return (
     <>
@@ -22,7 +21,6 @@ const stateChip: Record<GoogleStatus["state"], { tone: ChipTone; label: string }
   NotConfigured: { tone: "muted", label: "Not configured" },
 };
 
-// Plain-language names for the read-only scopes.
 const scopeNames: Record<string, string> = {
   "https://www.googleapis.com/auth/classroom.courses.readonly": "See your Classroom courses",
   "https://www.googleapis.com/auth/classroom.coursework.students.readonly": "See coursework and student submissions",

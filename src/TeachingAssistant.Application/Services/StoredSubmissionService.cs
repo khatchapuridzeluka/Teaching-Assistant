@@ -24,7 +24,6 @@ public class StoredSubmissionService : IStoredSubmissionService
     {
         var submissions = await _store.GetByAssignmentAsync(SubmissionSource.GoogleClassroom, assignmentId, cancellationToken);
 
-        // Only submissions with stored files; the others exist for state and grades alone (nothing to show or grade).
         return submissions
             .Where(s => s.Versions.Count > 0)
             .OrderBy(s => s.StudentName)

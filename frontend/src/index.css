@@ -1,7 +1,6 @@
 @import "tailwindcss";
 @import "@fontsource-variable/inter";
 
-/* Palette from the Figma design: three fixed colors (ink, paper, accent) plus tints of them. No gradients. */
 @theme {
   --font-sans: "Inter Variable", "Segoe UI", system-ui, sans-serif;
   --font-mono: Consolas, "Courier New", monospace;
@@ -20,7 +19,6 @@ body {
   @apply bg-paper font-sans text-[13px] leading-normal text-ink antialiased;
 }
 
-/* Markdown written by the agent: compact spacing for a narrow chat panel. */
 .markdown > * + * { @apply mt-2; }
 .markdown ul { @apply list-disc pl-5; }
 .markdown ol { @apply list-decimal pl-5; }
@@ -31,12 +29,10 @@ body {
 .markdown code { @apply rounded bg-white px-1 py-0.5 font-mono text-[12px]; }
 .markdown pre { @apply overflow-x-auto rounded-lg bg-ink p-3 text-[12px] text-white; }
 .markdown pre code { @apply bg-transparent p-0 text-white; }
-/* Wide tables scroll on their own instead of widening the whole chat panel. */
 .markdown table { @apply block max-w-full overflow-x-auto border-collapse text-[12px]; }
 .markdown th, .markdown td { @apply border border-line px-2 py-1 text-left; }
 .markdown blockquote { @apply border-l-2 border-line pl-3 text-ink-muted; }
 
-/* Mistake marks in the code viewer (CodeBrowser): a dot in the gutter and a tinted line, coloured by severity. */
 .mistake-glyph { cursor: pointer; }
 .mistake-glyph-Major { background: radial-gradient(circle, #dc2626 0 4px, transparent 4.5px); }
 .mistake-glyph-Minor { background: radial-gradient(circle, #d97706 0 4px, transparent 4.5px); }

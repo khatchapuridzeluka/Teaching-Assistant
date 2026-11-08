@@ -1,12 +1,7 @@
 namespace TeachingAssistant.Domain.Ingestion;
 
-/// <summary>
-/// An assignment of a course as the source reports it, kept locally for what scores need: its maximum points and its
-/// deadline (missing work counts once the deadline has passed). The source owns the assignment; we keep a copy.
-/// </summary>
 public class CourseAssignment
 {
-    // For EF Core.
     private CourseAssignment()
     {
     }
@@ -28,7 +23,6 @@ public class CourseAssignment
     public string ExternalAssignmentId { get; private set; } = null!;
     public string Title { get; private set; } = null!;
 
-    /// <summary>Null for ungraded work.</summary>
     public double? MaxPoints { get; private set; }
 
     public DateTimeOffset? DueAt { get; private set; }

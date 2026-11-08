@@ -6,13 +6,11 @@ import { Button, Card, CardHeader, Chip, EmptyState, ErrorPanel, PageHeader, Spi
 import { formatDate } from "../format";
 import { coursePath, courseSections } from "../navigation";
 
-// GET /courses and GET /courses/{courseId}/assignments: the page a course opens on, with its sections.
 export function CourseOverviewPage() {
   const { courseId = "" } = useParams();
   const course = useCourses().data?.find((c) => c.id === courseId);
   const assignments = useAssignments(courseId);
 
-  // The nearest deadline still ahead; the list itself comes newest first from the API.
   const now = Date.now();
   const nextDue = assignments.data
     ?.filter((a) => a.dueAt && new Date(a.dueAt).getTime() > now)
