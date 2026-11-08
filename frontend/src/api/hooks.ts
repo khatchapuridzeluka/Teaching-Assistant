@@ -163,6 +163,17 @@ export const useAssignmentJobs = (courseId: string, assignmentId: string) =>
     refetchInterval: (query) => (query.state.data?.some((job) => isActive(job.status)) ? 2000 : false),
   });
 
+export const useJob = (jobId: string) =>
+  useQuery({
+    queryKey: ["jobs", jobId],
+    queryFn: () => unwrap(api.GET("/jobs/{jobId}", { params: { path: { jobId } } })),
+    staleTime: 0,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status === undefined || isActive(status) ? 2000 : false;
+    },
+  });
+
 export const useCancelJob = (courseId: string, assignmentId: string) => {
   const queryClient = useQueryClient();
   return useMutation({

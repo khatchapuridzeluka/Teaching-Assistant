@@ -14,6 +14,7 @@ import {
   useSubmissions,
 } from "../api/hooks";
 import { InstructionsBar } from "../components/InstructionsCard";
+import { useTrackJob } from "../components/JobToasts";
 import { PreviewPanel } from "../components/PreviewPanel";
 import { hasWork, stateChip, SubmissionDetail } from "../components/SubmissionDetail";
 import { Avatar, Button, Card, Chip, ErrorPanel, PageHeader, Spinner } from "../components/ui";
@@ -30,6 +31,7 @@ export function AssignmentPage() {
   const cancel = useCancelJob(courseId, assignmentId);
   const jobs = useAssignmentJobs(courseId, assignmentId);
   const queryClient = useQueryClient();
+  const trackJob = useTrackJob();
   const [previewing, setPreviewing] = useState<{ submission: StoredSubmission; versionId: string } | null>(null);
   const [sort, setSort] = useState<SortOption>("status");
   const [filter, setFilter] = useState<Filter>("all");
@@ -189,7 +191,17 @@ export function AssignmentPage() {
               version={selectedVersion}
               onPickVersion={(versionId) => selectedStored && setPickedVersions((p) => ({ ...p, [selectedStored.id]: versionId }))}
               onPreview={() => selectedStored && selectedVersion && setPreviewing({ submission: selectedStored, versionId: selectedVersion.id })}
-              onGrade={() => selectedVersion && queue.mutate(selectedVersion.id)}
+              onGrade={() => {
+                if (selected && selectedVersion) {
+                  queue.mutate(selectedVersion.id, {
+                    onSuccess: (job) =>
+                      trackJob(job, {
+                        label: selected.studentName,
+                        to: `/courses/${courseId}/assignments/${assignmentId}?student=${selected.id}`,
+                      }),
+                  });
+                }
+              }}
               job={selectedVersion ? latestJob.get(selectedVersion.id) : undefined}
               queuing={queue.isPending && queue.variables === selectedVersion?.id}
               queueError={queue.isError && queue.variables === selectedVersion?.id ? queue.error : null}

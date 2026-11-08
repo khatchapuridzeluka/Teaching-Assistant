@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation, useMatch, useMatches } from "react-
 import { useApiHealth, useAssignments, useCourses, useGoogleStatus } from "../api/hooks";
 import { coursePath, courseSections, workspaceSections } from "../navigation";
 import { ChatPanel } from "./ChatPanel";
+import { JobToastProvider } from "./JobToasts";
 import { Button } from "./ui";
 
 export type Crumb = { label: ReactNode; to?: string };
@@ -24,29 +25,31 @@ export function Layout() {
   }, [location.pathname]);
 
   return (
-    <div className="flex h-dvh overflow-hidden">
-      <Sidebar className="hidden lg:flex" />
-      {navOpen && (
-        <div className="fixed inset-0 z-50 flex lg:hidden">
-          <div className="absolute inset-0 bg-ink/50" onClick={() => setNavOpen(false)} />
-          <Sidebar className="relative flex shadow-xl" />
-        </div>
-      )}
-      <div className="flex min-w-0 flex-1 flex-col">
-        <TopBar chatOpen={chatOpen} onToggleChat={() => setChatOpen(!chatOpen)} onOpenNav={() => setNavOpen(true)} />
-        <main className="flex-1 overflow-y-auto px-4 py-4 lg:px-7 lg:py-6">
-          <div className="flex flex-col gap-[18px]">
-            <Outlet />
+    <JobToastProvider>
+      <div className="flex h-dvh overflow-hidden">
+        <Sidebar className="hidden lg:flex" />
+        {navOpen && (
+          <div className="fixed inset-0 z-50 flex lg:hidden">
+            <div className="absolute inset-0 bg-ink/50" onClick={() => setNavOpen(false)} />
+            <Sidebar className="relative flex shadow-xl" />
           </div>
-        </main>
+        )}
+        <div className="flex min-w-0 flex-1 flex-col">
+          <TopBar chatOpen={chatOpen} onToggleChat={() => setChatOpen(!chatOpen)} onOpenNav={() => setNavOpen(true)} />
+          <main className="flex-1 overflow-y-auto px-4 py-4 lg:px-7 lg:py-6">
+            <div className="flex flex-col gap-[18px]">
+              <Outlet />
+            </div>
+          </main>
+        </div>
+        <div
+          className={chatOpen ? "fixed inset-0 z-50 flex justify-end bg-ink/40 xl:static xl:z-auto xl:bg-transparent" : "hidden"}
+          onClick={(e) => e.target === e.currentTarget && setChatOpen(false)}
+        >
+          <ChatPanel page={page} onClose={() => setChatOpen(false)} />
+        </div>
       </div>
-      <div
-        className={chatOpen ? "fixed inset-0 z-50 flex justify-end bg-ink/40 xl:static xl:z-auto xl:bg-transparent" : "hidden"}
-        onClick={(e) => e.target === e.currentTarget && setChatOpen(false)}
-      >
-        <ChatPanel page={page} onClose={() => setChatOpen(false)} />
-      </div>
-    </div>
+    </JobToastProvider>
   );
 }
 
