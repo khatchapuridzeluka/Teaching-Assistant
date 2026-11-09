@@ -51,6 +51,8 @@ public class ModelHealthServiceTests
 
         public string ModelId => Id;
 
+        public string GradingModelId => Id;
+
         public Task<LanguageModelReply> CompleteAsync(string prompt, CancellationToken cancellationToken = default) =>
             failure is null
                 ? Task.FromResult(new LanguageModelReply(Id, reply!))

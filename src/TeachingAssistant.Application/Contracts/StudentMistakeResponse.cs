@@ -13,5 +13,6 @@ public record StudentMistakeResponse(
     MistakeSeverity Severity,
     MistakeCategory Category,
     string Message,
+    double? Points,
     MistakeDecision Decision,
     DateTimeOffset ApprovedAt);

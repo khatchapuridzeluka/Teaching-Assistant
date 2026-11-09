@@ -28,6 +28,7 @@ public record ReportMistakeResponse(
     MistakeSeverity Severity,
     MistakeCategory Category,
     string Message,
+    double? Points,
     MistakeDecision Decision);
 
 public record SaveGradingReportRequest(
@@ -41,4 +42,5 @@ public record ReportMistakeInput(
     bool Rejected,
     MistakeSeverity Severity,
     MistakeCategory Category,
-    string Message);
+    string Message,
+    double? Points = null);

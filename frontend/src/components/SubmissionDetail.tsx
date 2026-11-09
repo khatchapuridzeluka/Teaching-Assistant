@@ -417,6 +417,7 @@ export function MistakeList({ mistakes, onShow }: { mistakes: CodeMistake[]; onS
                   <span className="flex flex-wrap items-center gap-x-2 text-xs">
                     <b>{m.severity}</b>
                     <span className="text-ink-muted">{m.category}</span>
+                    {m.points != null && m.points > 0 && <b className="text-[#8f2d2d]">−{points(m.points)}</b>}
                     <span className={`ml-auto font-mono ${canShow ? "text-accent" : "text-ink-muted"}`}>
                       {name ? (lines ? `${name}:${lines}` : name) : "Whole submission"}
                     </span>

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using TeachingAssistant.Application.Contracts;
 using TeachingAssistant.Application.Interfaces.Services;
+using TeachingAssistant.Domain.Jobs;
 
 namespace TeachingAssistant.WebAPI.Controllers;
 
@@ -28,6 +29,38 @@ public class JobsController : ControllerBase
     public async Task<ActionResult<JobResponse>> QueueGradeVersionAsync(Guid versionId, CancellationToken cancellationToken)
     {
         var job = await _jobService.QueueGradeVersionAsync(versionId, cancellationToken);
+        if (job is null)
+        {
+            return NotFound();
+        }
+
+        return Accepted($"/jobs/{job.Id}", job);
+    }
+
+    /// <summary>
+    /// Returns the queue overview for the System page: counts (queued and running now, finished in the last 24 hours) and the 200 most recent jobs with the student and assignment they are about, newest first.
+    /// </summary>
+    /// <response code="200">Overview retrieved successfully</response>
+    [HttpGet("jobs")]
+    public async Task<ActionResult<JobOverviewResponse>> GetOverviewAsync(
+        [FromQuery] JobStatus? status, [FromQuery] string? courseId, [FromQuery] string? assignmentId, CancellationToken cancellationToken)
+    {
+        return Ok(await _jobService.GetOverviewAsync(status, courseId, assignmentId, cancellationToken));
+    }
+
+    /// <summary>
+    /// Queues a failed or canceled job again as a new job (the old one stays in the history); a grading is checked again first.
+    /// </summary>
+    /// <response code="202">Queued again (or an active job for the same work is returned)</response>
+    /// <response code="400">The job is not failed or canceled, its type cannot be retried, or its version no longer exists</response>
+    /// <response code="404">No job with this ID</response>
+    [HttpPost("jobs/{jobId:guid}/retry")]
+    [ProducesResponseType(typeof(JobResponse), StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<JobResponse>> RetryAsync(Guid jobId, CancellationToken cancellationToken)
+    {
+        var job = await _jobService.RetryAsync(jobId, cancellationToken);
         if (job is null)
         {
             return NotFound();

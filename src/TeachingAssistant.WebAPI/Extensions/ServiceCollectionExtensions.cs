@@ -7,6 +7,7 @@ using Serilog;
 using TeachingAssistant.Application.Interfaces;
 using TeachingAssistant.Application.Interfaces.Services;
 using TeachingAssistant.Application.Jobs;
+using TeachingAssistant.Application.Models;
 using TeachingAssistant.Application.Services;
 using TeachingAssistant.Infrastructure.Documents;
 using TeachingAssistant.Infrastructure.Google;
@@ -51,6 +52,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IReviewQueueStore, ReviewQueueStore>();
         services.AddScoped<IGradingReportStore, GradingReportStore>();
         services.AddScoped<IStudentMistakeStore, StudentMistakeStore>();
+        services.AddScoped<IModelCallStore, ModelCallStore>();
 
         services.Configure<StorageOptions>(configuration.GetSection(StorageOptions.SectionName));
         services.AddSingleton<ISnapshotStorage, FileSystemSnapshotStorage>();
@@ -121,6 +123,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IReviewQueueService, ReviewQueueService>();
         services.AddScoped<IGradingReportService, GradingReportService>();
         services.AddScoped<IStudentMistakeService, StudentMistakeService>();
+        services.AddScoped<IModelUsageService, ModelUsageService>();
         services.AddScoped<IJobService, JobService>();
         services.AddScoped<IJobProcessor, JobProcessor>();
         services.AddScoped<IJobHandler, GradeVersionJobHandler>();
@@ -141,7 +144,13 @@ public static class ServiceCollectionExtensions
                 ? new AnthropicClient()
                 : new AnthropicClient { ApiKey = options.ApiKey };
         });
-        services.AddSingleton<ILanguageModel, ClaudeLanguageModel>();
+        services.AddSingleton<ClaudeLanguageModel>();
+        services.AddScoped<ModelCallContext>();
+        services.AddScoped<ILanguageModel>(sp => new RecordingLanguageModel(
+            sp.GetRequiredService<ClaudeLanguageModel>(),
+            sp.GetRequiredService<IModelCallStore>(),
+            sp.GetRequiredService<ModelCallContext>(),
+            sp.GetRequiredService<TimeProvider>()));
 
         return services;
     }

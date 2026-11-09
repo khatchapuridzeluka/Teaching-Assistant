@@ -24,7 +24,8 @@ public record CodeMistake(
     MistakeSeverity Severity,
     MistakeCategory Category,
     string Message,
-    Guid? Id = null);
+    Guid? Id = null,
+    double? Points = null);
 
 public record AssignmentGradingResponse(
     Guid Id,

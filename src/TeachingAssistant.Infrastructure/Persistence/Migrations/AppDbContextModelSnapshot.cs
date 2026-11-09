@@ -162,6 +162,10 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("message");
 
+                    b.Property<double?>("Points")
+                        .HasColumnType("double precision")
+                        .HasColumnName("points");
+
                     b.Property<int>("Position")
                         .HasColumnType("integer")
                         .HasColumnName("position");
@@ -293,6 +297,10 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("message");
+
+                    b.Property<double?>("Points")
+                        .HasColumnType("double precision")
+                        .HasColumnName("points");
 
                     b.Property<int>("Position")
                         .HasColumnType("integer")
@@ -977,6 +985,10 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("message");
 
+                    b.Property<double?>("Points")
+                        .HasColumnType("double precision")
+                        .HasColumnName("points");
+
                     b.Property<Guid>("ReportId")
                         .HasColumnType("uuid")
                         .HasColumnName("report_id");
@@ -1031,6 +1043,86 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_student_mistakes_course_id_student_id_approved_at");
 
                     b.ToTable("student_mistakes", (string)null);
+                });
+
+            modelBuilder.Entity("TeachingAssistant.Domain.Usage.ModelCall", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AssignmentId")
+                        .HasColumnType("text")
+                        .HasColumnName("assignment_id");
+
+                    b.Property<long?>("CacheReadTokens")
+                        .HasColumnType("bigint")
+                        .HasColumnName("cache_read_tokens");
+
+                    b.Property<long?>("CacheWriteTokens")
+                        .HasColumnType("bigint")
+                        .HasColumnName("cache_write_tokens");
+
+                    b.Property<string>("CourseId")
+                        .HasColumnType("text")
+                        .HasColumnName("course_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<long>("DurationMs")
+                        .HasColumnType("bigint")
+                        .HasColumnName("duration_ms");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("error");
+
+                    b.Property<long?>("InputTokens")
+                        .HasColumnType("bigint")
+                        .HasColumnName("input_tokens");
+
+                    b.Property<string>("Model")
+                        .HasColumnType("text")
+                        .HasColumnName("model");
+
+                    b.Property<long?>("OutputTokens")
+                        .HasColumnType("bigint")
+                        .HasColumnName("output_tokens");
+
+                    b.Property<string>("Purpose")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("purpose");
+
+                    b.Property<string>("RequestedModel")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("requested_model");
+
+                    b.Property<bool>("Succeeded")
+                        .HasColumnType("boolean")
+                        .HasColumnName("succeeded");
+
+                    b.Property<Guid?>("VersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("version_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_model_calls");
+
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("ix_model_calls_created_at");
+
+                    b.HasIndex("CourseId", "AssignmentId")
+                        .HasDatabaseName("ix_model_calls_course_id_assignment_id");
+
+                    b.HasIndex("Purpose", "CreatedAt")
+                        .HasDatabaseName("ix_model_calls_purpose_created_at");
+
+                    b.ToTable("model_calls", (string)null);
                 });
 
             modelBuilder.Entity("TeachingAssistant.Domain.Grading.AiGrading", b =>

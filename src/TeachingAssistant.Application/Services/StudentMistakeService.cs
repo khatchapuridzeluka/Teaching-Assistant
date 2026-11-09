@@ -19,7 +19,7 @@ public class StudentMistakeService : IStudentMistakeService
         var mistakes = await _mistakes.GetByStudentAsync(courseId, studentId, cancellationToken);
         return mistakes
             .Select(m => new StudentMistakeResponse(m.Id, m.AssignmentId, m.VersionId, m.ReportId, m.File, m.StartLine, m.EndLine,
-                m.Severity, m.Category, m.Message, m.Decision, m.ApprovedAt))
+                m.Severity, m.Category, m.Message, m.Points, m.Decision, m.ApprovedAt))
             .ToList();
     }
 }

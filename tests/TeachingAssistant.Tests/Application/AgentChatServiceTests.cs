@@ -131,6 +131,8 @@ public class AgentChatServiceTests
 
         public string ModelId => "fake-model";
 
+        public string GradingModelId => "fake-grading-model";
+
         public Task<LanguageModelReply> CompleteAsync(string prompt, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 

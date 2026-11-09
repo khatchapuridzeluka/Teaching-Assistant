@@ -7,6 +7,8 @@ public interface ILanguageModel
 {
     string ModelId { get; }
 
+    string GradingModelId { get; }
+
     Task<LanguageModelReply> CompleteAsync(string prompt, CancellationToken cancellationToken = default);
 
     Task<LanguageModelReply> ChatAsync(

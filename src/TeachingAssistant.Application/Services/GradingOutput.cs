@@ -56,9 +56,13 @@ internal static class GradingOutput
                   "message": {
                     "type": "string",
                     "description": "What is wrong and how to fix it, one or two sentences, and which task it costs points in, or that it cost no points (always for Style)."
+                  },
+                  "points": {
+                    "type": "number",
+                    "description": "Points this mistake took off, as a positive number; 0 for Style."
                   }
                 },
-                "required": ["file", "startLine", "endLine", "severity", "category", "message"]
+                "required": ["file", "startLine", "endLine", "severity", "category", "message", "points"]
               }
             }
           },
@@ -106,7 +110,8 @@ internal static class GradingOutput
             end = Math.Clamp(mistake.EndLine ?? first, first, codeLines[file]);
         }
 
-        return new CodeMistake(file, start, end, mistake.Severity, mistake.Category, mistake.Message!.Trim());
+        double? points = mistake.Points is { } value ? Math.Abs(value) : null;
+        return new CodeMistake(file, start, end, mistake.Severity, mistake.Category, mistake.Message!.Trim(), Points: points);
     }
 
     private static string? ResolveFile(string? path, IEnumerable<string> files)
@@ -133,5 +138,5 @@ internal static class GradingOutput
     private sealed record Reply(string? Review, double? Score, double? MaxScore, double? Bonus, List<ReplyMistake>? Mistakes);
 
     private sealed record ReplyMistake(
-        string? File, int? StartLine, int? EndLine, MistakeSeverity Severity, MistakeCategory Category, string? Message);
+        string? File, int? StartLine, int? EndLine, MistakeSeverity Severity, MistakeCategory Category, string? Message, double? Points);
 }

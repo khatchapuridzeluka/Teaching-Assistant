@@ -66,6 +66,37 @@ public class GradingReportTests
     }
 
     [Fact]
+    public void ChangingOnlyThePoints_CountsAsEdited_AndReachesTheStudentRecord()
+    {
+        var submission = new Submission(SubmissionSource.GoogleClassroom, "course", "assignment", "student", "Ana", "sub", "folder", Now);
+        var version = submission.AddVersion(VersionStatus.Ready, null, "hash", "path", Now, Now, []);
+        var grading = new AiGrading(version.Id, "model", "AI review", 82, 100, null, 1, [], [], "{}",
+            [new GradingMistake(null, null, null, MistakeSeverity.Minor, MistakeCategory.Design, "getName() belongs in Creature", 1)], Now);
+        var mistake = grading.Mistakes[0];
+        var report = new GradingReport(grading, submission, Now);
+        Assert.Equal(1, report.Mistakes[0].Points);
+
+        report.Save(grading, 80, null, "Review",
+            [new ReportMistakeEdit(mistake.Id, false, mistake.Severity, mistake.Category, mistake.Message, 3)], Now);
+        report.Approve(Now);
+
+        Assert.Equal((MistakeDecision.Edited, (double?)3), (report.Mistakes[0].Decision, report.Mistakes[0].Points));
+        Assert.Equal((double?)1, mistake.Points);
+        Assert.Equal((double?)3, Assert.Single(StudentMistake.FromApprovedReport(report, submission)).Points);
+    }
+
+    [Fact]
+    public void NegativePoints_AreRefused()
+    {
+        var grading = Grading();
+        var report = new GradingReport(grading, _submission, Now);
+        var mistake = grading.Mistakes[0];
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => report.Save(grading, 80, null, "Review",
+            [new ReportMistakeEdit(mistake.Id, false, mistake.Severity, mistake.Category, mistake.Message, -2)], Now));
+    }
+
+    [Fact]
     public void EditingBackToTheOriginal_CountsAsKept()
     {
         var grading = Grading();

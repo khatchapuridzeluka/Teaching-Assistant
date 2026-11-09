@@ -25,8 +25,9 @@ type EditableMistake = {
   severity: MistakeSeverity;
   category: MistakeCategory;
   message: string;
+  points: string;
   rejected: boolean;
-  original: { severity: MistakeSeverity; category: MistakeCategory; message: string };
+  original: { severity: MistakeSeverity; category: MistakeCategory; message: string; points: number | null };
 };
 
 export function ReportEditor({
@@ -74,6 +75,7 @@ export function ReportEditor({
             severity: m.severity,
             category: m.category,
             message: m.message,
+            points: fromInput(m.points),
           })),
         },
       },
@@ -82,6 +84,7 @@ export function ReportEditor({
   }
 
   const rejected = mistakes.filter((m) => m.rejected).length;
+  const deducted = mistakes.filter((m) => !m.rejected).reduce((sum, m) => sum + (fromInput(m.points) ?? 0), 0);
   const edited = mistakes.filter((m) => !m.rejected && isEdited(m)).length;
 
   return (
@@ -113,8 +116,10 @@ export function ReportEditor({
                   min={0}
                   step="0.5"
                   value={score}
+                  placeholder={toInput(grading.score)}
+                  title={grading.score != null ? `AI suggested ${grading.score}` : undefined}
                   onChange={(e) => setScore(e.target.value)}
-                  className="h-9 w-24 rounded-lg border border-line bg-white px-2 text-[14px] font-semibold text-ink"
+                  className="h-9 w-24 rounded-lg border border-line bg-white px-2 text-[14px] font-semibold text-ink placeholder:font-normal placeholder:text-ink-muted/60"
                 />
                 / {grading.maxScore ?? "–"}
               </span>
@@ -126,13 +131,20 @@ export function ReportEditor({
                 min={0}
                 step="0.5"
                 value={bonus}
+                placeholder={toInput(grading.bonus)}
+                title={grading.bonus != null ? `AI suggested ${grading.bonus}` : undefined}
                 onChange={(e) => setBonus(e.target.value)}
-                className="h-9 w-24 rounded-lg border border-line bg-white px-2 text-[14px] font-semibold text-ink"
+                className="h-9 w-24 rounded-lg border border-line bg-white px-2 text-[14px] font-semibold text-ink placeholder:font-normal placeholder:text-ink-muted/60"
               />
             </label>
-            <span className="pb-2 text-xs text-ink-muted">
-              AI suggested {grading.score ?? "–"} / {grading.maxScore ?? "–"}
-              {grading.bonus ? ` +${grading.bonus}` : ""}
+            <span className="flex flex-col pb-1.5 text-xs text-ink-muted">
+              <span>
+                AI suggested {grading.score ?? "–"} / {grading.maxScore ?? "–"}
+                {grading.bonus ? ` +${grading.bonus}` : ""}
+              </span>
+              <span>
+                Kept mistakes take off <b className="text-ink">{formatPoints(deducted)}</b> points; the score is not changed for you
+              </span>
             </span>
           </section>
 
@@ -191,6 +203,22 @@ export function ReportEditor({
                       </option>
                     ))}
                   </select>
+                  <label className="flex items-center gap-1 text-ink-muted" title="Points this mistake takes off">
+                    −
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.5"
+                      value={m.points}
+                      placeholder={toInput(m.original.points)}
+                      title={m.original.points != null ? `AI suggested ${m.original.points}` : "The AI gave no points for this mistake"}
+                      onChange={(e) => update(i, { points: e.target.value })}
+                      disabled={m.rejected}
+                      aria-label="Points deducted"
+                      className="h-7 w-14 rounded-lg border border-line bg-white px-1.5 font-semibold text-ink placeholder:font-normal placeholder:text-ink-muted/60"
+                    />
+                    pts
+                  </label>
                   <span className="font-mono text-ink-muted">{location(m)}</span>
                   {m.rejected ? <Chip tone="muted">Rejected</Chip> : isEdited(m) && <Chip tone="tint">Edited</Chip>}
                   <Button small className="ml-auto" onClick={() => update(i, { rejected: !m.rejected })}>
@@ -232,7 +260,15 @@ export function ReportEditor({
 export function keptMistakes(report: GradingReport): CodeMistake[] {
   return report.mistakes
     .filter((m) => m.decision !== "Rejected")
-    .map((m) => ({ file: m.file, startLine: m.startLine, endLine: m.endLine, severity: m.severity, category: m.category, message: m.message }));
+    .map((m) => ({
+      file: m.file,
+      startLine: m.startLine,
+      endLine: m.endLine,
+      severity: m.severity,
+      category: m.category,
+      message: m.message,
+      points: m.points,
+    }));
 }
 
 export function ReportChip({ report }: { report: GradingReport }) {
@@ -252,14 +288,20 @@ function initialMistakes(grading: GradingResult, report: GradingReport | null | 
         severity: saved?.severity ?? m.severity,
         category: saved?.category ?? m.category,
         message: saved?.message ?? m.message,
+        points: toInput(saved ? saved.points : m.points),
         rejected: saved?.decision === "Rejected",
-        original: { severity: m.severity, category: m.category, message: m.message },
+        original: { severity: m.severity, category: m.category, message: m.message, points: m.points ?? null },
       };
     });
 }
 
 function isEdited(m: EditableMistake): boolean {
-  return m.severity !== m.original.severity || m.category !== m.original.category || m.message.trim() !== m.original.message.trim();
+  return (
+    m.severity !== m.original.severity ||
+    m.category !== m.original.category ||
+    m.message.trim() !== m.original.message.trim() ||
+    fromInput(m.points) !== m.original.points
+  );
 }
 
 function location(m: EditableMistake): string {
@@ -279,4 +321,8 @@ function toInput(value: number | null | undefined): string {
 
 function fromInput(value: string): number | null {
   return value.trim() === "" ? null : Number(value);
+}
+
+function formatPoints(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }

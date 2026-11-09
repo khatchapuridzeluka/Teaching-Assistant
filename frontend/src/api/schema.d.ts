@@ -1039,6 +1039,102 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Returns the queue overview for the System page: counts (queued and running now, finished in the last 24 hours) and the 200 most recent jobs with the student and assignment they are about, newest first. */
+        get: {
+            parameters: {
+                query?: {
+                    status?: components["schemas"]["JobStatus"];
+                    courseId?: string;
+                    assignmentId?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Overview retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["JobOverviewResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/{jobId}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Queues a failed or canceled job again as a new job (the old one stays in the history); a grading is checked again first. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    jobId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Queued again (or an active job for the same work is returned) */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["JobResponse"];
+                    };
+                };
+                /** @description The job is not failed or canceled, its type cannot be retried, or its version no longer exists */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description No job with this ID */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/jobs/{jobId}": {
         parameters: {
             query?: never;
@@ -1196,6 +1292,51 @@ export interface paths {
                 };
                 /** @description Model unreachable or returned an error (bad key, unknown model, rate limit, network) */
                 503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/model-usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Returns the model calls of the last days (default 30): totals per purpose (calls, failures, input, output and cache tokens, average duration) and the 200 most recent calls; only metadata is recorded, never prompts or answers. */
+        get: {
+            parameters: {
+                query?: {
+                    days?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Usage retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ModelUsageResponse"];
+                    };
+                };
+                /** @description Days outside 1-365 */
+                400: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -1807,6 +1948,8 @@ export interface components {
             message: string;
             /** Format: uuid */
             id?: string | null;
+            /** Format: double */
+            points?: number | null;
         };
         /** @enum {string} */
         ContentKind: "CodeArchive" | "SourceFile" | "Repository" | "Document" | "Image" | "Other";
@@ -2008,6 +2151,35 @@ export interface components {
             stored: boolean;
             url?: string | null;
         };
+        JobCounts: {
+            /** Format: int32 */
+            queued: number;
+            /** Format: int32 */
+            running: number;
+            /** Format: int32 */
+            succeeded: number;
+            /** Format: int32 */
+            failed: number;
+            /** Format: int32 */
+            canceled: number;
+            /** Format: date-time */
+            finishedSince: string;
+        };
+        JobOverviewItem: {
+            job: components["schemas"]["JobResponse"];
+            courseId?: string | null;
+            assignmentId?: string | null;
+            assignmentTitle?: string | null;
+            submissionId?: string | null;
+            studentId?: string | null;
+            studentName?: string | null;
+            /** Format: int32 */
+            versionNumber?: number | null;
+        };
+        JobOverviewResponse: {
+            counts: components["schemas"]["JobCounts"];
+            jobs: components["schemas"]["JobOverviewItem"][];
+        };
         JobResponse: {
             /** Format: uuid */
             id: string;
@@ -2046,6 +2218,37 @@ export interface components {
         MistakeDecision: "Kept" | "Edited" | "Rejected";
         /** @enum {string} */
         MistakeSeverity: "Major" | "Minor" | "Style";
+        /** @enum {string} */
+        ModelCallPurpose: "Grading" | "Chat" | "HealthCheck";
+        ModelCallResponse: {
+            /** Format: uuid */
+            id: string;
+            purpose: components["schemas"]["ModelCallPurpose"];
+            requestedModel: string;
+            model?: string | null;
+            succeeded: boolean;
+            error?: string | null;
+            /** Format: int64 */
+            inputTokens?: number | null;
+            /** Format: int64 */
+            outputTokens?: number | null;
+            /** Format: int64 */
+            cacheReadTokens?: number | null;
+            /** Format: int64 */
+            cacheWriteTokens?: number | null;
+            /** Format: int64 */
+            durationMs: number;
+            courseId?: string | null;
+            assignmentId?: string | null;
+            assignmentTitle?: string | null;
+            /** Format: uuid */
+            versionId?: string | null;
+            submissionId?: string | null;
+            studentId?: string | null;
+            studentName?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
         ModelHealthResponse: {
             healthy: boolean;
             model: string;
@@ -2053,6 +2256,50 @@ export interface components {
             latencyMs: number;
             reply?: string | null;
             error?: string | null;
+        };
+        ModelUsageDay: {
+            /** Format: date */
+            date: string;
+            /** Format: int32 */
+            calls: number;
+            /** Format: int64 */
+            inputTokens: number;
+            /** Format: int64 */
+            cacheReadTokens: number;
+            /** Format: int64 */
+            cacheWriteTokens: number;
+            /** Format: int64 */
+            outputTokens: number;
+        };
+        ModelUsageResponse: {
+            /** Format: date-time */
+            since: string;
+            totals: components["schemas"]["ModelUsageTotal"][];
+            days: components["schemas"]["ModelUsageDay"][];
+            recent: components["schemas"]["ModelCallResponse"][];
+        };
+        ModelUsageTotal: {
+            purpose: components["schemas"]["ModelCallPurpose"];
+            /** Format: int32 */
+            calls: number;
+            /** Format: int32 */
+            failed: number;
+            /** Format: int64 */
+            inputTokens: number;
+            /** Format: int64 */
+            outputTokens: number;
+            /** Format: int64 */
+            cacheReadTokens: number;
+            /** Format: int64 */
+            cacheWriteTokens: number;
+            /** Format: int64 */
+            averagePromptTokens: number;
+            /** Format: int64 */
+            averageOutputTokens: number;
+            /** Format: double */
+            cacheHitRate?: number | null;
+            /** Format: int64 */
+            averageDurationMs: number;
         };
         ProblemDetails: {
             type?: string | null;
@@ -2071,6 +2318,8 @@ export interface components {
             severity: components["schemas"]["MistakeSeverity"];
             category: components["schemas"]["MistakeCategory"];
             message: string;
+            /** Format: double */
+            points?: number | null;
         };
         ReportMistakeResponse: {
             /** Format: uuid */
@@ -2085,6 +2334,8 @@ export interface components {
             severity: components["schemas"]["MistakeSeverity"];
             category: components["schemas"]["MistakeCategory"];
             message: string;
+            /** Format: double */
+            points?: number | null;
             decision: components["schemas"]["MistakeDecision"];
         };
         /** @enum {string} */
@@ -2217,6 +2468,8 @@ export interface components {
             severity: components["schemas"]["MistakeSeverity"];
             category: components["schemas"]["MistakeCategory"];
             message: string;
+            /** Format: double */
+            points?: number | null;
             decision: components["schemas"]["MistakeDecision"];
             /** Format: date-time */
             approvedAt: string;

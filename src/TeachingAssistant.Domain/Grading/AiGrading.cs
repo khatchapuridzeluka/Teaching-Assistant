@@ -96,7 +96,9 @@ public class GradingMistake
     {
     }
 
-    public GradingMistake(string? file, int? startLine, int? endLine, MistakeSeverity severity, MistakeCategory category, string message)
+    public GradingMistake(
+        string? file, int? startLine, int? endLine, MistakeSeverity severity, MistakeCategory category, string message,
+        double? points = null)
     {
         Id = Guid.CreateVersion7();
         File = file;
@@ -105,6 +107,7 @@ public class GradingMistake
         Severity = severity;
         Category = category;
         Message = message;
+        Points = points;
     }
 
     public Guid Id { get; private set; }
@@ -119,6 +122,8 @@ public class GradingMistake
     public MistakeSeverity Severity { get; private set; }
     public MistakeCategory Category { get; private set; }
     public string Message { get; private set; } = null!;
+
+    public double? Points { get; private set; }
 
     internal void AttachTo(Guid gradingId, int position)
     {

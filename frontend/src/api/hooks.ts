@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, type SaveReportRequest, unwrap } from "./client";
+import { api, type JobStatus, type SaveReportRequest, unwrap } from "./client";
 import { forgetMissingPhotos } from "../components/ui";
 
 export const useCourses = () =>
@@ -180,6 +180,39 @@ export const useJob = (jobId: string) =>
       return status === undefined || isActive(status) ? 2000 : false;
     },
   });
+
+export const useJobOverview = (status: JobStatus | undefined) =>
+  useQuery({
+    queryKey: ["jobs", "overview", status ?? "all"],
+    queryFn: () => unwrap(api.GET("/jobs", { params: { query: { status } } })),
+    staleTime: 0,
+    refetchInterval: (query) => {
+      const counts = query.state.data?.counts;
+      return counts && counts.queued + counts.running > 0 ? 2000 : 15000;
+    },
+  });
+
+export const useModelUsage = (days: number) =>
+  useQuery({
+    queryKey: ["model-usage", days],
+    queryFn: () => unwrap(api.GET("/model-usage", { params: { query: { days } } })),
+    staleTime: 0,
+    refetchInterval: 30000,
+  });
+
+export const useJobAction = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ jobId, action }: { jobId: string; action: "cancel" | "retry" }) =>
+      action === "cancel"
+        ? unwrap(api.POST("/jobs/{jobId}/cancel", { params: { path: { jobId } } }))
+        : unwrap(api.POST("/jobs/{jobId}/retry", { params: { path: { jobId } } })),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      void queryClient.invalidateQueries({ predicate: (query) => query.queryKey.includes("jobs") });
+    },
+  });
+};
 
 export const useCancelJob = (courseId: string, assignmentId: string) => {
   const queryClient = useQueryClient();

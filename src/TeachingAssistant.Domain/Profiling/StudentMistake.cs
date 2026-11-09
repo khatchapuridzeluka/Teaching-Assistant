@@ -27,6 +27,7 @@ public class StudentMistake
         Severity = mistake.Severity;
         Category = mistake.Category;
         Message = mistake.Message;
+        Points = mistake.Points;
         Decision = mistake.Decision;
         ApprovedAt = report.ApprovedAt!.Value;
     }
@@ -62,6 +63,8 @@ public class StudentMistake
     public MistakeCategory Category { get; private set; }
 
     public string Message { get; private set; } = null!;
+
+    public double? Points { get; private set; }
 
     public MistakeDecision Decision { get; private set; }
 

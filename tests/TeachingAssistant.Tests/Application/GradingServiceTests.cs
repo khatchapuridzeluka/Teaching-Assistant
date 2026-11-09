@@ -21,7 +21,10 @@ public class GradingServiceTests
     private readonly FakeWordReader _wordReader = new();
     private readonly FakeGradingStore _gradings = new();
 
-    private GradingService Service() => new(_store, _instructions, _storage, _wordReader, _model, _gradings, TimeProvider.System);
+    private readonly ModelCallContext _callContext = new();
+
+    private GradingService Service() =>
+        new(_store, _instructions, _storage, _wordReader, _model, _gradings, _callContext, TimeProvider.System);
 
     [Fact]
     public async Task Grade_SavesTheWholeAnswerAsADraft_WithTheScoreAsNumbers()
@@ -117,8 +120,8 @@ public class GradingServiceTests
             {
               "review": "## Score\n90/100",
               "mistakes": [
-                { "file": "src/Zoo.java", "startLine": 2, "endLine": 2, "severity": "Major", "category": "Encapsulation", "message": " Field is public. " },
-                { "file": "Zoo.java", "startLine": 3, "endLine": 99, "severity": "Minor", "category": "Naming", "message": "Unclear name." },
+                { "file": "src/Zoo.java", "startLine": 2, "endLine": 2, "severity": "Major", "category": "Encapsulation", "message": " Field is public. ", "points": 5 },
+                { "file": "Zoo.java", "startLine": 3, "endLine": 99, "severity": "Minor", "category": "Naming", "message": "Unclear name.", "points": -3 },
                 { "file": "src/Zoo.java", "startLine": 40, "endLine": 41, "severity": "Style", "category": "Readability", "message": "Lines that do not exist." },
                 { "file": "Other.java", "startLine": 1, "endLine": 1, "severity": "Major", "category": "Correctness", "message": "A file that was not sent." },
                 { "file": null, "startLine": null, "endLine": null, "severity": "Major", "category": "MissingRequirement", "message": "Task 3 is missing." }
@@ -129,13 +132,14 @@ public class GradingServiceTests
         var result = await Service().GradeVersionAsync(versionId, TestContext.Current.CancellationToken);
 
         Assert.Contains("\"enum\"", _model.Schema);
+        Assert.Contains("\"points\"", _model.Schema);
         Assert.Equal("## Score\n90/100", result!.Review);
         Assert.Equal(
         [
             // As given, trimmed.
-            new CodeMistake("src/Zoo.java", 2, 2, MistakeSeverity.Major, MistakeCategory.Encapsulation, "Field is public."),
+            new CodeMistake("src/Zoo.java", 2, 2, MistakeSeverity.Major, MistakeCategory.Encapsulation, "Field is public.", Points: 5),
             // The file name alone matches the one file with that name; the end line is kept inside the file (4 lines).
-            new CodeMistake("src/Zoo.java", 3, 4, MistakeSeverity.Minor, MistakeCategory.Naming, "Unclear name."),
+            new CodeMistake("src/Zoo.java", 3, 4, MistakeSeverity.Minor, MistakeCategory.Naming, "Unclear name.", Points: 3),
             // Lines outside the file are dropped, the file is kept.
             new CodeMistake("src/Zoo.java", null, null, MistakeSeverity.Style, MistakeCategory.Readability, "Lines that do not exist."),
             // A file that was not sent is dropped with its lines: the mistake stays, about the submission as a whole.
@@ -414,6 +418,8 @@ public class GradingServiceTests
         public string Reply { get; set; } = """{ "review": "The review", "mistakes": [] }""";
 
         public string ModelId => "fake-model";
+
+        public string GradingModelId => "fake-grading-model";
 
         public Task<LanguageModelReply> GradeAsync(
             string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default)

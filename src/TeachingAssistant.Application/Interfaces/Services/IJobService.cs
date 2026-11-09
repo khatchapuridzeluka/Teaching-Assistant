@@ -12,6 +12,11 @@ public interface IJobService
     Task<IReadOnlyList<JobResponse>> GetByAssignmentAsync(string assignmentId, CancellationToken cancellationToken = default);
 
     Task<JobResponse?> CancelAsync(Guid jobId, CancellationToken cancellationToken = default);
+
+    Task<JobOverviewResponse> GetOverviewAsync(
+        JobStatus? status, string? courseId, string? assignmentId, CancellationToken cancellationToken = default);
+
+    Task<JobResponse?> RetryAsync(Guid jobId, CancellationToken cancellationToken = default);
 }
 
 public interface IJobProcessor

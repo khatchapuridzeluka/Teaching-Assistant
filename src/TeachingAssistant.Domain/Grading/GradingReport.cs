@@ -23,7 +23,8 @@ public sealed record ReportMistakeEdit(
     bool Rejected,
     MistakeSeverity Severity,
     MistakeCategory Category,
-    string Message);
+    string Message,
+    double? Points = null);
 
 public class GradingReport
 {
@@ -105,6 +106,11 @@ public class GradingReport
             throw new ArgumentOutOfRangeException(nameof(score), "Score and bonus cannot be negative.");
         }
 
+        if (edits.Any(e => e.Points < 0))
+        {
+            throw new ArgumentOutOfRangeException(nameof(edits), "A mistake cannot deduct a negative number of points.");
+        }
+
         foreach (var edit in edits)
         {
             var mistake = _mistakes.SingleOrDefault(m => m.SourceMistakeId == edit.SourceMistakeId)
@@ -147,6 +153,7 @@ public class ReportMistake
         Severity = source.Severity;
         Category = source.Category;
         Message = source.Message;
+        Points = source.Points;
         Decision = MistakeDecision.Kept;
     }
 
@@ -170,6 +177,8 @@ public class ReportMistake
 
     public string Message { get; private set; } = null!;
 
+    public double? Points { get; private set; }
+
     public MistakeDecision Decision { get; private set; }
 
     internal void Apply(ReportMistakeEdit edit, GradingMistake source)
@@ -177,6 +186,7 @@ public class ReportMistake
         Severity = edit.Severity;
         Category = edit.Category;
         Message = edit.Message.Trim();
+        Points = edit.Points;
 
         if (edit.Rejected)
         {
@@ -184,7 +194,8 @@ public class ReportMistake
             return;
         }
 
-        var changed = Severity != source.Severity || Category != source.Category || Message != source.Message.Trim();
+        var changed = Severity != source.Severity || Category != source.Category || Message != source.Message.Trim()
+                      || Points != source.Points;
         Decision = changed ? MistakeDecision.Edited : MistakeDecision.Kept;
     }
 }

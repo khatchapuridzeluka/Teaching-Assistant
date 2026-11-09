@@ -86,6 +86,12 @@ export const workspaceSections: Section[] = [
       "Tracked over time as the rubric and rules improve",
     ],
   },
+  {
+    path: "system",
+    label: "System",
+    ready: true,
+    description: "Background jobs with cancel and retry, and every model call with its tokens, cache use and duration.",
+  },
 ];
 
 export const coursePath = (courseId: string, sectionPath = "") =>

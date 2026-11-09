@@ -72,7 +72,7 @@ public class GradingReportService : IGradingReportService
             _reports.Add(report);
         }
 
-        var edits = request.Mistakes.Select(m => new ReportMistakeEdit(m.SourceMistakeId, m.Rejected, m.Severity, m.Category, m.Message));
+        var edits = request.Mistakes.Select(m => new ReportMistakeEdit(m.SourceMistakeId, m.Rejected, m.Severity, m.Category, m.Message, m.Points));
         report.Save(grading, request.Score, request.Bonus, request.Review.Trim(), edits, now);
         _studentMistakes.RemoveRange(await _studentMistakes.GetByReportAsync(report.Id, cancellationToken));
 
@@ -103,6 +103,11 @@ public class GradingReportService : IGradingReportService
             throw new InvalidRequestException("The review text cannot be empty.");
         }
 
+        if (request.Mistakes.Any(m => m.Points < 0))
+        {
+            throw new InvalidRequestException("A mistake cannot deduct a negative number of points.");
+        }
+
         var known = grading.Mistakes.Select(m => m.Id).ToHashSet();
         var unknown = request.Mistakes.FirstOrDefault(m => !known.Contains(m.SourceMistakeId));
         if (unknown is not null)
@@ -121,7 +126,7 @@ public class GradingReportService : IGradingReportService
         report.Id, report.GradingId, report.VersionId, report.StudentId, report.CourseId, report.AssignmentId, report.Status, report.Score, grading.MaxScore, report.Bonus, report.Review,
         report.Mistakes.OrderBy(m => m.Position)
             .Select(m => new ReportMistakeResponse(m.Id, m.SourceMistakeId, m.File, m.StartLine, m.EndLine, m.Severity, m.Category,
-                m.Message, m.Decision))
+                m.Message, m.Points, m.Decision))
             .ToList(),
         report.CreatedAt, report.UpdatedAt, report.ApprovedAt);
 }

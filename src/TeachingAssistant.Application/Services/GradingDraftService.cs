@@ -64,6 +64,6 @@ public class GradingDraftService : IGradingDraftService
     internal static GradingResponse ToResponse(AiGrading g) => new(
         g.Id, g.VersionId, g.Status, g.Model, g.Review, g.Score, g.MaxScore, g.Bonus,
         g.Mistakes.OrderBy(m => m.Position)
-            .Select(m => new CodeMistake(m.File, m.StartLine, m.EndLine, m.Severity, m.Category, m.Message, m.Id)).ToList(),
+            .Select(m => new CodeMistake(m.File, m.StartLine, m.EndLine, m.Severity, m.Category, m.Message, m.Id, m.Points)).ToList(),
         g.InstructionsVersion, g.SentFiles, g.SkippedFiles, g.CreatedAt);
 }

@@ -118,6 +118,41 @@ public class JobServiceTests
         Assert.Equal(JobStatus.Queued, _store.Jobs.Single(j => j.Id == claimed!.Id).Status);
     }
 
+    [Fact]
+    public async Task Overview_CountsActiveAndRecentlyFinished_AndNamesTheStudent()
+    {
+        var versionId = _grading.AddGradable();
+        _store.Subjects.Add(new JobSubject(versionId, 2, "course-1", "assignment-1", "Assignment 2", "sub-1", "student-1", "Ana"));
+        await Service().QueueGradeVersionAsync(versionId, TestContext.Current.CancellationToken);
+        var other = await Service().QueueGradeVersionAsync(_grading.AddGradable(), TestContext.Current.CancellationToken);
+        await Service().CancelAsync(other!.Id, TestContext.Current.CancellationToken);
+
+        var overview = await Service().GetOverviewAsync(null, null, null, TestContext.Current.CancellationToken);
+
+        Assert.Equal((1, 0, 1), (overview.Counts.Queued, overview.Counts.Running, overview.Counts.Canceled));
+        var ana = Assert.Single(overview.Jobs, j => j.Job.VersionId == versionId);
+        Assert.Equal(("Ana", "Assignment 2", "sub-1", 2), (ana.StudentName, ana.AssignmentTitle, ana.SubmissionId, ana.VersionNumber));
+        Assert.Single((await Service().GetOverviewAsync(JobStatus.Canceled, null, null, TestContext.Current.CancellationToken)).Jobs);
+    }
+
+    [Fact]
+    public async Task Retry_QueuesAFailedJobAgainAsANewJob_ButNotARunningOne()
+    {
+        var versionId = _grading.AddGradable();
+        var first = await Service().QueueGradeVersionAsync(versionId, TestContext.Current.CancellationToken);
+        var claimed = await Processor().ClaimNextAsync("w", Lease, TestContext.Current.CancellationToken);
+
+        await Assert.ThrowsAsync<InvalidRequestException>(() => Service().RetryAsync(first!.Id, TestContext.Current.CancellationToken));
+
+        await Processor().FailAsync(claimed!.Id, new InvalidRequestException("Broken"), TestContext.Current.CancellationToken);
+        var retried = await Service().RetryAsync(first!.Id, TestContext.Current.CancellationToken);
+
+        Assert.NotEqual(first.Id, retried!.Id);
+        Assert.Equal((JobStatus.Queued, versionId), (retried.Status, retried.VersionId));
+        Assert.Equal(JobStatus.Failed, (await Service().GetAsync(first.Id, TestContext.Current.CancellationToken))!.Status);
+        Assert.Null(await Service().RetryAsync(Guid.NewGuid(), TestContext.Current.CancellationToken));
+    }
+
     private sealed class FakeGrading : IGradingService
     {
         private readonly HashSet<Guid> _gradable = [];
@@ -195,6 +230,29 @@ public class JobServiceTests
 
         public Task<IReadOnlyList<Job>> GetExpiredLeasesAsync(DateTimeOffset now, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<Job>>(Jobs.Where(j => j.HasExpiredLease(now)).ToList());
+
+        public List<JobSubject> Subjects { get; } = [];
+
+        public Task<IReadOnlyList<Job>> GetRecentAsync(
+            JobStatus? status, string? courseId, string? assignmentId, int limit, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<Job>>(Jobs
+                .Where(j => status is null || j.Status == status)
+                .Where(j => courseId is null || j.CourseId == courseId)
+                .Where(j => assignmentId is null || j.AssignmentId == assignmentId)
+                .OrderByDescending(j => j.CreatedAt)
+                .Take(limit)
+                .ToList());
+
+        public Task<IReadOnlyDictionary<JobStatus, int>> CountByStatusAsync(
+            DateTimeOffset finishedSince, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyDictionary<JobStatus, int>>(Jobs
+                .Where(j => !j.IsFinished || j.FinishedAt >= finishedSince)
+                .GroupBy(j => j.Status)
+                .ToDictionary(g => g.Key, g => g.Count()));
+
+        public Task<IReadOnlyList<JobSubject>> GetSubjectsAsync(
+            IReadOnlyCollection<Guid> versionIds, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<JobSubject>>(Subjects.Where(s => versionIds.Contains(s.VersionId)).ToList());
 
         public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     }

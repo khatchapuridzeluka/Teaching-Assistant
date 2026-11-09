@@ -89,6 +89,10 @@ public class GradingService : IGradingService
           points (readability, and every trivial issue from the grading policy).
         - message: what is wrong and how to fix it in one or two sentences, and which task it costs points in, or that
           it cost no points (always the case for Style).
+        - points: how many points this mistake took off, as a positive number (3 for a name fixed by the instructions, 0
+          for every Style entry). The teacher adjusts these per mistake and compares them across the class, so a number
+          must match what the message and the Score section say, and the points of all mistakes should add up to what
+          the Score section deducts.
         - An empty list when there are no mistakes.
 
         Keep it concise; the teacher reviews a whole class.
@@ -100,6 +104,7 @@ public class GradingService : IGradingService
     private readonly IDocumentReader _documentReader;
     private readonly ILanguageModel _languageModel;
     private readonly IGradingStore _gradings;
+    private readonly ModelCallContext _callContext;
     private readonly TimeProvider _timeProvider;
 
     public GradingService(
@@ -109,6 +114,7 @@ public class GradingService : IGradingService
         IDocumentReader documentReader,
         ILanguageModel languageModel,
         IGradingStore gradings,
+        ModelCallContext callContext,
         TimeProvider timeProvider)
     {
         _store = store;
@@ -117,6 +123,7 @@ public class GradingService : IGradingService
         _documentReader = documentReader;
         _languageModel = languageModel;
         _gradings = gradings;
+        _callContext = callContext;
         _timeProvider = timeProvider;
     }
 
@@ -134,13 +141,14 @@ public class GradingService : IGradingService
             return null;
         }
 
-        var (_, instructions, prompt) = prepared;
+        var (submission, instructions, prompt) = prepared;
+        _callContext.Describe(submission.CourseId, submission.AssignmentId, versionId);
         var reply = await _languageModel.GradeAsync(SystemPrompt, prompt.Parts, GradingOutput.Schema, cancellationToken);
         var read = GradingOutput.Read(reply.Text, prompt.CodeLines);
 
         var grading = new AiGrading(versionId, reply.Model, read.Review, read.Score, read.MaxScore, read.Bonus,
             instructions.Number, prompt.Sent, prompt.Skipped, reply.Text,
-            read.Mistakes.Select(m => new GradingMistake(m.File, m.StartLine, m.EndLine, m.Severity, m.Category, m.Message)),
+            read.Mistakes.Select(m => new GradingMistake(m.File, m.StartLine, m.EndLine, m.Severity, m.Category, m.Message, m.Points)),
             _timeProvider.GetUtcNow());
         _gradings.Add(grading);
         await _gradings.SaveChangesAsync(cancellationToken);

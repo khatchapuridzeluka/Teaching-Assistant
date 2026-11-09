@@ -3,6 +3,7 @@ using TeachingAssistant.Domain.Grading;
 using TeachingAssistant.Domain.Ingestion;
 using TeachingAssistant.Domain.Jobs;
 using TeachingAssistant.Domain.Profiling;
+using TeachingAssistant.Domain.Usage;
 
 namespace TeachingAssistant.Infrastructure.Persistence;
 
@@ -23,6 +24,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<GradingReport> GradingReports => Set<GradingReport>();
     public DbSet<ReportMistake> ReportMistakes => Set<ReportMistake>();
     public DbSet<StudentMistake> StudentMistakes => Set<StudentMistake>();
+    public DbSet<ModelCall> ModelCalls => Set<ModelCall>();
     public DbSet<Job> Jobs => Set<Job>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder) =>

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using TeachingAssistant.Application.Interfaces;
+using TeachingAssistant.Application.Models;
 using TeachingAssistant.Domain.Jobs;
 
 namespace TeachingAssistant.Infrastructure.Persistence;
@@ -73,6 +74,62 @@ public class JobStore(AppDbContext db) : IJobStore
         await db.Jobs
             .Where(j => j.Status == JobStatus.Running && j.LockedUntil < now)
             .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<Job>> GetRecentAsync(
+        JobStatus? status, string? courseId, string? assignmentId, int limit, CancellationToken cancellationToken = default)
+    {
+        var jobs = db.Jobs.AsQueryable();
+        if (status is { } wanted)
+        {
+            jobs = jobs.Where(j => j.Status == wanted);
+        }
+
+        if (courseId is not null)
+        {
+            jobs = jobs.Where(j => j.CourseId == courseId);
+        }
+
+        if (assignmentId is not null)
+        {
+            jobs = jobs.Where(j => j.AssignmentId == assignmentId);
+        }
+
+        return await jobs.OrderByDescending(j => j.CreatedAt).Take(limit).ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyDictionary<JobStatus, int>> CountByStatusAsync(
+        DateTimeOffset finishedSince, CancellationToken cancellationToken = default)
+    {
+        var counts = await db.Jobs
+            .Where(j => j.Status == JobStatus.Queued || j.Status == JobStatus.Running || j.FinishedAt >= finishedSince)
+            .GroupBy(j => j.Status)
+            .Select(g => new { Status = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+        return counts.ToDictionary(c => c.Status, c => c.Count);
+    }
+
+    public async Task<IReadOnlyList<JobSubject>> GetSubjectsAsync(
+        IReadOnlyCollection<Guid> versionIds, CancellationToken cancellationToken = default)
+    {
+        if (versionIds.Count == 0)
+        {
+            return [];
+        }
+
+        var rows =
+            from version in db.SubmissionVersions
+            join submission in db.Submissions on version.SubmissionId equals submission.Id
+            where versionIds.Contains(version.Id)
+            join assignment in db.CourseAssignments
+                on new { submission.Source, submission.CourseId, Id = submission.AssignmentId }
+                equals new { assignment.Source, assignment.CourseId, Id = assignment.ExternalAssignmentId } into assignments
+            from assignment in assignments.DefaultIfEmpty()
+            select new JobSubject(version.Id, version.Number, submission.CourseId, submission.AssignmentId,
+                assignment == null ? null : assignment.Title, submission.ExternalSubmissionId, submission.StudentId,
+                submission.StudentName);
+
+        return await rows.ToListAsync(cancellationToken);
+    }
 
     public Task SaveChangesAsync(CancellationToken cancellationToken = default) => db.SaveChangesAsync(cancellationToken);
 
