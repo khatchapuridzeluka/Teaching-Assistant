@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Net.Http.Headers;
 using TeachingAssistant.Application.Contracts;
 using TeachingAssistant.Application.Interfaces.Services;
+using TeachingAssistant.Domain.Grading;
+using TeachingAssistant.Domain.Profiling;
 
 namespace TeachingAssistant.WebAPI.Controllers;
 
@@ -30,14 +32,16 @@ public class StudentsController : ControllerBase
     }
 
     /// <summary>
-    /// Returns a student's recorded mistakes in the course, newest first: the kept and edited mistakes of every approved report (rejected ones are never recorded).
+    /// Returns a student's recorded mistakes in the course (kept and edited mistakes of approved reports), newest assignment first, each labelled new or repeated (same category in an earlier assignment; labels always come from the full history), with breakdowns by category, severity, label and assignment; filterable by assignment, category, severity and label.
     /// </summary>
-    /// <response code="200">Mistakes retrieved successfully; empty when the student has no approved report yet</response>
+    /// <response code="200">Mistakes retrieved successfully; empty lists when the student has no approved report yet</response>
     [HttpGet("{userId}/mistakes")]
-    public async Task<ActionResult<IReadOnlyList<StudentMistakeResponse>>> GetMistakesAsync(
-        string courseId, string userId, CancellationToken cancellationToken)
+    public async Task<ActionResult<StudentMistakesResponse>> GetMistakesAsync(
+        string courseId, string userId, [FromQuery] string? assignmentId, [FromQuery] MistakeCategory? category,
+        [FromQuery] MistakeSeverity? severity, [FromQuery] MistakeLabel? label, CancellationToken cancellationToken)
     {
-        return Ok(await _mistakeService.GetAsync(courseId, userId, cancellationToken));
+        var filter = new StudentMistakeFilter(assignmentId, category, severity, label);
+        return Ok(await _mistakeService.GetAsync(courseId, userId, filter, cancellationToken));
     }
 
     /// <summary>

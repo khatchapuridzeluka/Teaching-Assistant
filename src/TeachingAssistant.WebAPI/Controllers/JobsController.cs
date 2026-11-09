@@ -38,14 +38,15 @@ public class JobsController : ControllerBase
     }
 
     /// <summary>
-    /// Returns the queue overview for the System page: counts (queued and running now, finished in the last 24 hours) and the 200 most recent jobs with the student and assignment they are about, newest first.
+    /// Returns the queue overview for the System page: counts (queued and running now, finished in the last 24 hours) and the 200 most recent jobs with the student and assignment they are about, newest first; filterable by status and kind of work.
     /// </summary>
     /// <response code="200">Overview retrieved successfully</response>
     [HttpGet("jobs")]
     public async Task<ActionResult<JobOverviewResponse>> GetOverviewAsync(
-        [FromQuery] JobStatus? status, [FromQuery] string? courseId, [FromQuery] string? assignmentId, CancellationToken cancellationToken)
+        [FromQuery] JobStatus? status, [FromQuery] JobType? type, [FromQuery] string? courseId, [FromQuery] string? assignmentId,
+        CancellationToken cancellationToken)
     {
-        return Ok(await _jobService.GetOverviewAsync(status, courseId, assignmentId, cancellationToken));
+        return Ok(await _jobService.GetOverviewAsync(status, type, courseId, assignmentId, cancellationToken));
     }
 
     /// <summary>

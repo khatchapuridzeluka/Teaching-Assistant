@@ -129,6 +129,9 @@ public class GradingReportServiceTests
         public Task<GradingReport?> FindByGradingAsync(Guid gradingId, CancellationToken cancellationToken = default) =>
             Task.FromResult(Reports.FirstOrDefault(r => r.GradingId == gradingId));
 
+        public Task<IReadOnlyList<ReportScore>> GetScoresAsync(IReadOnlyCollection<Guid> reportIds, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public void Add(GradingReport report) => Reports.Add(report);
 
         public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;

@@ -76,12 +76,17 @@ public class JobStore(AppDbContext db) : IJobStore
             .ToListAsync(cancellationToken);
 
     public async Task<IReadOnlyList<Job>> GetRecentAsync(
-        JobStatus? status, string? courseId, string? assignmentId, int limit, CancellationToken cancellationToken = default)
+        JobStatus? status, JobType? type, string? courseId, string? assignmentId, int limit, CancellationToken cancellationToken = default)
     {
         var jobs = db.Jobs.AsQueryable();
         if (status is { } wanted)
         {
             jobs = jobs.Where(j => j.Status == wanted);
+        }
+
+        if (type is { } kind)
+        {
+            jobs = jobs.Where(j => j.Type == kind);
         }
 
         if (courseId is not null)
@@ -98,9 +103,15 @@ public class JobStore(AppDbContext db) : IJobStore
     }
 
     public async Task<IReadOnlyDictionary<JobStatus, int>> CountByStatusAsync(
-        DateTimeOffset finishedSince, CancellationToken cancellationToken = default)
+        DateTimeOffset finishedSince, JobType? type, CancellationToken cancellationToken = default)
     {
-        var counts = await db.Jobs
+        var jobs = db.Jobs.AsQueryable();
+        if (type is { } kind)
+        {
+            jobs = jobs.Where(j => j.Type == kind);
+        }
+
+        var counts = await jobs
             .Where(j => j.Status == JobStatus.Queued || j.Status == JobStatus.Running || j.FinishedAt >= finishedSince)
             .GroupBy(j => j.Status)
             .Select(g => new { Status = g.Key, Count = g.Count() })

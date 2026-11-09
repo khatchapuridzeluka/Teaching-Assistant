@@ -1,7 +1,8 @@
 import { type ReactNode, useState } from "react";
 import { Link } from "react-router";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import type { ModelCallItem, ModelUsageTotal } from "../api/client";
+import type { ModelCallItem, ModelCallPurpose, ModelUsageTotal } from "../api/client";
+import { FilterChips } from "./FilterChips";
 import { useModelUsage } from "../api/hooks";
 import { formatDate, formatDay } from "../format";
 import { Card, CardHeader, Chip, EmptyState, ErrorPanel, Spinner } from "./ui";
@@ -20,11 +21,20 @@ const purposeLabels: Record<string, string> = {
 
 const periods = [7, 30, 90];
 
+const purposeOptions: { value: ModelCallPurpose | undefined; label: string }[] = [
+  { value: undefined, label: "All work" },
+  { value: "Grading", label: "AI grading" },
+  { value: "Chat", label: "Ask agent" },
+  { value: "HealthCheck", label: "Model check" },
+];
+
 export function UsageView() {
   const [days, setDays] = useState(30);
-  const usage = useModelUsage(days);
+  const [purpose, setPurpose] = useState<ModelCallPurpose | undefined>(undefined);
+  const usage = useModelUsage(days, purpose);
   const data = usage.data;
-  const grading = data?.totals.find((t) => t.purpose === "Grading");
+  const summary = data?.summary;
+  const workLabel = purpose ? (purposeLabels[purpose] ?? purpose) : "All work";
   const chartData = (data?.days ?? []).map((d) => ({
     date: d.date,
     uncached: d.inputTokens + d.cacheWriteTokens,
@@ -33,27 +43,28 @@ export function UsageView() {
     calls: d.calls,
   }));
   const hasCalls = (data?.totals.length ?? 0) > 0;
+  const purposeCounts = new Map((data?.totals ?? []).map((t) => [t.purpose, t.calls]));
+  const allCalls = (data?.totals ?? []).reduce((sum, t) => sum + t.calls, 0);
 
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="text-xs text-ink-muted">
-          Every Claude call: tokens, cache use, duration and errors · only metadata is recorded, never prompts or answers
-        </div>
-        <div className="flex items-center gap-1.5" role="group" aria-label="Period">
-          {periods.map((p) => (
-            <button
-              key={p}
-              onClick={() => setDays(p)}
-              aria-pressed={days === p}
-              className={`inline-flex h-7 items-center rounded-full border px-3 text-xs font-semibold ${
-                days === p ? "border-accent bg-accent text-white" : "border-line bg-white text-ink hover:border-accent"
-              }`}
-            >
-              {p} days
-            </button>
-          ))}
-        </div>
+        <FilterChips
+          label="Work"
+          options={purposeOptions.map((o) => ({ ...o, count: o.value ? (purposeCounts.get(o.value) ?? 0) : allCalls }))}
+          value={purpose}
+          onChange={setPurpose}
+        />
+        <FilterChips
+          label="Period"
+          options={periods.map((p) => ({ value: p, label: `${p} days` }))}
+          value={days}
+          onChange={setDays}
+        />
+      </div>
+
+      <div className="text-xs text-ink-muted">
+        Every Claude call: tokens, cache use, duration and errors · only metadata is recorded, never prompts or answers
       </div>
 
       {usage.isError && <ErrorPanel error={usage.error} />}
@@ -71,15 +82,19 @@ export function UsageView() {
       {data && hasCalls && (
         <>
           <div className="grid grid-cols-2 border-t border-line md:grid-cols-5">
-            <Stat label="AI gradings" value={grading ? grading.calls : 0} note={grading?.failed ? `${grading.failed} failed` : "none failed"} />
-            <Stat label="Prompt per grading" value={grading ? tokens(grading.averagePromptTokens) : "–"} note="tokens sent, on average" />
-            <Stat label="Output per grading" value={grading ? tokens(grading.averageOutputTokens) : "–"} note="tokens written, on average" />
-            <Stat label="From cache" value={percent(grading?.cacheHitRate)} note="share of grading prompts" />
-            <Stat label="Grading time" value={grading ? seconds(grading.averageDurationMs) : "–"} note="average per call" />
+            <Stat
+              label={`Calls · ${workLabel}`}
+              value={summary?.calls ?? 0}
+              note={summary?.failed ? `${summary.failed} failed` : "none failed"}
+            />
+            <Stat label="Prompt per call" value={summary?.calls ? tokens(summary.averagePromptTokens) : "–"} note="tokens sent, on average" />
+            <Stat label="Output per call" value={summary?.calls ? tokens(summary.averageOutputTokens) : "–"} note="tokens written, on average" />
+            <Stat label="From cache" value={percent(summary?.cacheHitRate)} note="share of the prompt tokens" />
+            <Stat label="Time per call" value={summary?.calls ? seconds(summary.averageDurationMs) : "–"} note="average" />
           </div>
 
           <Card>
-            <CardHeader title="Tokens per day" subtitle={`All calls, last ${days} days`} />
+            <CardHeader title="Tokens per day" subtitle={`${workLabel}, last ${days} days`} />
             <div className="px-[18px] pt-3">
               <Legend />
             </div>
@@ -155,7 +170,7 @@ export function UsageView() {
           </Card>
 
           <Card>
-            <CardHeader title="By purpose" subtitle="Prompt tokens include cached ones; averages count answered calls" />
+            <CardHeader title="All work by purpose" subtitle="Always the full picture · prompt tokens include cached ones" />
             <div className="overflow-x-auto">
               <table className="w-full min-w-[640px] text-left text-xs tabular-nums">
                 <thead className="text-ink-muted">
@@ -171,7 +186,7 @@ export function UsageView() {
                 </thead>
                 <tbody>
                   {data.totals.map((t) => (
-                    <PurposeRow key={t.purpose} total={t} />
+                    <PurposeRow key={t.purpose} total={t} selected={t.purpose === purpose} onSelect={() => setPurpose(t.purpose)} />
                   ))}
                 </tbody>
               </table>
@@ -179,12 +194,16 @@ export function UsageView() {
           </Card>
 
           <Card>
-            <CardHeader title="Recent calls" subtitle="Newest first · up to 200" />
-            <ul className="@container divide-y divide-line">
-              {data.recent.map((call) => (
-                <CallRow key={call.id} call={call} />
-              ))}
-            </ul>
+            <CardHeader title="Recent calls" subtitle={`${workLabel} · newest first · up to 200`} />
+            {data.recent.length === 0 ? (
+              <EmptyState>No {workLabel.toLowerCase()} calls in the last {days} days.</EmptyState>
+            ) : (
+              <ul className="@container divide-y divide-line">
+                {data.recent.map((call) => (
+                  <CallRow key={call.id} call={call} />
+                ))}
+              </ul>
+            )}
           </Card>
         </>
       )}
@@ -192,11 +211,15 @@ export function UsageView() {
   );
 }
 
-function PurposeRow({ total }: { total: ModelUsageTotal }) {
+function PurposeRow({ total, selected, onSelect }: { total: ModelUsageTotal; selected: boolean; onSelect: () => void }) {
   const prompt = total.inputTokens + total.cacheReadTokens + total.cacheWriteTokens;
   return (
-    <tr className="border-b border-line last:border-b-0">
-      <td className="px-[18px] py-2 font-semibold">{purposeLabels[total.purpose] ?? total.purpose}</td>
+    <tr className={`border-b border-line last:border-b-0 ${selected ? "bg-accent-tint/60" : ""}`}>
+      <td className="px-[18px] py-2 font-semibold">
+        <button onClick={onSelect} className="text-left hover:underline" title="Show only this work">
+          {purposeLabels[total.purpose] ?? total.purpose}
+        </button>
+      </td>
       <td className="px-3 py-2">{total.calls}</td>
       <td className={`px-3 py-2 ${total.failed > 0 ? "font-semibold text-[#8f2d2d]" : ""}`}>{total.failed}</td>
       <td className="px-3 py-2">{tokens(prompt)}</td>

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, type JobStatus, type SaveReportRequest, unwrap } from "./client";
+import { api, type JobStatus, type JobType, type ModelCallPurpose, type SaveReportRequest, type StudentMistakeFilter, unwrap } from "./client";
 import { forgetMissingPhotos } from "../components/ui";
 
 export const useCourses = () =>
@@ -33,6 +33,18 @@ export const useGradebook = (courseId: string) =>
   useQuery({
     queryKey: ["courses", courseId, "gradebook"],
     queryFn: () => unwrap(api.GET("/courses/{courseId}/gradebook", { params: { path: { courseId } } })),
+  });
+
+export const useStudentMistakes = (courseId: string, userId: string, filter: StudentMistakeFilter = {}) =>
+  useQuery({
+    queryKey: ["courses", courseId, "students", userId, "mistakes", "gradings", filter],
+    queryFn: () =>
+      unwrap(
+        api.GET("/courses/{courseId}/students/{userId}/mistakes", {
+          params: { path: { courseId, userId }, query: filter },
+        }),
+      ),
+    placeholderData: (previous) => previous,
   });
 
 export const useSyncCourse = (courseId: string) => {
@@ -181,10 +193,10 @@ export const useJob = (jobId: string) =>
     },
   });
 
-export const useJobOverview = (status: JobStatus | undefined) =>
+export const useJobOverview = (status: JobStatus | undefined, type: JobType | undefined) =>
   useQuery({
-    queryKey: ["jobs", "overview", status ?? "all"],
-    queryFn: () => unwrap(api.GET("/jobs", { params: { query: { status } } })),
+    queryKey: ["jobs", "overview", status ?? "all", type ?? "all"],
+    queryFn: () => unwrap(api.GET("/jobs", { params: { query: { status, type } } })),
     staleTime: 0,
     refetchInterval: (query) => {
       const counts = query.state.data?.counts;
@@ -192,10 +204,10 @@ export const useJobOverview = (status: JobStatus | undefined) =>
     },
   });
 
-export const useModelUsage = (days: number) =>
+export const useModelUsage = (days: number, purpose: ModelCallPurpose | undefined) =>
   useQuery({
-    queryKey: ["model-usage", days],
-    queryFn: () => unwrap(api.GET("/model-usage", { params: { query: { days } } })),
+    queryKey: ["model-usage", days, purpose ?? "all"],
+    queryFn: () => unwrap(api.GET("/model-usage", { params: { query: { days, purpose } } })),
     staleTime: 0,
     refetchInterval: 30000,
   });

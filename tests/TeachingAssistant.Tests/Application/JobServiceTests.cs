@@ -127,12 +127,15 @@ public class JobServiceTests
         var other = await Service().QueueGradeVersionAsync(_grading.AddGradable(), TestContext.Current.CancellationToken);
         await Service().CancelAsync(other!.Id, TestContext.Current.CancellationToken);
 
-        var overview = await Service().GetOverviewAsync(null, null, null, TestContext.Current.CancellationToken);
+        var overview = await Service().GetOverviewAsync(null, null, null, null, TestContext.Current.CancellationToken);
 
         Assert.Equal((1, 0, 1), (overview.Counts.Queued, overview.Counts.Running, overview.Counts.Canceled));
         var ana = Assert.Single(overview.Jobs, j => j.Job.VersionId == versionId);
         Assert.Equal(("Ana", "Assignment 2", "sub-1", 2), (ana.StudentName, ana.AssignmentTitle, ana.SubmissionId, ana.VersionNumber));
-        Assert.Single((await Service().GetOverviewAsync(JobStatus.Canceled, null, null, TestContext.Current.CancellationToken)).Jobs);
+        Assert.Single((await Service().GetOverviewAsync(JobStatus.Canceled, null, null, null, TestContext.Current.CancellationToken)).Jobs);
+        Assert.Equal(2, (await Service().GetOverviewAsync(null, JobType.GradeVersion, null, null, TestContext.Current.CancellationToken)).Jobs.Count);
+        var otherWork = await Service().GetOverviewAsync(null, JobType.SyncCourse, null, null, TestContext.Current.CancellationToken);
+        Assert.Equal((0, 0), (otherWork.Jobs.Count, otherWork.Counts.Queued));
     }
 
     [Fact]
@@ -234,9 +237,10 @@ public class JobServiceTests
         public List<JobSubject> Subjects { get; } = [];
 
         public Task<IReadOnlyList<Job>> GetRecentAsync(
-            JobStatus? status, string? courseId, string? assignmentId, int limit, CancellationToken cancellationToken = default) =>
+            JobStatus? status, JobType? type, string? courseId, string? assignmentId, int limit, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<Job>>(Jobs
                 .Where(j => status is null || j.Status == status)
+                .Where(j => type is null || j.Type == type)
                 .Where(j => courseId is null || j.CourseId == courseId)
                 .Where(j => assignmentId is null || j.AssignmentId == assignmentId)
                 .OrderByDescending(j => j.CreatedAt)
@@ -244,8 +248,9 @@ public class JobServiceTests
                 .ToList());
 
         public Task<IReadOnlyDictionary<JobStatus, int>> CountByStatusAsync(
-            DateTimeOffset finishedSince, CancellationToken cancellationToken = default) =>
+            DateTimeOffset finishedSince, JobType? type, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyDictionary<JobStatus, int>>(Jobs
+                .Where(j => type is null || j.Type == type)
                 .Where(j => !j.IsFinished || j.FinishedAt >= finishedSince)
                 .GroupBy(j => j.Status)
                 .ToDictionary(g => g.Key, g => g.Count()));

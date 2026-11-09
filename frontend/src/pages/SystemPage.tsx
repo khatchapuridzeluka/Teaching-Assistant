@@ -1,8 +1,9 @@
 import { type ReactNode, useState } from "react";
 import { Link, useSearchParams } from "react-router";
-import type { JobOverviewItem, JobStatus } from "../api/client";
+import type { JobOverviewItem, JobStatus, JobType } from "../api/client";
 import { useCourses, useJobAction, useJobOverview } from "../api/hooks";
 import { Avatar, Button, Card, Chip, EmptyState, ErrorPanel, PageHeader, Spinner } from "../components/ui";
+import { FilterChips } from "../components/FilterChips";
 import { UsageView } from "../components/UsageView";
 import { formatAge, formatDate, initials } from "../format";
 
@@ -13,6 +14,15 @@ const filters: { key: JobStatus | undefined; label: string }[] = [
   { key: "Failed", label: "Failed" },
   { key: "Succeeded", label: "Succeeded" },
   { key: "Canceled", label: "Canceled" },
+];
+
+const workOptions: { value: JobType | undefined; label: string }[] = [
+  { value: undefined, label: "All work" },
+  { value: "GradeVersion", label: "AI grading" },
+  { value: "GradeAssignment", label: "Grade all" },
+  { value: "FetchAssignment", label: "Fetch" },
+  { value: "SyncCourse", label: "Course sync" },
+  { value: "ReExtract", label: "Re-extract" },
 ];
 
 const jobTypeLabels: Record<string, string> = {
@@ -51,7 +61,8 @@ export function SystemPage() {
 
 function QueueView() {
   const [status, setStatus] = useState<JobStatus | undefined>(undefined);
-  const overview = useJobOverview(status);
+  const [work, setWork] = useState<JobType | undefined>(undefined);
+  const overview = useJobOverview(status, work);
   const action = useJobAction();
   const courses = useCourses();
   const courseNames = new Map((courses.data ?? []).map((c) => [c.id, c.name]));
@@ -69,6 +80,7 @@ function QueueView() {
 
   return (
     <>
+      <FilterChips label="Work" options={workOptions} value={work} onChange={setWork} />
       <div className="text-xs text-ink-muted">
         {active > 0
           ? "Background jobs · updating every 2 seconds while something is queued or running"
@@ -113,7 +125,11 @@ function QueueView() {
           </div>
 
           {jobs.length === 0 ? (
-            <EmptyState>{status ? `No ${status.toLowerCase()} jobs.` : "No background jobs yet. Grading with AI queues one."}</EmptyState>
+            <EmptyState>
+              {status || work
+                ? `No ${status ? `${status.toLowerCase()} ` : ""}${work ? `${jobTypeLabels[work] ?? work} ` : ""}jobs.`
+                : "No background jobs yet. Grading with AI queues one."}
+            </EmptyState>
           ) : (
             <ul className="@container divide-y divide-line">
               {jobs.map((item) => (

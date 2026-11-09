@@ -16,9 +16,10 @@ public interface IJobStore
     Task<IReadOnlyList<Job>> GetExpiredLeasesAsync(DateTimeOffset now, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<Job>> GetRecentAsync(
-        JobStatus? status, string? courseId, string? assignmentId, int limit, CancellationToken cancellationToken = default);
+        JobStatus? status, JobType? type, string? courseId, string? assignmentId, int limit, CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyDictionary<JobStatus, int>> CountByStatusAsync(DateTimeOffset finishedSince, CancellationToken cancellationToken = default);
+    Task<IReadOnlyDictionary<JobStatus, int>> CountByStatusAsync(
+        DateTimeOffset finishedSince, JobType? type, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<JobSubject>> GetSubjectsAsync(IReadOnlyCollection<Guid> versionIds, CancellationToken cancellationToken = default);
 

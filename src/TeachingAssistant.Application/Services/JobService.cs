@@ -69,11 +69,11 @@ public class JobService : IJobService
     }
 
     public async Task<JobOverviewResponse> GetOverviewAsync(
-        JobStatus? status, string? courseId, string? assignmentId, CancellationToken cancellationToken = default)
+        JobStatus? status, JobType? type, string? courseId, string? assignmentId, CancellationToken cancellationToken = default)
     {
         var since = _timeProvider.GetUtcNow() - CountWindow;
-        var counts = await _jobs.CountByStatusAsync(since, cancellationToken);
-        var jobs = await _jobs.GetRecentAsync(status, courseId, assignmentId, RecentJobsOverview, cancellationToken);
+        var counts = await _jobs.CountByStatusAsync(since, type, cancellationToken);
+        var jobs = await _jobs.GetRecentAsync(status, type, courseId, assignmentId, RecentJobsOverview, cancellationToken);
 
         var responses = jobs.Select(JobPayloads.ToResponse).ToList();
         var versionIds = responses.Where(j => j.VersionId is not null).Select(j => j.VersionId!.Value).Distinct().ToList();

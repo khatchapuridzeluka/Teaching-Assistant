@@ -4,12 +4,26 @@ namespace TeachingAssistant.Application.Contracts;
 
 public record ModelUsageResponse(
     DateTimeOffset Since,
+    ModelCallPurpose? Purpose,
+    ModelUsageSummary Summary,
     IReadOnlyList<ModelUsageTotal> Totals,
     IReadOnlyList<ModelUsageDay> Days,
     IReadOnlyList<ModelCallResponse> Recent);
 
 public record ModelUsageTotal(
     ModelCallPurpose Purpose,
+    int Calls,
+    int Failed,
+    long InputTokens,
+    long OutputTokens,
+    long CacheReadTokens,
+    long CacheWriteTokens,
+    long AveragePromptTokens,
+    long AverageOutputTokens,
+    double? CacheHitRate,
+    long AverageDurationMs);
+
+public record ModelUsageSummary(
     int Calls,
     int Failed,
     long InputTokens,

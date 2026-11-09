@@ -21,7 +21,7 @@ public class ModelUsageService : IModelUsageService
         _timeProvider = timeProvider;
     }
 
-    public async Task<ModelUsageResponse> GetAsync(int days, CancellationToken cancellationToken = default)
+    public async Task<ModelUsageResponse> GetAsync(int days, ModelCallPurpose? purpose, CancellationToken cancellationToken = default)
     {
         if (days is < 1 or > 365)
         {
@@ -30,13 +30,16 @@ public class ModelUsageService : IModelUsageService
 
         var now = _timeProvider.GetUtcNow();
         var since = now.AddDays(-days);
-        var calls = await _calls.GetSinceAsync(since, cancellationToken);
+        var all = await _calls.GetSinceAsync(since, cancellationToken);
 
-        var totals = calls
+        var totals = all
             .GroupBy(c => c.Purpose)
             .OrderBy(g => g.Key)
             .Select(g => Total(g.Key, g.ToList()))
             .ToList();
+
+        var calls = purpose is { } wanted ? all.Where(c => c.Purpose == wanted).ToList() : all.ToList();
+        var summary = Summarize(calls);
 
         var byDay = calls.ToLookup(c => DateOnly.FromDateTime(c.CreatedAt.UtcDateTime));
         var firstDay = DateOnly.FromDateTime(since.UtcDateTime).AddDays(1);
@@ -64,10 +67,17 @@ public class ModelUsageService : IModelUsageService
             })
             .ToList();
 
-        return new ModelUsageResponse(since, totals, series, recentResponses);
+        return new ModelUsageResponse(since, purpose, summary, totals, series, recentResponses);
     }
 
     private static ModelUsageTotal Total(ModelCallPurpose purpose, List<ModelCall> calls)
+    {
+        var s = Summarize(calls);
+        return new ModelUsageTotal(purpose, s.Calls, s.Failed, s.InputTokens, s.OutputTokens, s.CacheReadTokens, s.CacheWriteTokens,
+            s.AveragePromptTokens, s.AverageOutputTokens, s.CacheHitRate, s.AverageDurationMs);
+    }
+
+    private static ModelUsageSummary Summarize(List<ModelCall> calls)
     {
         var input = calls.Sum(c => c.InputTokens ?? 0);
         var output = calls.Sum(c => c.OutputTokens ?? 0);
@@ -76,8 +86,7 @@ public class ModelUsageService : IModelUsageService
         var answered = calls.Count(c => c.Succeeded);
         var prompt = input + cacheRead + cacheWrite;
 
-        return new ModelUsageTotal(
-            purpose,
+        return new ModelUsageSummary(
             calls.Count,
             calls.Count - answered,
             input,
@@ -87,6 +96,6 @@ public class ModelUsageService : IModelUsageService
             answered == 0 ? 0 : prompt / answered,
             answered == 0 ? 0 : output / answered,
             prompt == 0 ? null : (double)cacheRead / prompt,
-            (long)calls.Average(c => c.DurationMs));
+            calls.Count == 0 ? 0 : (long)calls.Average(c => c.DurationMs));
     }
 }

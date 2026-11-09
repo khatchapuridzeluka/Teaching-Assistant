@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from "react-router";
 import type { CourseStudent, CourseSyncSummary, StudentAssignmentColumn, StudentAssignmentResult } from "../api/client";
 import { useCourseStudents, useSyncCourse } from "../api/hooks";
 import { CourseName } from "../components/Layout";
+import { MistakeCategoriesCard, MistakeHistoryCard } from "../components/StudentMistakes";
 import { stateChip } from "../components/SubmissionDetail";
 import { Avatar, Button, Card, Chip, EmptyState, ErrorPanel, PageHeader, Spinner } from "../components/ui";
 import { formatDate, formatDay, initials } from "../format";
@@ -395,9 +396,14 @@ function StudentProfile({
                   ))}
                 </ul>
               </div>
+
+              <MistakeHistoryCard courseId={courseId} userId={student.externalUserId} />
             </div>
 
-            <ComingNext />
+            <aside className="flex flex-col gap-4">
+              <MistakeCategoriesCard courseId={courseId} userId={student.externalUserId} />
+              <ComingNext />
+            </aside>
           </div>
         </div>
       </div>
@@ -531,21 +537,17 @@ function Grade({ result, maxPoints }: { result: StudentAssignmentResult | undefi
 function ComingNext() {
   const plans = [
     {
-      title: "Mistake history",
-      text: "Every mistake from the AI reviews, labelled new, repeated or fixed since earlier assignments.",
+      title: "Fixed after a resubmission",
+      text: "Mistakes that disappear when the student fixes the work and you approve the new version.",
     },
     {
       title: "Written overview",
       text: "A short summary of the student's progress, drafted by the agent for you to edit before sharing.",
     },
-    {
-      title: "Mistake categories",
-      text: "Where the student loses points most often: design, naming, error handling, missing requirements.",
-    },
   ];
 
   return (
-    <aside className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2">
       <h3 className="text-[11px] font-bold uppercase tracking-[0.06em] text-accent">Coming next</h3>
       {plans.map((plan) => (
         <div key={plan.title} className="rounded-[10px] border border-dashed border-line bg-white/60 px-4 py-3">
@@ -556,7 +558,7 @@ function ComingNext() {
           <p className="mt-1 text-xs text-ink-muted">{plan.text}</p>
         </div>
       ))}
-    </aside>
+    </div>
   );
 }
 

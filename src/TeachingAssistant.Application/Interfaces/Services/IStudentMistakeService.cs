@@ -4,5 +4,6 @@ namespace TeachingAssistant.Application.Interfaces.Services;
 
 public interface IStudentMistakeService
 {
-    Task<IReadOnlyList<StudentMistakeResponse>> GetAsync(string courseId, string studentId, CancellationToken cancellationToken = default);
+    Task<StudentMistakesResponse> GetAsync(
+        string courseId, string studentId, StudentMistakeFilter? filter = null, CancellationToken cancellationToken = default);
 }

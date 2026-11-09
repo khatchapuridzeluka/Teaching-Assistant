@@ -1046,11 +1046,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Returns the queue overview for the System page: counts (queued and running now, finished in the last 24 hours) and the 200 most recent jobs with the student and assignment they are about, newest first. */
+        /** Returns the queue overview for the System page: counts (queued and running now, finished in the last 24 hours) and the 200 most recent jobs with the student and assignment they are about, newest first; filterable by status and kind of work. */
         get: {
             parameters: {
                 query?: {
                     status?: components["schemas"]["JobStatus"];
+                    type?: components["schemas"]["JobType"];
                     courseId?: string;
                     assignmentId?: string;
                 };
@@ -1314,11 +1315,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Returns the model calls of the last days (default 30): totals per purpose (calls, failures, input, output and cache tokens, average duration) and the 200 most recent calls; only metadata is recorded, never prompts or answers. */
+        /** Returns the model calls of the last days (default 30): a summary, tokens per day and the 200 most recent calls for all work or one purpose, plus the totals per purpose; only metadata is recorded, never prompts or answers. */
         get: {
             parameters: {
                 query?: {
                     days?: number;
+                    purpose?: components["schemas"]["ModelCallPurpose"];
                 };
                 header?: never;
                 path?: never;
@@ -1482,10 +1484,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Returns a student's recorded mistakes in the course, newest first: the kept and edited mistakes of every approved report (rejected ones are never recorded). */
+        /** Returns a student's recorded mistakes in the course (kept and edited mistakes of approved reports), newest assignment first, each labelled new or repeated (same category in an earlier assignment; labels always come from the full history), with breakdowns by category, severity, label and assignment; filterable by assignment, category, severity and label. */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    assignmentId?: string;
+                    category?: components["schemas"]["MistakeCategory"];
+                    severity?: components["schemas"]["MistakeSeverity"];
+                    label?: components["schemas"]["MistakeLabel"];
+                };
                 header?: never;
                 path: {
                     courseId: string;
@@ -1495,13 +1502,13 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Mistakes retrieved successfully; empty when the student has no approved report yet */
+                /** @description Mistakes retrieved successfully; empty lists when the student has no approved report yet */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["StudentMistakeResponse"][];
+                        "application/json": components["schemas"]["StudentMistakesResponse"];
                     };
                 };
             };
@@ -2212,12 +2219,82 @@ export interface components {
         JobStatus: "Queued" | "Running" | "Succeeded" | "Failed" | "Canceled";
         /** @enum {string} */
         JobType: "GradeVersion" | "GradeAssignment" | "FetchAssignment" | "SyncCourse" | "ReExtract";
+        MistakeAssignmentOption: {
+            assignmentId: string;
+            title?: string | null;
+            /** Format: date-time */
+            dueAt?: string | null;
+            /** Format: int32 */
+            count: number;
+        };
+        MistakeAssignmentResponse: {
+            assignmentId: string;
+            title?: string | null;
+            /** Format: date-time */
+            dueAt?: string | null;
+            /** Format: int32 */
+            total: number;
+            /** Format: int32 */
+            major: number;
+            /** Format: int32 */
+            minor: number;
+            /** Format: int32 */
+            style: number;
+            /** Format: int32 */
+            repeated: number;
+            /** Format: double */
+            pointsLost: number;
+            /** Format: double */
+            maxPoints?: number | null;
+            /** Format: double */
+            classroomInitial?: number | null;
+            /** Format: double */
+            classroomFinal?: number | null;
+            /** Format: double */
+            reportScore?: number | null;
+            /** Format: double */
+            reportBonus?: number | null;
+            /** Format: double */
+            aiScore?: number | null;
+            /** Format: double */
+            aiBonus?: number | null;
+        };
         /** @enum {string} */
         MistakeCategory: "Correctness" | "MissingRequirement" | "Encapsulation" | "Design" | "ErrorHandling" | "Naming" | "Readability" | "Other";
+        MistakeCategoryResponse: {
+            category: components["schemas"]["MistakeCategory"];
+            /** Format: int32 */
+            count: number;
+            /** Format: double */
+            percent: number;
+            /** Format: int32 */
+            assignments: number;
+            repeated: boolean;
+            /** Format: double */
+            pointsLost: number;
+            firstAssignmentTitle?: string | null;
+            lastAssignmentTitle?: string | null;
+        };
         /** @enum {string} */
         MistakeDecision: "Kept" | "Edited" | "Rejected";
         /** @enum {string} */
+        MistakeLabel: "New" | "Repeated";
+        MistakeLabelMistakeShare: {
+            key: components["schemas"]["MistakeLabel"];
+            /** Format: int32 */
+            count: number;
+            /** Format: double */
+            percent: number;
+        };
+        /** @enum {string} */
         MistakeSeverity: "Major" | "Minor" | "Style";
+        MistakeSeverityMistakeShare: {
+            key: components["schemas"]["MistakeSeverity"];
+            /** Format: int32 */
+            count: number;
+            /** Format: double */
+            percent: number;
+        };
         /** @enum {string} */
         ModelCallPurpose: "Grading" | "Chat" | "HealthCheck";
         ModelCallResponse: {
@@ -2274,9 +2351,33 @@ export interface components {
         ModelUsageResponse: {
             /** Format: date-time */
             since: string;
+            purpose?: components["schemas"]["ModelCallPurpose"];
+            summary: components["schemas"]["ModelUsageSummary"];
             totals: components["schemas"]["ModelUsageTotal"][];
             days: components["schemas"]["ModelUsageDay"][];
             recent: components["schemas"]["ModelCallResponse"][];
+        };
+        ModelUsageSummary: {
+            /** Format: int32 */
+            calls: number;
+            /** Format: int32 */
+            failed: number;
+            /** Format: int64 */
+            inputTokens: number;
+            /** Format: int64 */
+            outputTokens: number;
+            /** Format: int64 */
+            cacheReadTokens: number;
+            /** Format: int64 */
+            cacheWriteTokens: number;
+            /** Format: int64 */
+            averagePromptTokens: number;
+            /** Format: int64 */
+            averageOutputTokens: number;
+            /** Format: double */
+            cacheHitRate?: number | null;
+            /** Format: int64 */
+            averageDurationMs: number;
         };
         ModelUsageTotal: {
             purpose: components["schemas"]["ModelCallPurpose"];
@@ -2456,6 +2557,9 @@ export interface components {
             /** Format: uuid */
             id: string;
             assignmentId: string;
+            assignmentTitle?: string | null;
+            /** Format: date-time */
+            assignmentDueAt?: string | null;
             /** Format: uuid */
             versionId: string;
             /** Format: uuid */
@@ -2471,8 +2575,28 @@ export interface components {
             /** Format: double */
             points?: number | null;
             decision: components["schemas"]["MistakeDecision"];
+            label: components["schemas"]["MistakeLabel"];
+            repeatedFromAssignmentTitle?: string | null;
             /** Format: date-time */
             approvedAt: string;
+        };
+        StudentMistakesResponse: {
+            /** Format: int32 */
+            total: number;
+            /** Format: int32 */
+            recorded: number;
+            /** Format: double */
+            pointsLost: number;
+            /** Format: double */
+            classroomPointsLost?: number | null;
+            /** Format: int32 */
+            classroomGraded: number;
+            mistakes: components["schemas"]["StudentMistakeResponse"][];
+            categories: components["schemas"]["MistakeCategoryResponse"][];
+            severities: components["schemas"]["MistakeSeverityMistakeShare"][];
+            labels: components["schemas"]["MistakeLabelMistakeShare"][];
+            assignments: components["schemas"]["MistakeAssignmentResponse"][];
+            assignmentOptions: components["schemas"]["MistakeAssignmentOption"][];
         };
         SubmissionAttachment: {
             kind: components["schemas"]["AttachmentKind"];

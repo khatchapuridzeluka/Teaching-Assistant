@@ -30,6 +30,17 @@ export type JobInfo = components["schemas"]["JobResponse"];
 export type JobOverview = components["schemas"]["JobOverviewResponse"];
 export type JobOverviewItem = components["schemas"]["JobOverviewItem"];
 export type JobStatus = components["schemas"]["JobStatus"];
+export type JobType = components["schemas"]["JobType"];
+export type ModelCallPurpose = components["schemas"]["ModelCallPurpose"];
+export type StudentMistakeInfo = components["schemas"]["StudentMistakeResponse"];
+export type MistakeCategoryInfo = components["schemas"]["MistakeCategoryResponse"];
+export type MistakeLabel = components["schemas"]["MistakeLabel"];
+export type StudentMistakeFilter = {
+  assignmentId?: string;
+  category?: MistakeCategory;
+  severity?: MistakeSeverity;
+  label?: MistakeLabel;
+};
 export type ModelUsage = components["schemas"]["ModelUsageResponse"];
 export type ModelUsageTotal = components["schemas"]["ModelUsageTotal"];
 export type ModelCallItem = components["schemas"]["ModelCallResponse"];

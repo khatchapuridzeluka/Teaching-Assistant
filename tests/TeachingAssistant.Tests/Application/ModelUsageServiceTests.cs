@@ -28,12 +28,20 @@ public class ModelUsageServiceTests
             TimeSpan.FromSeconds(40), subject));
         _calls.Calls.Add(ModelCall.Failure(ModelCallPurpose.Grading, "opus", "Rate limited", Now.AddDays(-1), TimeSpan.FromSeconds(3), subject));
 
-        var usage = await Service().GetAsync(7, TestContext.Current.CancellationToken);
+        _calls.Calls.Add(ModelCall.Success(ModelCallPurpose.Chat, "haiku", "haiku", new ModelCallTokens(500, 100, 0, 0), Now.AddHours(-2),
+            TimeSpan.FromSeconds(2), null));
 
-        var grading = Assert.Single(usage.Totals);
+        var usage = await Service().GetAsync(7, ModelCallPurpose.Grading, TestContext.Current.CancellationToken);
+        var overall = await Service().GetAsync(7, null, TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, usage.Totals.Count);
+        var grading = usage.Summary;
         Assert.Equal((3, 1), (grading.Calls, grading.Failed));
         Assert.Equal((10000L, 2000L), (grading.AveragePromptTokens, grading.AverageOutputTokens));
         Assert.Equal(0.7, grading.CacheHitRate!.Value, 3);
+        Assert.Equal((4, 1), (overall.Summary.Calls, overall.Summary.Failed));
+        Assert.Equal(4, overall.Recent.Count);
+        Assert.All(usage.Recent, c => Assert.Equal(ModelCallPurpose.Grading, c.Purpose));
         Assert.Equal(7, usage.Days.Count);
         Assert.Equal((1, 2000L), (usage.Days[^1].Calls, usage.Days[^1].InputTokens));
         Assert.Equal(("Ana", "Assignment 2"), (usage.Recent[0].StudentName, usage.Recent[0].AssignmentTitle));
@@ -42,7 +50,7 @@ public class ModelUsageServiceTests
     [Fact]
     public async Task Days_OutsideOneToAYear_AreRefused()
     {
-        await Assert.ThrowsAsync<InvalidRequestException>(() => Service().GetAsync(0, TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<InvalidRequestException>(() => Service().GetAsync(0, null, TestContext.Current.CancellationToken));
     }
 
     private sealed class FixedClock(DateTimeOffset now) : TimeProvider
@@ -85,10 +93,11 @@ public class ModelUsageServiceTests
             throw new NotSupportedException();
 
         public Task<IReadOnlyList<Job>> GetRecentAsync(
-            JobStatus? status, string? courseId, string? assignmentId, int limit, CancellationToken cancellationToken = default) =>
+            JobStatus? status, JobType? type, string? courseId, string? assignmentId, int limit, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
-        public Task<IReadOnlyDictionary<JobStatus, int>> CountByStatusAsync(DateTimeOffset finishedSince, CancellationToken cancellationToken = default) =>
+        public Task<IReadOnlyDictionary<JobStatus, int>> CountByStatusAsync(
+            DateTimeOffset finishedSince, JobType? type, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
         public Task SaveChangesAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();

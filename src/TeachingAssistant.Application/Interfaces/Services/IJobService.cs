@@ -14,7 +14,7 @@ public interface IJobService
     Task<JobResponse?> CancelAsync(Guid jobId, CancellationToken cancellationToken = default);
 
     Task<JobOverviewResponse> GetOverviewAsync(
-        JobStatus? status, string? courseId, string? assignmentId, CancellationToken cancellationToken = default);
+        JobStatus? status, JobType? type, string? courseId, string? assignmentId, CancellationToken cancellationToken = default);
 
     Task<JobResponse?> RetryAsync(Guid jobId, CancellationToken cancellationToken = default);
 }
