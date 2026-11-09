@@ -1,3 +1,5 @@
+using TeachingAssistant.Domain.Profiling;
+
 namespace TeachingAssistant.Application.Contracts;
 
 public record CourseStudentsResponse(
@@ -28,6 +30,7 @@ public record StudentAssignmentResult(
     bool TurnedIn,
     bool Late,
     bool Missing,
+    GradeStatus GradeStatus,
     double? InitialGrade,
     double? FinalGrade,
     IReadOnlyList<GradeReturn> Returns);

@@ -3,9 +3,10 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Link, useParams, useSearchParams } from "react-router";
 import type { AssignmentGrading } from "../api/client";
-import { useAssignments, useCourseGradings, useDiscardGrading, useVersionGradings } from "../api/hooks";
+import { useAssignments, useCourseGradings, useDiscardGrading, useGradingReport, useVersionGradings } from "../api/hooks";
 import { CodeBrowser, type CodeFocus } from "../components/CodeBrowser";
 import { CourseName } from "../components/Layout";
+import { keptMistakes, ReportChip, ReportEditor } from "../components/ReportEditor";
 import { MistakeList } from "../components/SubmissionDetail";
 import { Avatar, Button, Card, Chip, EmptyState, ErrorPanel, PageHeader, Spinner } from "../components/ui";
 import { formatDate, initials } from "../format";
@@ -428,6 +429,10 @@ function DraftRow({
           <Score draft={draft} />
           {draft.status === "Discarded" ? (
             <Chip tone="muted">Discarded</Chip>
+          ) : draft.reportStatus === "Approved" ? (
+            <Chip tone="accent">Approved</Chip>
+          ) : draft.reportStatus === "InReview" ? (
+            <Chip tone="ink">In review</Chip>
           ) : (
             !draft.current && <Chip tone="dashed">Earlier</Chip>
           )}
@@ -451,12 +456,19 @@ function DraftDetail({
   const history = useVersionGradings(draft.versionId);
   const discard = useDiscardGrading();
   const grading = history.data?.find((g) => g.id === draft.id);
+  const report = useGradingReport(draft.id).data;
+  const [editing, setEditing] = useState(false);
+  const [showOriginal, setShowOriginal] = useState(false);
+  const showReport = report != null && !showOriginal;
+  const mistakes = showReport ? keptMistakes(report) : grading?.mistakes ?? [];
   const [focus, setFocus] = useState<CodeFocus>();
   const [tab, setTab] = useState<"review" | "code">("review");
   const workspace = `/courses/${courseId}/assignments/${draft.assignmentId}?student=${encodeURIComponent(draft.submissionId)}`;
 
   useEffect(() => {
     setTab("review");
+    setEditing(false);
+    setShowOriginal(false);
   }, [draft.id]);
 
   return (
@@ -477,6 +489,7 @@ function DraftDetail({
               ) : (
                 <Chip tone="dashed">Earlier draft</Chip>
               )}
+              {report && <ReportChip report={report} />}
             </div>
             <div className="truncate text-xs text-ink-muted">
               {assignmentTitle} · v{draft.versionNumber} · saved {formatDate(draft.createdAt)} · {draft.model}
@@ -485,9 +498,19 @@ function DraftDetail({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-lg">
-            <Score draft={draft} />
+            <Score draft={showReport ? { score: report.score, maxScore: draft.maxScore, bonus: report.bonus } : draft} />
           </span>
-          {draft.status === "Draft" && (
+          {draft.status === "Draft" && grading && (
+            <Button
+              small
+              variant={report?.status === "Approved" ? "outline" : "primary"}
+              onClick={() => setEditing(true)}
+              title="Correct the score, feedback and mistakes; saved as your report, the AI draft stays as it was"
+            >
+              {report ? "Edit report" : "Edit draft"}
+            </Button>
+          )}
+          {draft.status === "Draft" && report == null && (
             <Button
               small
               onClick={() => discard.mutate(draft.id)}
@@ -519,7 +542,7 @@ function DraftDetail({
                   tab === key ? "border-accent text-ink" : "border-transparent text-ink-muted hover:text-ink"
                 }`}
               >
-                {key === "review" ? `Review · ${grading.mistakes.length} mistakes` : "Code"}
+                {key === "review" ? `Review · ${mistakes.length} mistakes` : "Code"}
               </button>
             ))}
           </nav>
@@ -530,11 +553,28 @@ function DraftDetail({
             }`}
           >
             <div className="flex flex-col gap-4 p-4 sm:p-5">
+              {report && (
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <h3 className="text-[11px] font-bold uppercase tracking-[0.06em] text-accent">
+                    {showReport ? "Your report" : "AI draft"}
+                  </h3>
+                  <span className="text-ink-muted">
+                    {showReport
+                      ? report.status === "Approved"
+                        ? `approved ${formatDate(report.approvedAt)}`
+                        : `saved ${formatDate(report.updatedAt)}`
+                      : "as Claude wrote it"}
+                  </span>
+                  <button onClick={() => setShowOriginal(!showOriginal)} className="font-semibold text-accent hover:underline">
+                    {showOriginal ? "Show your report" : "AI original"}
+                  </button>
+                </div>
+              )}
               <div className="markdown rounded-[10px] border border-line bg-white px-5 py-4">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{grading.review}</ReactMarkdown>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{showReport ? report.review : grading.review}</ReactMarkdown>
               </div>
               <MistakeList
-                mistakes={grading.mistakes}
+                mistakes={mistakes}
                 onShow={(file, line) => {
                   setFocus({ file, line, key: Date.now() });
                   setTab("code");
@@ -564,9 +604,12 @@ function DraftDetail({
           </div>
 
           <div className={`min-h-0 min-w-0 flex-1 flex-col p-2 sm:p-4 @4xl:flex ${tab === "code" ? "flex" : "hidden"}`}>
-            <CodeBrowser versionId={draft.versionId} className="h-full" mistakes={grading.mistakes} focus={focus} />
+            <CodeBrowser versionId={draft.versionId} className="h-full" mistakes={mistakes} focus={focus} />
           </div>
         </div>
+      )}
+      {editing && grading && (
+        <ReportEditor grading={grading} report={report} studentName={draft.studentName} onClose={() => setEditing(false)} />
       )}
     </section>
   );
@@ -580,7 +623,7 @@ function points(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
-function Score({ draft }: { draft: AssignmentGrading }) {
+function Score({ draft }: { draft: Pick<AssignmentGrading, "score" | "maxScore" | "bonus"> }) {
   if (draft.score == null) {
     return <span className="text-xs text-ink-muted">score in text</span>;
   }

@@ -141,7 +141,8 @@ public class GradingServiceTests
             // A file that was not sent is dropped with its lines: the mistake stays, about the submission as a whole.
             new CodeMistake(null, null, null, MistakeSeverity.Major, MistakeCategory.Correctness, "A file that was not sent."),
             new CodeMistake(null, null, null, MistakeSeverity.Major, MistakeCategory.MissingRequirement, "Task 3 is missing."),
-        ], result.Mistakes);
+        ], result.Mistakes.Select(m => m with { Id = null }));
+        Assert.All(result.Mistakes, m => Assert.NotNull(m.Id));
     }
 
     [Fact]

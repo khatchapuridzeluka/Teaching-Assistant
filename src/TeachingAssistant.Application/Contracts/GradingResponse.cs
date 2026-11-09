@@ -23,7 +23,8 @@ public record CodeMistake(
     int? EndLine,
     MistakeSeverity Severity,
     MistakeCategory Category,
-    string Message);
+    string Message,
+    Guid? Id = null);
 
 public record AssignmentGradingResponse(
     Guid Id,
@@ -42,4 +43,5 @@ public record AssignmentGradingResponse(
     int Minor,
     int Style,
     string Model,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    ReportStatus? ReportStatus);

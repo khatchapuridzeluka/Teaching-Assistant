@@ -12,7 +12,9 @@ import { ComingSoonPage } from "./pages/ComingSoonPage";
 import { CourseOverviewPage } from "./pages/CourseOverviewPage";
 import { CoursesPage } from "./pages/CoursesPage";
 import { DraftsPage } from "./pages/DraftsPage";
+import { GradebookPage } from "./pages/GradebookPage";
 import { InstructionsPage } from "./pages/InstructionsPage";
+import { ReviewQueuePage } from "./pages/ReviewQueuePage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { StudentsPage } from "./pages/StudentsPage";
 
@@ -73,6 +75,11 @@ const router = createBrowserRouter([
             element: <DraftsPage />,
             handle: { crumbs: () => [{ label: "AI drafts" }] } satisfies CrumbHandle,
           },
+          {
+            path: "gradebook",
+            element: <GradebookPage />,
+            handle: { crumbs: () => [{ label: "Gradebook" }] } satisfies CrumbHandle,
+          },
           ...courseSections
             .filter((section) => !section.ready)
             .map((section) => ({
@@ -82,11 +89,18 @@ const router = createBrowserRouter([
             })),
         ],
       },
-      ...workspaceSections.map((section) => ({
-        path: `/${section.path}`,
-        element: <ComingSoonPage section={section} />,
-        handle: { crumbs: () => [{ label: section.label }] } satisfies CrumbHandle,
-      })),
+      {
+        path: "/review",
+        element: <ReviewQueuePage />,
+        handle: { crumbs: () => [{ label: "Review queue" }] } satisfies CrumbHandle,
+      },
+      ...workspaceSections
+        .filter((section) => !section.ready)
+        .map((section) => ({
+          path: `/${section.path}`,
+          element: <ComingSoonPage section={section} />,
+          handle: { crumbs: () => [{ label: section.label }] } satisfies CrumbHandle,
+        })),
       {
         path: "/settings",
         element: <SettingsPage />,

@@ -18,4 +18,5 @@ public record GradingSummary(
     int Minor,
     int Style,
     string Model,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    ReportStatus? ReportStatus);

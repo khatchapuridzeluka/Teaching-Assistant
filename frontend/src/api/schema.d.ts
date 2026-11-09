@@ -348,6 +348,83 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/courses/{courseId}/gradebook": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Returns the course gradebook: enrolled students × assignments with each cell's state, initial and final grade, per-assignment summaries and overall scores, from the grades synced from Classroom. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    courseId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Gradebook retrieved successfully; empty lists before the first sync */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GradebookResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/courses/{courseId}/gradebook/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Downloads the gradebook as a CSV file (initial and final grade per assignment, overall %), for the teacher's own records; nothing is written to Classroom. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    courseId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The CSV file */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/csv": string;
+                        "application/json": string;
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/versions/{versionId}/grade": {
         parameters: {
             query?: never;
@@ -611,6 +688,159 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/gradings/{gradingId}/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Returns the teacher's report on an AI draft: the edited score, review and mistakes, with each mistake's decision (kept, edited, rejected); the AI draft itself is never changed. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    gradingId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Report retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GradingReportResponse"];
+                    };
+                };
+                /** @description No report yet (the draft has not been edited), or no draft with this ID */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        /** Saves the teacher's edits to an AI draft as a report in review (created from the draft on first save); saving an approved report reopens it. */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    gradingId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SaveGradingReportRequest"];
+                    "text/json": components["schemas"]["SaveGradingReportRequest"];
+                    "application/*+json": components["schemas"]["SaveGradingReportRequest"];
+                };
+            };
+            responses: {
+                /** @description Report saved; returns it */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GradingReportResponse"];
+                    };
+                };
+                /** @description Draft discarded, negative score or bonus, empty review, empty kept mistake, or a mistake that is not part of the draft */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description No draft with this ID */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/gradings/{gradingId}/report/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Saves the teacher's edits and approves the report as final; nothing is sent to Classroom or the student. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    gradingId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SaveGradingReportRequest"];
+                    "text/json": components["schemas"]["SaveGradingReportRequest"];
+                    "application/*+json": components["schemas"]["SaveGradingReportRequest"];
+                };
+            };
+            responses: {
+                /** @description Report approved; returns it */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GradingReportResponse"];
+                    };
+                };
+                /** @description Draft discarded, negative score or bonus, empty review, empty kept mistake, or a mistake that is not part of the draft */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description No draft with this ID */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProblemDetails"];
+                    };
                 };
             };
         };
@@ -981,6 +1211,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/review-queue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Returns what waits for the teacher across all courses: current AI drafts not yet decided (oldest first) and turned-in submissions whose latest version has no draft yet. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Review queue retrieved successfully; both lists are empty when nothing waits */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ReviewQueueResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/stored-files/{contentId}": {
         parameters: {
             query?: never;
@@ -1056,6 +1322,45 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["CourseStudentsResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/courses/{courseId}/students/{userId}/mistakes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Returns a student's recorded mistakes in the course, newest first: the kept and edited mistakes of every approved report (rejected ones are never recorded). */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    courseId: string;
+                    userId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Mistakes retrieved successfully; empty when the student has no approved report yet */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StudentMistakeResponse"][];
                     };
                 };
             };
@@ -1454,6 +1759,7 @@ export interface components {
             model: string;
             /** Format: date-time */
             createdAt: string;
+            reportStatus?: components["schemas"]["ReportStatus"];
         };
         AssignmentResponse: {
             id: string;
@@ -1499,6 +1805,8 @@ export interface components {
             severity: components["schemas"]["MistakeSeverity"];
             category: components["schemas"]["MistakeCategory"];
             message: string;
+            /** Format: uuid */
+            id?: string | null;
         };
         /** @enum {string} */
         ContentKind: "CodeArchive" | "SourceFile" | "Repository" | "Document" | "Image" | "Other";
@@ -1612,6 +1920,58 @@ export interface components {
             /** Format: date-time */
             at: string;
         };
+        /** @enum {string} */
+        GradeStatus: "Graded" | "AwaitingGrade" | "Missing" | "NotDue" | "NotSubmitted";
+        GradebookColumn: {
+            id: string;
+            title: string;
+            /** Format: double */
+            maxPoints?: number | null;
+            /** Format: date-time */
+            dueAt?: string | null;
+            /** Format: int32 */
+            graded: number;
+            /** Format: int32 */
+            awaitingGrade: number;
+            /** Format: int32 */
+            missing: number;
+            /** Format: double */
+            averagePercent?: number | null;
+        };
+        GradebookResponse: {
+            /** Format: date-time */
+            syncedAt?: string | null;
+            assignments: components["schemas"]["GradebookColumn"][];
+            students: components["schemas"]["CourseStudentResponse"][];
+            /** Format: double */
+            classAveragePercent?: number | null;
+        };
+        GradingReportResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            gradingId: string;
+            /** Format: uuid */
+            versionId: string;
+            studentId: string;
+            courseId: string;
+            assignmentId: string;
+            status: components["schemas"]["ReportStatus"];
+            /** Format: double */
+            score?: number | null;
+            /** Format: double */
+            maxScore?: number | null;
+            /** Format: double */
+            bonus?: number | null;
+            review: string;
+            mistakes: components["schemas"]["ReportMistakeResponse"][];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: date-time */
+            approvedAt?: string | null;
+        };
         GradingResponse: {
             /** Format: uuid */
             id: string;
@@ -1683,6 +2043,8 @@ export interface components {
         /** @enum {string} */
         MistakeCategory: "Correctness" | "MissingRequirement" | "Encapsulation" | "Design" | "ErrorHandling" | "Naming" | "Readability" | "Other";
         /** @enum {string} */
+        MistakeDecision: "Kept" | "Edited" | "Rejected";
+        /** @enum {string} */
         MistakeSeverity: "Major" | "Minor" | "Style";
         ModelHealthResponse: {
             healthy: boolean;
@@ -1701,6 +2063,73 @@ export interface components {
             instance?: string | null;
         } & {
             [key: string]: unknown;
+        };
+        ReportMistakeInput: {
+            /** Format: uuid */
+            sourceMistakeId: string;
+            rejected: boolean;
+            severity: components["schemas"]["MistakeSeverity"];
+            category: components["schemas"]["MistakeCategory"];
+            message: string;
+        };
+        ReportMistakeResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            sourceMistakeId?: string | null;
+            file?: string | null;
+            /** Format: int32 */
+            startLine?: number | null;
+            /** Format: int32 */
+            endLine?: number | null;
+            severity: components["schemas"]["MistakeSeverity"];
+            category: components["schemas"]["MistakeCategory"];
+            message: string;
+            decision: components["schemas"]["MistakeDecision"];
+        };
+        /** @enum {string} */
+        ReportStatus: "InReview" | "Approved";
+        ReviewDraftItem: {
+            /** Format: uuid */
+            gradingId: string;
+            /** Format: uuid */
+            versionId: string;
+            /** Format: int32 */
+            versionNumber: number;
+            isLatestVersion: boolean;
+            courseId: string;
+            assignmentId: string;
+            assignmentTitle?: string | null;
+            submissionId: string;
+            studentId: string;
+            studentName: string;
+            /** Format: double */
+            score?: number | null;
+            /** Format: double */
+            maxScore?: number | null;
+            /** Format: double */
+            bonus?: number | null;
+            /** Format: int32 */
+            major: number;
+            /** Format: int32 */
+            minor: number;
+            /** Format: int32 */
+            style: number;
+            /** Format: date-time */
+            createdAt: string;
+            reportStatus?: components["schemas"]["ReportStatus"];
+        };
+        ReviewQueueResponse: {
+            drafts: components["schemas"]["ReviewDraftItem"][];
+            ungraded: components["schemas"]["UngradedSubmissionItem"][];
+        };
+        SaveGradingReportRequest: {
+            /** Format: double */
+            score?: number | null;
+            /** Format: double */
+            bonus?: number | null;
+            review: string;
+            mistakes: components["schemas"]["ReportMistakeInput"][];
         };
         StoredFileResponse: {
             /** Format: uuid */
@@ -1765,11 +2194,32 @@ export interface components {
             turnedIn: boolean;
             late: boolean;
             missing: boolean;
+            gradeStatus: components["schemas"]["GradeStatus"];
             /** Format: double */
             initialGrade?: number | null;
             /** Format: double */
             finalGrade?: number | null;
             returns: components["schemas"]["GradeReturn"][];
+        };
+        StudentMistakeResponse: {
+            /** Format: uuid */
+            id: string;
+            assignmentId: string;
+            /** Format: uuid */
+            versionId: string;
+            /** Format: uuid */
+            reportId: string;
+            file?: string | null;
+            /** Format: int32 */
+            startLine?: number | null;
+            /** Format: int32 */
+            endLine?: number | null;
+            severity: components["schemas"]["MistakeSeverity"];
+            category: components["schemas"]["MistakeCategory"];
+            message: string;
+            decision: components["schemas"]["MistakeDecision"];
+            /** Format: date-time */
+            approvedAt: string;
         };
         SubmissionAttachment: {
             kind: components["schemas"]["AttachmentKind"];
@@ -1793,6 +2243,21 @@ export interface components {
             /** Format: double */
             assignedGrade?: number | null;
             gradeHistory: components["schemas"]["GradeChange"][];
+        };
+        UngradedSubmissionItem: {
+            /** Format: uuid */
+            versionId: string;
+            /** Format: int32 */
+            versionNumber: number;
+            courseId: string;
+            assignmentId: string;
+            assignmentTitle?: string | null;
+            submissionId: string;
+            studentId: string;
+            studentName: string;
+            late: boolean;
+            /** Format: date-time */
+            fetchedAt: string;
         };
         /** @enum {string} */
         VersionStatus: "Ready" | "PartiallySupported" | "Failed";

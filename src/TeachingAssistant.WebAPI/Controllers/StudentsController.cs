@@ -11,10 +11,12 @@ namespace TeachingAssistant.WebAPI.Controllers;
 public class StudentsController : ControllerBase
 {
     private readonly IStudentService _studentService;
+    private readonly IStudentMistakeService _mistakeService;
 
-    public StudentsController(IStudentService studentService)
+    public StudentsController(IStudentService studentService, IStudentMistakeService mistakeService)
     {
         _studentService = studentService;
+        _mistakeService = mistakeService;
     }
 
     /// <summary>
@@ -25,6 +27,17 @@ public class StudentsController : ControllerBase
     public async Task<ActionResult<CourseStudentsResponse>> GetAllAsync(string courseId, CancellationToken cancellationToken)
     {
         return Ok(await _studentService.GetCourseStudentsAsync(courseId, cancellationToken));
+    }
+
+    /// <summary>
+    /// Returns a student's recorded mistakes in the course, newest first: the kept and edited mistakes of every approved report (rejected ones are never recorded).
+    /// </summary>
+    /// <response code="200">Mistakes retrieved successfully; empty when the student has no approved report yet</response>
+    [HttpGet("{userId}/mistakes")]
+    public async Task<ActionResult<IReadOnlyList<StudentMistakeResponse>>> GetMistakesAsync(
+        string courseId, string userId, CancellationToken cancellationToken)
+    {
+        return Ok(await _mistakeService.GetAsync(courseId, userId, cancellationToken));
     }
 
     /// <summary>

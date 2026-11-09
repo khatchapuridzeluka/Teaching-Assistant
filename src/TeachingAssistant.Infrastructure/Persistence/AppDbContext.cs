@@ -20,6 +20,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<CourseAssignment> CourseAssignments => Set<CourseAssignment>();
     public DbSet<AiGrading> Gradings => Set<AiGrading>();
     public DbSet<GradingMistake> GradingMistakes => Set<GradingMistake>();
+    public DbSet<GradingReport> GradingReports => Set<GradingReport>();
+    public DbSet<ReportMistake> ReportMistakes => Set<ReportMistake>();
+    public DbSet<StudentMistake> StudentMistakes => Set<StudentMistake>();
     public DbSet<Job> Jobs => Set<Job>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder) =>

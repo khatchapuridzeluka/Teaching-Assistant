@@ -4,6 +4,31 @@ public sealed record AssignmentResult(double? MaxPoints, DateTimeOffset? DueAt, 
 {
     public bool IsMissing(DateTimeOffset now) =>
         MaxPoints is > 0 && FinalGrade is null && !TurnedIn && DueAt is { } due && due <= now;
+
+    public GradeStatus GradeStatusAt(DateTimeOffset now)
+    {
+        if (FinalGrade is not null)
+        {
+            return GradeStatus.Graded;
+        }
+
+        if (TurnedIn)
+        {
+            return GradeStatus.AwaitingGrade;
+        }
+
+        if (IsMissing(now))
+        {
+            return GradeStatus.Missing;
+        }
+
+        if (DueAt is { } due && due > now)
+        {
+            return GradeStatus.NotDue;
+        }
+
+        return GradeStatus.NotSubmitted;
+    }
 }
 
 public sealed record OverallScore(double Earned, double Possible, int Counted)

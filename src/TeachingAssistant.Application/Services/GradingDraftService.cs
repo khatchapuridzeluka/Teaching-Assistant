@@ -44,7 +44,7 @@ public class GradingDraftService : IGradingDraftService
             .Where(r => includeAll || current.Contains(r.Id))
             .Select(r => new AssignmentGradingResponse(r.Id, r.VersionId, r.VersionNumber, r.AssignmentId, r.SubmissionId,
                 r.StudentId, r.StudentName, r.Status, current.Contains(r.Id), r.Score, r.MaxScore, r.Bonus, r.Major, r.Minor, r.Style,
-                r.Model, r.CreatedAt))
+                r.Model, r.CreatedAt, r.ReportStatus))
             .ToList();
     }
 
@@ -64,6 +64,6 @@ public class GradingDraftService : IGradingDraftService
     internal static GradingResponse ToResponse(AiGrading g) => new(
         g.Id, g.VersionId, g.Status, g.Model, g.Review, g.Score, g.MaxScore, g.Bonus,
         g.Mistakes.OrderBy(m => m.Position)
-            .Select(m => new CodeMistake(m.File, m.StartLine, m.EndLine, m.Severity, m.Category, m.Message)).ToList(),
+            .Select(m => new CodeMistake(m.File, m.StartLine, m.EndLine, m.Severity, m.Category, m.Message, m.Id)).ToList(),
         g.InstructionsVersion, g.SentFiles, g.SkippedFiles, g.CreatedAt);
 }

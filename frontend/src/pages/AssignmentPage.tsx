@@ -426,6 +426,10 @@ function StudentList({
                       <span className="text-[11px] font-semibold text-accent">
                         {gradingVersionIds.get(version.id) === "Queued" ? "Queued…" : "Grading…"}
                       </span>
+                    ) : review?.reportStatus === "Approved" ? (
+                      <span className="text-[11px] font-semibold text-accent">✓ Report approved</span>
+                    ) : review?.reportStatus === "InReview" ? (
+                      <span className="text-[11px] font-semibold text-accent">Report in review</span>
                     ) : review ? (
                       <span className="text-[11px] font-semibold text-accent">
                         Draft {review.score != null ? `${points(review.score)}/${review.maxScore ?? "–"}` : ""} · {mistakeCount(review)}{" "}

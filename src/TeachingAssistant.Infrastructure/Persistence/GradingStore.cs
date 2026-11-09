@@ -61,7 +61,8 @@ public class GradingStore(AppDbContext db) : IGradingStore
                 r.grading.Mistakes.Count(m => m.Severity == MistakeSeverity.Minor),
                 r.grading.Mistakes.Count(m => m.Severity == MistakeSeverity.Style),
                 r.grading.Model,
-                r.grading.CreatedAt))
+                r.grading.CreatedAt,
+                db.GradingReports.Where(report => report.GradingId == r.grading.Id).Select(report => (ReportStatus?)report.Status).FirstOrDefault()))
             .ToListAsync(cancellationToken);
     }
 

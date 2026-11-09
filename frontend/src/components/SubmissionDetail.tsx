@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { CodeMistake, JobInfo, StoredFile, StoredSubmission, StoredVersion, Submission } from "../api/client";
-import { useDiscardGrading, useReview, useVersionGradings } from "../api/hooks";
+import { useDiscardGrading, useGradingReport, useReview, useVersionGradings } from "../api/hooks";
 import { formatDate, formatDay, initials } from "../format";
 import { CodeBrowser, type CodeFocus, severityColor } from "./CodeBrowser";
+import { keptMistakes, ReportEditor } from "./ReportEditor";
 import { Avatar, Button, Chip, type ChipTone, ErrorPanel, Spinner } from "./ui";
 
 export const stateChip: Record<string, { tone: ChipTone; label: string }> = {
@@ -54,9 +55,20 @@ export function SubmissionDetail({
   const jobFailed = job?.status === "Failed" && (!current || job.createdAt > current.createdAt);
   const gradingError = queueError ?? (jobFailed ? new Error(job.error ?? "The grading failed.") : null);
 
+  const report = useGradingReport(review?.id).data;
+  const [editing, setEditing] = useState(false);
+  const [showOriginal, setShowOriginal] = useState(false);
+  const showReport = report != null && !showOriginal;
+  const shownMistakes: CodeMistake[] | undefined = showReport ? keptMistakes(report) : review?.mistakes;
+
   useEffect(() => {
     setViewingId(null);
   }, [current?.id]);
+
+  useEffect(() => {
+    setShowOriginal(false);
+    setEditing(false);
+  }, [review?.id]);
   const [focus, setFocus] = useState<CodeFocus>();
   const [tab, setTab] = useState<"review" | "code">("review");
   const [expanded, setExpanded] = useState(false);
@@ -152,7 +164,7 @@ export function SubmissionDetail({
                   tab === key ? "border-accent text-ink" : "border-transparent text-ink-muted hover:text-ink"
                 }`}
               >
-                {key === "review" ? `Review${review ? ` · ${review.mistakes.length} mistakes` : ""}` : "Code"}
+                {key === "review" ? `Review${shownMistakes ? ` · ${shownMistakes.length} mistakes` : ""}` : "Code"}
               </button>
             ))}
           </nav>
@@ -192,17 +204,36 @@ export function SubmissionDetail({
                 <div className={`flex flex-col gap-4 ${grading ? "opacity-50" : ""}`}>
                   <div>
                     <div className="mb-2 flex flex-wrap items-center gap-2">
-                      <h3 className="text-[11px] font-bold uppercase tracking-[0.06em] text-accent">AI draft</h3>
-                      {review.status === "Discarded" ? (
+                      <h3 className="text-[11px] font-bold uppercase tracking-[0.06em] text-accent">
+                        {showReport ? "Your report" : "AI draft"}
+                      </h3>
+                      {showReport ? (
+                        report.status === "Approved" ? (
+                          <Chip tone="accent">Approved {formatDate(report.approvedAt)}</Chip>
+                        ) : (
+                          <Chip tone="tint">In review · saved {formatDate(report.updatedAt)}</Chip>
+                        )
+                      ) : review.status === "Discarded" ? (
                         <Chip tone="muted">Discarded</Chip>
                       ) : (
                         <Chip tone="tint">Saved {formatDate(review.createdAt)}</Chip>
                       )}
-                      {review.score != null && (
+                      {(showReport ? report.score : review.score) != null && (
                         <b className="tabular-nums">
-                          {points(review.score)} / {review.maxScore ?? "–"}
-                          {review.bonus ? <span className="font-normal text-ink-muted"> +{points(review.bonus)} bonus</span> : null}
+                          {points((showReport ? report.score : review.score)!)} / {review.maxScore ?? "–"}
+                          {(showReport ? report.bonus : review.bonus) ? (
+                            <span className="font-normal text-ink-muted"> +{points((showReport ? report.bonus : review.bonus)!)} bonus</span>
+                          ) : null}
                         </b>
+                      )}
+                      {report != null && (
+                        <button
+                          onClick={() => setShowOriginal(!showOriginal)}
+                          className="text-xs font-semibold text-accent hover:underline"
+                          title={showOriginal ? "Show your edited report" : "Show the AI draft as Claude wrote it"}
+                        >
+                          {showOriginal ? "Show your report" : "AI original"}
+                        </button>
                       )}
                       <span className="ml-auto flex items-center gap-2">
                         {history.length > 1 && (
@@ -224,6 +255,16 @@ export function SubmissionDetail({
                         {review.status === "Draft" && (
                           <Button
                             small
+                            variant={report?.status === "Approved" ? "outline" : "primary"}
+                            onClick={() => setEditing(true)}
+                            title="Correct the score, feedback and mistakes; saved as your report, the AI draft stays as it was"
+                          >
+                            {report ? "Edit report" : "Edit draft"}
+                          </Button>
+                        )}
+                        {review.status === "Draft" && report == null && (
+                          <Button
+                            small
                             onClick={() => discard.mutate(review.id)}
                             disabled={discard.isPending}
                             title="Throw this draft away; it stays in the history and the previous draft becomes current"
@@ -234,13 +275,16 @@ export function SubmissionDetail({
                       </span>
                     </div>
                     <div className="markdown rounded-[10px] border border-line bg-white px-5 py-4">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{review.review}</ReactMarkdown>
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{showReport ? report.review : review.review}</ReactMarkdown>
                     </div>
                     <div className="mt-1.5 text-[11px] text-ink-muted">
                       {review.model} · instructions v{review.instructionsVersion} · read from the code only, nothing was compiled or run
                     </div>
                   </div>
-                  <MistakeList mistakes={review.mistakes} onShow={showMistake} />
+                  <MistakeList mistakes={shownMistakes ?? []} onShow={showMistake} />
+                  {editing && (
+                    <ReportEditor grading={review} report={report} studentName={submission.studentName} onClose={() => setEditing(false)} />
+                  )}
                   <details className="text-xs">
                     <summary className="cursor-pointer font-semibold text-ink-muted hover:text-ink">
                       Files sent to the model · {review.sentFiles.length}
@@ -274,7 +318,7 @@ export function SubmissionDetail({
 
           <div className={`min-h-0 min-w-0 flex-1 flex-col p-2 sm:p-4 @4xl:flex ${tab === "code" ? "flex" : "hidden"}`}>
             {version.hasCode ? (
-              <CodeBrowser versionId={version.id} className="h-full" mistakes={review?.mistakes} focus={focus} />
+              <CodeBrowser versionId={version.id} className="h-full" mistakes={shownMistakes} focus={focus} />
             ) : (
               <div className="flex flex-1 items-center justify-center text-center text-ink-muted">
                 No code in this version. Preview files shows its images and documents.

@@ -34,13 +34,8 @@ export const courseSections: Section[] = [
   {
     path: "gradebook",
     label: "Gradebook",
-    ready: false,
-    description: "Initial and final scores for every student and assignment, ready to export.",
-    plans: [
-      "One row per student, one column per assignment",
-      "Which version counts as final, always chosen by you",
-      "Export to your own file; nothing is ever written back to Classroom",
-    ],
+    ready: true,
+    description: "Initial and final grades for every student and assignment, with class averages and a CSV export.",
   },
   {
     path: "mistakes",
@@ -77,13 +72,8 @@ export const workspaceSections: Section[] = [
   {
     path: "review",
     label: "Review queue",
-    ready: false,
-    description: "Every AI draft waiting for your approval, across all courses, in one list.",
-    plans: [
-      "Drafted grades waiting for review, newest first",
-      "New versions submitted after a grade was approved",
-      "Approve, edit or regrade without opening each assignment",
-    ],
+    ready: true,
+    description: "Every AI draft waiting for your decision and every turned-in submission not graded yet, across all courses.",
   },
   {
     path: "evaluation",

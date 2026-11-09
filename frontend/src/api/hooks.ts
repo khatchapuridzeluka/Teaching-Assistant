@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, unwrap } from "./client";
+import { api, type SaveReportRequest, unwrap } from "./client";
 import { forgetMissingPhotos } from "../components/ui";
 
 export const useCourses = () =>
@@ -29,6 +29,12 @@ export const useCourseStudents = (courseId: string) =>
     queryFn: () => unwrap(api.GET("/courses/{courseId}/students", { params: { path: { courseId } } })),
   });
 
+export const useGradebook = (courseId: string) =>
+  useQuery({
+    queryKey: ["courses", courseId, "gradebook"],
+    queryFn: () => unwrap(api.GET("/courses/{courseId}/gradebook", { params: { path: { courseId } } })),
+  });
+
 export const useSyncCourse = (courseId: string) => {
   const queryClient = useQueryClient();
   return useMutation({
@@ -36,6 +42,7 @@ export const useSyncCourse = (courseId: string) => {
     onSuccess: () => {
       forgetMissingPhotos();
       void queryClient.invalidateQueries({ queryKey: ["courses", courseId, "students"] });
+      void queryClient.invalidateQueries({ queryKey: ["courses", courseId, "gradebook"] });
     },
   });
 };
@@ -192,6 +199,28 @@ export const useReview = (versionId: string | undefined) =>
     enabled: versionId !== undefined,
   });
 
+export const useGradingReport = (gradingId: string | undefined) =>
+  useQuery({
+    queryKey: ["reports", gradingId],
+    queryFn: async () =>
+      (await unwrap(api.GET("/gradings/{gradingId}/report", { params: { path: { gradingId: gradingId! } } }))) ?? null,
+    enabled: gradingId !== undefined,
+  });
+
+export const useSaveReport = (gradingId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ approve, body }: { approve: boolean; body: SaveReportRequest }) =>
+      approve
+        ? unwrap(api.POST("/gradings/{gradingId}/report/approve", { params: { path: { gradingId } }, body }))
+        : unwrap(api.PUT("/gradings/{gradingId}/report", { params: { path: { gradingId } }, body })),
+    onSuccess: (report) => {
+      queryClient.setQueryData(["reports", gradingId], report);
+      void queryClient.invalidateQueries({ predicate: (query) => query.queryKey.includes("gradings") });
+    },
+  });
+};
+
 export const useVersionGradings = (versionId: string | undefined) =>
   useQuery({
     queryKey: ["versions", versionId, "gradings"],
@@ -225,6 +254,13 @@ export const useCourseGradings = (
           },
         }),
       ),
+  });
+
+export const useReviewQueue = () =>
+  useQuery({
+    queryKey: ["gradings", "review-queue"],
+    queryFn: () => unwrap(api.GET("/review-queue")),
+    staleTime: 0,
   });
 
 export const useDiscardGrading = () => {

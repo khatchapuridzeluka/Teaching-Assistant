@@ -139,7 +139,7 @@ public class GradingDraftServiceTests
                     x.Grading.Mistakes.Count(m => m.Severity == MistakeSeverity.Major),
                     x.Grading.Mistakes.Count(m => m.Severity == MistakeSeverity.Minor),
                     x.Grading.Mistakes.Count(m => m.Severity == MistakeSeverity.Style),
-                    x.Grading.Model, x.Grading.CreatedAt))
+                    x.Grading.Model, x.Grading.CreatedAt, null))
                 .ToList());
 
         public Task<IReadOnlyList<AiGrading>> GetByVersionsAsync(IReadOnlyCollection<Guid> versionIds, CancellationToken cancellationToken = default) =>

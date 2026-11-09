@@ -81,7 +81,7 @@ public class StudentService : IStudentService
                 .Select(e => new GradeReturn(e.PointsEarned, e.GradedAt))
                 .ToList();
             results.Add(new StudentAssignmentResult(assignment.ExternalAssignmentId, submission?.ExternalSubmissionId,
-                submission?.State, result.TurnedIn, submission?.Late ?? false, result.IsMissing(now),
+                submission?.State, result.TurnedIn, submission?.Late ?? false, result.IsMissing(now), result.GradeStatusAt(now),
                 submission?.InitialGrade, submission?.FinalGrade, returns));
         }
 
