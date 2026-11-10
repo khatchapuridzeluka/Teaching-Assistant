@@ -62,7 +62,7 @@ export function Layout() {
       {!chatOpen && (
         <button
           onClick={() => setChatOpen(true)}
-          className="fixed bottom-5 right-5 z-40 flex h-11 items-center gap-2 rounded-full bg-mark px-4 text-[13px] font-semibold text-navy shadow-raised transition-all hover:brightness-95 active:translate-y-px"
+          className="fixed bottom-5 right-5 z-40 flex h-11 items-center gap-2 rounded-full bg-accent px-4 text-[13px] font-semibold text-white shadow-raised transition-all hover:brightness-95 active:translate-y-px"
           title="Ask the agent about this page, teaching, rubrics or feedback wording"
         >
           <Sparkles className="h-4 w-4" />
@@ -110,10 +110,10 @@ function usePageDescription(): string | null {
 function LogoMark({ className = "h-7 w-7" }: { className?: string }) {
   return (
     <svg viewBox="0 0 32 32" className={`shrink-0 ${className}`} aria-hidden>
-      <rect width="32" height="32" rx="8" fill="#ffd23f" />
-      <path d="M10.5 9.5 5.8 16l4.7 6.5" fill="none" stroke="#0f1a36" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M21.5 9.5 26.2 16l-4.7 6.5" fill="none" stroke="#0f1a36" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="m12.6 16.4 2.5 2.6 4.5-5.6" fill="none" stroke="#1857d6" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+      <rect width="32" height="32" rx="8" fill="#1857d6" />
+      <path d="M10.5 9.5 5.8 16l4.7 6.5" fill="none" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M21.5 9.5 26.2 16l-4.7 6.5" fill="none" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="m12.6 16.4 2.5 2.6 4.5-5.6" fill="none" stroke="#bcd0ff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

@@ -8,8 +8,8 @@
 @import "@fontsource-variable/jetbrains-mono";
 
 /*
-  Design language: a marking desk. Navy ink, cobalt for what you can act on, highlighter yellow for what waits for
-  you, red pen for mistakes, a green tick for what is done. FiraGO for all text, titles and numbers (Noto Sans
+  Design language: a marking desk. Navy ink, one cobalt blue for the brand and for what you can act on or what waits
+  for you, red pen for mistakes, a green tick for what is done, amber only for real warnings. FiraGO for all text, titles and numbers (Noto Sans
   Georgian covers Georgian), JetBrains Mono only for code, file names and keys.
 */
 @theme {
@@ -33,9 +33,9 @@
   --color-navy-soft: #1c2a4f;
   --color-navy-line: #2a3960;
 
-  --color-mark: #ffd23f;
-  --color-mark-tint: #fff3c2;
-  --color-mark-ink: #6b4700;
+  --color-mark: #1857d6;
+  --color-mark-tint: #e7eeff;
+  --color-mark-ink: #1146b4;
 
   --color-danger: #cf3a2b;
   --color-danger-tint: #ffe7e2;
@@ -131,7 +131,7 @@
   }
 
   ::selection {
-    background: var(--color-mark);
+    background: #cfdcff;
     color: var(--color-ink);
   }
 

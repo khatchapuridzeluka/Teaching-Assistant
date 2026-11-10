@@ -55,6 +55,15 @@ public class RecordingLanguageModelTests
     }
 
     [Fact]
+    public async Task AnAgentRun_IsRecordedAsChat()
+    {
+        await Recorder().RunAgentAsync("system", [], [], TestContext.Current.CancellationToken);
+
+        var call = Assert.Single(_calls.Calls);
+        Assert.Equal((ModelCallPurpose.Chat, true), (call.Purpose, call.Succeeded));
+    }
+
+    [Fact]
     public async Task AMistakeAnalysis_IsRecordedUnderItsOwnPurpose_WithTheAssignment()
     {
         _context.DescribeAssignment("course-1", "assignment-1");
@@ -84,6 +93,11 @@ public class RecordingLanguageModelTests
         public Task<LanguageModelReply> CompleteAsync(string prompt, CancellationToken cancellationToken = default) => Reply("chat-model");
 
         public Task<LanguageModelReply> ChatAsync(string systemPrompt, IReadOnlyList<ChatMessage> messages, CancellationToken cancellationToken = default) =>
+            Reply("chat-model");
+
+        public Task<LanguageModelReply> RunAgentAsync(
+            string systemPrompt, IReadOnlyList<ChatMessage> messages, IReadOnlyList<object> tools,
+            CancellationToken cancellationToken = default) =>
             Reply("chat-model");
 
         public Task<LanguageModelReply> AnalyzeAsync(

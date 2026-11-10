@@ -33,6 +33,14 @@ public class RecordingLanguageModel : ILanguageModel
         return RecordAsync(ModelCallPurpose.Chat, _inner.ModelId, () => _inner.ChatAsync(systemPrompt, messages, cancellationToken));
     }
 
+    public Task<LanguageModelReply> RunAgentAsync(
+        string systemPrompt, IReadOnlyList<ChatMessage> messages, IReadOnlyList<object> tools,
+        CancellationToken cancellationToken = default)
+    {
+        return RecordAsync(ModelCallPurpose.Chat, _inner.ModelId,
+            () => _inner.RunAgentAsync(systemPrompt, messages, tools, cancellationToken));
+    }
+
     public Task<LanguageModelReply> GradeAsync(
         string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default)
     {

@@ -10,7 +10,7 @@ export const palette = {
   accent: "#1857d6",
   accentSoft: "#a9c1f4",
   navy: "#0f1a36",
-  mark: "#ffd23f",
+  mark: "#1857d6",
   hover: "rgba(22, 32, 58, 0.06)",
 } as const;
 
@@ -24,7 +24,7 @@ export const chartLabel = { fontSize: 12, fill: palette.ink, fontFamily: "FiraGO
 
 const avatarTones = [
   { background: "#e7eeff", color: "#1146b4" },
-  { background: "#fff3c2", color: "#6b4700" },
+  { background: "#e1f3f1", color: "#0f6b63" },
   { background: "#dcf5e6", color: "#0f5d33" },
   { background: "#ffe7e2", color: "#9c2318" },
   { background: "#e6f4fb", color: "#0d5c7d" },

@@ -336,7 +336,7 @@ export function SubmissionDetail({
               ) : (
                 !grading && (
                   <div className="flex flex-col items-center rounded-[10px] border border-dashed border-ink-faint/60 bg-white/60 px-5 py-8 text-center">
-                    <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-mark-tint text-warn-ink">
+                    <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-mark-tint text-mark-ink">
                       <Sparkles className="h-5 w-5" />
                     </span>
                     <div className="font-display text-[17px] font-semibold">No AI draft yet</div>

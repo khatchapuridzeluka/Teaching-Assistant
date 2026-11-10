@@ -75,7 +75,7 @@ Previously graded homework exists (Claude-drafted, teacher-corrected). Use it as
 - **Backend:** C# / ASP.NET Core API (the tool is .NET even though graded code is Java/C++). Written and reviewed carefully by the teacher — all grading logic, agents and data live here.
 - **Frontend:** React + Vite + TypeScript, Tailwind + shadcn/ui, `@monaco-editor/react` (code viewer, inline comments, diff), Recharts, TanStack Query. **Mostly AI-generated ("vibe-coded")** — so it must stay a thin client: no grading/business logic in the frontend, it only displays and edits what the API returns.
 - **API contract first:** endpoints and DTOs defined in the backend, exposed via **Swashbuckle** (Swagger UI at `/swagger`, spec at `/swagger/v1/swagger.json`; not Microsoft.AspNetCore.OpenApi); TypeScript types are generated from it, never hand-written.
-- Semantic Kernel — or Microsoft Agent Framework if that's where SK's agent features moved (verify current status before starting)
+- **Microsoft Agent Framework** (`Microsoft.Agents.AI`) for agents with tools, over the Anthropic SDK's `IChatClient` — Semantic Kernel is in maintenance mode since Agent Framework 1.0 (April 2026). A tool is a method marked `[AgentTool("name")]` with a `[Description]`, in a class under `Application/Tools/`: a small adapter that calls an existing service and returns only what the model needs, with failures returned as text. Infrastructure registers every marked method; only Infrastructure references the framework
 - Google Classroom API + Drive API (read-only scopes), **personal Google account**: own Google Cloud project, OAuth consent screen in "Testing" mode with the teacher as test user. Note: refresh tokens in Testing mode expire after ~7 days — re-auth flow must be easy.
 - Postgres + pgvector (grades, mistake records, profiles)
 - Docker sandboxes (multiple JDK images); Polly for retries; OpenTelemetry logging
@@ -155,7 +155,7 @@ When a change affects anything `README.md` describes (features and their status,
 
 ## Privacy
 
-The program owners approved real student data for the MVP and Demo Day (sensitive data reaching the LLM is acceptable at this stage). Still send the model only what grading needs: never names, emails or photos. For later scale, consider a local model or anonymizing again before anything goes to an LLM. Student photos are stored locally (one copy per student, no history) and never sent to the model.
+The program owners approved real student data for the MVP and Demo Day (sensitive data reaching the LLM is acceptable at this stage). Still send the model only what grading needs: never names, emails or photos. One exception, decided by the teacher for the demo: the chat agent's `list_submissions` tool returns student names so the teacher can ask about students by name; grading and analysis prompts still never get them. For later scale, consider a local model or anonymizing again before anything goes to an LLM. Student photos are stored locally (one copy per student, no history) and never sent to the model.
 
 ## Timeline
 

@@ -70,6 +70,21 @@ public class ClaudeLanguageModel : ILanguageModel
         }
     }
 
+    public async Task<LanguageModelReply> RunAgentAsync(
+        string systemPrompt, IReadOnlyList<ChatMessage> messages, IReadOnlyList<object> tools,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await ClaudeAgent.RunAsync(
+                _client, _options.Model, _options.ChatMaxTokens, systemPrompt, messages, tools, cancellationToken);
+        }
+        catch (Exception ex) when (Translate(ex, _options.Model) is { } translated)
+        {
+            throw translated;
+        }
+    }
+
     public Task<LanguageModelReply> GradeAsync(
         string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default)
     {

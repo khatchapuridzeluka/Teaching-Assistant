@@ -13,7 +13,7 @@ const buttonStyles: Record<ButtonVariant, string> = {
   ghost: "border-transparent bg-transparent text-ink-soft hover:bg-paper-dark",
   danger: "border-danger bg-danger text-white hover:border-danger-ink hover:bg-danger-ink",
   success: "border-success bg-success text-white shadow-[inset_0_-1px_0_rgb(0_0_0/0.16)] hover:border-success-ink hover:bg-success-ink",
-  mark: "border-mark bg-mark text-navy shadow-[inset_0_-1px_0_rgb(0_0_0/0.12)] hover:brightness-95",
+  mark: "border-mark bg-mark text-white shadow-[inset_0_-1px_0_rgb(0_0_0/0.12)] hover:brightness-95",
 };
 
 export function buttonClass(variant: ButtonVariant = "outline", small = false, className = "") {
@@ -51,7 +51,7 @@ const chipStyles: Record<ChipTone, string> = {
   dashed: "border-dashed border-ink-faint bg-transparent text-ink-muted",
   warn: "border-transparent bg-warn-tint text-warn-ink",
   danger: "border-transparent bg-danger-tint text-danger-ink",
-  mark: "border-transparent bg-mark text-navy",
+  mark: "border-transparent bg-mark-tint text-mark-ink",
 };
 
 export function Chip({ tone, children, icon, className = "" }: { tone: ChipTone; children: ReactNode; icon?: ReactNode; className?: string }) {

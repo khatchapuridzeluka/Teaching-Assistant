@@ -11,6 +11,7 @@
       <PackageReference Include="Google.Apis.Auth" Version="1.78.0" />
       <PackageReference Include="Google.Apis.Classroom.v1" Version="1.77.0.4304" />
       <PackageReference Include="Google.Apis.Drive.v3" Version="1.78.0.4313" />
+      <PackageReference Include="Microsoft.Agents.AI" Version="1.28.0" />
       <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.14" />
       <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.14" />
       <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />

@@ -3,17 +3,19 @@ using TeachingAssistant.Application.Exceptions;
 using TeachingAssistant.Application.Interfaces;
 using TeachingAssistant.Application.Models;
 using TeachingAssistant.Application.Services;
+using TeachingAssistant.Application.Tools;
 
 namespace TeachingAssistant.Tests.Application;
 
 public class AgentChatServiceTests
 {
     private readonly RecordingModel _model = new();
+    private readonly ClassroomTools _tools = new(null!, null!, null!, null!); // never called here: only the model calls tools
 
     [Fact]
     public async Task Reply_PassesTheConversationAndPageToTheModel()
     {
-        var service = new AgentChatService(_model);
+        var service = new AgentChatService(_model, _tools);
         var request = new ChatRequest([new ChatMessage(ChatRole.User, "Hi")], "Assignment 'Assignment 4' in course 'Java II N2'");
 
         var reply = await service.ReplyAsync(request, TestContext.Current.CancellationToken);
@@ -26,7 +28,7 @@ public class AgentChatServiceTests
     [Fact]
     public async Task Reply_RejectsAConversationNotEndingWithTheTeacher()
     {
-        var service = new AgentChatService(_model);
+        var service = new AgentChatService(_model, _tools);
         var request = new ChatRequest([new ChatMessage(ChatRole.User, "Hi"), new ChatMessage(ChatRole.Assistant, "Hello")], null);
 
         await Assert.ThrowsAsync<InvalidRequestException>(() => service.ReplyAsync(request, TestContext.Current.CancellationToken));
@@ -36,7 +38,7 @@ public class AgentChatServiceTests
     [Fact]
     public async Task Reply_KeepsOnlyRecentMessages_StartingWithTheTeacher()
     {
-        var service = new AgentChatService(_model);
+        var service = new AgentChatService(_model, _tools);
         var history = Enumerable.Range(0, 50)
             .Select(i => new ChatMessage(i % 2 == 0 ? ChatRole.User : ChatRole.Assistant, $"message {i}"))
             .Append(new ChatMessage(ChatRole.User, "latest"))
@@ -54,7 +56,7 @@ public class AgentChatServiceTests
     [InlineData(true)] // one character over the limit
     public async Task Reply_RejectsAnEmptyOrTooLongNewMessage(bool tooLong)
     {
-        var service = new AgentChatService(_model);
+        var service = new AgentChatService(_model, _tools);
         var text = tooLong ? new string('x', 8_001) : "   ";
         var request = new ChatRequest(
         [
@@ -70,7 +72,7 @@ public class AgentChatServiceTests
     [Fact]
     public async Task Reply_DropsEmptyEarlierMessages_InsteadOfFailing()
     {
-        var service = new AgentChatService(_model);
+        var service = new AgentChatService(_model, _tools);
         var request = new ChatRequest(
         [
             new ChatMessage(ChatRole.User, "first"),
@@ -86,7 +88,7 @@ public class AgentChatServiceTests
     [Fact]
     public async Task Reply_KeepsALongEarlierReply()
     {
-        var service = new AgentChatService(_model);
+        var service = new AgentChatService(_model, _tools);
         var longReply = new string('x', 30_000); // a long model answer, far over the new-message limit
         var request = new ChatRequest(
         [
@@ -104,7 +106,7 @@ public class AgentChatServiceTests
     [Fact]
     public async Task Reply_DropsTheOldestMessagesBeyondTheLengthBudget()
     {
-        var service = new AgentChatService(_model);
+        var service = new AgentChatService(_model, _tools);
         // Two of these plus "recent question" fill the 120,000-character budget almost exactly.
         var big = new string('x', 59_990);
         var request = new ChatRequest(
@@ -124,10 +126,33 @@ public class AgentChatServiceTests
         Assert.Equal(["recent question", big, "latest"], _model.Messages!.Select(m => m.Text));
     }
 
+    [Fact]
+    public async Task Reply_GivesTheModelTheClassroomTools_AndTheOpenPageIds()
+    {
+        var service = new AgentChatService(_model, _tools);
+        var request = new ChatRequest([new ChatMessage(ChatRole.User, "Fetch them")], "Assignment 'A4' in course 'Java'", "course-1", "assignment-4");
+
+        await service.ReplyAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.Same(_tools, Assert.Single(_model.Tools!));
+        Assert.Contains("Assignment 'A4' in course 'Java' (course id course-1, assignment id assignment-4)", _model.System);
+    }
+
+    [Fact]
+    public async Task Reply_WithoutAnOpenPage_AddsNoPageLine()
+    {
+        var service = new AgentChatService(_model, _tools);
+
+        await service.ReplyAsync(new ChatRequest([new ChatMessage(ChatRole.User, "Hi")], null), TestContext.Current.CancellationToken);
+
+        Assert.DoesNotContain("currently looking at", _model.System);
+    }
+
     private sealed class RecordingModel : ILanguageModel
     {
         public string? System { get; private set; }
         public IReadOnlyList<ChatMessage>? Messages { get; private set; }
+        public IReadOnlyList<object>? Tools { get; private set; }
 
         public string ModelId => "fake-model";
 
@@ -137,10 +162,16 @@ public class AgentChatServiceTests
             throw new NotSupportedException();
 
         public Task<LanguageModelReply> ChatAsync(
-            string systemPrompt, IReadOnlyList<ChatMessage> messages, CancellationToken cancellationToken = default)
+            string systemPrompt, IReadOnlyList<ChatMessage> messages, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<LanguageModelReply> RunAgentAsync(
+            string systemPrompt, IReadOnlyList<ChatMessage> messages, IReadOnlyList<object> tools,
+            CancellationToken cancellationToken = default)
         {
             System = systemPrompt;
             Messages = messages;
+            Tools = tools;
             return Task.FromResult(new LanguageModelReply(ModelId, "Hello!"));
         }
 

@@ -246,7 +246,7 @@ function Pipeline() {
           <li key={step.title} className="relative flex gap-3">
             <span
               className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                i === steps.length - 1 ? "bg-success-tint text-success-ink" : i === 2 ? "bg-mark text-navy" : "bg-accent-tint text-accent-strong"
+                i === steps.length - 1 ? "bg-success-tint text-success-ink" : i === 2 ? "bg-accent text-white" : "bg-accent-tint text-accent-strong"
               }`}
             >
               <step.icon className="h-4 w-4" />

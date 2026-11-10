@@ -167,7 +167,7 @@ export function ChatPanel({ page, onClose }: { page: string | null; onClose: () 
 
 function AgentMark({ size }: { size: string; text?: string }) {
   return (
-    <span aria-hidden="true" className={`flex shrink-0 items-center justify-center rounded-lg bg-mark text-navy ${size}`}>
+    <span aria-hidden="true" className={`flex shrink-0 items-center justify-center rounded-lg bg-accent text-white ${size}`}>
       <Sparkles className="h-[55%] w-[55%]" />
     </span>
   );

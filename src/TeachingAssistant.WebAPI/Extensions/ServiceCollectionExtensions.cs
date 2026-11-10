@@ -9,6 +9,7 @@ using TeachingAssistant.Application.Interfaces.Services;
 using TeachingAssistant.Application.Jobs;
 using TeachingAssistant.Application.Models;
 using TeachingAssistant.Application.Services;
+using TeachingAssistant.Application.Tools;
 using TeachingAssistant.Infrastructure.Documents;
 using TeachingAssistant.Infrastructure.Google;
 using TeachingAssistant.Infrastructure.Jobs;
@@ -120,6 +121,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IInstructionsFetchService, InstructionsFetchService>();
         services.AddScoped<IInstructionsService, InstructionsService>();
         services.AddScoped<IStoredSubmissionService, StoredSubmissionService>();
+        services.AddScoped<ClassroomTools>();
         services.AddScoped<IAgentChatService, AgentChatService>();
         services.AddScoped<IGradingService, GradingService>();
         services.AddScoped<IGradingDraftService, GradingDraftService>();
