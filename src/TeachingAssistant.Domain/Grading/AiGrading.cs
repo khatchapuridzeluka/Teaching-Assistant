@@ -10,6 +10,7 @@ public enum GradingStatus
 public class AiGrading
 {
     private readonly List<GradingMistake> _mistakes = [];
+    private readonly List<GradingStrength> _strengths = [];
 
     private AiGrading()
     {
@@ -27,7 +28,8 @@ public class AiGrading
         IEnumerable<string> skippedFiles,
         string rawOutput,
         IEnumerable<GradingMistake> mistakes,
-        DateTimeOffset createdAt)
+        DateTimeOffset createdAt,
+        IEnumerable<GradingStrength>? strengths = null)
     {
         Id = Guid.CreateVersion7();
         VersionId = versionId;
@@ -48,6 +50,13 @@ public class AiGrading
         {
             mistake.AttachTo(Id, position++);
             _mistakes.Add(mistake);
+        }
+
+        position = 0;
+        foreach (var strength in strengths ?? [])
+        {
+            strength.AttachTo(Id, position++);
+            _strengths.Add(strength);
         }
     }
 
@@ -77,6 +86,8 @@ public class AiGrading
     public DateTimeOffset? DiscardedAt { get; private set; }
 
     public IReadOnlyList<GradingMistake> Mistakes => _mistakes;
+
+    public IReadOnlyList<GradingStrength> Strengths => _strengths;
 
     public void Discard(DateTimeOffset at)
     {

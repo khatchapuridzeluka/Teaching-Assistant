@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using TeachingAssistant.Application.Interfaces;
+using TeachingAssistant.Domain.Grading;
 using TeachingAssistant.Domain.Profiling;
 
 namespace TeachingAssistant.Infrastructure.Persistence;
@@ -15,6 +16,7 @@ public class StudentMistakeStore(AppDbContext db) : IStudentMistakeStore
         string courseId, string studentId, CancellationToken cancellationToken = default) =>
         await db.StudentMistakes
             .Where(m => m.CourseId == courseId && m.StudentId == studentId)
+            .Where(m => db.Gradings.Any(g => g.Id == m.GradingId && g.Status == GradingStatus.Draft))
             .OrderByDescending(m => m.ApprovedAt)
             .ToListAsync(cancellationToken);
 

@@ -15,8 +15,10 @@ public class GradingReportServiceTests
     private readonly FakeReports _reports = new();
     private readonly FakeSubmissions _submissions = new();
     private readonly FakeStudentMistakes _studentMistakes = new();
+    private readonly FakeStudentStrengths _studentStrengths = new();
 
-    private GradingReportService Service() => new(_gradings, _reports, _submissions, _studentMistakes, TimeProvider.System);
+    private GradingReportService Service() =>
+        new(_gradings, _reports, _submissions, _studentMistakes, _studentStrengths, TimeProvider.System);
 
     [Fact]
     public async Task Get_IsNull_UntilTheFirstSave_ThenTheSameReportIsUpdated()
@@ -65,6 +67,69 @@ public class GradingReportServiceTests
     }
 
     [Fact]
+    public async Task Strengths_AreCopiedToTheReport_EditedOrRejected_AndOnlyKeptOnesAreRecordedOnApprove()
+    {
+        var grading = Create();
+        var request = Request(grading, 88) with
+        {
+            Strengths =
+            [
+                new ReportStrengthInput(grading.Strengths[0].Id, true, MistakeCategory.Design, grading.Strengths[0].Message),
+                new ReportStrengthInput(grading.Strengths[1].Id, false, MistakeCategory.ErrorHandling, "  Validates every input value. "),
+            ],
+        };
+
+        var saved = await Service().SaveAsync(grading.Id, Request(grading, 88), TestContext.Current.CancellationToken);
+        Assert.Equal(["Clean hierarchy", "Validates input"], saved!.Strengths.Select(s => s.Message));
+        Assert.All(saved.Strengths, s => Assert.Equal(MistakeDecision.Kept, s.Decision));
+        Assert.Empty(_studentStrengths.Strengths);
+
+        var report = await Service().ApproveAsync(grading.Id, request, TestContext.Current.CancellationToken);
+
+        Assert.Equal([MistakeDecision.Rejected, MistakeDecision.Edited], report!.Strengths.Select(s => s.Decision));
+        var recorded = Assert.Single(_studentStrengths.Strengths);
+        Assert.Equal(("student-1", "assignment-1", MistakeCategory.ErrorHandling, "Validates every input value."),
+            (recorded.StudentId, recorded.AssignmentId, recorded.Category, recorded.Message));
+
+        await Service().SaveAsync(grading.Id, request, TestContext.Current.CancellationToken);
+        Assert.Empty(_studentStrengths.Strengths);
+    }
+
+    [Fact]
+    public async Task ApprovingADraft_DiscardsTheStudentsOtherDraftsOfTheSubmission_AndOnlyItsRecordsCount()
+    {
+        var first = Create();
+        var submission = _submissions.Submissions.Single();
+        await Service().ApproveAsync(first.Id, Request(first, 80), TestContext.Current.CancellationToken);
+        Assert.Equal(2, _studentMistakes.Mistakes.Count);
+
+        var regrade = Add(first.VersionId, "Regrade mistake");
+        var resubmission = submission.AddVersion(VersionStatus.Ready, null, "hash-2", "path-2", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, []);
+        var latest = Add(resubmission.Id, "Latest mistake");
+
+        await Service().ApproveAsync(latest.Id, Request(latest, 95), TestContext.Current.CancellationToken);
+
+        Assert.Equal([GradingStatus.Discarded, GradingStatus.Discarded, GradingStatus.Draft], new[] { first, regrade, latest }.Select(g => g.Status));
+        Assert.Equal(["Latest mistake"], _studentMistakes.Mistakes.Select(m => m.Message));
+        Assert.Equal(["Latest strength"], _studentStrengths.Strengths.Select(s => s.Message));
+        Assert.Equal(2, _reports.Reports.Count);
+    }
+
+    [Fact]
+    public async Task DiscardingAnApprovedDraft_RemovesItsRecordsFromTheProfile()
+    {
+        var grading = Create();
+        await Service().ApproveAsync(grading.Id, Request(grading, 80), TestContext.Current.CancellationToken);
+
+        await new GradingDraftService(_gradings, _reports, _studentMistakes, _studentStrengths, TimeProvider.System)
+            .DiscardAsync(grading.Id, TestContext.Current.CancellationToken);
+
+        Assert.Equal(GradingStatus.Discarded, grading.Status);
+        Assert.Empty(_studentMistakes.Mistakes);
+        Assert.Empty(_studentStrengths.Strengths);
+    }
+
+    [Fact]
     public async Task UnknownDraft_IsNull_BadInput_IsRejected()
     {
         var grading = Create();
@@ -80,6 +145,16 @@ public class GradingReportServiceTests
             Service().SaveAsync(grading.Id, Request(grading, 80) with { Review = " " }, TestContext.Current.CancellationToken));
         await Assert.ThrowsAsync<InvalidRequestException>(() =>
             Service().SaveAsync(grading.Id, unknownMistake, TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<InvalidRequestException>(() =>
+            Service().SaveAsync(grading.Id, Request(grading, 80) with
+            {
+                Strengths = [new ReportStrengthInput(Guid.NewGuid(), false, MistakeCategory.Design, "x")],
+            }, TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<InvalidRequestException>(() =>
+            Service().SaveAsync(grading.Id, Request(grading, 80) with
+            {
+                Strengths = [new ReportStrengthInput(grading.Strengths[0].Id, false, MistakeCategory.Design, " ")],
+            }, TestContext.Current.CancellationToken));
         Assert.Empty(_reports.Reports);
     }
 
@@ -94,7 +169,20 @@ public class GradingReportServiceTests
         [
             new GradingMistake("A.java", 1, 1, MistakeSeverity.Minor, MistakeCategory.Naming, "First"),
             new GradingMistake("A.java", 5, 6, MistakeSeverity.Major, MistakeCategory.Correctness, "Second"),
-        ], now);
+        ], now,
+        [
+            new GradingStrength("A.java", 10, 20, MistakeCategory.Design, "Clean hierarchy"),
+            new GradingStrength(null, null, null, MistakeCategory.ErrorHandling, "Validates input"),
+        ]);
+        _gradings.Add(grading);
+        return grading;
+    }
+
+    private AiGrading Add(Guid versionId, string message)
+    {
+        var grading = new AiGrading(versionId, "model", "AI review", 90, 100, null, 1, [], [], "{}",
+            [new GradingMistake("A.java", 1, 1, MistakeSeverity.Minor, MistakeCategory.Naming, message)], DateTimeOffset.UtcNow,
+            [new GradingStrength(null, null, null, MistakeCategory.Design, message.Replace("mistake", "strength"))]);
         _gradings.Add(grading);
         return grading;
     }
@@ -111,7 +199,7 @@ public class GradingReportServiceTests
             Task.FromResult(_gradings.FirstOrDefault(g => g.Id == gradingId));
 
         public Task<IReadOnlyList<AiGrading>> GetByVersionsAsync(IReadOnlyCollection<Guid> versionIds, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
+            Task.FromResult<IReadOnlyList<AiGrading>>(_gradings.Where(g => versionIds.Contains(g.VersionId)).ToList());
 
         public Task<IReadOnlyList<GradingSummary>> GetSummariesAsync(
             SubmissionSource source, string courseId, string? assignmentId, string? studentId, CancellationToken cancellationToken = default) =>
@@ -154,6 +242,27 @@ public class GradingReportServiceTests
             foreach (var mistake in mistakes.ToList())
             {
                 Mistakes.Remove(mistake);
+            }
+        }
+    }
+
+    private sealed class FakeStudentStrengths : IStudentStrengthStore
+    {
+        public List<StudentStrength> Strengths { get; } = [];
+
+        public Task<IReadOnlyList<StudentStrength>> GetByReportAsync(Guid reportId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<StudentStrength>>(Strengths.Where(s => s.ReportId == reportId).ToList());
+
+        public Task<IReadOnlyList<StudentStrength>> GetByStudentAsync(string courseId, string studentId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<StudentStrength>>(Strengths.Where(s => s.CourseId == courseId && s.StudentId == studentId).ToList());
+
+        public void AddRange(IEnumerable<StudentStrength> strengths) => Strengths.AddRange(strengths);
+
+        public void RemoveRange(IEnumerable<StudentStrength> strengths)
+        {
+            foreach (var strength in strengths.ToList())
+            {
+                Strengths.Remove(strength);
             }
         }
     }

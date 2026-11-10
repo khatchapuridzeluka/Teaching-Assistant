@@ -28,6 +28,24 @@ public class AiGradingConfiguration : IEntityTypeConfiguration<AiGrading>
             .HasForeignKey(m => m.GradingId)
             .OnDelete(DeleteBehavior.Cascade);
         builder.Navigation(g => g.Mistakes).UsePropertyAccessMode(PropertyAccessMode.Field);
+
+        builder.HasMany(g => g.Strengths)
+            .WithOne()
+            .HasForeignKey(s => s.GradingId)
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(g => g.Strengths).UsePropertyAccessMode(PropertyAccessMode.Field);
+    }
+}
+
+public class GradingStrengthConfiguration : IEntityTypeConfiguration<GradingStrength>
+{
+    public void Configure(EntityTypeBuilder<GradingStrength> builder)
+    {
+        builder.ToTable("grading_strengths");
+        builder.HasKey(s => s.Id);
+        builder.Property(s => s.Id).ValueGeneratedNever();
+        builder.Property(s => s.Category).HasConversion<string>();
+        builder.HasIndex(s => s.GradingId);
     }
 }
 

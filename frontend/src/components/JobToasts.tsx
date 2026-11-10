@@ -162,6 +162,10 @@ function messageFor(entry: TrackedJob, job: JobInfo): ToastMessage | null {
     return analysisMessage(entry, job);
   }
 
+  if (job.type === "AnalyzeStudent") {
+    return analysisMessage(entry, job, "Student analysis ready");
+  }
+
   switch (job.status) {
     case "Queued":
       if (job.attempts > 0) {
@@ -219,7 +223,7 @@ function groupMessage(entry: TrackedJob, job: JobInfo): ToastMessage {
   }
 }
 
-function analysisMessage(entry: TrackedJob, job: JobInfo): ToastMessage | null {
+function analysisMessage(entry: TrackedJob, job: JobInfo, readyTitle = "Common mistakes ready"): ToastMessage | null {
   switch (job.status) {
     case "Queued":
       return job.attempts > 0
@@ -228,7 +232,7 @@ function analysisMessage(entry: TrackedJob, job: JobInfo): ToastMessage | null {
     case "Running":
       return null;
     case "Succeeded":
-      return { tone: "success", title: "Common mistakes ready", detail: entry.label, link: { to: entry.to, label: "Open" } };
+      return { tone: "success", title: readyTitle, detail: entry.label, link: { to: entry.to, label: "Open" } };
     case "Failed":
       return { tone: "error", title: "Analysis failed", detail: `${entry.label}: ${job.error ?? "unknown error"}` };
     case "Canceled":

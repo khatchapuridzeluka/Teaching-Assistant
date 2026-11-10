@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import type { CodeMistake, GradingReport, GradingResult, MistakeCategory, MistakeSeverity } from "../api/client";
+import type { CodeMistake, CodeStrength, GradingReport, GradingResult, MistakeCategory, MistakeSeverity } from "../api/client";
 import { useSaveReport } from "../api/hooks";
-import { severityColor } from "./CodeBrowser";
+import { severityColor, strengthColor } from "./CodeBrowser";
 import { Button, Chip, ErrorPanel } from "./ui";
 
 const severities: MistakeSeverity[] = ["Major", "Minor", "Style"];
@@ -30,6 +30,17 @@ type EditableMistake = {
   original: { severity: MistakeSeverity; category: MistakeCategory; message: string; points: number | null };
 };
 
+type EditableStrength = {
+  sourceStrengthId: string;
+  file?: string | null;
+  startLine?: number | null;
+  endLine?: number | null;
+  category: MistakeCategory;
+  message: string;
+  rejected: boolean;
+  original: { category: MistakeCategory; message: string };
+};
+
 export function ReportEditor({
   grading,
   report,
@@ -46,6 +57,7 @@ export function ReportEditor({
   const [bonus, setBonus] = useState(toInput(report ? report.bonus : grading.bonus));
   const [review, setReview] = useState(report?.review ?? grading.review);
   const [mistakes, setMistakes] = useState<EditableMistake[]>(() => initialMistakes(grading, report));
+  const [strengths, setStrengths] = useState<EditableStrength[]>(() => initialStrengths(grading, report));
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -59,6 +71,10 @@ export function ReportEditor({
 
   function update(index: number, change: Partial<EditableMistake>) {
     setMistakes((list) => list.map((m, i) => (i === index ? { ...m, ...change } : m)));
+  }
+
+  function updateStrength(index: number, change: Partial<EditableStrength>) {
+    setStrengths((list) => list.map((s, i) => (i === index ? { ...s, ...change } : s)));
   }
 
   function submit(approve: boolean) {
@@ -77,6 +93,12 @@ export function ReportEditor({
             message: m.message,
             points: fromInput(m.points),
           })),
+          strengths: strengths.map((s) => ({
+            sourceStrengthId: s.sourceStrengthId,
+            rejected: s.rejected,
+            category: s.category,
+            message: s.message,
+          })),
         },
       },
       { onSuccess: onClose },
@@ -86,6 +108,8 @@ export function ReportEditor({
   const rejected = mistakes.filter((m) => m.rejected).length;
   const deducted = mistakes.filter((m) => !m.rejected).reduce((sum, m) => sum + (fromInput(m.points) ?? 0), 0);
   const edited = mistakes.filter((m) => !m.rejected && isEdited(m)).length;
+  const strengthsRejected = strengths.filter((s) => s.rejected).length;
+  const strengthsEdited = strengths.filter((s) => !s.rejected && isStrengthEdited(s)).length;
 
   return (
     <div
@@ -236,18 +260,70 @@ export function ReportEditor({
               </div>
             ))}
           </section>
+
+          <section className="flex flex-col gap-2">
+            <h3 className="text-xs font-semibold">
+              Strengths · {strengths.length}
+              <span className="font-normal text-ink-muted">
+                {strengthsEdited > 0 && ` · ${strengthsEdited} edited`}
+                {strengthsRejected > 0 && ` · ${strengthsRejected} rejected`}
+                {" · never change the score; kept ones go to the student's profile on approve"}
+              </span>
+            </h3>
+            {strengths.length === 0 && <div className="text-xs text-ink-muted">The AI noted no strengths in this draft.</div>}
+            {strengths.map((s, i) => (
+              <div
+                key={s.sourceStrengthId}
+                className={`flex flex-col gap-2 rounded-[10px] border bg-white px-3 py-2.5 ${s.rejected ? "border-dashed border-line opacity-60" : "border-line"}`}
+              >
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: strengthColor }} />
+                  <b>Strength</b>
+                  <select
+                    value={s.category}
+                    onChange={(e) => updateStrength(i, { category: e.target.value as MistakeCategory })}
+                    disabled={s.rejected}
+                    aria-label="Category"
+                    className="h-7 rounded-lg border border-line bg-white px-1.5"
+                  >
+                    {categories.map((c) => (
+                      <option key={c.value} value={c.value}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="font-mono text-ink-muted">{location(s)}</span>
+                  {s.rejected ? <Chip tone="muted">Rejected</Chip> : isStrengthEdited(s) && <Chip tone="tint">Edited</Chip>}
+                  <Button small className="ml-auto" onClick={() => updateStrength(i, { rejected: !s.rejected })}>
+                    {s.rejected ? "Restore" : "Reject"}
+                  </Button>
+                </div>
+                <textarea
+                  value={s.message}
+                  onChange={(e) => updateStrength(i, { message: e.target.value })}
+                  disabled={s.rejected}
+                  rows={2}
+                  aria-label="Strength"
+                  className={`w-full resize-y rounded-lg border border-line px-2.5 py-1.5 text-[13px] ${s.rejected ? "bg-paper line-through" : "bg-white"}`}
+                />
+              </div>
+            ))}
+          </section>
         </div>
 
         <footer className="flex flex-col gap-2 border-t border-line bg-white px-5 py-3 sm:rounded-b-[12px]">
           {save.isError && <ErrorPanel error={save.error} />}
           <div className="flex flex-wrap items-center justify-end gap-2">
+            <span className="mr-auto text-[11px] text-ink-muted">
+              Approve makes this the one that counts: {studentName}'s other drafts of this assignment are discarded.
+            </span>
             <Button onClick={onClose} disabled={save.isPending}>
               Cancel
             </Button>
             <Button onClick={() => submit(false)} disabled={save.isPending} title="Keep your edits as a report in review; you can come back to it">
               {save.isPending && !save.variables?.approve ? "Saving…" : "Save"}
             </Button>
-            <Button variant="primary" onClick={() => submit(true)} disabled={save.isPending} title="Save and mark this report as final">
+            <Button variant="primary" onClick={() => submit(true)} disabled={save.isPending} title="Save and mark this report as final; the student's other drafts of this assignment (any version) are discarded, so only this one counts on the profile">
               {save.isPending && save.variables?.approve ? "Approving…" : "Approve"}
             </Button>
           </div>
@@ -269,6 +345,12 @@ export function keptMistakes(report: GradingReport): CodeMistake[] {
       message: m.message,
       points: m.points,
     }));
+}
+
+export function keptStrengths(report: GradingReport): CodeStrength[] {
+  return report.strengths
+    .filter((s) => s.decision !== "Rejected")
+    .map((s) => ({ file: s.file, startLine: s.startLine, endLine: s.endLine, category: s.category, message: s.message }));
 }
 
 export function ReportChip({ report }: { report: GradingReport }) {
@@ -295,6 +377,28 @@ function initialMistakes(grading: GradingResult, report: GradingReport | null | 
     });
 }
 
+function initialStrengths(grading: GradingResult, report: GradingReport | null | undefined): EditableStrength[] {
+  return grading.strengths
+    .filter((s) => s.id != null)
+    .map((s) => {
+      const saved = report?.strengths.find((r) => r.sourceStrengthId === s.id);
+      return {
+        sourceStrengthId: s.id!,
+        file: s.file,
+        startLine: s.startLine,
+        endLine: s.endLine,
+        category: saved?.category ?? s.category,
+        message: saved?.message ?? s.message,
+        rejected: saved?.decision === "Rejected",
+        original: { category: s.category, message: s.message },
+      };
+    });
+}
+
+function isStrengthEdited(s: EditableStrength): boolean {
+  return s.category !== s.original.category || s.message.trim() !== s.original.message.trim();
+}
+
 function isEdited(m: EditableMistake): boolean {
   return (
     m.severity !== m.original.severity ||
@@ -304,7 +408,7 @@ function isEdited(m: EditableMistake): boolean {
   );
 }
 
-function location(m: EditableMistake): string {
+function location(m: { file?: string | null; startLine?: number | null; endLine?: number | null }): string {
   const name = m.file?.slice(m.file.lastIndexOf("/") + 1);
   if (!name) {
     return "Whole submission";

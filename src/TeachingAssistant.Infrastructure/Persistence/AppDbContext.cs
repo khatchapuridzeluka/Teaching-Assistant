@@ -24,6 +24,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<GradingReport> GradingReports => Set<GradingReport>();
     public DbSet<ReportMistake> ReportMistakes => Set<ReportMistake>();
     public DbSet<StudentMistake> StudentMistakes => Set<StudentMistake>();
+    public DbSet<GradingStrength> GradingStrengths => Set<GradingStrength>();
+    public DbSet<ReportStrength> ReportStrengths => Set<ReportStrength>();
+    public DbSet<StudentStrength> StudentStrengths => Set<StudentStrength>();
+    public DbSet<StudentAnalysis> StudentAnalyses => Set<StudentAnalysis>();
     public DbSet<ModelCall> ModelCalls => Set<ModelCall>();
     public DbSet<MistakeAnalysis> MistakeAnalyses => Set<MistakeAnalysis>();
     public DbSet<Job> Jobs => Set<Job>();

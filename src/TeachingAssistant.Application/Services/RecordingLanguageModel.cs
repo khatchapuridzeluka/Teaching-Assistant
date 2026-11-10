@@ -44,7 +44,8 @@ public class RecordingLanguageModel : ILanguageModel
     public Task<LanguageModelReply> AnalyzeAsync(
         string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default)
     {
-        return RecordAsync(ModelCallPurpose.MistakeAnalysis, _inner.GradingModelId,
+        var purpose = _context.StudentAnalysis ? ModelCallPurpose.StudentAnalysis : ModelCallPurpose.MistakeAnalysis;
+        return RecordAsync(purpose, _inner.GradingModelId,
             () => _inner.AnalyzeAsync(systemPrompt, parts, outputSchema, cancellationToken));
     }
 

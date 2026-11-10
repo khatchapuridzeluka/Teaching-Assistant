@@ -10,6 +10,8 @@ public class GradingReportStore(AppDbContext db) : IGradingReportStore
     public Task<GradingReport?> FindByGradingAsync(Guid gradingId, CancellationToken cancellationToken = default) =>
         db.GradingReports
             .Include(r => r.Mistakes)
+            .Include(r => r.Strengths)
+            .AsSplitQuery()
             .SingleOrDefaultAsync(r => r.GradingId == gradingId, cancellationToken);
 
     public async Task<IReadOnlyList<ReportScore>> GetScoresAsync(

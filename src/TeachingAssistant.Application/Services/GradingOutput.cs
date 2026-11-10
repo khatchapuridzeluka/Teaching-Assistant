@@ -64,9 +64,37 @@ internal static class GradingOutput
                 },
                 "required": ["file", "startLine", "endLine", "severity", "category", "message", "points"]
               }
+            },
+            "strengths": {
+              "type": "array",
+              "description": "Up to three specific skills the code shows were done well; empty only when nothing stands out.",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "file": {
+                    "anyOf": [{ "type": "string" }, { "type": "null" }],
+                    "description": "Path of the file exactly as in <file path=\"...\">, or null for a strength of the whole submission."
+                  },
+                  "startLine": {
+                    "anyOf": [{ "type": "integer" }, { "type": "null" }],
+                    "description": "First line that shows it, using the line numbers shown in the code; null when file is null."
+                  },
+                  "endLine": {
+                    "anyOf": [{ "type": "integer" }, { "type": "null" }],
+                    "description": "Last line that shows it (same as startLine for one line); null when file is null."
+                  },
+                  "category": { "type": "string", "enum": {{Categories}} },
+                  "message": {
+                    "type": "string",
+                    "description": "One sentence: what was done and why it is good."
+                  }
+                },
+                "required": ["file", "startLine", "endLine", "category", "message"]
+              }
             }
           },
-          "required": ["review", "score", "maxScore", "bonus", "mistakes"]
+          "required": ["review", "score", "maxScore", "bonus", "mistakes", "strengths"]
         }
         """;
 
@@ -90,25 +118,44 @@ internal static class GradingOutput
 
         if (parsed?.Review is null)
         {
-            return new ReadReply(reply, null, null, null, []);
+            return new ReadReply(reply, null, null, null, [], []);
         }
 
         var mistakes = (parsed.Mistakes ?? [])
             .Where(m => !string.IsNullOrWhiteSpace(m.Message))
             .Select(m => Locate(m, codeLines))
             .ToList();
-        return new ReadReply(parsed.Review, parsed.Score, parsed.MaxScore, parsed.Bonus, mistakes);
+        var strengths = (parsed.Strengths ?? [])
+            .Where(s => !string.IsNullOrWhiteSpace(s.Message))
+            .Take(MaxStrengths)
+            .Select(s => Locate(s, codeLines))
+            .ToList();
+        return new ReadReply(parsed.Review, parsed.Score, parsed.MaxScore, parsed.Bonus, mistakes, strengths);
+    }
+
+    private const int MaxStrengths = 3;
+
+    private static CodeStrength Locate(ReplyStrength strength, IReadOnlyDictionary<string, int> codeLines)
+    {
+        var (file, start, end) = Lines(strength.File, strength.StartLine, strength.EndLine, codeLines);
+        return new CodeStrength(file, start, end, strength.Category, strength.Message!.Trim());
+    }
+
+    private static (string? File, int? Start, int? End) Lines(
+        string? path, int? startLine, int? endLine, IReadOnlyDictionary<string, int> codeLines)
+    {
+        var file = ResolveFile(path, codeLines.Keys);
+        if (file is not null && startLine is { } first && first >= 1 && first <= codeLines[file])
+        {
+            return (file, first, Math.Clamp(endLine ?? first, first, codeLines[file]));
+        }
+
+        return (file, null, null);
     }
 
     private static CodeMistake Locate(ReplyMistake mistake, IReadOnlyDictionary<string, int> codeLines)
     {
-        var file = ResolveFile(mistake.File, codeLines.Keys);
-        int? start = null, end = null;
-        if (file is not null && mistake.StartLine is { } first && first >= 1 && first <= codeLines[file])
-        {
-            start = first;
-            end = Math.Clamp(mistake.EndLine ?? first, first, codeLines[file]);
-        }
+        var (file, start, end) = Lines(mistake.File, mistake.StartLine, mistake.EndLine, codeLines);
 
         double? points = mistake.Points is { } value ? Math.Abs(value) : null;
         return new CodeMistake(file, start, end, mistake.Severity, mistake.Category, mistake.Message!.Trim(), Points: points);
@@ -133,9 +180,14 @@ internal static class GradingOutput
         return bySuffix.Count == 1 ? bySuffix[0] : null;
     }
 
-    public sealed record ReadReply(string Review, double? Score, double? MaxScore, double? Bonus, IReadOnlyList<CodeMistake> Mistakes);
+    public sealed record ReadReply(
+        string Review, double? Score, double? MaxScore, double? Bonus, IReadOnlyList<CodeMistake> Mistakes,
+        IReadOnlyList<CodeStrength> Strengths);
 
-    private sealed record Reply(string? Review, double? Score, double? MaxScore, double? Bonus, List<ReplyMistake>? Mistakes);
+    private sealed record Reply(
+        string? Review, double? Score, double? MaxScore, double? Bonus, List<ReplyMistake>? Mistakes, List<ReplyStrength>? Strengths);
+
+    private sealed record ReplyStrength(string? File, int? StartLine, int? EndLine, MistakeCategory Category, string? Message);
 
     private sealed record ReplyMistake(
         string? File, int? StartLine, int? EndLine, MistakeSeverity Severity, MistakeCategory Category, string? Message, double? Points);

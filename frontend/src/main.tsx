@@ -19,6 +19,7 @@ import { ReviewQueuePage } from "./pages/ReviewQueuePage";
 import { SystemPage } from "./pages/SystemPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { StudentMistakesPage } from "./pages/StudentMistakesPage";
+import { StudentStrengthsPage } from "./pages/StudentStrengthsPage";
 import { StudentsPage } from "./pages/StudentsPage";
 
 const queryClient = new QueryClient({
@@ -78,6 +79,13 @@ const router = createBrowserRouter([
             element: <StudentMistakesPage />,
             handle: {
               crumbs: ({ courseId }) => [{ label: "Students", to: `/courses/${courseId}/students` }, { label: "Mistakes" }],
+            } satisfies CrumbHandle,
+          },
+          {
+            path: "students/:userId/strengths",
+            element: <StudentStrengthsPage />,
+            handle: {
+              crumbs: ({ courseId }) => [{ label: "Students", to: `/courses/${courseId}/students` }, { label: "Strengths" }],
             } satisfies CrumbHandle,
           },
           {

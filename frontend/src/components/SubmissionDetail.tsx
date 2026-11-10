@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { CodeMistake, JobInfo, StoredFile, StoredSubmission, StoredVersion, Submission } from "../api/client";
+import type { CodeMistake, CodeStrength, JobInfo, StoredFile, StoredSubmission, StoredVersion, Submission } from "../api/client";
 import { useDiscardGrading, useGradingReport, useReview, useVersionGradings } from "../api/hooks";
 import { formatDate, formatDay, initials } from "../format";
-import { CodeBrowser, type CodeFocus, severityColor } from "./CodeBrowser";
-import { keptMistakes, ReportEditor } from "./ReportEditor";
+import { CodeBrowser, type CodeFocus, severityColor, strengthColor } from "./CodeBrowser";
+import { keptMistakes, keptStrengths, ReportEditor } from "./ReportEditor";
 import { Avatar, Button, Chip, type ChipTone, ErrorPanel, Spinner } from "./ui";
 
 export const stateChip: Record<string, { tone: ChipTone; label: string }> = {
@@ -60,6 +60,7 @@ export function SubmissionDetail({
   const [showOriginal, setShowOriginal] = useState(false);
   const showReport = report != null && !showOriginal;
   const shownMistakes: CodeMistake[] | undefined = showReport ? keptMistakes(report) : review?.mistakes;
+  const shownStrengths: CodeStrength[] | undefined = showReport ? keptStrengths(report) : review?.strengths;
 
   useEffect(() => {
     setViewingId(null);
@@ -282,6 +283,7 @@ export function SubmissionDetail({
                     </div>
                   </div>
                   <MistakeList mistakes={shownMistakes ?? []} onShow={showMistake} />
+                  <StrengthList strengths={shownStrengths ?? []} onShow={showMistake} />
                   {editing && (
                     <ReportEditor grading={review} report={report} studentName={submission.studentName} onClose={() => setEditing(false)} />
                   )}
@@ -318,7 +320,7 @@ export function SubmissionDetail({
 
           <div className={`min-h-0 min-w-0 flex-1 flex-col p-2 sm:p-4 @4xl:flex ${tab === "code" ? "flex" : "hidden"}`}>
             {version.hasCode ? (
-              <CodeBrowser versionId={version.id} className="h-full" mistakes={shownMistakes} focus={focus} />
+              <CodeBrowser versionId={version.id} className="h-full" mistakes={shownMistakes} strengths={shownStrengths} focus={focus} />
             ) : (
               <div className="flex flex-1 items-center justify-center text-center text-ink-muted">
                 No code in this version. Preview files shows its images and documents.
@@ -423,6 +425,47 @@ export function MistakeList({ mistakes, onShow }: { mistakes: CodeMistake[]; onS
                     </span>
                   </span>
                   <span className="mt-0.5 block text-[13px]">{m.message}</span>
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+export function StrengthList({ strengths, onShow }: { strengths: CodeStrength[]; onShow: (file: string, line: number) => void }) {
+  if (strengths.length === 0) {
+    return null;
+  }
+
+  return (
+    <section>
+      <h3 className="mb-2 text-[11px] font-bold uppercase tracking-[0.06em] text-accent">Strengths · {strengths.length}</h3>
+      <ul className="flex flex-col gap-2">
+        {strengths.map((s, i) => {
+          const name = s.file?.slice(s.file.lastIndexOf("/") + 1);
+          const lines = s.startLine == null ? null : s.endLine && s.endLine !== s.startLine ? `${s.startLine}–${s.endLine}` : `${s.startLine}`;
+          const canShow = s.file != null && s.startLine != null;
+          return (
+            <li key={i}>
+              <button
+                onClick={canShow ? () => onShow(s.file!, s.startLine!) : undefined}
+                disabled={!canShow}
+                className="flex w-full gap-3 rounded-[10px] border border-line bg-white px-4 py-2.5 text-left enabled:hover:border-accent disabled:cursor-default"
+                title={canShow ? "Show in the code" : undefined}
+              >
+                <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: strengthColor }} />
+                <span className="min-w-0 flex-1">
+                  <span className="flex flex-wrap items-center gap-x-2 text-xs">
+                    <b>Strength</b>
+                    <span className="text-ink-muted">{s.category}</span>
+                    <span className={`ml-auto font-mono ${canShow ? "text-accent" : "text-ink-muted"}`}>
+                      {name ? (lines ? `${name}:${lines}` : name) : "Whole submission"}
+                    </span>
+                  </span>
+                  <span className="mt-0.5 block text-[13px]">{s.message}</span>
                 </span>
               </button>
             </li>

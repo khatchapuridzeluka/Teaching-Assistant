@@ -9,11 +9,19 @@ namespace TeachingAssistant.Application.Services;
 public class GradingDraftService : IGradingDraftService
 {
     private readonly IGradingStore _gradings;
+    private readonly IGradingReportStore _reports;
+    private readonly IStudentMistakeStore _studentMistakes;
+    private readonly IStudentStrengthStore _studentStrengths;
     private readonly TimeProvider _timeProvider;
 
-    public GradingDraftService(IGradingStore gradings, TimeProvider timeProvider)
+    public GradingDraftService(
+        IGradingStore gradings, IGradingReportStore reports, IStudentMistakeStore studentMistakes,
+        IStudentStrengthStore studentStrengths, TimeProvider timeProvider)
     {
         _gradings = gradings;
+        _reports = reports;
+        _studentMistakes = studentMistakes;
+        _studentStrengths = studentStrengths;
         _timeProvider = timeProvider;
     }
 
@@ -57,6 +65,12 @@ public class GradingDraftService : IGradingDraftService
         }
 
         grading.Discard(_timeProvider.GetUtcNow());
+        if (await _reports.FindByGradingAsync(gradingId, cancellationToken) is { } report)
+        {
+            _studentMistakes.RemoveRange(await _studentMistakes.GetByReportAsync(report.Id, cancellationToken));
+            _studentStrengths.RemoveRange(await _studentStrengths.GetByReportAsync(report.Id, cancellationToken));
+        }
+
         await _gradings.SaveChangesAsync(cancellationToken);
         return ToResponse(grading);
     }
@@ -65,5 +79,7 @@ public class GradingDraftService : IGradingDraftService
         g.Id, g.VersionId, g.Status, g.Model, g.Review, g.Score, g.MaxScore, g.Bonus,
         g.Mistakes.OrderBy(m => m.Position)
             .Select(m => new CodeMistake(m.File, m.StartLine, m.EndLine, m.Severity, m.Category, m.Message, m.Id, m.Points)).ToList(),
-        g.InstructionsVersion, g.SentFiles, g.SkippedFiles, g.CreatedAt);
+        g.InstructionsVersion, g.SentFiles, g.SkippedFiles, g.CreatedAt,
+        g.Strengths.OrderBy(s => s.Position)
+            .Select(s => new CodeStrength(s.File, s.StartLine, s.EndLine, s.Category, s.Message, s.Id)).ToList());
 }

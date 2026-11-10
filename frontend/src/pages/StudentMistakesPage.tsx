@@ -5,6 +5,7 @@ import type { MistakeCategory, MistakeLabel, MistakeSeverity, StudentMistakeFilt
 import { useCourseStudents, useStudentMistakes } from "../api/hooks";
 import { FilterChips } from "../components/FilterChips";
 import { CourseName } from "../components/Layout";
+import { StudentOverviewCard } from "../components/StudentOverview";
 import { categoryLabels, MistakeRow } from "../components/StudentMistakes";
 import { Avatar, Button, Card, CardHeader, EmptyState, ErrorPanel, PageHeader, Spinner } from "../components/ui";
 import { formatDay, initials } from "../format";
@@ -69,9 +70,14 @@ export function StudentMistakesPage() {
           </>
         }
         actions={
-          <Link to={`/courses/${courseId}/students${student ? `?student=${student.id}` : ""}`}>
-            <Button>← Profile</Button>
-          </Link>
+          <span className="flex flex-wrap gap-2">
+            <Link to={`/courses/${courseId}/students/${userId}/strengths`}>
+              <Button>Strengths →</Button>
+            </Link>
+            <Link to={`/courses/${courseId}/students${student ? `?student=${student.id}` : ""}`}>
+              <Button>← Profile</Button>
+            </Link>
+          </span>
         }
       />
 
@@ -89,6 +95,13 @@ export function StudentMistakesPage() {
 
       {data && data.recorded > 0 && (
         <>
+          <StudentOverviewCard
+            courseId={courseId}
+            userId={userId}
+            studentName={student?.name ?? "this student"}
+            returnTo={`/courses/${courseId}/students/${userId}/mistakes`}
+            kind="Mistakes"
+          />
           <Card className="flex flex-col gap-3 px-[18px] py-3">
             <div className="flex flex-wrap items-center gap-2">
               <span className="mr-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-muted">Assignment</span>

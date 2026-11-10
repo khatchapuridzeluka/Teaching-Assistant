@@ -28,6 +28,30 @@ public class GradingReportConfiguration : IEntityTypeConfiguration<GradingReport
             .HasForeignKey(m => m.ReportId)
             .OnDelete(DeleteBehavior.Cascade);
         builder.Navigation(r => r.Mistakes).UsePropertyAccessMode(PropertyAccessMode.Field);
+
+        builder.HasMany(r => r.Strengths)
+            .WithOne()
+            .HasForeignKey(s => s.ReportId)
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(r => r.Strengths).UsePropertyAccessMode(PropertyAccessMode.Field);
+    }
+}
+
+public class ReportStrengthConfiguration : IEntityTypeConfiguration<ReportStrength>
+{
+    public void Configure(EntityTypeBuilder<ReportStrength> builder)
+    {
+        builder.ToTable("report_strengths");
+        builder.HasKey(s => s.Id);
+        builder.Property(s => s.Id).ValueGeneratedNever();
+        builder.Property(s => s.Category).HasConversion<string>();
+        builder.Property(s => s.Decision).HasConversion<string>();
+
+        builder.HasOne<GradingStrength>()
+            .WithMany()
+            .HasForeignKey(s => s.SourceStrengthId)
+            .OnDelete(DeleteBehavior.SetNull);
+        builder.HasIndex(s => s.ReportId);
     }
 }
 

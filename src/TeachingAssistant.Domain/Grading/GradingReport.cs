@@ -29,6 +29,7 @@ public sealed record ReportMistakeEdit(
 public class GradingReport
 {
     private readonly List<ReportMistake> _mistakes = [];
+    private readonly List<ReportStrength> _strengths = [];
 
     private GradingReport()
     {
@@ -63,6 +64,11 @@ public class GradingReport
         {
             _mistakes.Add(new ReportMistake(Id, mistake));
         }
+
+        foreach (var strength in grading.Strengths.OrderBy(s => s.Position))
+        {
+            _strengths.Add(new ReportStrength(Id, strength));
+        }
     }
 
     public Guid Id { get; private set; }
@@ -93,8 +99,11 @@ public class GradingReport
 
     public IReadOnlyList<ReportMistake> Mistakes => _mistakes;
 
+    public IReadOnlyList<ReportStrength> Strengths => _strengths;
+
     public void Save(
-        AiGrading grading, double? score, double? bonus, string review, IEnumerable<ReportMistakeEdit> edits, DateTimeOffset at)
+        AiGrading grading, double? score, double? bonus, string review, IEnumerable<ReportMistakeEdit> edits, DateTimeOffset at,
+        IEnumerable<ReportStrengthEdit>? strengthEdits = null)
     {
         if (grading.Id != GradingId)
         {
@@ -117,6 +126,14 @@ public class GradingReport
                           ?? throw new ArgumentException($"Mistake {edit.SourceMistakeId} is not part of this report.", nameof(edits));
             var source = grading.Mistakes.Single(m => m.Id == edit.SourceMistakeId);
             mistake.Apply(edit, source);
+        }
+
+        foreach (var edit in strengthEdits ?? [])
+        {
+            var strength = _strengths.SingleOrDefault(s => s.SourceStrengthId == edit.SourceStrengthId)
+                           ?? throw new ArgumentException($"Strength {edit.SourceStrengthId} is not part of this report.", nameof(strengthEdits));
+            var source = grading.Strengths.Single(s => s.Id == edit.SourceStrengthId);
+            strength.Apply(edit, source);
         }
 
         Score = score;

@@ -1,3 +1,4 @@
+using TeachingAssistant.Domain.Profiling;
 using System.Text.Json;
 using TeachingAssistant.Application.Contracts;
 using TeachingAssistant.Domain.Jobs;
@@ -14,6 +15,9 @@ public record GradeAssignmentResult(int Succeeded, int Failed, int Canceled);
 
 public record AnalyzeMistakesPayload(string CourseId, string AssignmentId);
 
+public record AnalyzeStudentPayload(
+    string CourseId, string StudentId, string? StudentName = null, StudentAnalysisKind Kind = StudentAnalysisKind.Mistakes);
+
 public record GradeStudentPayload(string CourseId, string StudentId, string? StudentName = null);
 
 public record FetchStudentWorkPayload(string CourseId, string StudentId, Guid ParentId);
@@ -28,6 +32,8 @@ public record FetchStudentWorkResult(
     IReadOnlyList<string> Problems);
 
 public record AnalyzeMistakesResult(Guid AnalysisId);
+
+public record AnalyzeStudentResult(Guid AnalysisId);
 
 internal static class JobPayloads
 {

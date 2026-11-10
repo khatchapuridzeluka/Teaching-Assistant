@@ -11,6 +11,8 @@ public enum ModelCallPurpose
     HealthCheck,
 
     MistakeAnalysis,
+
+    StudentAnalysis,
 }
 
 public class ModelCall

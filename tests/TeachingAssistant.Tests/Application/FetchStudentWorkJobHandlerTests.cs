@@ -131,5 +131,10 @@ public class FetchStudentWorkJobHandlerTests
 
         public Task<JobResponse> QueueAnalyzeMistakesAsync(string courseId, string assignmentId, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
+
+        public Task<JobResponse> QueueAnalyzeStudentAsync(
+            string courseId, string studentId, TeachingAssistant.Domain.Profiling.StudentAnalysisKind kind,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 }

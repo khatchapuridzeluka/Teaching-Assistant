@@ -3,6 +3,7 @@ using TeachingAssistant.Application.Models;
 using TeachingAssistant.Application.Services;
 using TeachingAssistant.Domain.Grading;
 using TeachingAssistant.Domain.Ingestion;
+using TeachingAssistant.Domain.Profiling;
 
 namespace TeachingAssistant.Tests.Application;
 
@@ -12,7 +13,7 @@ public class GradingDraftServiceTests
 
     private readonly FakeGradingStore _gradings = new();
 
-    private GradingDraftService Service() => new(_gradings, TimeProvider.System);
+    private GradingDraftService Service() => new(_gradings, new NoReports(), new NoMistakes(), new NoStrengths(), TimeProvider.System);
 
     [Fact]
     public async Task Current_IsTheNewestDraft_DiscardedOnesAreSkipped()
@@ -107,6 +108,49 @@ public class GradingDraftServiceTests
         var grading = new AiGrading(versionId, "model", "review", score, 100, null, 1, [], [], "{}", mistakes, at);
         _gradings.Gradings.Add(grading);
         return grading;
+    }
+
+    private sealed class NoReports : IGradingReportStore
+    {
+        public Task<GradingReport?> FindByGradingAsync(Guid gradingId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<GradingReport?>(null);
+
+        public Task<IReadOnlyList<ReportScore>> GetScoresAsync(IReadOnlyCollection<Guid> reportIds, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public void Add(GradingReport report) => throw new NotSupportedException();
+
+        public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
+    private sealed class NoMistakes : IStudentMistakeStore
+    {
+        public Task<IReadOnlyList<StudentMistake>> GetByReportAsync(Guid reportId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<StudentMistake>>([]);
+
+        public Task<IReadOnlyList<StudentMistake>> GetByStudentAsync(string courseId, string studentId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<StudentMistake>>([]);
+
+        public void AddRange(IEnumerable<StudentMistake> mistakes) => throw new NotSupportedException();
+
+        public void RemoveRange(IEnumerable<StudentMistake> mistakes)
+        {
+        }
+    }
+
+    private sealed class NoStrengths : IStudentStrengthStore
+    {
+        public Task<IReadOnlyList<StudentStrength>> GetByReportAsync(Guid reportId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<StudentStrength>>([]);
+
+        public Task<IReadOnlyList<StudentStrength>> GetByStudentAsync(string courseId, string studentId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<StudentStrength>>([]);
+
+        public void AddRange(IEnumerable<StudentStrength> strengths) => throw new NotSupportedException();
+
+        public void RemoveRange(IEnumerable<StudentStrength> strengths)
+        {
+        }
     }
 
     // Stands in for the database: gradings plus the version → submission facts the real store joins to.

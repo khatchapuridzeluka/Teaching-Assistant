@@ -12,6 +12,7 @@ public class GradingStore(AppDbContext db) : IGradingStore
         IReadOnlyCollection<Guid> versionIds, CancellationToken cancellationToken = default) =>
         await db.Gradings
             .Include(g => g.Mistakes)
+            .Include(g => g.Strengths)
             .Where(g => versionIds.Contains(g.VersionId))
             .OrderByDescending(g => g.CreatedAt)
             .AsSplitQuery()
@@ -20,6 +21,8 @@ public class GradingStore(AppDbContext db) : IGradingStore
     public Task<AiGrading?> FindAsync(Guid gradingId, CancellationToken cancellationToken = default) =>
         db.Gradings
             .Include(g => g.Mistakes)
+            .Include(g => g.Strengths)
+            .AsSplitQuery()
             .SingleOrDefaultAsync(g => g.Id == gradingId, cancellationToken);
 
     public async Task<IReadOnlyList<GradingSummary>> GetSummariesAsync(

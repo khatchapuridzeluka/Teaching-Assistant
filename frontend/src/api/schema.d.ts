@@ -1800,6 +1800,122 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/courses/{courseId}/students/{userId}/strengths": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Returns a student's recorded strengths in the course (kept and edited strengths of approved reports), newest assignment first, each labelled new, consistent (same category was a strength in an earlier assignment) or improved (same category was a mistake in an earlier assignment), with breakdowns by category and label and strengths vs. mistakes per assignment; filterable by assignment, category and label. */
+        get: {
+            parameters: {
+                query?: {
+                    assignmentId?: string;
+                    category?: components["schemas"]["MistakeCategory"];
+                    label?: components["schemas"]["StrengthLabel"];
+                };
+                header?: never;
+                path: {
+                    courseId: string;
+                    userId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Strengths retrieved successfully; empty lists when the student has no approved report with strengths yet */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StudentStrengthsResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/courses/{courseId}/students/{userId}/analysis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Returns the latest AI analysis of the student's mistakes (feedback of at most 200 words and what to work on next) or strengths (the strengths grouped into skills and an overview), with what it was based on and whether reports changed since. */
+        get: {
+            parameters: {
+                query?: {
+                    kind?: components["schemas"]["StudentAnalysisKind"];
+                };
+                header?: never;
+                path: {
+                    courseId: string;
+                    userId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Analysis retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StudentAnalysisResponse"];
+                    };
+                };
+                /** @description The student has not been analyzed for this kind yet */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        /** Queues an AI analysis of the student from their approved reports: Mistakes sends only the kept mistakes with their points and labels, Strengths sends only the kept strengths to be grouped into skills; trends are counted in code and the student is never named. */
+        post: {
+            parameters: {
+                query?: {
+                    kind?: components["schemas"]["StudentAnalysisKind"];
+                };
+                header?: never;
+                path: {
+                    courseId: string;
+                    userId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Analysis queued (or the running one is returned); follow it with GET /jobs/{jobId} */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["JobResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/students/{userId}/photo": {
         parameters: {
             query?: never;
@@ -2261,6 +2377,17 @@ export interface components {
             /** Format: double */
             points?: number | null;
         };
+        CodeStrength: {
+            file?: string | null;
+            /** Format: int32 */
+            startLine?: number | null;
+            /** Format: int32 */
+            endLine?: number | null;
+            category: components["schemas"]["MistakeCategory"];
+            message: string;
+            /** Format: uuid */
+            id?: string | null;
+        };
         CommonMistakesResponse: {
             /** Format: uuid */
             analysisId: string;
@@ -2454,6 +2581,7 @@ export interface components {
             bonus?: number | null;
             review: string;
             mistakes: components["schemas"]["ReportMistakeResponse"][];
+            strengths: components["schemas"]["ReportStrengthResponse"][];
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -2482,9 +2610,17 @@ export interface components {
             skippedFiles: string[];
             /** Format: date-time */
             createdAt: string;
+            strengths: components["schemas"]["CodeStrength"][];
         };
         /** @enum {string} */
         GradingStatus: "Draft" | "Discarded";
+        GroupedStrength: {
+            /** Format: uuid */
+            id: string;
+            assignmentTitle?: string | null;
+            category: components["schemas"]["MistakeCategory"];
+            message: string;
+        };
         InstructionsFileResponse: {
             /** Format: uuid */
             id: string;
@@ -2575,7 +2711,7 @@ export interface components {
         /** @enum {string} */
         JobStatus: "Queued" | "Running" | "Succeeded" | "Failed" | "Canceled";
         /** @enum {string} */
-        JobType: "GradeVersion" | "GradeAssignment" | "FetchAssignment" | "SyncCourse" | "ReExtract" | "AnalyzeMistakes" | "GradeStudent" | "FetchStudentWork";
+        JobType: "GradeVersion" | "GradeAssignment" | "FetchAssignment" | "SyncCourse" | "ReExtract" | "AnalyzeMistakes" | "GradeStudent" | "FetchStudentWork" | "AnalyzeStudent";
         MistakeAssignmentOption: {
             assignmentId: string;
             title?: string | null;
@@ -2680,7 +2816,7 @@ export interface components {
             percent: number;
         };
         /** @enum {string} */
-        ModelCallPurpose: "Grading" | "GradeAll" | "Chat" | "HealthCheck" | "MistakeAnalysis";
+        ModelCallPurpose: "Grading" | "GradeAll" | "Chat" | "HealthCheck" | "MistakeAnalysis" | "StudentAnalysis";
         ModelCallResponse: {
             /** Format: uuid */
             id: string;
@@ -2825,6 +2961,27 @@ export interface components {
         };
         /** @enum {string} */
         ReportStatus: "InReview" | "Approved";
+        ReportStrengthInput: {
+            /** Format: uuid */
+            sourceStrengthId: string;
+            rejected: boolean;
+            category: components["schemas"]["MistakeCategory"];
+            message: string;
+        };
+        ReportStrengthResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            sourceStrengthId?: string | null;
+            file?: string | null;
+            /** Format: int32 */
+            startLine?: number | null;
+            /** Format: int32 */
+            endLine?: number | null;
+            category: components["schemas"]["MistakeCategory"];
+            message: string;
+            decision: components["schemas"]["MistakeDecision"];
+        };
         ReviewDraftItem: {
             /** Format: uuid */
             gradingId: string;
@@ -2866,6 +3023,7 @@ export interface components {
             bonus?: number | null;
             review: string;
             mistakes: components["schemas"]["ReportMistakeInput"][];
+            strengths?: components["schemas"]["ReportStrengthInput"][] | null;
         };
         StoredFileResponse: {
             /** Format: uuid */
@@ -2914,6 +3072,69 @@ export interface components {
             /** Format: date-time */
             turnedInAt?: string | null;
             files: components["schemas"]["StoredFileResponse"][];
+        };
+        StrengthAssignmentResponse: {
+            assignmentId: string;
+            title?: string | null;
+            /** Format: date-time */
+            dueAt?: string | null;
+            /** Format: int32 */
+            strengths: number;
+            /** Format: int32 */
+            mistakes: number;
+        };
+        StrengthCategoryResponse: {
+            category: components["schemas"]["MistakeCategory"];
+            /** Format: int32 */
+            count: number;
+            /** Format: double */
+            percent: number;
+            /** Format: int32 */
+            assignments: number;
+            consistent: boolean;
+            /** Format: int32 */
+            mistakes: number;
+            improvedSinceAssignmentTitle?: string | null;
+            firstAssignmentTitle?: string | null;
+            lastAssignmentTitle?: string | null;
+        };
+        StrengthGroupResponse: {
+            title: string;
+            explanation: string;
+            ungrouped: boolean;
+            /** Format: int32 */
+            count: number;
+            /** Format: int32 */
+            assignments: number;
+            categories: components["schemas"]["MistakeCategory"][];
+            strengths: components["schemas"]["GroupedStrength"][];
+        };
+        /** @enum {string} */
+        StrengthLabel: "New" | "Consistent" | "Improved";
+        StrengthLabelMistakeShare: {
+            key: components["schemas"]["StrengthLabel"];
+            /** Format: int32 */
+            count: number;
+            /** Format: double */
+            percent: number;
+        };
+        /** @enum {string} */
+        StudentAnalysisKind: "Mistakes" | "Strengths";
+        StudentAnalysisResponse: {
+            /** Format: uuid */
+            id: string;
+            kind: components["schemas"]["StudentAnalysisKind"];
+            model: string;
+            summary: string;
+            nextSteps: string;
+            /** Format: int32 */
+            assignments: number;
+            /** Format: int32 */
+            records: number;
+            /** Format: date-time */
+            createdAt: string;
+            outdated: boolean;
+            groups: components["schemas"]["StrengthGroupResponse"][];
         };
         StudentAssignmentColumn: {
             id: string;
@@ -2980,6 +3201,43 @@ export interface components {
             severities: components["schemas"]["MistakeSeverityMistakeShare"][];
             labels: components["schemas"]["MistakeLabelMistakeShare"][];
             assignments: components["schemas"]["MistakeAssignmentResponse"][];
+            assignmentOptions: components["schemas"]["MistakeAssignmentOption"][];
+        };
+        StudentStrengthResponse: {
+            /** Format: uuid */
+            id: string;
+            assignmentId: string;
+            assignmentTitle?: string | null;
+            /** Format: date-time */
+            assignmentDueAt?: string | null;
+            /** Format: uuid */
+            versionId: string;
+            /** Format: uuid */
+            reportId: string;
+            file?: string | null;
+            /** Format: int32 */
+            startLine?: number | null;
+            /** Format: int32 */
+            endLine?: number | null;
+            category: components["schemas"]["MistakeCategory"];
+            message: string;
+            decision: components["schemas"]["MistakeDecision"];
+            label: components["schemas"]["StrengthLabel"];
+            sinceAssignmentTitle?: string | null;
+            /** Format: date-time */
+            approvedAt: string;
+        };
+        StudentStrengthsResponse: {
+            /** Format: int32 */
+            total: number;
+            /** Format: int32 */
+            recorded: number;
+            /** Format: int32 */
+            recordedMistakes: number;
+            strengths: components["schemas"]["StudentStrengthResponse"][];
+            categories: components["schemas"]["StrengthCategoryResponse"][];
+            labels: components["schemas"]["StrengthLabelMistakeShare"][];
+            assignments: components["schemas"]["StrengthAssignmentResponse"][];
             assignmentOptions: components["schemas"]["MistakeAssignmentOption"][];
         };
         SubmissionAttachment: {

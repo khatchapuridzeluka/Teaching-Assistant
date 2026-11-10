@@ -6,8 +6,8 @@ import type { AssignmentGrading } from "../api/client";
 import { useAssignments, useCourseGradings, useDiscardGrading, useGradingReport, useVersionGradings } from "../api/hooks";
 import { CodeBrowser, type CodeFocus } from "../components/CodeBrowser";
 import { CourseName } from "../components/Layout";
-import { keptMistakes, ReportChip, ReportEditor } from "../components/ReportEditor";
-import { MistakeList } from "../components/SubmissionDetail";
+import { keptMistakes, keptStrengths, ReportChip, ReportEditor } from "../components/ReportEditor";
+import { MistakeList, StrengthList } from "../components/SubmissionDetail";
 import { Avatar, Button, Card, Chip, EmptyState, ErrorPanel, PageHeader, Spinner } from "../components/ui";
 import { formatDate, initials } from "../format";
 
@@ -461,6 +461,7 @@ function DraftDetail({
   const [showOriginal, setShowOriginal] = useState(false);
   const showReport = report != null && !showOriginal;
   const mistakes = showReport ? keptMistakes(report) : grading?.mistakes ?? [];
+  const strengths = showReport ? keptStrengths(report) : grading?.strengths ?? [];
   const [focus, setFocus] = useState<CodeFocus>();
   const [tab, setTab] = useState<"review" | "code">("review");
   const workspace = `/courses/${courseId}/assignments/${draft.assignmentId}?student=${encodeURIComponent(draft.submissionId)}`;
@@ -580,6 +581,13 @@ function DraftDetail({
                   setTab("code");
                 }}
               />
+              <StrengthList
+                strengths={strengths}
+                onShow={(file, line) => {
+                  setFocus({ file, line, key: Date.now() });
+                  setTab("code");
+                }}
+              />
               <details className="text-xs">
                 <summary className="cursor-pointer font-semibold text-ink-muted hover:text-ink">
                   Files sent to the model · {grading.sentFiles.length}
@@ -604,7 +612,7 @@ function DraftDetail({
           </div>
 
           <div className={`min-h-0 min-w-0 flex-1 flex-col p-2 sm:p-4 @4xl:flex ${tab === "code" ? "flex" : "hidden"}`}>
-            <CodeBrowser versionId={draft.versionId} className="h-full" mistakes={mistakes} focus={focus} />
+            <CodeBrowser versionId={draft.versionId} className="h-full" mistakes={mistakes} strengths={strengths} focus={focus} />
           </div>
         </div>
       )}

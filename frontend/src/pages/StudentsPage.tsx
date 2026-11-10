@@ -6,6 +6,8 @@ import { ConfirmDialog } from "../components/ConfirmDialog";
 import { useTrackJob } from "../components/JobToasts";
 import { CourseName } from "../components/Layout";
 import { MistakeCategoriesCard, MistakeHistoryCard } from "../components/StudentMistakes";
+import { StrengthsCard } from "../components/StudentStrengths";
+import { StudentOverviewCard } from "../components/StudentOverview";
 import { stateChip } from "../components/SubmissionDetail";
 import { Avatar, Button, Card, Chip, EmptyState, ErrorPanel, PageHeader, Spinner } from "../components/ui";
 import { formatDate, formatDay, initials } from "../format";
@@ -436,6 +438,20 @@ function StudentProfile({
               </button>
             </div>
           )}
+          <StudentOverviewCard
+            courseId={courseId}
+            userId={student.externalUserId}
+            studentName={student.name}
+            returnTo={`/courses/${courseId}/students?student=${student.id}`}
+            kind="Mistakes"
+          />
+          <StudentOverviewCard
+            courseId={courseId}
+            userId={student.externalUserId}
+            studentName={student.name}
+            returnTo={`/courses/${courseId}/students?student=${student.id}`}
+            kind="Strengths"
+          />
           <div className="grid grid-cols-2 gap-px overflow-hidden rounded-[10px] border border-line bg-line @xl:grid-cols-4">
             <Tile label="Turned in" value={`${student.turnedIn} / ${assignments.length}`} note="handed in or returned" />
             <Tile label="Missing" value={student.missing} note="past due, counts as 0" strong={student.missing > 0} />
@@ -468,6 +484,7 @@ function StudentProfile({
             </div>
 
             <aside className="flex flex-col gap-4">
+              <StrengthsCard courseId={courseId} userId={student.externalUserId} />
               <MistakeCategoriesCard courseId={courseId} userId={student.externalUserId} />
               <ComingNext />
             </aside>

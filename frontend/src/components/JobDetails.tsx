@@ -26,6 +26,11 @@ export const jobTypeInfo: Record<JobType, { label: string; description: string }
     description:
       "The first step of Grade student. It downloads the new and changed submissions of every assignment the student turned in from Google Classroom (read-only), then queues the gradings under the same Grade student job. It makes no AI call.",
   },
+  AnalyzeStudent: {
+    label: "Student analysis",
+    description:
+      "An AI analysis of one student from their approved reports, never the name. Mistakes: every kept mistake with its points and new / repeated label, plus trends counted in code; the model writes feedback of at most 200 words and what to work on next. Strengths: every kept strength; the model groups similar ones into skills and writes an overview. Shown on the student's profile and on their mistakes or strengths page.",
+  },
   AnalyzeMistakes: {
     label: "Common mistakes",
     description:
@@ -91,6 +96,13 @@ const iconPaths: Record<JobType, ReactNode> = {
       <path d="M3 19a6 6 0 0 1 9-5.2" />
       <path d="M18 11v8" />
       <path d="m15 16 3 3 3-3" />
+    </>
+  ),
+  AnalyzeStudent: (
+    <>
+      <circle cx="10" cy="8" r="3.5" />
+      <path d="M3 20a7 7 0 0 1 11-5.7" />
+      <path d="M17 13l1.2 2.6 2.8.4-2 2 .5 2.8-2.5-1.3-2.5 1.3.5-2.8-2-2 2.8-.4z" />
     </>
   ),
   AnalyzeMistakes: (
@@ -318,6 +330,19 @@ function Result({
 
   if (job.type === "FetchStudentWork") {
     return job.summary ? <p>{job.summary}</p> : <p className="text-ink-muted">Nothing was fetched.</p>;
+  }
+
+  if (job.type === "AnalyzeStudent" && item.courseId && item.studentId) {
+    return job.status === "Succeeded" ? (
+      <p>
+        The overview was saved.{" "}
+        <Link to={`/courses/${item.courseId}/students/${item.studentId}/mistakes`} className="font-semibold text-accent hover:underline">
+          Open the student's analysis →
+        </Link>
+      </p>
+    ) : (
+      <p className="text-ink-muted">No overview was saved.</p>
+    );
   }
 
   if (job.type === "AnalyzeMistakes" && item.courseId && item.assignmentId) {

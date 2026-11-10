@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import Editor, { type OnMount } from "@monaco-editor/react";
-import { type CodeFile, type CodeMistake, codeFileUrl } from "../api/client";
+import { type CodeFile, type CodeMistake, type CodeStrength, codeFileUrl } from "../api/client";
 import { useCodeFileText, useCodeFiles } from "../api/hooks";
 import { ErrorPanel, Spinner } from "./ui";
 
@@ -18,6 +18,7 @@ type Severity = CodeMistake["severity"];
 
 const severityOrder: Severity[] = ["Major", "Minor", "Style"];
 export const severityColor: Record<Severity, string> = { Major: "#dc2626", Minor: "#d97706", Style: "#64748b" };
+export const strengthColor = "#15803d";
 
 export type CodeFocus = { file: string; line: number; key: number };
 
@@ -25,11 +26,13 @@ export function CodeBrowser({
   versionId,
   className = "h-[560px]",
   mistakes = [],
+  strengths = [],
   focus,
 }: {
   versionId: string;
   className?: string;
   mistakes?: CodeMistake[];
+  strengths?: CodeStrength[];
   focus?: CodeFocus;
 }) {
   const files = useCodeFiles(versionId, true);
@@ -72,6 +75,7 @@ export function CodeBrowser({
             versionId={versionId}
             path={selected}
             mistakes={mistakes.filter((m) => m.file === selected && m.startLine != null)}
+            strengths={strengths.filter((s) => s.file === selected && s.startLine != null)}
             focus={focus?.file === selected ? focus : undefined}
           />
         )}
@@ -143,11 +147,13 @@ function FileView({
   versionId,
   path,
   mistakes,
+  strengths,
   focus,
 }: {
   versionId: string;
   path: string;
   mistakes: CodeMistake[];
+  strengths: CodeStrength[];
   focus: CodeFocus | undefined;
 }) {
   const ext = extension(path);
@@ -160,8 +166,23 @@ function FileView({
       return;
     }
     const { editor: ed, monaco } = editor;
-    const collection = ed.createDecorationsCollection(
-      mistakes.map((m) => {
+    const strengthMarks = strengths.map((s) => {
+      const hover = { value: `**Strength · ${s.category}**\n\n${s.message}` };
+      return {
+        range: new monaco.Range(s.startLine!, 1, s.endLine ?? s.startLine!, 1),
+        options: {
+          isWholeLine: true,
+          className: "strength-line",
+          glyphMarginClassName: "strength-glyph",
+          glyphMarginHoverMessage: hover,
+          hoverMessage: hover,
+          overviewRuler: { color: strengthColor, position: monaco.editor.OverviewRulerLane.Left },
+        },
+      };
+    });
+    const collection = ed.createDecorationsCollection([
+      ...strengthMarks,
+      ...mistakes.map((m) => {
         const hover = { value: `**${m.severity} · ${m.category}**\n\n${m.message}` };
         return {
           range: new monaco.Range(m.startLine!, 1, m.endLine ?? m.startLine!, 1),
@@ -175,9 +196,9 @@ function FileView({
           },
         };
       }),
-    );
+    ]);
     return () => collection.clear();
-  }, [editor, mistakes, text.data]);
+  }, [editor, mistakes, strengths, text.data]);
 
   useEffect(() => {
     if (!editor || !focus || text.data === undefined) {
@@ -191,7 +212,11 @@ function FileView({
     <>
       <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-2 text-xs">
         <b className="truncate">{path}</b>
-        {mistakes.length > 0 && <span className="shrink-0 text-ink-muted">Hover a dot to read the mistake</span>}
+        {mistakes.length + strengths.length > 0 && (
+          <span className="shrink-0 text-ink-muted">
+            Hover a dot to read it{strengths.length > 0 ? " · green marks a strength" : ""}
+          </span>
+        )}
       </div>
       {isImage ? (
         <div className="flex min-h-0 flex-1 items-center justify-center bg-paper-dark p-4">

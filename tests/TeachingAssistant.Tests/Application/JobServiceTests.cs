@@ -327,7 +327,7 @@ public class JobServiceTests
         {
             LastGradingId = Guid.NewGuid();
             return Task.FromResult<GradingResponse?>(new GradingResponse(LastGradingId, versionId, GradingStatus.Draft, "model",
-                "review", 90, 100, null, [], 1, [], [], DateTimeOffset.UtcNow));
+                "review", 90, 100, null, [], 1, [], [], DateTimeOffset.UtcNow, []));
         }
     }
 

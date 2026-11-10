@@ -1,3 +1,4 @@
+using TeachingAssistant.Domain.Profiling;
 using TeachingAssistant.Application.Contracts;
 using TeachingAssistant.Application.Jobs;
 using TeachingAssistant.Domain.Jobs;
@@ -30,6 +31,9 @@ public interface IJobService
         CancellationToken cancellationToken = default);
 
     Task<JobResponse> QueueAnalyzeMistakesAsync(string courseId, string assignmentId, CancellationToken cancellationToken = default);
+
+    Task<JobResponse> QueueAnalyzeStudentAsync(
+        string courseId, string studentId, StudentAnalysisKind kind, CancellationToken cancellationToken = default);
 }
 
 public interface IJobProcessor

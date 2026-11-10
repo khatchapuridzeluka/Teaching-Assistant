@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, type JobStatus, type JobType, type ModelCallPurpose, type SaveReportRequest, type StudentMistakeFilter, unwrap } from "./client";
+import { api, type JobStatus, type JobType, type ModelCallPurpose, type SaveReportRequest, type StudentMistakeFilter,
+  type StudentStrengthFilter, type StudentAnalysisKind, unwrap } from "./client";
 import { forgetMissingPhotos } from "../components/ui";
 
 export const useCourses = () =>
@@ -45,6 +46,33 @@ export const useStudentMistakes = (courseId: string, userId: string, filter: Stu
         }),
       ),
     placeholderData: (previous) => previous,
+  });
+
+export const useStudentStrengths = (courseId: string, userId: string, filter: StudentStrengthFilter = {}) =>
+  useQuery({
+    queryKey: ["courses", courseId, "students", userId, "strengths", "gradings", filter],
+    queryFn: () =>
+      unwrap(
+        api.GET("/courses/{courseId}/students/{userId}/strengths", {
+          params: { path: { courseId, userId }, query: filter },
+        }),
+      ),
+    placeholderData: (previous) => previous,
+  });
+
+export const useStudentAnalysis = (courseId: string, userId: string, kind: StudentAnalysisKind) =>
+  useQuery({
+    queryKey: ["courses", courseId, "students", userId, "analysis", kind, "gradings"],
+    queryFn: async () =>
+      (await unwrap(
+        api.GET("/courses/{courseId}/students/{userId}/analysis", { params: { path: { courseId, userId }, query: { kind } } }),
+      )) ?? null,
+  });
+
+export const useAnalyzeStudent = (courseId: string, userId: string, kind: StudentAnalysisKind) =>
+  useMutation({
+    mutationFn: () =>
+      unwrap(api.POST("/courses/{courseId}/students/{userId}/analysis", { params: { path: { courseId, userId }, query: { kind } } })),
   });
 
 export const useSyncCourse = (courseId: string) => {

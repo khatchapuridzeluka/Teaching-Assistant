@@ -15,7 +15,8 @@ public record GradingResponse(
     int InstructionsVersion,
     IReadOnlyList<string> SentFiles,
     IReadOnlyList<string> SkippedFiles,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    IReadOnlyList<CodeStrength> Strengths);
 
 public record CodeMistake(
     string? File,
@@ -26,6 +27,14 @@ public record CodeMistake(
     string Message,
     Guid? Id = null,
     double? Points = null);
+
+public record CodeStrength(
+    string? File,
+    int? StartLine,
+    int? EndLine,
+    MistakeCategory Category,
+    string Message,
+    Guid? Id = null);
 
 public record AssignmentGradingResponse(
     Guid Id,

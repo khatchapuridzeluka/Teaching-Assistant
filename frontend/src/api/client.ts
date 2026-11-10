@@ -44,12 +44,26 @@ export type StudentMistakeFilter = {
   severity?: MistakeSeverity;
   label?: MistakeLabel;
 };
+export type StudentStrengths = components["schemas"]["StudentStrengthsResponse"];
+export type StudentAnalysis = components["schemas"]["StudentAnalysisResponse"];
+export type StudentAnalysisKind = components["schemas"]["StudentAnalysisKind"];
+export type StudentStrengthGroup = components["schemas"]["StrengthGroupResponse"];
+export type StudentStrengthInfo = components["schemas"]["StudentStrengthResponse"];
+export type StrengthCategoryInfo = components["schemas"]["StrengthCategoryResponse"];
+export type StrengthLabel = components["schemas"]["StrengthLabel"];
+export type StudentStrengthFilter = {
+  assignmentId?: string;
+  category?: MistakeCategory;
+  label?: StrengthLabel;
+};
 export type ModelUsage = components["schemas"]["ModelUsageResponse"];
 export type ModelUsageTotal = components["schemas"]["ModelUsageTotal"];
 export type ModelCallItem = components["schemas"]["ModelCallResponse"];
 export type CodeMistake = components["schemas"]["CodeMistake"];
 export type GradingReport = components["schemas"]["GradingReportResponse"];
 export type ReportMistake = components["schemas"]["ReportMistakeResponse"];
+export type CodeStrength = components["schemas"]["CodeStrength"];
+export type ReportStrength = components["schemas"]["ReportStrengthResponse"];
 export type SaveReportRequest = components["schemas"]["SaveGradingReportRequest"];
 export type MistakeSeverity = components["schemas"]["MistakeSeverity"];
 export type MistakeCategory = components["schemas"]["MistakeCategory"];

@@ -5,6 +5,7 @@ using TeachingAssistant.Application.Interfaces.Services;
 using TeachingAssistant.Application.Jobs;
 using TeachingAssistant.Application.Models;
 using TeachingAssistant.Domain.Jobs;
+using TeachingAssistant.Domain.Profiling;
 
 namespace TeachingAssistant.Application.Services;
 
@@ -198,6 +199,18 @@ public class JobService : IJobService
         return JobPayloads.ToResponse(queued);
     }
 
+    public async Task<JobResponse> QueueAnalyzeStudentAsync(
+        string courseId, string studentId, StudentAnalysisKind kind, CancellationToken cancellationToken = default)
+    {
+        var name = await _grading.FindStudentNameAsync(courseId, studentId, cancellationToken);
+        var job = new Job(JobType.AnalyzeStudent, JobPayloads.Write(new AnalyzeStudentPayload(courseId, studentId, name, kind)),
+            _timeProvider.GetUtcNow(), dedupKey: $"analyze-student:{kind}:{courseId}:{studentId}", courseId: courseId,
+            maxAttempts: MaxGradingAttempts);
+        var queued = await _jobs.AddOrGetActiveAsync(job, cancellationToken);
+        _signal.Notify();
+        return JobPayloads.ToResponse(queued);
+    }
+
     public async Task<IReadOnlyList<JobOverviewItem>?> GetChildrenAsync(Guid jobId, CancellationToken cancellationToken = default)
     {
         var job = await _jobs.FindAsync(jobId, cancellationToken);
@@ -266,6 +279,13 @@ public class JobService : IJobService
                         student.StudentName ?? groupSubject?.StudentName, null, children);
                 }
 
+                if (job.Type == JobType.AnalyzeStudent)
+                {
+                    var analyzed = JobPayloads.Read<AnalyzeStudentPayload>(job.Payload);
+                    return new JobOverviewItem(response, job.CourseId, null, null, null, analyzed.StudentId, analyzed.StudentName, null,
+                        null);
+                }
+
                 var assignmentId = subject?.AssignmentId ?? job.AssignmentId;
                 var title = subject?.AssignmentTitle ?? groupSubject?.AssignmentTitle;
                 return new JobOverviewItem(response, subject?.CourseId ?? job.CourseId, assignmentId, title, subject?.SubmissionId,
@@ -315,6 +335,12 @@ public class JobService : IJobService
         {
             var payload = JobPayloads.Read<GradeStudentPayload>(job.Payload);
             return await QueueGradeStudentAsync(payload.CourseId, payload.StudentId, cancellationToken);
+        }
+
+        if (job.Type == JobType.AnalyzeStudent)
+        {
+            var payload = JobPayloads.Read<AnalyzeStudentPayload>(job.Payload);
+            return await QueueAnalyzeStudentAsync(payload.CourseId, payload.StudentId, payload.Kind, cancellationToken);
         }
 
         if (job.Type == JobType.FetchStudentWork)

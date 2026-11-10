@@ -57,3 +57,5 @@ body {
 .mistake-line-Major { background: rgb(220 38 38 / 0.08); }
 .mistake-line-Minor { background: rgb(217 119 6 / 0.08); }
 .mistake-line-Style { background: rgb(100 116 139 / 0.08); }
+.strength-glyph { cursor: pointer; background: radial-gradient(circle, #15803d 0 4px, transparent 4.5px); }
+.strength-line { background: rgb(21 128 61 / 0.08); }

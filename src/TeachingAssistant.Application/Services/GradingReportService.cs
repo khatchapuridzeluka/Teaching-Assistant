@@ -3,6 +3,7 @@ using TeachingAssistant.Application.Exceptions;
 using TeachingAssistant.Application.Interfaces;
 using TeachingAssistant.Application.Interfaces.Services;
 using TeachingAssistant.Domain.Grading;
+using TeachingAssistant.Domain.Ingestion;
 using TeachingAssistant.Domain.Profiling;
 
 namespace TeachingAssistant.Application.Services;
@@ -13,16 +14,18 @@ public class GradingReportService : IGradingReportService
     private readonly IGradingReportStore _reports;
     private readonly ISubmissionStore _submissions;
     private readonly IStudentMistakeStore _studentMistakes;
+    private readonly IStudentStrengthStore _studentStrengths;
     private readonly TimeProvider _timeProvider;
 
     public GradingReportService(
         IGradingStore gradings, IGradingReportStore reports, ISubmissionStore submissions, IStudentMistakeStore studentMistakes,
-        TimeProvider timeProvider)
+        IStudentStrengthStore studentStrengths, TimeProvider timeProvider)
     {
         _gradings = gradings;
         _reports = reports;
         _submissions = submissions;
         _studentMistakes = studentMistakes;
+        _studentStrengths = studentStrengths;
         _timeProvider = timeProvider;
     }
 
@@ -73,17 +76,44 @@ public class GradingReportService : IGradingReportService
         }
 
         var edits = request.Mistakes.Select(m => new ReportMistakeEdit(m.SourceMistakeId, m.Rejected, m.Severity, m.Category, m.Message, m.Points));
-        report.Save(grading, request.Score, request.Bonus, request.Review.Trim(), edits, now);
-        _studentMistakes.RemoveRange(await _studentMistakes.GetByReportAsync(report.Id, cancellationToken));
+        var strengthEdits = (request.Strengths ?? [])
+            .Select(s => new ReportStrengthEdit(s.SourceStrengthId, s.Rejected, s.Category, s.Message));
+        report.Save(grading, request.Score, request.Bonus, request.Review.Trim(), edits, now, strengthEdits);
+        await RemoveRecordsAsync(report.Id, cancellationToken);
 
         if (approve)
         {
             report.Approve(now);
             _studentMistakes.AddRange(StudentMistake.FromApprovedReport(report, submission!));
+            _studentStrengths.AddRange(StudentStrength.FromApprovedReport(report, submission!));
+            await DiscardOtherDraftsAsync(grading, submission!, now, cancellationToken);
         }
 
         await _reports.SaveChangesAsync(cancellationToken);
         return ToResponse(report, grading);
+    }
+
+    private async Task DiscardOtherDraftsAsync(
+        AiGrading approved, Submission submission, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var others = (await _gradings.GetByVersionsAsync(submission.Versions.Select(v => v.Id).ToList(), cancellationToken))
+            .Where(g => g.Id != approved.Id && g.Status == GradingStatus.Draft)
+            .ToList();
+
+        foreach (var other in others)
+        {
+            other.Discard(now);
+            if (await _reports.FindByGradingAsync(other.Id, cancellationToken) is { } otherReport)
+            {
+                await RemoveRecordsAsync(otherReport.Id, cancellationToken);
+            }
+        }
+    }
+
+    private async Task RemoveRecordsAsync(Guid reportId, CancellationToken cancellationToken)
+    {
+        _studentMistakes.RemoveRange(await _studentMistakes.GetByReportAsync(reportId, cancellationToken));
+        _studentStrengths.RemoveRange(await _studentStrengths.GetByReportAsync(reportId, cancellationToken));
     }
 
     private static void Validate(AiGrading grading, SaveGradingReportRequest request)
@@ -120,6 +150,19 @@ public class GradingReportService : IGradingReportService
         {
             throw new InvalidRequestException("A kept mistake needs a message; reject it instead of leaving it empty.");
         }
+
+        var strengths = request.Strengths ?? [];
+        var knownStrengths = grading.Strengths.Select(s => s.Id).ToHashSet();
+        var unknownStrength = strengths.FirstOrDefault(s => !knownStrengths.Contains(s.SourceStrengthId));
+        if (unknownStrength is not null)
+        {
+            throw new InvalidRequestException($"Strength {unknownStrength.SourceStrengthId} is not one of this draft's strengths.");
+        }
+
+        if (strengths.Any(s => !s.Rejected && string.IsNullOrWhiteSpace(s.Message)))
+        {
+            throw new InvalidRequestException("A kept strength needs a message; reject it instead of leaving it empty.");
+        }
     }
 
     private static GradingReportResponse ToResponse(GradingReport report, AiGrading grading) => new(
@@ -127,6 +170,10 @@ public class GradingReportService : IGradingReportService
         report.Mistakes.OrderBy(m => m.Position)
             .Select(m => new ReportMistakeResponse(m.Id, m.SourceMistakeId, m.File, m.StartLine, m.EndLine, m.Severity, m.Category,
                 m.Message, m.Points, m.Decision))
+            .ToList(),
+        report.Strengths.OrderBy(s => s.Position)
+            .Select(s => new ReportStrengthResponse(s.Id, s.SourceStrengthId, s.File, s.StartLine, s.EndLine, s.Category, s.Message,
+                s.Decision))
             .ToList(),
         report.CreatedAt, report.UpdatedAt, report.ApprovedAt);
 }

@@ -95,6 +95,23 @@ public class GradingService : IGradingService
           the Score section deducts.
         - An empty list when there are no mistakes.
 
+        "strengths" lists what the student did well, up to three entries. The teacher follows each student's growth
+        over the course, not only their mistakes, and compares these entries across assignments to see which skills a
+        student has mastered, so each one must be specific and something the code shows:
+        - Name the skill the code demonstrates and where: for example a generic class written correctly, bounds checked
+          consistently in every method, equals used instead of == for objects, a clean class hierarchy, an interface or
+          pattern used where it pays off, input that is validated, a loop or algorithm that is clear. Doing a hard part
+          of the task well counts, and so does going beyond it. Most solid submissions have one to three; whatever you
+          praise in the Feedback section should appear here too.
+        - Not generic praise ("good job", "well structured") and not that the code compiles. Leave the list empty only
+          when nothing stands out, for example when most of the work is missing or wrong.
+        - file, startLine and endLine: as for mistakes, the few lines that show it; null when it is about the whole
+          submission.
+        - category: the area it shows, from the same list as mistakes (for example Design, Encapsulation,
+          ErrorHandling).
+        - message: one sentence saying what was done and why it is good.
+        - Strengths never change the score.
+
         Keep it concise; the teacher reviews a whole class.
         """;
 
@@ -263,7 +280,8 @@ public class GradingService : IGradingService
         var grading = new AiGrading(versionId, reply.Model, read.Review, read.Score, read.MaxScore, read.Bonus,
             instructions.Number, prompt.Sent, prompt.Skipped, reply.Text,
             read.Mistakes.Select(m => new GradingMistake(m.File, m.StartLine, m.EndLine, m.Severity, m.Category, m.Message, m.Points)),
-            _timeProvider.GetUtcNow());
+            _timeProvider.GetUtcNow(),
+            read.Strengths.Select(s => new GradingStrength(s.File, s.StartLine, s.EndLine, s.Category, s.Message)));
         _gradings.Add(grading);
         await _gradings.SaveChangesAsync(cancellationToken);
         return GradingDraftService.ToResponse(grading);
