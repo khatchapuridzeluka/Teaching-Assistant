@@ -100,6 +100,14 @@ public class ModelUsageServiceTests
             DateTimeOffset finishedSince, JobType? type, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
+        public Task<IReadOnlyList<Job>> GetChildrenAsync(Guid parentId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<JobChildCount>> CountChildrenAsync(IReadOnlyCollection<Guid> parentIds, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<Job>> GetOpenGroupsAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
         public Task SaveChangesAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 }

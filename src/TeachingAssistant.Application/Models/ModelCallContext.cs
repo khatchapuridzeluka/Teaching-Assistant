@@ -6,8 +6,20 @@ public class ModelCallContext
 {
     public ModelCallSubject? Subject { get; private set; }
 
+    public bool PartOfGradeAll { get; private set; }
+
+    public void MarkPartOfGradeAll()
+    {
+        PartOfGradeAll = true;
+    }
+
     public void Describe(string courseId, string assignmentId, Guid versionId)
     {
         Subject = new ModelCallSubject(courseId, assignmentId, versionId);
+    }
+
+    public void DescribeAssignment(string courseId, string assignmentId)
+    {
+        Subject = new ModelCallSubject(courseId, assignmentId, null);
     }
 }

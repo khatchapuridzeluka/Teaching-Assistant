@@ -16,4 +16,7 @@ public interface ILanguageModel
 
     Task<LanguageModelReply> GradeAsync(
         string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default);
+
+    Task<LanguageModelReply> AnalyzeAsync(
+        string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default);
 }

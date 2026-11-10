@@ -1,18 +1,30 @@
 import { type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useParams, useSearchParams } from "react-router";
-import type { AssignmentGrading, ExtractionSummary, FetchProblem, FetchSummary, JobInfo, StoredSubmission, StoredVersion, Submission } from "../api/client";
+import type {
+  AssignmentGrading,
+  ExtractionSummary,
+  FetchProblem,
+  FetchSummary,
+  GradeAllResult,
+  JobInfo,
+  StoredSubmission,
+  StoredVersion,
+  Submission,
+} from "../api/client";
 import {
   useAssignments,
   useFetchSubmissions,
   useAssignmentJobs,
   useCancelJob,
+  useGradeAll,
   useQueueGrading,
   useReExtract,
   useAssignmentGradings,
   useStoredSubmissions,
   useSubmissions,
 } from "../api/hooks";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { InstructionsBar } from "../components/InstructionsCard";
 import { useTrackJob } from "../components/JobToasts";
 import { PreviewPanel } from "../components/PreviewPanel";
@@ -29,6 +41,22 @@ export function AssignmentPage() {
   const extract = useReExtract(courseId, assignmentId);
   const queue = useQueueGrading(courseId, assignmentId);
   const cancel = useCancelJob(courseId, assignmentId);
+  const gradeAll = useGradeAll(courseId, assignmentId);
+  const [confirmGradeAll, setConfirmGradeAll] = useState(false);
+
+  function startGradeAll() {
+    setConfirmGradeAll(false);
+    gradeAll.mutate(undefined, {
+      onSuccess: (result) => {
+        if (result.job) {
+          trackJob(result.job, {
+            label: `${assignment?.title ?? "Assignment"} · ${result.queued} ${result.queued === 1 ? "student" : "students"}`,
+            to: `/courses/${courseId}/assignments/${assignmentId}`,
+          });
+        }
+      },
+    });
+  }
   const jobs = useAssignmentJobs(courseId, assignmentId);
   const queryClient = useQueryClient();
   const trackJob = useTrackJob();
@@ -124,6 +152,15 @@ export function AssignmentPage() {
                 Drafts ({gradings.data!.filter((g) => g.status === "Draft").length})
               </Button>
             )}
+            {(stored.data?.length ?? 0) > 0 && (
+              <Button
+                onClick={() => setConfirmGradeAll(true)}
+                disabled={gradeAll.isPending || fetch.isPending}
+                title="Queue an AI grading for every student without a draft; they run in the background, 3 at a time"
+              >
+                {gradeAll.isPending ? "Queuing…" : "Grade all with AI"}
+              </Button>
+            )}
             <Button variant="primary" onClick={() => fetch.mutate()} disabled={fetch.isPending}>
               {fetch.isPending ? "Fetching…" : "Fetch from Classroom"}
             </Button>
@@ -157,6 +194,25 @@ export function AssignmentPage() {
       )}
       {fetch.isError && <ErrorPanel error={fetch.error} />}
       {fetch.data && <FetchBanner summary={fetch.data} onDismiss={() => fetch.reset()} />}
+      {confirmGradeAll && (
+        <ConfirmDialog
+          title={`Grade all students of ${assignment?.title ?? "this assignment"}?`}
+          confirmLabel={withWork.length - drafts > 0 ? `Grade up to ${withWork.length - drafts} students` : "Grade all"}
+          onConfirm={startGradeAll}
+          onCancel={() => setConfirmGradeAll(false)}
+        >
+          <p>
+            Every student whose latest version has no draft yet gets an AI grading
+            {withWork.length - drafts > 0 ? ` (up to ${withWork.length - drafts} of ${withWork.length} turned in)` : ""}. Students
+            with a draft that is not discarded are skipped.
+          </p>
+          <p className="mt-1.5">
+            Each grading is one paid AI call. They run in the background, 3 at a time; you can follow them on the System page.
+          </p>
+        </ConfirmDialog>
+      )}
+      {gradeAll.isError && <ErrorPanel error={gradeAll.error} />}
+      {gradeAll.data && <GradeAllBanner result={gradeAll.data} onDismiss={() => gradeAll.reset()} />}
       {extract.isError && <ErrorPanel error={extract.error} />}
       {extract.data && <ExtractBanner summary={extract.data} onDismiss={() => extract.reset()} />}
 
@@ -468,6 +524,31 @@ function FetchBanner({ summary, onDismiss }: { summary: FetchSummary; onDismiss:
       title="Fetch finished"
       text={`${summary.submissions} checked · ${summary.newSubmissions} new · ${summary.newVersions} new versions · ${summary.unchanged} unchanged · ${summary.notSubmitted} not submitted · ${instructions}`}
       problems={summary.problems}
+      onDismiss={onDismiss}
+    />
+  );
+}
+
+function GradeAllBanner({ result, onDismiss }: { result: GradeAllResult; onDismiss: () => void }) {
+  const parts = [
+    `${result.queued} queued`,
+    result.alreadyDrafted > 0 ? `${result.alreadyDrafted} already have a draft` : null,
+    result.alreadyQueued > 0 ? `${result.alreadyQueued} already queued` : null,
+    result.notFetched > 0 ? `${result.notFetched} turned in but not fetched yet (Fetch from Classroom first)` : null,
+    result.noWork > 0 ? `${result.noWork} not submitted` : null,
+  ].filter(Boolean);
+  const problems = result.problems.map((problem) => {
+    const split = problem.indexOf(": ");
+    return split > 0
+      ? { studentName: problem.slice(0, split), detail: problem.slice(split + 2) }
+      : { studentName: "", detail: problem };
+  });
+
+  return (
+    <ResultBanner
+      title={result.job ? "Grade all queued" : "Nothing to grade"}
+      text={`${parts.join(" · ")} · ${result.students} students in total${result.job ? " · follow it on the System page" : ""}`}
+      problems={problems as FetchProblem[]}
       onDismiss={onDismiss}
     />
   );

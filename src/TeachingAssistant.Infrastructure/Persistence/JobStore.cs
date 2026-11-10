@@ -78,7 +78,7 @@ public class JobStore(AppDbContext db) : IJobStore
     public async Task<IReadOnlyList<Job>> GetRecentAsync(
         JobStatus? status, JobType? type, string? courseId, string? assignmentId, int limit, CancellationToken cancellationToken = default)
     {
-        var jobs = db.Jobs.AsQueryable();
+        var jobs = db.Jobs.Where(j => j.ParentId == null);
         if (status is { } wanted)
         {
             jobs = jobs.Where(j => j.Status == wanted);
@@ -105,7 +105,7 @@ public class JobStore(AppDbContext db) : IJobStore
     public async Task<IReadOnlyDictionary<JobStatus, int>> CountByStatusAsync(
         DateTimeOffset finishedSince, JobType? type, CancellationToken cancellationToken = default)
     {
-        var jobs = db.Jobs.AsQueryable();
+        var jobs = db.Jobs.Where(j => j.ParentId == null);
         if (type is { } kind)
         {
             jobs = jobs.Where(j => j.Type == kind);
@@ -141,6 +141,32 @@ public class JobStore(AppDbContext db) : IJobStore
 
         return await rows.ToListAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyList<Job>> GetChildrenAsync(Guid parentId, CancellationToken cancellationToken = default) =>
+        await db.Jobs
+            .Where(j => j.ParentId == parentId)
+            .OrderBy(j => j.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<JobChildCount>> CountChildrenAsync(
+        IReadOnlyCollection<Guid> parentIds, CancellationToken cancellationToken = default)
+    {
+        if (parentIds.Count == 0)
+        {
+            return [];
+        }
+
+        return await db.Jobs
+            .Where(j => j.ParentId != null && parentIds.Contains(j.ParentId.Value))
+            .GroupBy(j => new { ParentId = j.ParentId!.Value, j.Status })
+            .Select(g => new JobChildCount(g.Key.ParentId, g.Key.Status, g.Count()))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Job>> GetOpenGroupsAsync(CancellationToken cancellationToken = default) =>
+        await db.Jobs
+            .Where(j => j.Type == JobType.GradeAssignment && j.Status == JobStatus.Running)
+            .ToListAsync(cancellationToken);
 
     public Task SaveChangesAsync(CancellationToken cancellationToken = default) => db.SaveChangesAsync(cancellationToken);
 

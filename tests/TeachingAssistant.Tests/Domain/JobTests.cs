@@ -4,6 +4,48 @@ namespace TeachingAssistant.Tests.Domain;
 
 public class JobTests
 {
+    [Fact]
+    public void AGroup_StartsRunningWithoutAWorker_SoItIsNeverClaimedOrRecovered()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var group = Job.Group(JobType.GradeAssignment, "{}", now);
+
+        Assert.Equal((JobStatus.Running, (string?)null), (group.Status, group.LockedBy));
+        Assert.False(group.CanStart(now.AddHours(1)));
+        Assert.False(group.HasExpiredLease(now.AddDays(1)));
+        Assert.Throws<ArgumentException>(() => Job.Group(JobType.GradeVersion, "{}", now));
+        Assert.True(Job.Group(JobType.GradeStudent, "{}", now).IsGroup);
+    }
+
+    [Fact]
+    public void AGroup_FinishesOnlyWhenEveryChildHasFinished()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var group = Job.Group(JobType.GradeAssignment, "{}", now);
+        group.SetChildTotal(3);
+
+        group.TrackChildren(3, 2, 0, null, now);
+        Assert.Equal((JobStatus.Running, 2), (group.Status, group.ProgressDone));
+
+        group.TrackChildren(3, 3, 0, "{}", now);
+        Assert.Equal((JobStatus.Succeeded, "{}"), (group.Status, group.Result));
+    }
+
+    [Fact]
+    public void AGroup_FailsWhenAChildFailed_AndIsCanceledWhenItWasCanceled()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var failed = Job.Group(JobType.GradeAssignment, "{}", now);
+        failed.TrackChildren(4, 4, 1, null, now);
+
+        var canceled = Job.Group(JobType.GradeAssignment, "{}", now);
+        canceled.Cancel(now);
+        canceled.TrackChildren(2, 2, 0, null, now);
+
+        Assert.Equal((JobStatus.Failed, "1 of 4 failed."), (failed.Status, failed.Error));
+        Assert.Equal(JobStatus.Canceled, canceled.Status);
+    }
+
     private static readonly DateTimeOffset Now = new(2026, 11, 8, 12, 0, 0, TimeSpan.Zero);
     private static readonly TimeSpan Lease = TimeSpan.FromMinutes(10);
 

@@ -1,4 +1,5 @@
 using TeachingAssistant.Application.Contracts;
+using TeachingAssistant.Application.Jobs;
 using TeachingAssistant.Domain.Jobs;
 
 namespace TeachingAssistant.Application.Interfaces.Services;
@@ -17,6 +18,18 @@ public interface IJobService
         JobStatus? status, JobType? type, string? courseId, string? assignmentId, CancellationToken cancellationToken = default);
 
     Task<JobResponse?> RetryAsync(Guid jobId, CancellationToken cancellationToken = default);
+
+    Task<GradeAllResponse> QueueGradeAssignmentAsync(string courseId, string assignmentId, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<JobOverviewItem>?> GetChildrenAsync(Guid jobId, CancellationToken cancellationToken = default);
+
+    Task<JobResponse> QueueGradeStudentAsync(string courseId, string studentId, CancellationToken cancellationToken = default);
+
+    Task<FetchStudentWorkResult> QueueStudentGradingsAsync(
+        Guid parentId, string courseId, string studentId, int fetched, IReadOnlyList<string> fetchProblems,
+        CancellationToken cancellationToken = default);
+
+    Task<JobResponse> QueueAnalyzeMistakesAsync(string courseId, string assignmentId, CancellationToken cancellationToken = default);
 }
 
 public interface IJobProcessor
@@ -32,6 +45,8 @@ public interface IJobProcessor
     Task ConfirmCanceledAsync(Guid jobId, CancellationToken cancellationToken = default);
 
     Task<int> RecoverExpiredLeasesAsync(CancellationToken cancellationToken = default);
+
+    Task<int> ReconcileGroupsAsync(CancellationToken cancellationToken = default);
 }
 
 public record ClaimedJob(Guid Id, JobType Type, string Payload);

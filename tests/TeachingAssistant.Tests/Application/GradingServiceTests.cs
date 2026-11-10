@@ -27,6 +27,76 @@ public class GradingServiceTests
         new(_store, _instructions, _storage, _wordReader, _model, _gradings, _callContext, TimeProvider.System);
 
     [Fact]
+    public async Task PlanGradeAll_SkipsVersionsWithADraftThatIsNotDiscarded_AndKeepsTheRest()
+    {
+        _instructions.Store("Write a zoo.");
+        _storage.Code["Main.java"] = "class Main {}";
+        var drafted = _store.AddVersion(Content(ContentKind.CodeArchive, "zoo.zip", "application/zip"));
+        var discarded = _store.AddVersion(Content(ContentKind.CodeArchive, "zoo.zip", "application/zip"));
+        var fresh = _store.AddVersion(Content(ContentKind.CodeArchive, "zoo.zip", "application/zip"));
+        _gradings.Add(Draft(drafted));
+        var thrownAway = Draft(discarded);
+        thrownAway.Discard(DateTimeOffset.UtcNow);
+        _gradings.Add(thrownAway);
+
+        var plan = await Service().PlanGradeAllAsync("course-1", "assignment-1", TestContext.Current.CancellationToken);
+
+        Assert.Equal(new[] { discarded, fresh }.Order(), plan.VersionIds.Order());
+        Assert.Equal((3, 1, 0), (plan.Students, plan.AlreadyDrafted, plan.NoWork));
+        Assert.Empty(plan.Problems);
+    }
+
+    [Fact]
+    public async Task PlanGradeAll_WithoutStoredInstructions_ListsTheProblem_AndQueuesNothing()
+    {
+        _storage.Code["Main.java"] = "class Main {}";
+        _store.AddVersion(Content(ContentKind.CodeArchive, "zoo.zip", "application/zip"));
+
+        var plan = await Service().PlanGradeAllAsync("course-1", "assignment-1", TestContext.Current.CancellationToken);
+
+        Assert.Empty(plan.VersionIds);
+        Assert.Contains(StudentName, Assert.Single(plan.Problems));
+    }
+
+    [Fact]
+    public async Task PlanGradeStudent_SkipsDraftedAssignments_OtherStudents_AndListsAssignmentsThatCannotBeGraded()
+    {
+        _instructions.Store("Write a zoo.");
+        _storage.Code["Main.java"] = "class Main {}";
+        var a1 = _store.AddVersionFor("assignment-1", "ria", Content(ContentKind.CodeArchive, "zoo.zip", "application/zip"));
+        var a4 = _store.AddVersionFor("assignment-4", "ria", Content(ContentKind.CodeArchive, "zoo.zip", "application/zip"));
+        var a5 = _store.AddVersionFor("assignment-5", "ria", Content(ContentKind.CodeArchive, "zoo.zip", "application/zip"));
+        _store.AddVersionFor("assignment-1", "someone-else", Content(ContentKind.CodeArchive, "zoo.zip", "application/zip"));
+        _gradings.Add(Draft(a4));
+
+        var plan = await Service().PlanGradeStudentAsync("course-1", "ria", TestContext.Current.CancellationToken);
+
+        Assert.Equal([a1], plan.VersionIds);
+        Assert.Equal((3, 1), (plan.Students, plan.AlreadyDrafted));
+        Assert.Equal("assignment-1", plan.AssignmentIds![a1]);
+        Assert.False(plan.AssignmentIds.ContainsKey(a5));
+        Assert.Contains("instructions are not stored", Assert.Single(plan.Problems));
+    }
+
+    [Fact]
+    public async Task PlanGradeStudent_TellsTurnedInButNotFetchedApartFromNotSubmitted()
+    {
+        _instructions.Store("Write a zoo.");
+        _storage.Code["Main.java"] = "class Main {}";
+        var graded = _store.AddVersionFor("assignment-1", "ria", Content(ContentKind.CodeArchive, "zoo.zip", "application/zip"));
+        _store.AddWithoutWork("assignment-3", "ria", "RETURNED");
+        _store.AddWithoutWork("assignment-4", "ria", "CREATED");
+
+        var plan = await Service().PlanGradeStudentAsync("course-1", "ria", TestContext.Current.CancellationToken);
+
+        Assert.Equal([graded], plan.VersionIds);
+        Assert.Equal((3, 1, 1), (plan.Students, plan.NotFetched, plan.NoWork));
+    }
+
+    private static AiGrading Draft(Guid versionId) =>
+        new(versionId, "model", "review", 80, 100, null, 1, [], [], "{}", [], DateTimeOffset.UtcNow);
+
+    [Fact]
     public async Task Grade_SavesTheWholeAnswerAsADraft_WithTheScoreAsNumbers()
     {
         _instructions.Store("Write a zoo.");
@@ -295,9 +365,19 @@ public class GradingServiceTests
     {
         private readonly List<Submission> _submissions = [];
 
-        public Guid AddVersion(params VersionContent[] contents)
+        public Guid AddVersion(params VersionContent[] contents) => AddVersionFor("assignment-1", "student-1", contents);
+
+        public void AddWithoutWork(string assignmentId, string studentId, string state)
         {
-            var submission = new Submission(SubmissionSource.GoogleClassroom, "course-1", "assignment-1", "student-1",
+            var submission = new Submission(SubmissionSource.GoogleClassroom, "course-1", assignmentId, studentId,
+                StudentName, $"submission-{assignmentId}", "folder", DateTimeOffset.UtcNow);
+            submission.RecordStatus(state, false, null, [], DateTimeOffset.UtcNow);
+            _submissions.Add(submission);
+        }
+
+        public Guid AddVersionFor(string assignmentId, string studentId, params VersionContent[] contents)
+        {
+            var submission = new Submission(SubmissionSource.GoogleClassroom, "course-1", assignmentId, studentId,
                 StudentName, "submission-1", "folder", DateTimeOffset.UtcNow);
             var version = submission.AddVersion(VersionStatus.Ready, null, "hash", "folder/v1", null, DateTimeOffset.UtcNow, contents);
             _submissions.Add(submission);
@@ -308,10 +388,14 @@ public class GradingServiceTests
             Task.FromResult(_submissions.FirstOrDefault(s => s.Versions.Any(v => v.Id == versionId)));
 
         public Task<IReadOnlyList<Submission>> GetByAssignmentAsync(SubmissionSource source, string assignmentId, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
+            Task.FromResult<IReadOnlyList<Submission>>(_submissions.Where(s => s.AssignmentId == assignmentId).ToList());
 
         public Task<IReadOnlyList<Submission>> GetByCourseAsync(SubmissionSource source, string courseId, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
+            Task.FromResult<IReadOnlyList<Submission>>(_submissions
+                .Where(s => s.CourseId == courseId)
+                .Select(s => new Submission(s.Source, s.CourseId, s.AssignmentId, s.StudentId, s.StudentName, s.ExternalSubmissionId,
+                    s.StorageFolder, s.CreatedAt))
+                .ToList());
 
         public Task<StoredFileLocation?> FindStoredFileAsync(Guid contentId, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
@@ -396,7 +480,7 @@ public class GradingServiceTests
         public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 
         public Task<IReadOnlyList<AiGrading>> GetByVersionsAsync(IReadOnlyCollection<Guid> versionIds, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
+            Task.FromResult<IReadOnlyList<AiGrading>>(Saved.Where(g => versionIds.Contains(g.VersionId)).ToList());
 
         public Task<AiGrading?> FindAsync(Guid gradingId, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
@@ -420,6 +504,10 @@ public class GradingServiceTests
         public string ModelId => "fake-model";
 
         public string GradingModelId => "fake-grading-model";
+
+        public Task<LanguageModelReply> AnalyzeAsync(
+            string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
 
         public Task<LanguageModelReply> GradeAsync(
             string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default)

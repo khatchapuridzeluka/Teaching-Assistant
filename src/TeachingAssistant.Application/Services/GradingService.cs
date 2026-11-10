@@ -133,6 +133,120 @@ public class GradingService : IGradingService
         return prepared is null ? null : new GradableVersion(prepared.Submission.CourseId, prepared.Submission.AssignmentId);
     }
 
+    public async Task<GradeAllPlan> PlanGradeAllAsync(string courseId, string assignmentId, CancellationToken cancellationToken = default)
+    {
+        var submissions = (await _store.GetByAssignmentAsync(SubmissionSource.GoogleClassroom, assignmentId, cancellationToken))
+            .Where(s => s.CourseId == courseId)
+            .ToList();
+        var latest = submissions
+            .Select(s => (Submission: s, Version: s.LatestVersion))
+            .Where(x => x.Version is not null && x.Version.Status != VersionStatus.Failed)
+            .ToList();
+
+        var drafted = (await _gradings.GetByVersionsAsync(latest.Select(x => x.Version!.Id).ToList(), cancellationToken))
+            .Where(g => g.Status == GradingStatus.Draft)
+            .Select(g => g.VersionId)
+            .ToHashSet();
+
+        var toGrade = new List<Guid>();
+        var problems = new List<string>();
+        foreach (var (submission, version) in latest.Where(x => !drafted.Contains(x.Version!.Id)))
+        {
+            try
+            {
+                if (await CheckAsync(version!.Id, cancellationToken) is not null)
+                {
+                    toGrade.Add(version.Id);
+                }
+            }
+            catch (InvalidRequestException ex)
+            {
+                problems.Add($"{submission.StudentName}: {ex.Message}");
+            }
+        }
+
+        var (noWork, notFetched) = Unstored(submissions);
+        return new GradeAllPlan(toGrade, submissions.Count, latest.Count(x => drafted.Contains(x.Version!.Id)), noWork, problems,
+            NotFetched: notFetched);
+    }
+
+    public async Task<GradeAllPlan> PlanGradeStudentAsync(string courseId, string studentId, CancellationToken cancellationToken = default)
+    {
+        var studentAssignments = (await _store.GetByCourseAsync(SubmissionSource.GoogleClassroom, courseId, cancellationToken))
+            .Where(s => s.StudentId == studentId)
+            .Select(s => s.AssignmentId)
+            .Distinct()
+            .ToList();
+
+        var submissions = new List<Submission>();
+        foreach (var assignmentId in studentAssignments)
+        {
+            submissions.AddRange((await _store.GetByAssignmentAsync(SubmissionSource.GoogleClassroom, assignmentId, cancellationToken))
+                .Where(s => s.CourseId == courseId && s.StudentId == studentId));
+        }
+
+        var latest = submissions
+            .Select(s => (Submission: s, Version: s.LatestVersion))
+            .Where(x => x.Version is not null && x.Version.Status != VersionStatus.Failed)
+            .ToList();
+
+        var drafted = (await _gradings.GetByVersionsAsync(latest.Select(x => x.Version!.Id).ToList(), cancellationToken))
+            .Where(g => g.Status == GradingStatus.Draft)
+            .Select(g => g.VersionId)
+            .ToHashSet();
+
+        var toGrade = new List<Guid>();
+        var assignmentIds = new Dictionary<Guid, string>();
+        var problems = new List<string>();
+        foreach (var (submission, version) in latest.Where(x => !drafted.Contains(x.Version!.Id)))
+        {
+            try
+            {
+                if (await CheckAsync(version!.Id, cancellationToken) is not null)
+                {
+                    toGrade.Add(version.Id);
+                    assignmentIds[version.Id] = submission.AssignmentId;
+                }
+            }
+            catch (InvalidRequestException ex)
+            {
+                var title = (await _instructionsStore.GetAsync(submission.Source, submission.AssignmentId, cancellationToken))
+                    ?.LatestVersion?.Title ?? "An assignment";
+                problems.Add($"{title}: {ex.Message}");
+            }
+        }
+
+        var (noWork, notFetched) = Unstored(submissions);
+        return new GradeAllPlan(toGrade, submissions.Count, latest.Count(x => drafted.Contains(x.Version!.Id)), noWork, problems,
+            assignmentIds, notFetched);
+    }
+
+    private static (int NoWork, int NotFetched) Unstored(IReadOnlyList<Submission> submissions)
+    {
+        var unstored = submissions.Where(s => s.LatestVersion is null || s.LatestVersion.Status == VersionStatus.Failed).ToList();
+        var notFetched = unstored.Count(s => s.IsTurnedIn && s.LatestVersion is null);
+        return (unstored.Count - notFetched, notFetched);
+    }
+
+    public async Task<string?> FindStudentNameAsync(string courseId, string studentId, CancellationToken cancellationToken = default)
+    {
+        return (await _store.GetByCourseAsync(SubmissionSource.GoogleClassroom, courseId, cancellationToken))
+            .FirstOrDefault(s => s.StudentId == studentId)?.StudentName;
+    }
+
+    public async Task<IReadOnlyList<PromptPart>?> BuildInstructionsAsync(string assignmentId, CancellationToken cancellationToken = default)
+    {
+        var stored = await _instructionsStore.GetAsync(SubmissionSource.GoogleClassroom, assignmentId, cancellationToken);
+        if (stored?.LatestVersion is not { } instructions)
+        {
+            return null;
+        }
+
+        var prompt = new Prompt();
+        AddInstructions(prompt, instructions);
+        return prompt.HasInstructions ? prompt.Parts : null;
+    }
+
     public async Task<GradingResponse?> GradeVersionAsync(Guid versionId, CancellationToken cancellationToken = default)
     {
         var prepared = await PrepareAsync(versionId, cancellationToken);

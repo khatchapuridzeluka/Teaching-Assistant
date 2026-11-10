@@ -12,4 +12,17 @@ public record JobOverviewItem(
     string? SubmissionId,
     string? StudentId,
     string? StudentName,
-    int? VersionNumber);
+    int? VersionNumber,
+    JobChildCounts? Children = null);
+
+public record JobChildCounts(int Total, int Queued, int Running, int Succeeded, int Failed, int Canceled);
+
+public record GradeAllResponse(
+    JobResponse? Job,
+    int Queued,
+    int Students,
+    int AlreadyDrafted,
+    int AlreadyQueued,
+    int NoWork,
+    int NotFetched,
+    IReadOnlyList<string> Problems);

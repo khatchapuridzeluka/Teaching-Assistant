@@ -4,9 +4,13 @@ public enum ModelCallPurpose
 {
     Grading,
 
+    GradeAll,
+
     Chat,
 
     HealthCheck,
+
+    MistakeAnalysis,
 }
 
 public class ModelCall

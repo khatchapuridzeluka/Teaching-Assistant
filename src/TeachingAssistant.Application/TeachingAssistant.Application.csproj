@@ -4,6 +4,10 @@
       <ProjectReference Include="..\TeachingAssistant.Domain\TeachingAssistant.Domain.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <InternalsVisibleTo Include="TeachingAssistant.Tests" />
+    </ItemGroup>
+
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>

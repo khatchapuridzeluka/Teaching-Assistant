@@ -179,6 +179,7 @@ export const useAssignmentJobs = (courseId: string, assignmentId: string) =>
       unwrap(
         api.GET("/courses/{courseId}/assignments/{assignmentId}/jobs", { params: { path: { courseId, assignmentId } } }),
       ),
+    enabled: assignmentId !== "",
     refetchInterval: (query) => (query.state.data?.some((job) => isActive(job.status)) ? 2000 : false),
   });
 
@@ -210,6 +211,78 @@ export const useModelUsage = (days: number, purpose: ModelCallPurpose | undefine
     queryFn: () => unwrap(api.GET("/model-usage", { params: { query: { days, purpose } } })),
     staleTime: 0,
     refetchInterval: 30000,
+  });
+
+export const useGradeAll = (courseId: string, assignmentId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      unwrap(
+        api.POST("/courses/{courseId}/assignments/{assignmentId}/grade-all", { params: { path: { courseId, assignmentId } } }),
+      ),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["courses", courseId, "assignments", assignmentId, "jobs"] });
+      void queryClient.invalidateQueries({ queryKey: ["jobs"] });
+    },
+  });
+};
+
+export const useCommonMistakes = (courseId: string, assignmentId: string) =>
+  useQuery({
+    queryKey: ["courses", courseId, "assignments", assignmentId, "common-mistakes", "gradings"],
+    queryFn: async () =>
+      (await unwrap(
+        api.GET("/courses/{courseId}/assignments/{assignmentId}/common-mistakes", { params: { path: { courseId, assignmentId } } }),
+      )) ?? null,
+    enabled: assignmentId !== "",
+  });
+
+export const useAnalyzeMistakes = (courseId: string, assignmentId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      unwrap(
+        api.POST("/courses/{courseId}/assignments/{assignmentId}/common-mistakes/analyze", {
+          params: { path: { courseId, assignmentId } },
+        }),
+      ),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["courses", courseId, "assignments", assignmentId, "jobs"] });
+    },
+  });
+};
+
+export const useApproveExplanation = (courseId: string, assignmentId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ clusterId, explanation }: { clusterId: string; explanation: string }) =>
+      unwrap(api.POST("/mistake-clusters/{clusterId}/approve", { params: { path: { clusterId } }, body: { explanation } })),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["courses", courseId, "assignments", assignmentId, "common-mistakes"] });
+    },
+  });
+};
+
+export const useGradeStudent = (courseId: string, userId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      unwrap(api.POST("/courses/{courseId}/students/{userId}/grade-all", { params: { path: { courseId, userId } } })),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      void queryClient.invalidateQueries({ predicate: (query) => query.queryKey.includes("jobs") });
+    },
+  });
+};
+
+export const useJobChildren = (jobId: string, enabled: boolean) =>
+  useQuery({
+    queryKey: ["jobs", "children", jobId],
+    queryFn: () => unwrap(api.GET("/jobs/{jobId}/children", { params: { path: { jobId } } })),
+    enabled,
+    staleTime: 0,
+    refetchInterval: (query) =>
+      query.state.data?.some((item) => item.job.status === "Queued" || item.job.status === "Running") ? 2000 : false,
   });
 
 export const useJobAction = () => {

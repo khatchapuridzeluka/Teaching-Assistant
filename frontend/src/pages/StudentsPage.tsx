@@ -1,7 +1,9 @@
 import { type KeyboardEvent, type ReactNode, useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import type { CourseStudent, CourseSyncSummary, StudentAssignmentColumn, StudentAssignmentResult } from "../api/client";
-import { useCourseStudents, useSyncCourse } from "../api/hooks";
+import { useCourseStudents, useGradeStudent, useSyncCourse } from "../api/hooks";
+import { ConfirmDialog } from "../components/ConfirmDialog";
+import { useTrackJob } from "../components/JobToasts";
 import { CourseName } from "../components/Layout";
 import { MistakeCategoriesCard, MistakeHistoryCard } from "../components/StudentMistakes";
 import { stateChip } from "../components/SubmissionDetail";
@@ -338,6 +340,27 @@ function StudentProfile({
 }) {
   const [opened, setOpened] = useState<StudentAssignmentColumn | null>(null);
   const byAssignment = new Map(student.results.map((r) => [r.assignmentId, r]));
+  const gradeStudent = useGradeStudent(courseId, student.externalUserId);
+  const trackJob = useTrackJob();
+
+  const [confirmGrade, setConfirmGrade] = useState(false);
+
+  useEffect(() => {
+    gradeStudent.reset();
+    setConfirmGrade(false);
+  }, [student.id]);
+
+  function gradeAll() {
+    setConfirmGrade(false);
+    gradeStudent.mutate(undefined, {
+      onSuccess: (job) => {
+        trackJob(job, {
+          label: `${student.name} · fetching, then grading`,
+          to: `/courses/${courseId}/students?student=${student.id}`,
+        });
+      },
+    });
+  }
 
   return (
     <section className="@container flex min-h-0 min-w-0 flex-1 flex-col">
@@ -364,11 +387,55 @@ function StudentProfile({
           <div className="mt-1 text-[11px] text-ink-muted">
             {student.possible > 0 ? `${points(student.earned)} of ${points(student.possible)} points overall` : "nothing counted yet"}
           </div>
+          <Button
+            small
+            className="mt-2"
+            onClick={() => setConfirmGrade(true)}
+            disabled={gradeStudent.isPending}
+            title="Fetch this student's turned-in work from Classroom, then queue an AI grading for every assignment without a draft"
+          >
+            {gradeStudent.isPending ? "Queuing…" : "Grade all assignments with AI"}
+          </Button>
         </div>
       </header>
 
+      {confirmGrade && (
+        <ConfirmDialog
+          title={`Grade all assignments of ${student.name}?`}
+          confirmLabel="Grade assignments"
+          onConfirm={gradeAll}
+          onCancel={() => setConfirmGrade(false)}
+        >
+          <p>
+            First everything {student.name} turned in is fetched from Google Classroom, then every assignment without a draft gets an AI
+            grading. Assignments with a draft that is not discarded are skipped, and assignments that were not turned in are left out.
+          </p>
+          <p className="mt-1.5">
+            Each grading is one paid AI call. They run in the background, 3 at a time; you can follow them on the System page.
+          </p>
+        </ConfirmDialog>
+      )}
+
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="flex flex-col gap-4 p-4 sm:p-5">
+          {gradeStudent.isError && <ErrorPanel error={gradeStudent.error} />}
+          {gradeStudent.data && (
+            <div className="flex items-start gap-3 rounded-[10px] border border-line bg-white px-4 py-3 text-xs">
+              <div className="min-w-0 flex-1">
+                <b>Queued</b>
+                <span className="text-ink-muted">
+                  {" · "}first {student.name}'s turned-in work is fetched from Classroom, then every assignment without a draft is graded ·
+                  follow it on the{" "}
+                  <Link to="/system" className="font-semibold text-accent hover:underline">
+                    System page
+                  </Link>
+                </span>
+              </div>
+              <button onClick={() => gradeStudent.reset()} aria-label="Dismiss" className="shrink-0 text-ink-muted hover:text-ink">
+                ✕
+              </button>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-px overflow-hidden rounded-[10px] border border-line bg-line @xl:grid-cols-4">
             <Tile label="Turned in" value={`${student.turnedIn} / ${assignments.length}`} note="handed in or returned" />
             <Tile label="Missing" value={student.missing} note="past due, counts as 0" strong={student.missing > 0} />

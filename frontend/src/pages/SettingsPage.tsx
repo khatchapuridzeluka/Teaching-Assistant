@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { useConnectGoogle, useDisconnectGoogle, useGoogleStatus, useModelHealth } from "../api/hooks";
 import type { GoogleStatus } from "../api/client";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Button, Card, CardHeader, Chip, type ChipTone, ErrorPanel, PageHeader, Spinner } from "../components/ui";
 
 export function SettingsPage() {
@@ -33,6 +35,7 @@ function GoogleConnection() {
   const status = useGoogleStatus();
   const connect = useConnectGoogle();
   const disconnect = useDisconnectGoogle();
+  const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const state = status.data?.state;
 
   return (
@@ -72,10 +75,27 @@ function GoogleConnection() {
             <Button
               small
               disabled={disconnect.isPending}
-              onClick={() => confirm("Revoke the app's access to Google Classroom?") && disconnect.mutate()}
+              onClick={() => setConfirmDisconnect(true)}
             >
               Disconnect
             </Button>
+          )}
+          {confirmDisconnect && (
+            <ConfirmDialog
+              title="Disconnect Google Classroom?"
+              confirmLabel="Disconnect"
+              danger
+              onConfirm={() => {
+                setConfirmDisconnect(false);
+                disconnect.mutate();
+              }}
+              onCancel={() => setConfirmDisconnect(false)}
+            >
+              <p>
+                This revokes the app's read-only access to your Google Classroom. Stored submissions, drafts and reports stay; you
+                can connect again at any time.
+              </p>
+            </ConfirmDialog>
           )}
         </div>
       </div>

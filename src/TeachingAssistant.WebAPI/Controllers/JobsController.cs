@@ -71,6 +71,55 @@ public class JobsController : ControllerBase
     }
 
     /// <summary>
+    /// Queues AI grading for every student of an assignment as one parent job with a child job per student; students whose latest version already has a draft that is not discarded, or whose grading is already queued, are skipped.
+    /// </summary>
+    /// <response code="202">Gradings queued under a parent job (or the running grade-all for this assignment is returned)</response>
+    /// <response code="200">Nothing to queue; the response says why (all drafted, no work, or problems)</response>
+    [HttpPost("courses/{courseId}/assignments/{assignmentId}/grade-all")]
+    [ProducesResponseType(typeof(GradeAllResponse), StatusCodes.Status202Accepted)]
+    [ProducesResponseType(typeof(GradeAllResponse), StatusCodes.Status200OK)]
+    public async Task<ActionResult<GradeAllResponse>> QueueGradeAssignmentAsync(
+        string courseId, string assignmentId, CancellationToken cancellationToken)
+    {
+        var result = await _jobService.QueueGradeAssignmentAsync(courseId, assignmentId, cancellationToken);
+        if (result.Job is null)
+        {
+            return Ok(result);
+        }
+
+        return Accepted($"/jobs/{result.Job.Id}", result);
+    }
+
+    /// <summary>
+    /// Queues grading of every assignment of one student as one parent job: first a fetch step downloads every assignment the student turned in (and stores missing instructions), then it queues a grading per assignment that has no draft that is not discarded.
+    /// </summary>
+    /// <response code="202">Queued (or the running job for this student is returned); follow it with GET /jobs/{jobId}</response>
+    [HttpPost("courses/{courseId}/students/{userId}/grade-all")]
+    [ProducesResponseType(typeof(JobResponse), StatusCodes.Status202Accepted)]
+    public async Task<ActionResult<JobResponse>> QueueGradeStudentAsync(string courseId, string userId, CancellationToken cancellationToken)
+    {
+        var job = await _jobService.QueueGradeStudentAsync(courseId, userId, cancellationToken);
+        return Accepted($"/jobs/{job.Id}", job);
+    }
+
+    /// <summary>
+    /// Returns the child jobs of a parent job (for example each student's grading under a grade-all), oldest first.
+    /// </summary>
+    /// <response code="200">Children retrieved successfully; empty for a job without children</response>
+    /// <response code="404">No job with this ID</response>
+    [HttpGet("jobs/{jobId:guid}/children")]
+    public async Task<ActionResult<IReadOnlyList<JobOverviewItem>>> GetChildrenAsync(Guid jobId, CancellationToken cancellationToken)
+    {
+        var children = await _jobService.GetChildrenAsync(jobId, cancellationToken);
+        if (children is null)
+        {
+            return NotFound();
+        }
+
+        return Ok(children);
+    }
+
+    /// <summary>
     /// Returns a background job: its status, progress, error and, for a finished grading, the draft it produced.
     /// </summary>
     /// <response code="200">Job retrieved successfully</response>
@@ -99,7 +148,7 @@ public class JobsController : ControllerBase
     }
 
     /// <summary>
-    /// Cancels a job: a queued one at once, a running one at the worker's next check.
+    /// Cancels a job: a queued one at once, a running one at the worker's next check; canceling a parent job cancels its unfinished children.
     /// </summary>
     /// <response code="200">Cancel recorded; returns the job</response>
     /// <response code="404">No job with this ID</response>

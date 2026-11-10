@@ -23,6 +23,12 @@ public interface IJobStore
 
     Task<IReadOnlyList<JobSubject>> GetSubjectsAsync(IReadOnlyCollection<Guid> versionIds, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<Job>> GetChildrenAsync(Guid parentId, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<JobChildCount>> CountChildrenAsync(IReadOnlyCollection<Guid> parentIds, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<Job>> GetOpenGroupsAsync(CancellationToken cancellationToken = default);
+
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }
 

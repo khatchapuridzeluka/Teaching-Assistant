@@ -53,6 +53,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IGradingReportStore, GradingReportStore>();
         services.AddScoped<IStudentMistakeStore, StudentMistakeStore>();
         services.AddScoped<IModelCallStore, ModelCallStore>();
+        services.AddScoped<IMistakeAnalysisStore, MistakeAnalysisStore>();
 
         services.Configure<StorageOptions>(configuration.GetSection(StorageOptions.SectionName));
         services.AddSingleton<ISnapshotStorage, FileSystemSnapshotStorage>();
@@ -124,9 +125,12 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IGradingReportService, GradingReportService>();
         services.AddScoped<IStudentMistakeService, StudentMistakeService>();
         services.AddScoped<IModelUsageService, ModelUsageService>();
+        services.AddScoped<IMistakeAnalysisService, MistakeAnalysisService>();
         services.AddScoped<IJobService, JobService>();
         services.AddScoped<IJobProcessor, JobProcessor>();
         services.AddScoped<IJobHandler, GradeVersionJobHandler>();
+        services.AddScoped<IJobHandler, AnalyzeMistakesJobHandler>();
+        services.AddScoped<IJobHandler, FetchStudentWorkJobHandler>();
         services.AddScoped<ICourseSyncService, CourseSyncService>();
         services.AddScoped<IStudentService, StudentService>();
         services.AddScoped<IGradebookService, GradebookService>();

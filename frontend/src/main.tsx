@@ -10,6 +10,7 @@ import { AssignmentPage } from "./pages/AssignmentPage";
 import { AssignmentsPage } from "./pages/AssignmentsPage";
 import { ComingSoonPage } from "./pages/ComingSoonPage";
 import { CourseOverviewPage } from "./pages/CourseOverviewPage";
+import { CommonMistakesPage } from "./pages/CommonMistakesPage";
 import { CoursesPage } from "./pages/CoursesPage";
 import { DraftsPage } from "./pages/DraftsPage";
 import { GradebookPage } from "./pages/GradebookPage";
@@ -83,6 +84,11 @@ const router = createBrowserRouter([
             path: "drafts",
             element: <DraftsPage />,
             handle: { crumbs: () => [{ label: "AI drafts" }] } satisfies CrumbHandle,
+          },
+          {
+            path: "mistakes",
+            element: <CommonMistakesPage />,
+            handle: { crumbs: () => [{ label: "Common mistakes" }] } satisfies CrumbHandle,
           },
           {
             path: "gradebook",

@@ -40,13 +40,8 @@ export const courseSections: Section[] = [
   {
     path: "mistakes",
     label: "Common mistakes",
-    ready: false,
-    description: "Mistakes grouped across the class, so one explanation covers many students.",
-    plans: [
-      "Clusters of the same mistake across all submissions of an assignment",
-      "Approve or edit one explanation per cluster instead of per student",
-      "Topics the class struggles with, to revisit in the next lecture",
-    ],
+    ready: true,
+    description: "An assignment's mistakes grouped by meaning across the class, so one explanation covers many students.",
   },
   {
     path: "rubric",

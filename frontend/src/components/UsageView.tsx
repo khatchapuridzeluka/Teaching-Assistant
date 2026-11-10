@@ -14,7 +14,9 @@ const series = [
 ] as const;
 
 const purposeLabels: Record<string, string> = {
-  Grading: "AI grading",
+  Grading: "Single grading",
+  GradeAll: "Grade all",
+  MistakeAnalysis: "Common mistakes",
   Chat: "Ask agent",
   HealthCheck: "Model check",
 };
@@ -23,7 +25,9 @@ const periods = [7, 30, 90];
 
 const purposeOptions: { value: ModelCallPurpose | undefined; label: string }[] = [
   { value: undefined, label: "All work" },
-  { value: "Grading", label: "AI grading" },
+  { value: "Grading", label: "Single grading" },
+  { value: "GradeAll", label: "Grade all" },
+  { value: "MistakeAnalysis", label: "Common mistakes" },
   { value: "Chat", label: "Ask agent" },
   { value: "HealthCheck", label: "Model check" },
 ];

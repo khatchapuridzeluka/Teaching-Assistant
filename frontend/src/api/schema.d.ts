@@ -119,6 +119,153 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/courses/{courseId}/assignments/{assignmentId}/common-mistakes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Returns the latest common-mistakes analysis of an assignment: the AI's groups of mistakes with their explanation, your approved explanation, and students affected, points and severity counted in code. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    courseId: string;
+                    assignmentId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Analysis retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommonMistakesResponse"];
+                    };
+                };
+                /** @description The assignment has not been analyzed yet */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/courses/{courseId}/assignments/{assignmentId}/common-mistakes/analyze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Queues an analysis of the assignment's current drafts (your report's version where one exists, rejected mistakes left out): the AI groups the mistakes by meaning, code validates and counts them; only mistake text, category, severity, points and location are sent, never names. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    courseId: string;
+                    assignmentId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Analysis queued (or the running one is returned); follow it with GET /jobs/{jobId} */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["JobResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mistake-clusters/{clusterId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approves your explanation for a group of common mistakes (the AI's text stays as it was). */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    clusterId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ApproveExplanationRequest"];
+                    "text/json": components["schemas"]["ApproveExplanationRequest"];
+                    "application/*+json": components["schemas"]["ApproveExplanationRequest"];
+                };
+            };
+            responses: {
+                /** @description Explanation approved; returns the group */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MistakeClusterResponse"];
+                    };
+                };
+                /** @description The explanation is empty */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description No group with this ID */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/courses/{courseId}/sync": {
         parameters: {
             query?: never;
@@ -1136,6 +1283,138 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/courses/{courseId}/assignments/{assignmentId}/grade-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Queues AI grading for every student of an assignment as one parent job with a child job per student; students whose latest version already has a draft that is not discarded, or whose grading is already queued, are skipped. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    courseId: string;
+                    assignmentId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Nothing to queue; the response says why (all drafted, no work, or problems) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GradeAllResponse"];
+                    };
+                };
+                /** @description Gradings queued under a parent job (or the running grade-all for this assignment is returned) */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GradeAllResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/courses/{courseId}/students/{userId}/grade-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Queues grading of every assignment of one student as one parent job: first a fetch step downloads every assignment the student turned in (and stores missing instructions), then it queues a grading per assignment that has no draft that is not discarded. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    courseId: string;
+                    userId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Queued (or the running job for this student is returned); follow it with GET /jobs/{jobId} */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["JobResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/{jobId}/children": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Returns the child jobs of a parent job (for example each student's grading under a grade-all), oldest first. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    jobId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Children retrieved successfully; empty for a job without children */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["JobOverviewItem"][];
+                    };
+                };
+                /** @description No job with this ID */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/jobs/{jobId}": {
         parameters: {
             query?: never;
@@ -1229,7 +1508,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Cancels a job: a queued one at once, a running one at the worker's next check. */
+        /** Cancels a job: a queued one at once, a running one at the worker's next check; canceling a parent job cancels its unfinished children. */
         post: {
             parameters: {
                 query?: never;
@@ -1879,6 +2158,9 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ApproveExplanationRequest: {
+            explanation: string;
+        };
         AssignmentGradingResponse: {
             /** Format: uuid */
             id: string;
@@ -1939,6 +2221,27 @@ export interface components {
         };
         /** @enum {string} */
         ChatRole: "User" | "Assistant";
+        ClusterMemberResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            gradingMistakeId: string;
+            /** Format: uuid */
+            versionId: string;
+            studentId: string;
+            studentName: string;
+            submissionId: string;
+            severity: components["schemas"]["MistakeSeverity"];
+            category: components["schemas"]["MistakeCategory"];
+            /** Format: double */
+            points?: number | null;
+            message: string;
+            file?: string | null;
+            /** Format: int32 */
+            startLine?: number | null;
+            /** Format: int32 */
+            endLine?: number | null;
+        };
         CodeFileResponse: {
             path: string;
             /** Format: int64 */
@@ -1957,6 +2260,26 @@ export interface components {
             id?: string | null;
             /** Format: double */
             points?: number | null;
+        };
+        CommonMistakesResponse: {
+            /** Format: uuid */
+            analysisId: string;
+            /** Format: date-time */
+            analyzedAt: string;
+            model: string;
+            summary: string;
+            nextLecture: string;
+            /** Format: int32 */
+            students: number;
+            /** Format: int32 */
+            mistakes: number;
+            /** Format: int32 */
+            major: number;
+            /** Format: int32 */
+            minor: number;
+            /** Format: int32 */
+            style: number;
+            groups: components["schemas"]["MistakeClusterResponse"][];
         };
         /** @enum {string} */
         ContentKind: "CodeArchive" | "SourceFile" | "Repository" | "Document" | "Image" | "Other";
@@ -2052,6 +2375,22 @@ export interface components {
             state: components["schemas"]["GoogleConnectionState"];
             grantedScopes: string[];
             message?: string | null;
+        };
+        GradeAllResponse: {
+            job?: components["schemas"]["JobResponse"];
+            /** Format: int32 */
+            queued: number;
+            /** Format: int32 */
+            students: number;
+            /** Format: int32 */
+            alreadyDrafted: number;
+            /** Format: int32 */
+            alreadyQueued: number;
+            /** Format: int32 */
+            noWork: number;
+            /** Format: int32 */
+            notFetched: number;
+            problems: string[];
         };
         GradeChange: {
             kind: components["schemas"]["GradeEventKind"];
@@ -2158,6 +2497,20 @@ export interface components {
             stored: boolean;
             url?: string | null;
         };
+        JobChildCounts: {
+            /** Format: int32 */
+            total: number;
+            /** Format: int32 */
+            queued: number;
+            /** Format: int32 */
+            running: number;
+            /** Format: int32 */
+            succeeded: number;
+            /** Format: int32 */
+            failed: number;
+            /** Format: int32 */
+            canceled: number;
+        };
         JobCounts: {
             /** Format: int32 */
             queued: number;
@@ -2182,6 +2535,7 @@ export interface components {
             studentName?: string | null;
             /** Format: int32 */
             versionNumber?: number | null;
+            children?: components["schemas"]["JobChildCounts"];
         };
         JobOverviewResponse: {
             counts: components["schemas"]["JobCounts"];
@@ -2214,11 +2568,14 @@ export interface components {
             startedAt?: string | null;
             /** Format: date-time */
             finishedAt?: string | null;
+            /** Format: uuid */
+            parentId?: string | null;
+            summary?: string | null;
         };
         /** @enum {string} */
         JobStatus: "Queued" | "Running" | "Succeeded" | "Failed" | "Canceled";
         /** @enum {string} */
-        JobType: "GradeVersion" | "GradeAssignment" | "FetchAssignment" | "SyncCourse" | "ReExtract";
+        JobType: "GradeVersion" | "GradeAssignment" | "FetchAssignment" | "SyncCourse" | "ReExtract" | "AnalyzeMistakes" | "GradeStudent" | "FetchStudentWork";
         MistakeAssignmentOption: {
             assignmentId: string;
             title?: string | null;
@@ -2275,6 +2632,33 @@ export interface components {
             firstAssignmentTitle?: string | null;
             lastAssignmentTitle?: string | null;
         };
+        MistakeClusterResponse: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            explanation: string;
+            approvedExplanation?: string | null;
+            /** Format: date-time */
+            approvedAt?: string | null;
+            ungrouped: boolean;
+            /** Format: int32 */
+            students: number;
+            /** Format: double */
+            studentPercent: number;
+            /** Format: int32 */
+            count: number;
+            /** Format: double */
+            pointsLost: number;
+            /** Format: double */
+            averagePoints?: number | null;
+            /** Format: int32 */
+            major: number;
+            /** Format: int32 */
+            minor: number;
+            /** Format: int32 */
+            style: number;
+            members: components["schemas"]["ClusterMemberResponse"][];
+        };
         /** @enum {string} */
         MistakeDecision: "Kept" | "Edited" | "Rejected";
         /** @enum {string} */
@@ -2296,7 +2680,7 @@ export interface components {
             percent: number;
         };
         /** @enum {string} */
-        ModelCallPurpose: "Grading" | "Chat" | "HealthCheck";
+        ModelCallPurpose: "Grading" | "GradeAll" | "Chat" | "HealthCheck" | "MistakeAnalysis";
         ModelCallResponse: {
             /** Format: uuid */
             id: string;

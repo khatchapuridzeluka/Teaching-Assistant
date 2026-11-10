@@ -11,4 +11,10 @@ public enum JobType
     SyncCourse,
 
     ReExtract,
+
+    AnalyzeMistakes,
+
+    GradeStudent,
+
+    FetchStudentWork,
 }

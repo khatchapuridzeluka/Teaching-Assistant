@@ -31,6 +31,16 @@ public class RecordingLanguageModelTests
     }
 
     [Fact]
+    public async Task AGradingStartedByGradeAll_IsRecordedUnderItsOwnPurpose()
+    {
+        _context.MarkPartOfGradeAll();
+
+        await Recorder().GradeAsync("system", [], "{}", TestContext.Current.CancellationToken);
+
+        Assert.Equal(ModelCallPurpose.GradeAll, Assert.Single(_calls.Calls).Purpose);
+    }
+
+    [Fact]
     public async Task AFailedCall_IsRecordedWithItsError_AndStillThrows()
     {
         _model.Failure = new LanguageModelUnavailableException("Rate limited by the Anthropic API. Try again shortly.");
@@ -42,6 +52,17 @@ public class RecordingLanguageModelTests
         Assert.Equal((ModelCallPurpose.Chat, false, "Rate limited by the Anthropic API. Try again shortly."), (call.Purpose, call.Succeeded, call.Error));
         Assert.Null(call.InputTokens);
         Assert.Null(call.CourseId);
+    }
+
+    [Fact]
+    public async Task AMistakeAnalysis_IsRecordedUnderItsOwnPurpose_WithTheAssignment()
+    {
+        _context.DescribeAssignment("course-1", "assignment-1");
+
+        await Recorder().AnalyzeAsync("system", [], "{}", TestContext.Current.CancellationToken);
+
+        var call = Assert.Single(_calls.Calls);
+        Assert.Equal((ModelCallPurpose.MistakeAnalysis, "assignment-1", (Guid?)null), (call.Purpose, call.AssignmentId, call.VersionId));
     }
 
     [Fact]
@@ -64,6 +85,10 @@ public class RecordingLanguageModelTests
 
         public Task<LanguageModelReply> ChatAsync(string systemPrompt, IReadOnlyList<ChatMessage> messages, CancellationToken cancellationToken = default) =>
             Reply("chat-model");
+
+        public Task<LanguageModelReply> AnalyzeAsync(
+            string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default) =>
+            Reply("grading-model");
 
         public Task<LanguageModelReply> GradeAsync(
             string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default) =>

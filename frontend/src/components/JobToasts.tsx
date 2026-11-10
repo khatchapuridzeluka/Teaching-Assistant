@@ -154,6 +154,14 @@ function ToastCard({ toast, onClose }: { toast: Toast; onClose: () => void }) {
 }
 
 function messageFor(entry: TrackedJob, job: JobInfo): ToastMessage | null {
+  if (job.type === "GradeAssignment" || job.type === "GradeStudent") {
+    return groupMessage(entry, job);
+  }
+
+  if (job.type === "AnalyzeMistakes") {
+    return analysisMessage(entry, job);
+  }
+
   switch (job.status) {
     case "Queued":
       if (job.attempts > 0) {
@@ -172,6 +180,59 @@ function messageFor(entry: TrackedJob, job: JobInfo): ToastMessage | null {
       return { tone: "error", title: "Grading failed", detail: `${entry.label}: ${job.error ?? "unknown error"}` };
     case "Canceled":
       return { tone: "info", title: "Grading canceled", detail: entry.label };
+  }
+}
+
+function groupMessage(entry: TrackedJob, job: JobInfo): ToastMessage {
+  const forStudent = job.type === "GradeStudent";
+  const fetchSteps = forStudent ? 1 : 0;
+  const total = Math.max((job.progressTotal ?? 0) - fetchSteps, 0);
+  const done = Math.max((job.progressDone ?? 0) - fetchSteps, 0);
+  const fetching = forStudent && (job.progressDone ?? 0) === 0 && total === 0;
+  switch (job.status) {
+    case "Queued":
+    case "Running":
+      return {
+        tone: "info",
+        title: fetching ? "Fetching from Classroom" : forStudent ? "Grading all assignments" : "Grading all students",
+        detail: `${entry.label}${total > 0 ? ` · ${done} of ${total} done` : ""}`,
+      };
+    case "Succeeded":
+      if (forStudent && total === 0) {
+        return { tone: "info", title: "Nothing to grade", detail: entry.label, link: { to: "/system", label: "See why" } };
+      }
+      return {
+        tone: "success",
+        title: "All gradings finished",
+        detail: entry.label,
+        link: { to: entry.to, label: forStudent ? "Open student" : "Open assignment" },
+      };
+    case "Failed":
+      return {
+        tone: "error",
+        title: "Grade all finished with errors",
+        detail: `${entry.label}: ${job.error ?? "some gradings failed"}`,
+        link: { to: "/system", label: "See which failed" },
+      };
+    case "Canceled":
+      return { tone: "info", title: "Grade all canceled", detail: entry.label };
+  }
+}
+
+function analysisMessage(entry: TrackedJob, job: JobInfo): ToastMessage | null {
+  switch (job.status) {
+    case "Queued":
+      return job.attempts > 0
+        ? { tone: "error", title: "Analysis will retry", detail: `${entry.label}${job.error ? `: ${job.error}` : ""}` }
+        : { tone: "info", title: "Analysis queued", detail: entry.label };
+    case "Running":
+      return null;
+    case "Succeeded":
+      return { tone: "success", title: "Common mistakes ready", detail: entry.label, link: { to: entry.to, label: "Open" } };
+    case "Failed":
+      return { tone: "error", title: "Analysis failed", detail: `${entry.label}: ${job.error ?? "unknown error"}` };
+    case "Canceled":
+      return { tone: "info", title: "Analysis canceled", detail: entry.label };
   }
 }
 

@@ -85,6 +85,69 @@ public class Job
 
     public bool IsFinished => Status is JobStatus.Succeeded or JobStatus.Failed or JobStatus.Canceled;
 
+    public bool IsGroup => Type is JobType.GradeAssignment or JobType.GradeStudent;
+
+    public static Job Group(
+        JobType type, string payload, DateTimeOffset createdAt, string? dedupKey = null, string? courseId = null, string? assignmentId = null)
+    {
+        if (type is not (JobType.GradeAssignment or JobType.GradeStudent))
+        {
+            throw new ArgumentException($"{type} is not a job that groups other jobs.", nameof(type));
+        }
+
+        var job = new Job(type, payload, createdAt, dedupKey: dedupKey, courseId: courseId, assignmentId: assignmentId, maxAttempts: 1)
+        {
+            Status = JobStatus.Running,
+            Attempts = 1,
+            ProgressDone = 0,
+            ProgressTotal = 0,
+        };
+        job.StartedAt = job.CreatedAt;
+        return job;
+    }
+
+    public void TrackChildren(int total, int finished, int failed, string? result, DateTimeOffset now)
+    {
+        if (!IsGroup)
+        {
+            throw new InvalidOperationException($"Job {Id} is not a group of jobs.");
+        }
+
+        if (total < 0 || finished < 0 || finished > total || failed < 0 || failed > finished)
+        {
+            throw new ArgumentOutOfRangeException(nameof(finished), $"{finished} finished and {failed} failed of {total} is not possible.");
+        }
+
+        if (Status != JobStatus.Running)
+        {
+            return;
+        }
+
+        ProgressTotal = total;
+        ProgressDone = finished;
+        if (finished < total)
+        {
+            return;
+        }
+
+        Result = result;
+        if (CancelRequested)
+        {
+            Status = JobStatus.Canceled;
+        }
+        else if (failed > 0)
+        {
+            Status = JobStatus.Failed;
+            Error = $"{failed} of {total} failed.";
+        }
+        else
+        {
+            Status = JobStatus.Succeeded;
+        }
+
+        Finish(now);
+    }
+
     public bool CanStart(DateTimeOffset now) => Status == JobStatus.Queued && RunAfter <= now;
 
     public bool HasExpiredLease(DateTimeOffset now) => Status == JobStatus.Running && LockedUntil < now;
@@ -116,6 +179,16 @@ public class Job
         LockedBy = workerId;
         LockedUntil = (now + lease).ToUniversalTime();
         StartedAt ??= now.ToUniversalTime();
+    }
+
+    public void SetChildTotal(int total)
+    {
+        if (!IsGroup || Status != JobStatus.Running)
+        {
+            throw new InvalidOperationException($"Job {Id} is not a running group of jobs.");
+        }
+
+        ReportProgress(Math.Min(ProgressDone ?? 0, total), total);
     }
 
     public void ExtendLease(DateTimeOffset now, TimeSpan lease)

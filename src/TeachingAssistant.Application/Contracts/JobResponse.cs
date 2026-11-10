@@ -17,4 +17,6 @@ public record JobResponse(
     DateTimeOffset RunAfter,
     DateTimeOffset CreatedAt,
     DateTimeOffset? StartedAt,
-    DateTimeOffset? FinishedAt);
+    DateTimeOffset? FinishedAt,
+    Guid? ParentId = null,
+    string? Summary = null);

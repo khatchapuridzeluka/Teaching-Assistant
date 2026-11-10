@@ -70,8 +70,23 @@ public class ClaudeLanguageModel : ILanguageModel
         }
     }
 
-    public async Task<LanguageModelReply> GradeAsync(
+    public Task<LanguageModelReply> GradeAsync(
         string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default)
+    {
+        return StructuredAsync(systemPrompt, parts, outputSchema, Beta.Effort.High, "The model declined to grade this submission.",
+            cancellationToken);
+    }
+
+    public Task<LanguageModelReply> AnalyzeAsync(
+        string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default)
+    {
+        return StructuredAsync(systemPrompt, parts, outputSchema, Beta.Effort.Medium, "The model declined to analyze these mistakes.",
+            cancellationToken);
+    }
+
+    private async Task<LanguageModelReply> StructuredAsync(
+        string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, Beta.Effort effort, string refusal,
+        CancellationToken cancellationToken)
     {
         var schema = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(outputSchema)
             ?? throw new ArgumentException("The output schema is empty.", nameof(outputSchema));
@@ -84,7 +99,7 @@ public class ClaudeLanguageModel : ILanguageModel
                 MaxTokens = _options.GradingMaxTokens,
                 OutputConfig = new Beta.BetaOutputConfig
                 {
-                    Effort = Beta.Effort.High,
+                    Effort = effort,
                     Format = new Beta.BetaJsonOutputFormat { Schema = schema },
                 },
                 Betas = [AnthropicBeta.ServerSideFallback2026_06_01],
@@ -95,7 +110,7 @@ public class ClaudeLanguageModel : ILanguageModel
 
             if (response.StopReason == "refusal")
             {
-                throw new LanguageModelUnavailableException("The model declined to grade this submission.");
+                throw new LanguageModelUnavailableException(refusal);
             }
 
             if (response.StopReason == "max_tokens")

@@ -68,7 +68,7 @@ public class JobServiceTests
         Assert.NotNull(claimed);
         Assert.Null(await Processor().ClaimNextAsync("worker-2", Lease, TestContext.Current.CancellationToken)); // taken
 
-        var result = await new GradeVersionJobHandler(_grading).RunAsync(claimed.Payload, TestContext.Current.CancellationToken);
+        var result = await new GradeVersionJobHandler(_grading, new ModelCallContext()).RunAsync(claimed.Payload, TestContext.Current.CancellationToken);
         await Processor().CompleteAsync(claimed.Id, result, TestContext.Current.CancellationToken);
 
         var done = await Service().GetAsync(queued!.Id, TestContext.Current.CancellationToken);
@@ -156,12 +156,148 @@ public class JobServiceTests
         Assert.Null(await Service().RetryAsync(Guid.NewGuid(), TestContext.Current.CancellationToken));
     }
 
+    [Fact]
+    public async Task GradeAll_QueuesAParentWithAChildPerStudent_AndReportsWhatWasSkipped()
+    {
+        var ana = _grading.AddGradable();
+        var beka = _grading.AddGradable();
+        _grading.Plan = new GradeAllPlan([ana, beka], 5, AlreadyDrafted: 2, NoWork: 1, Problems: []);
+
+        var result = await Service().QueueGradeAssignmentAsync("course-1", "assignment-1", TestContext.Current.CancellationToken);
+
+        Assert.Equal((2, 5, 2, 1), (result.Queued, result.Students, result.AlreadyDrafted, result.NoWork));
+        var parent = _store.Jobs.Single(j => j.IsGroup);
+        Assert.Equal((JobStatus.Running, 2), (parent.Status, parent.ProgressTotal));
+        Assert.All(_store.Jobs.Where(j => !j.IsGroup), child => Assert.Equal(parent.Id, child.ParentId));
+        Assert.All(_store.Jobs.Where(j => !j.IsGroup), child => Assert.Contains("\"partOfGradeAll\":true", child.Payload));
+
+        var context = new ModelCallContext();
+        var claimed = await Processor().ClaimNextAsync("w", Lease, TestContext.Current.CancellationToken);
+        await new GradeVersionJobHandler(_grading, context).RunAsync(claimed!.Payload, TestContext.Current.CancellationToken);
+        Assert.True(context.PartOfGradeAll);
+        Assert.Equal(1, _signal.Notified);
+
+        var overview = await Service().GetOverviewAsync(null, null, null, null, TestContext.Current.CancellationToken);
+        var item = Assert.Single(overview.Jobs);
+        Assert.Equal((2, 1, 1), (item.Children!.Total, item.Children.Queued, item.Children.Running));
+        Assert.Equal(2, (await Service().GetChildrenAsync(parent.Id, TestContext.Current.CancellationToken))!.Count);
+    }
+
+    [Fact]
+    public async Task GradeAll_WithNothingToGrade_QueuesNoJob()
+    {
+        _grading.Plan = new GradeAllPlan([], 3, AlreadyDrafted: 3, NoWork: 0, Problems: []);
+
+        var result = await Service().QueueGradeAssignmentAsync("course-1", "assignment-1", TestContext.Current.CancellationToken);
+
+        Assert.Null(result.Job);
+        Assert.Equal(3, result.AlreadyDrafted);
+        Assert.Empty(_store.Jobs);
+    }
+
+    [Fact]
+    public async Task TheParentFinishes_WhenItsLastChildFinishes()
+    {
+        _grading.Plan = new GradeAllPlan([_grading.AddGradable(), _grading.AddGradable()], 2, 0, 0, []);
+        await Service().QueueGradeAssignmentAsync("course-1", "assignment-1", TestContext.Current.CancellationToken);
+        var parent = _store.Jobs.Single(j => j.IsGroup);
+
+        var first = await Processor().ClaimNextAsync("w", Lease, TestContext.Current.CancellationToken);
+        await Processor().CompleteAsync(first!.Id, null, TestContext.Current.CancellationToken);
+        Assert.Equal((JobStatus.Running, 1), (parent.Status, parent.ProgressDone));
+
+        var second = await Processor().ClaimNextAsync("w", Lease, TestContext.Current.CancellationToken);
+        await Processor().FailAsync(second!.Id, new InvalidRequestException("Broken"), TestContext.Current.CancellationToken);
+
+        Assert.Equal((JobStatus.Failed, 2, "1 of 2 failed."), (parent.Status, parent.ProgressDone, parent.Error));
+    }
+
+    [Fact]
+    public async Task CancelingTheParent_CancelsItsQueuedChildren_AndFinishesIt()
+    {
+        _grading.Plan = new GradeAllPlan([_grading.AddGradable(), _grading.AddGradable()], 2, 0, 0, []);
+        var result = await Service().QueueGradeAssignmentAsync("course-1", "assignment-1", TestContext.Current.CancellationToken);
+
+        await Service().CancelAsync(result.Job!.Id, TestContext.Current.CancellationToken);
+
+        Assert.All(_store.Jobs, j => Assert.Equal(JobStatus.Canceled, j.Status));
+    }
+
+    [Fact]
+    public async Task Reconcile_FinishesAParentWhoseChildrenAllFinished()
+    {
+        _grading.Plan = new GradeAllPlan([_grading.AddGradable()], 1, 0, 0, []);
+        await Service().QueueGradeAssignmentAsync("course-1", "assignment-1", TestContext.Current.CancellationToken);
+        var child = _store.Jobs.Single(j => !j.IsGroup);
+        child.Start("w", DateTimeOffset.UtcNow, Lease);
+        child.Succeed(null, DateTimeOffset.UtcNow);
+
+        var finished = await Processor().ReconcileGroupsAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, finished);
+        Assert.Equal(JobStatus.Succeeded, _store.Jobs.Single(j => j.IsGroup).Status);
+    }
+
+    [Fact]
+    public async Task GradeStudent_StartsWithAFetchStep_UnderAParentThatNamesTheStudent()
+    {
+        var job = await Service().QueueGradeStudentAsync("course-1", "ria", TestContext.Current.CancellationToken);
+
+        var parent = _store.Jobs.Single(j => j.IsGroup);
+        var fetch = Assert.Single(_store.Jobs, j => !j.IsGroup);
+        Assert.Equal((job.Id, JobType.GradeStudent, JobStatus.Running, 1), (parent.Id, parent.Type, parent.Status, parent.ProgressTotal));
+        Assert.Equal((JobType.FetchStudentWork, (Guid?)parent.Id), (fetch.Type, fetch.ParentId));
+        Assert.Contains(parent.Id.ToString(), fetch.Payload);
+        Assert.Equal(1, _signal.Notified);
+
+        var item = Assert.Single((await Service().GetOverviewAsync(null, null, null, null, TestContext.Current.CancellationToken)).Jobs);
+        Assert.Equal(("And Ria", "ria"), (item.StudentName, item.StudentId));
+    }
+
+    [Fact]
+    public async Task AfterTheFetch_GradingsAreAddedUnderTheSameParent_EachUnderItsOwnAssignment_AndTheParentWaitsForThem()
+    {
+        await Service().QueueGradeStudentAsync("course-1", "ria", TestContext.Current.CancellationToken);
+        var parent = _store.Jobs.Single(j => j.IsGroup);
+        var a1 = _grading.AddGradable();
+        var a5 = _grading.AddGradable();
+        _grading.StudentPlan = new GradeAllPlan([a1, a5], 4, AlreadyDrafted: 1, NoWork: 1, Problems: ["Assignment 3: no instructions."],
+            AssignmentIds: new Dictionary<Guid, string> { [a1] = "assignment-1", [a5] = "assignment-5" });
+
+        var fetch = await Processor().ClaimNextAsync("w", Lease, TestContext.Current.CancellationToken);
+        var result = await Service().QueueStudentGradingsAsync(parent.Id, "course-1", "ria", 3, [], TestContext.Current.CancellationToken);
+        await Processor().CompleteAsync(fetch!.Id, JobPayloads.Write(result), TestContext.Current.CancellationToken);
+
+        Assert.Equal((3, 2, 1), (result.Fetched, result.Queued, result.AlreadyDrafted));
+        Assert.Equal(["Assignment 3: no instructions."], result.Problems);
+        Assert.Equal(["assignment-1", "assignment-5"], _store.Jobs.Where(j => j.Type == JobType.GradeVersion).Select(j => j.AssignmentId).Order());
+        Assert.All(_store.Jobs.Where(j => !j.IsGroup), j => Assert.Equal(parent.Id, j.ParentId));
+        Assert.Equal((JobStatus.Running, 3, 1), (parent.Status, parent.ProgressTotal, parent.ProgressDone));
+        Assert.Contains("queued 2 gradings", (await Service().GetAsync(fetch.Id, TestContext.Current.CancellationToken))!.Summary);
+    }
+
     private sealed class FakeGrading : IGradingService
     {
         private readonly HashSet<Guid> _gradable = [];
         private readonly HashSet<Guid> _notGradable = [];
 
         public Guid LastGradingId { get; private set; }
+
+        public GradeAllPlan Plan { get; set; } = new([], 0, 0, 0, []);
+
+        public GradeAllPlan StudentPlan { get; set; } = new([], 0, 0, 0, []);
+
+        public Task<GradeAllPlan> PlanGradeStudentAsync(string courseId, string studentId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(StudentPlan);
+
+        public Task<string?> FindStudentNameAsync(string courseId, string studentId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<string?>("And Ria");
+
+        public Task<GradeAllPlan> PlanGradeAllAsync(string courseId, string assignmentId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(Plan);
+
+        public Task<IReadOnlyList<PromptPart>?> BuildInstructionsAsync(string assignmentId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<PromptPart>?>(null);
 
         public Guid AddGradable()
         {
@@ -236,9 +372,24 @@ public class JobServiceTests
 
         public List<JobSubject> Subjects { get; } = [];
 
+        public Task<IReadOnlyList<Job>> GetChildrenAsync(Guid parentId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<Job>>(Jobs.Where(j => j.ParentId == parentId).ToList());
+
+        public Task<IReadOnlyList<JobChildCount>> CountChildrenAsync(
+            IReadOnlyCollection<Guid> parentIds, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<JobChildCount>>(Jobs
+                .Where(j => j.ParentId is { } parent && parentIds.Contains(parent))
+                .GroupBy(j => (j.ParentId!.Value, j.Status))
+                .Select(g => new JobChildCount(g.Key.Value, g.Key.Status, g.Count()))
+                .ToList());
+
+        public Task<IReadOnlyList<Job>> GetOpenGroupsAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<Job>>(Jobs.Where(j => j.IsGroup && j.Status == JobStatus.Running).ToList());
+
         public Task<IReadOnlyList<Job>> GetRecentAsync(
             JobStatus? status, JobType? type, string? courseId, string? assignmentId, int limit, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<Job>>(Jobs
+                .Where(j => j.ParentId == null)
                 .Where(j => status is null || j.Status == status)
                 .Where(j => type is null || j.Type == type)
                 .Where(j => courseId is null || j.CourseId == courseId)
@@ -250,6 +401,7 @@ public class JobServiceTests
         public Task<IReadOnlyDictionary<JobStatus, int>> CountByStatusAsync(
             DateTimeOffset finishedSince, JobType? type, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyDictionary<JobStatus, int>>(Jobs
+                .Where(j => j.ParentId == null)
                 .Where(j => type is null || j.Type == type)
                 .Where(j => !j.IsFinished || j.FinishedAt >= finishedSince)
                 .GroupBy(j => j.Status)

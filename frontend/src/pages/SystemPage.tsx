@@ -1,9 +1,10 @@
-import { type ReactNode, useState } from "react";
+import { createContext, type ReactNode, useContext, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import type { JobOverviewItem, JobStatus, JobType } from "../api/client";
-import { useCourses, useJobAction, useJobOverview } from "../api/hooks";
+import { useCourses, useJobAction, useJobChildren, useJobOverview } from "../api/hooks";
 import { Avatar, Button, Card, Chip, EmptyState, ErrorPanel, PageHeader, Spinner } from "../components/ui";
 import { FilterChips } from "../components/FilterChips";
+import { JobDetailsModal, JobIcon } from "../components/JobDetails";
 import { UsageView } from "../components/UsageView";
 import { formatAge, formatDate, initials } from "../format";
 
@@ -18,16 +19,22 @@ const filters: { key: JobStatus | undefined; label: string }[] = [
 
 const workOptions: { value: JobType | undefined; label: string }[] = [
   { value: undefined, label: "All work" },
-  { value: "GradeVersion", label: "AI grading" },
+  { value: "GradeVersion", label: "Single grading" },
   { value: "GradeAssignment", label: "Grade all" },
+  { value: "GradeStudent", label: "Grade student" },
+  { value: "FetchStudentWork", label: "Fetch student's work" },
+  { value: "AnalyzeMistakes", label: "Common mistakes" },
   { value: "FetchAssignment", label: "Fetch" },
   { value: "SyncCourse", label: "Course sync" },
   { value: "ReExtract", label: "Re-extract" },
 ];
 
 const jobTypeLabels: Record<string, string> = {
-  GradeVersion: "AI grading",
+  GradeVersion: "Single grading",
   GradeAssignment: "Grade all",
+  GradeStudent: "Grade student",
+  FetchStudentWork: "Fetch student's work",
+  AnalyzeMistakes: "Common mistakes",
   FetchAssignment: "Fetch",
   SyncCourse: "Course sync",
   ReExtract: "Re-extract",
@@ -59,7 +66,10 @@ export function SystemPage() {
   );
 }
 
+const OpenJobContext = createContext<(item: JobOverviewItem) => void>(() => {});
+
 function QueueView() {
+  const [opened, setOpened] = useState<JobOverviewItem | null>(null);
   const [status, setStatus] = useState<JobStatus | undefined>(undefined);
   const [work, setWork] = useState<JobType | undefined>(undefined);
   const overview = useJobOverview(status, work);
@@ -101,7 +111,18 @@ function QueueView() {
         </div>
       )}
 
+      {opened && (
+        <JobDetailsModal
+          key={opened.job.id}
+          item={opened}
+          courseName={opened.courseId ? courseNames.get(opened.courseId) : undefined}
+          onClose={() => setOpened(null)}
+          onOpen={setOpened}
+        />
+      )}
+
       {overview.data && (
+        <OpenJobContext.Provider value={setOpened}>
         <Card>
           <div className="flex flex-wrap items-center gap-1.5 border-b border-line px-[18px] py-3">
             {filters.map((filter) => {
@@ -145,6 +166,7 @@ function QueueView() {
             </ul>
           )}
         </Card>
+        </OpenJobContext.Provider>
       )}
     </>
   );
@@ -163,7 +185,104 @@ function JobRow({
   onCancel: () => void;
   onRetry: () => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  if (item.children) {
+    return (
+      <>
+        <JobRowBody item={item} courseName={courseName} busy={busy} onCancel={onCancel} onRetry={onRetry}>
+          <GroupProgress item={item} expanded={expanded} onToggle={() => setExpanded(!expanded)} />
+        </JobRowBody>
+        {expanded && <ChildJobs parentId={item.job.id} courseName={courseName} />}
+      </>
+    );
+  }
+
+  return <JobRowBody item={item} courseName={courseName} busy={busy} onCancel={onCancel} onRetry={onRetry} />;
+}
+
+function GroupProgress({ item, expanded, onToggle }: { item: JobOverviewItem; expanded: boolean; onToggle: () => void }) {
+  const counts = item.children!;
+  const finished = counts.succeeded + counts.failed + counts.canceled;
+  const total = Math.max(counts.total, 1);
+
+  return (
+    <div className="mt-1.5 flex flex-col gap-1">
+      <div className="flex h-1.5 w-full max-w-[280px] overflow-hidden rounded-full bg-paper-dark" aria-hidden>
+        <div className="h-full bg-accent" style={{ width: `${(counts.succeeded / total) * 100}%` }} />
+        <div className="h-full bg-[#8f2d2d]" style={{ width: `${(counts.failed / total) * 100}%` }} />
+        <div className="h-full bg-ink-muted/40" style={{ width: `${(counts.canceled / total) * 100}%` }} />
+      </div>
+      <div className="flex flex-wrap items-center gap-x-2 text-[11px] text-ink-muted">
+        <span>
+          <b className="text-ink">{finished}</b> of {counts.total} done
+        </span>
+        {counts.running > 0 && <span>· {counts.running} running</span>}
+        {counts.queued > 0 && <span>· {counts.queued} waiting</span>}
+        {counts.failed > 0 && <span className="font-semibold text-[#8f2d2d]">· {counts.failed} failed</span>}
+        {counts.canceled > 0 && <span>· {counts.canceled} canceled</span>}
+        <button onClick={onToggle} aria-expanded={expanded} className="font-semibold text-accent hover:underline">
+          {item.job.type === "GradeStudent"
+            ? expanded
+              ? "Hide assignments ▴"
+              : `Show fetch + ${Math.max(counts.total - 1, 0)} assignments ▾`
+            : expanded
+              ? "Hide students ▴"
+              : `Show ${counts.total} students ▾`}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ChildJobs({ parentId, courseName }: { parentId: string; courseName: string | undefined }) {
+  const children = useJobChildren(parentId, true);
+  const action = useJobAction();
+
+  if (children.isLoading) {
+    return (
+      <li className="bg-paper/60 px-[18px] py-2 pl-12">
+        <Spinner label="Loading the gradings…" />
+      </li>
+    );
+  }
+
+  return (
+    <>
+      {(children.data ?? []).map((child) => (
+        <li key={child.job.id} className="border-l-4 border-accent-tint bg-paper/40">
+          <JobRowBody
+            item={child}
+            courseName={courseName}
+            busy={action.isPending && action.variables?.jobId === child.job.id}
+            onCancel={() => action.mutate({ jobId: child.job.id, action: "cancel" })}
+            onRetry={() => action.mutate({ jobId: child.job.id, action: "retry" })}
+            nested
+          />
+        </li>
+      ))}
+    </>
+  );
+}
+
+function JobRowBody({
+  item,
+  courseName,
+  busy,
+  onCancel,
+  onRetry,
+  nested,
+  children,
+}: {
+  item: JobOverviewItem;
+  courseName: string | undefined;
+  busy: boolean;
+  onCancel: () => void;
+  onRetry: () => void;
+  nested?: boolean;
+  children?: ReactNode;
+}) {
   const { job } = item;
+  const openJob = useContext(OpenJobContext);
   const active = job.status === "Queued" || job.status === "Running";
   const canRetry = job.status === "Failed" || job.status === "Canceled";
   const link =
@@ -171,23 +290,23 @@ function JobRow({
       ? `/courses/${item.courseId}/assignments/${item.assignmentId}?student=${encodeURIComponent(item.submissionId)}`
       : undefined;
 
+  const Row = nested ? "div" : "li";
+
   return (
-    <li className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-[18px] py-3 @4xl:grid-cols-[110px_minmax(0,1fr)_150px_170px_auto]">
+    <Row className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-[18px] py-3 @4xl:grid-cols-[110px_minmax(0,1fr)_150px_170px_auto]">
       <div className="@4xl:order-none order-3 col-span-2 flex flex-wrap items-center gap-1.5 @4xl:col-span-1">
         <StatusChip item={item} />
       </div>
 
       <div className="flex min-w-0 items-center gap-3">
-        {item.studentName ? (
-          <Avatar text={initials(item.studentName)} userId={item.studentId ?? undefined} />
-        ) : (
-          <span className="h-8 w-8 shrink-0 rounded-full bg-paper-dark" />
-        )}
+        <button onClick={() => openJob(item)} className="shrink-0 rounded-full" title="Show what this job did" aria-label="Show job details">
+          {item.studentName ? <Avatar text={initials(item.studentName)} userId={item.studentId ?? undefined} /> : <JobIcon type={job.type} />}
+        </button>
         <div className="min-w-0">
-          <div className="truncate font-semibold">
-            {jobTypeLabels[job.type] ?? job.type}
+          <button onClick={() => openJob(item)} className="block max-w-full truncate text-left font-semibold hover:underline" title="Show what this job did">
+            {nested ? "Grading" : (jobTypeLabels[job.type] ?? job.type)}
             {item.studentName && <span className="font-normal"> · {item.studentName}</span>}
-          </div>
+          </button>
           <div className="truncate text-xs text-ink-muted">
             {[item.assignmentTitle, item.versionNumber != null ? `v${item.versionNumber}` : null, courseName].filter(Boolean).join(" · ") ||
               "—"}
@@ -197,6 +316,7 @@ function JobRow({
               {job.error}
             </div>
           )}
+          {children}
         </div>
       </div>
 
@@ -212,6 +332,9 @@ function JobRow({
       </div>
 
       <div className="flex items-center justify-end gap-2">
+        <Button small onClick={() => openJob(item)} title="What this job is, what it did and when">
+          Details
+        </Button>
         {active && !job.cancelRequested && (
           <Button small onClick={onCancel} disabled={busy}>
             Cancel
@@ -228,7 +351,7 @@ function JobRow({
           </Link>
         )}
       </div>
-    </li>
+    </Row>
   );
 }
 

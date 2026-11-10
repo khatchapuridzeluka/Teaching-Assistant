@@ -144,6 +144,10 @@ public class AgentChatServiceTests
             return Task.FromResult(new LanguageModelReply(ModelId, "Hello!"));
         }
 
+        public Task<LanguageModelReply> AnalyzeAsync(
+            string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public Task<LanguageModelReply> GradeAsync(
             string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();

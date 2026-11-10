@@ -76,7 +76,9 @@ public class JobWorker(
     private async Task RecoverAsync(CancellationToken cancellationToken)
     {
         await using var scope = scopes.CreateAsyncScope();
-        var recovered = await scope.ServiceProvider.GetRequiredService<IJobProcessor>().RecoverExpiredLeasesAsync(cancellationToken);
+        var processor = scope.ServiceProvider.GetRequiredService<IJobProcessor>();
+        var recovered = await processor.RecoverExpiredLeasesAsync(cancellationToken);
+        await processor.ReconcileGroupsAsync(cancellationToken);
         _lastRecovery = timeProvider.GetUtcNow();
         if (recovered > 0)
         {
