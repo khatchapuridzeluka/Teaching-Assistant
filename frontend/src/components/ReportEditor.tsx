@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { CodeMistake, CodeStrength, GradingReport, GradingResult, MistakeCategory, MistakeSeverity } from "../api/client";
 import { useSaveReport } from "../api/hooks";
 import { severityColor, strengthColor } from "./CodeBrowser";
+import { BadgeCheck, Undo2, X } from "lucide-react";
 import { Button, Chip, ErrorPanel } from "./ui";
 
 const severities: MistakeSeverity[] = ["Major", "Minor", "Style"];
@@ -113,25 +114,30 @@ export function ReportEditor({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-3 sm:p-6"
+      className="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6"
       onClick={(e) => e.target === e.currentTarget && !save.isPending && onClose()}
     >
-      <div role="dialog" aria-modal="true" aria-label="Edit draft" className="flex max-h-[92dvh] w-full max-w-3xl flex-col rounded-[12px] bg-paper shadow-xl">
+      <div role="dialog" aria-modal="true" aria-label="Edit draft" className="flex max-h-[92dvh] w-full max-w-3xl flex-col rounded-xl bg-paper modal-panel">
         <header className="flex items-start justify-between gap-3 border-b border-line bg-white px-5 py-4 sm:rounded-t-[12px]">
           <div className="min-w-0">
-            <h2 className="text-[15px] font-bold">Edit draft · {studentName}</h2>
+            <h2 className="font-display text-[20px] font-semibold leading-tight">Review &amp; approve · {studentName}</h2>
             <div className="text-xs text-ink-muted">
               Your changes are saved as your report; the AI draft itself stays as it was.
               {report?.status === "Approved" && " Saving reopens the approved report."}
             </div>
           </div>
-          <button onClick={onClose} aria-label="Close" className="shrink-0 text-lg leading-none text-ink-muted hover:text-ink">
-            ×
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            title="Close (Esc)"
+            className="-mr-1.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-ink-muted hover:bg-paper-dark hover:text-ink"
+          >
+            <X className="h-4 w-4" />
           </button>
         </header>
 
         <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 py-4">
-          <section className="flex flex-wrap items-end gap-4">
+          <section className="surface flex flex-wrap items-end gap-4 border-l-4 border-l-mark px-4 py-3">
             <label className="flex flex-col gap-1 text-xs font-semibold">
               Score
               <span className="flex items-center gap-1.5 font-normal text-ink-muted">
@@ -143,7 +149,7 @@ export function ReportEditor({
                   placeholder={toInput(grading.score)}
                   title={grading.score != null ? `AI suggested ${grading.score}` : undefined}
                   onChange={(e) => setScore(e.target.value)}
-                  className="h-9 w-24 rounded-lg border border-line bg-white px-2 text-[14px] font-semibold text-ink placeholder:font-normal placeholder:text-ink-muted/60"
+                  className="field h-9 w-24 font-mono text-[14px] font-semibold placeholder:font-normal placeholder:text-ink-muted/60"
                 />
                 / {grading.maxScore ?? "–"}
               </span>
@@ -158,7 +164,7 @@ export function ReportEditor({
                 placeholder={toInput(grading.bonus)}
                 title={grading.bonus != null ? `AI suggested ${grading.bonus}` : undefined}
                 onChange={(e) => setBonus(e.target.value)}
-                className="h-9 w-24 rounded-lg border border-line bg-white px-2 text-[14px] font-semibold text-ink placeholder:font-normal placeholder:text-ink-muted/60"
+                className="field h-9 w-24 font-mono text-[14px] font-semibold placeholder:font-normal placeholder:text-ink-muted/60"
               />
             </label>
             <span className="flex flex-col pb-1.5 text-xs text-ink-muted">
@@ -181,14 +187,14 @@ export function ReportEditor({
               value={review}
               onChange={(e) => setReview(e.target.value)}
               rows={12}
-              className="w-full resize-y rounded-[10px] border border-line bg-white px-3 py-2 font-mono text-[12px] leading-relaxed"
+              className="field h-auto w-full resize-y px-3 py-2 font-mono text-[12px] leading-relaxed"
             />
           </section>
 
           <section className="flex flex-col gap-2">
-            <h3 className="text-xs font-semibold">
+            <h3 className="eyebrow text-ink">
               Mistakes · {mistakes.length}
-              <span className="font-normal text-ink-muted">
+              <span className="font-sans font-normal normal-case tracking-normal text-ink-muted">
                 {edited > 0 && ` · ${edited} edited`}
                 {rejected > 0 && ` · ${rejected} rejected`}
               </span>
@@ -197,7 +203,8 @@ export function ReportEditor({
             {mistakes.map((m, i) => (
               <div
                 key={m.sourceMistakeId}
-                className={`flex flex-col gap-2 rounded-[10px] border bg-white px-3 py-2.5 ${m.rejected ? "border-dashed border-line opacity-60" : "border-line"}`}
+                className={`flex flex-col gap-2 rounded-[10px] border border-l-[3px] bg-white px-3 py-2.5 shadow-card transition-opacity ${m.rejected ? "border-dashed border-line opacity-55" : "border-line"}`}
+                style={{ borderLeftColor: m.rejected ? undefined : severityColor[m.severity] }}
               >
                 <div className="flex flex-wrap items-center gap-2 text-xs">
                   <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: severityColor[m.severity] }} />
@@ -206,7 +213,7 @@ export function ReportEditor({
                     onChange={(e) => update(i, { severity: e.target.value as MistakeSeverity })}
                     disabled={m.rejected}
                     aria-label="Severity"
-                    className="h-7 rounded-lg border border-line bg-white px-1.5 font-semibold"
+                    className="field h-7 px-1.5 font-semibold"
                   >
                     {severities.map((s) => (
                       <option key={s} value={s}>
@@ -219,7 +226,7 @@ export function ReportEditor({
                     onChange={(e) => update(i, { category: e.target.value as MistakeCategory })}
                     disabled={m.rejected}
                     aria-label="Category"
-                    className="h-7 rounded-lg border border-line bg-white px-1.5"
+                    className="field h-7 px-1.5"
                   >
                     {categories.map((c) => (
                       <option key={c.value} value={c.value}>
@@ -239,13 +246,13 @@ export function ReportEditor({
                       onChange={(e) => update(i, { points: e.target.value })}
                       disabled={m.rejected}
                       aria-label="Points deducted"
-                      className="h-7 w-14 rounded-lg border border-line bg-white px-1.5 font-semibold text-ink placeholder:font-normal placeholder:text-ink-muted/60"
+                      className="field h-7 w-14 px-1.5 font-mono font-semibold placeholder:font-normal placeholder:text-ink-muted/60"
                     />
                     pts
                   </label>
                   <span className="font-mono text-ink-muted">{location(m)}</span>
                   {m.rejected ? <Chip tone="muted">Rejected</Chip> : isEdited(m) && <Chip tone="tint">Edited</Chip>}
-                  <Button small className="ml-auto" onClick={() => update(i, { rejected: !m.rejected })}>
+                  <Button small variant="ghost" icon={m.rejected ? <Undo2 /> : <X />} className="ml-auto" onClick={() => update(i, { rejected: !m.rejected })}>
                     {m.rejected ? "Restore" : "Reject"}
                   </Button>
                 </div>
@@ -255,16 +262,16 @@ export function ReportEditor({
                   disabled={m.rejected}
                   rows={2}
                   aria-label="Message"
-                  className={`w-full resize-y rounded-lg border border-line px-2.5 py-1.5 text-[13px] ${m.rejected ? "bg-paper line-through" : "bg-white"}`}
+                  className={`field h-auto w-full resize-y px-2.5 py-1.5 text-[13px] ${m.rejected ? "bg-paper line-through" : ""}`}
                 />
               </div>
             ))}
           </section>
 
           <section className="flex flex-col gap-2">
-            <h3 className="text-xs font-semibold">
+            <h3 className="eyebrow text-ink">
               Strengths · {strengths.length}
-              <span className="font-normal text-ink-muted">
+              <span className="font-sans font-normal normal-case tracking-normal text-ink-muted">
                 {strengthsEdited > 0 && ` · ${strengthsEdited} edited`}
                 {strengthsRejected > 0 && ` · ${strengthsRejected} rejected`}
                 {" · never change the score; kept ones go to the student's profile on approve"}
@@ -274,7 +281,8 @@ export function ReportEditor({
             {strengths.map((s, i) => (
               <div
                 key={s.sourceStrengthId}
-                className={`flex flex-col gap-2 rounded-[10px] border bg-white px-3 py-2.5 ${s.rejected ? "border-dashed border-line opacity-60" : "border-line"}`}
+                className={`flex flex-col gap-2 rounded-[10px] border border-l-[3px] bg-white px-3 py-2.5 shadow-card transition-opacity ${s.rejected ? "border-dashed border-line opacity-55" : "border-line"}`}
+                style={{ borderLeftColor: s.rejected ? undefined : strengthColor }}
               >
                 <div className="flex flex-wrap items-center gap-2 text-xs">
                   <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: strengthColor }} />
@@ -284,7 +292,7 @@ export function ReportEditor({
                     onChange={(e) => updateStrength(i, { category: e.target.value as MistakeCategory })}
                     disabled={s.rejected}
                     aria-label="Category"
-                    className="h-7 rounded-lg border border-line bg-white px-1.5"
+                    className="field h-7 px-1.5"
                   >
                     {categories.map((c) => (
                       <option key={c.value} value={c.value}>
@@ -294,7 +302,7 @@ export function ReportEditor({
                   </select>
                   <span className="font-mono text-ink-muted">{location(s)}</span>
                   {s.rejected ? <Chip tone="muted">Rejected</Chip> : isStrengthEdited(s) && <Chip tone="tint">Edited</Chip>}
-                  <Button small className="ml-auto" onClick={() => updateStrength(i, { rejected: !s.rejected })}>
+                  <Button small variant="ghost" icon={s.rejected ? <Undo2 /> : <X />} className="ml-auto" onClick={() => updateStrength(i, { rejected: !s.rejected })}>
                     {s.rejected ? "Restore" : "Reject"}
                   </Button>
                 </div>
@@ -304,7 +312,7 @@ export function ReportEditor({
                   disabled={s.rejected}
                   rows={2}
                   aria-label="Strength"
-                  className={`w-full resize-y rounded-lg border border-line px-2.5 py-1.5 text-[13px] ${s.rejected ? "bg-paper line-through" : "bg-white"}`}
+                  className={`field h-auto w-full resize-y px-2.5 py-1.5 text-[13px] ${s.rejected ? "bg-paper line-through" : ""}`}
                 />
               </div>
             ))}
@@ -314,7 +322,7 @@ export function ReportEditor({
         <footer className="flex flex-col gap-2 border-t border-line bg-white px-5 py-3 sm:rounded-b-[12px]">
           {save.isError && <ErrorPanel error={save.error} />}
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <span className="mr-auto text-[11px] text-ink-muted">
+            <span className="mr-auto min-w-0 flex-1 basis-[220px] text-[11px] leading-snug text-ink-muted">
               Approve makes this the one that counts: {studentName}'s other drafts of this assignment are discarded.
             </span>
             <Button onClick={onClose} disabled={save.isPending}>
@@ -323,7 +331,7 @@ export function ReportEditor({
             <Button onClick={() => submit(false)} disabled={save.isPending} title="Keep your edits as a report in review; you can come back to it">
               {save.isPending && !save.variables?.approve ? "Saving…" : "Save"}
             </Button>
-            <Button variant="primary" onClick={() => submit(true)} disabled={save.isPending} title="Save and mark this report as final; the student's other drafts of this assignment (any version) are discarded, so only this one counts on the profile">
+            <Button variant="success" icon={<BadgeCheck />} onClick={() => submit(true)} disabled={save.isPending} title="Save and mark this report as final; the student's other drafts of this assignment (any version) are discarded, so only this one counts on the profile">
               {save.isPending && save.variables?.approve ? "Approving…" : "Approve"}
             </Button>
           </div>
@@ -354,7 +362,7 @@ export function keptStrengths(report: GradingReport): CodeStrength[] {
 }
 
 export function ReportChip({ report }: { report: GradingReport }) {
-  return report.status === "Approved" ? <Chip tone="accent">Report approved</Chip> : <Chip tone="ink">Report in review</Chip>;
+  return report.status === "Approved" ? <Chip tone="success">Report approved</Chip> : <Chip tone="mark">Report in review</Chip>;
 }
 
 function initialMistakes(grading: GradingResult, report: GradingReport | null | undefined): EditableMistake[] {

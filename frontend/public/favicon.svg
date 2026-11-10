@@ -1,9 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <title>Teaching Assistant</title>
-  <!-- Checked code: code brackets around a check, on the app's green tile. Strokes are thick so it stays readable at
-       16 px in a browser tab. -->
-  <rect width="32" height="32" rx="7" fill="#2f5e4e"/>
-  <path d="M10.5 9 5.5 16l5 7" fill="none" stroke="#ffffff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M21.5 9 26.5 16l-5 7" fill="none" stroke="#ffffff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="m12.5 16.5 2.6 2.6 4.6-5.6" fill="none" stroke="#9fe1cb" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Checked code: code brackets around a check, on the app's highlighter-yellow tile. Strokes are thick so it stays
+       readable at 16 px in a browser tab. -->
+  <rect width="32" height="32" rx="8" fill="#ffd23f"/>
+  <path d="M10.5 9.5 5.8 16l4.7 6.5" fill="none" stroke="#0f1a36" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M21.5 9.5 26.2 16l-4.7 6.5" fill="none" stroke="#0f1a36" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="m12.6 16.4 2.5 2.6 4.5-5.6" fill="none" stroke="#1857d6" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

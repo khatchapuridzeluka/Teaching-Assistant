@@ -37,3 +37,12 @@ export function initials(name: string): string {
     .map((part) => part[0]!.toUpperCase())
     .join("");
 }
+
+export function formatPoints(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+export function greeting(now = new Date()): string {
+  const hour = now.getHours();
+  return hour < 5 ? "Working late" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+}

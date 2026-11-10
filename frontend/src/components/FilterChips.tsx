@@ -11,7 +11,7 @@ export function FilterChips<T extends string | number | undefined>({
 }) {
   return (
     <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={label}>
-      <span className="mr-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-muted">{label}</span>
+      <span className="eyebrow mr-1 w-[68px] shrink-0">{label}</span>
       {options.map((option) => {
         const selected = option.value === value;
         return (
@@ -19,12 +19,14 @@ export function FilterChips<T extends string | number | undefined>({
             key={String(option.value ?? "all")}
             onClick={() => onChange(option.value)}
             aria-pressed={selected}
-            className={`inline-flex h-7 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold ${
-              selected ? "border-accent bg-accent text-white" : "border-line bg-white text-ink hover:border-accent"
+            className={`inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors ${
+              selected
+                ? "border-accent bg-accent-tint font-semibold text-accent-strong shadow-[inset_0_0_0_1px_var(--color-accent)]"
+                : "border-line bg-white text-ink-soft hover:border-ink-faint hover:bg-paper"
             }`}
           >
             {option.label}
-            {option.count != null && <span className={selected ? "text-white/80" : "text-ink-muted"}>{option.count}</span>}
+            {option.count != null && <span className={`font-mono text-[10.5px] ${selected ? "text-accent" : "text-ink-faint"}`}>{option.count}</span>}
           </button>
         );
       })}

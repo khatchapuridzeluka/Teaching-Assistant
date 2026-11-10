@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import type { JobOverviewItem, JobType } from "../api/client";
 import { useJob, useJobAction, useJobChildren } from "../api/hooks";
 import { formatDate, initials } from "../format";
+import { Ban, CircleCheck, CircleX, Clock, X } from "lucide-react";
 import { Avatar, Button, Chip, Spinner } from "./ui";
 
 export const jobTypeInfo: Record<JobType, { label: string; description: string }> = {
@@ -60,7 +61,7 @@ const statusText: Record<string, string> = {
 
 export function JobIcon({ type }: { type: JobType }) {
   return (
-    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-white" aria-hidden>
+    <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-lg bg-accent-tint text-accent" aria-hidden>
       <svg viewBox="0 0 24 24" className="h-[17px] w-[17px]" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
         {iconPaths[type]}
       </svg>
@@ -174,8 +175,8 @@ export function JobDetailsModal({
       : undefined;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-3 sm:p-6" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div role="dialog" aria-modal="true" aria-label="Job details" className="flex max-h-[90dvh] w-full max-w-2xl flex-col rounded-[12px] bg-paper shadow-xl">
+    <div className="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div role="dialog" aria-modal="true" aria-label="Job details" className="flex max-h-[90dvh] w-full max-w-2xl flex-col rounded-xl bg-paper modal-panel">
         <header className="flex items-start gap-3 border-b border-line bg-white px-5 py-4 sm:rounded-t-[12px]">
           {item.studentName && job.type !== "AnalyzeMistakes" ? (
             <Avatar text={initials(item.studentName)} userId={item.studentId ?? undefined} />
@@ -183,7 +184,7 @@ export function JobDetailsModal({
             <JobIcon type={job.type} />
           )}
           <div className="min-w-0 flex-1">
-            <h2 className="text-[15px] font-bold">
+            <h2 className="font-display text-[19px] font-semibold leading-tight">
               {job.parentId ? "Grading" : info.label}
               {item.studentName && <span className="font-normal"> · {item.studentName}</span>}
             </h2>
@@ -192,8 +193,13 @@ export function JobDetailsModal({
               <span>{statusText[job.status]}</span>
             </div>
           </div>
-          <button onClick={onClose} aria-label="Close" className="shrink-0 text-lg leading-none text-ink-muted hover:text-ink">
-            ×
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            title="Close (Esc)"
+            className="-mr-1.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-ink-muted hover:bg-paper-dark hover:text-ink"
+          >
+            <X className="h-4 w-4" />
           </button>
         </header>
 
@@ -231,7 +237,7 @@ export function JobDetailsModal({
           {job.error && (
             <section>
               <SectionTitle>Error</SectionTitle>
-              <p className="rounded-[10px] border border-[#8f2d2d]/30 bg-[#8f2d2d]/5 px-3 py-2 text-[#8f2d2d]">{job.error}</p>
+              <p className="rounded-lg border border-danger/30 bg-danger-tint/50 px-3 py-2 font-mono text-[12px] text-danger-ink">{job.error}</p>
             </section>
           )}
 
@@ -249,7 +255,7 @@ export function JobDetailsModal({
               {children.isLoading ? (
                 <Spinner label="Loading…" />
               ) : (
-                <ul className="divide-y divide-line rounded-[10px] border border-line bg-white">
+                <ul className="surface divide-y divide-paper-dark overflow-hidden">
                   {(children.data ?? []).map((child) => (
                     <li key={child.job.id}>
                       <button onClick={() => onOpen(child)} className="flex w-full items-center gap-3 px-3 py-2 text-left text-xs hover:bg-paper">
@@ -262,7 +268,7 @@ export function JobDetailsModal({
                                 ? (child.assignmentTitle ?? "Assignment")
                                 : (child.studentName ?? "Student")}
                           </b>
-                          {child.job.error && <span className="text-[#8f2d2d]"> · {child.job.error}</span>}
+                          {child.job.error && <span className="text-danger"> · {child.job.error}</span>}
                         </span>
                         <span className="shrink-0 text-ink-muted">
                           {child.job.startedAt && child.job.finishedAt ? duration(child.job.startedAt, child.job.finishedAt) : ""}
@@ -364,7 +370,7 @@ function Result({
     const count = (status: string) => gradings.filter((c) => c.job.status === status).length;
     return (
       <p>
-        {fetch?.job.status === "Failed" && <span className="text-[#8f2d2d]">The fetch from Classroom failed: {fetch.job.error}. </span>}
+        {fetch?.job.status === "Failed" && <span className="text-danger">The fetch from Classroom failed: {fetch.job.error}. </span>}
         {fetch?.job.summary && <span>{fetch.job.summary.replace(/\.?$/, ".")} </span>}
         {childJobs
           ? `${count("Succeeded")} succeeded, ${count("Failed")} failed, ${count("Canceled")} canceled of ${gradings.length} ${gradings.length === 1 ? "grading" : "gradings"}.`
@@ -381,24 +387,48 @@ function Result({
   return <p className="text-ink-muted">{job.status === "Succeeded" ? "Done." : "Nothing was produced."}</p>;
 }
 
-function StatusBadge({ status, cancelRequested }: { status: string; cancelRequested: boolean }) {
+export function JobStatusChip({ status, cancelRequested, retrying }: { status: string; cancelRequested?: boolean; retrying?: boolean }) {
   if (status === "Failed") {
-    return <span className="inline-flex h-[22px] items-center rounded-full bg-[#8f2d2d] px-2.5 text-[11px] font-semibold text-white">Failed</span>;
+    return (
+      <Chip tone="danger" icon={<CircleX />}>
+        Failed
+      </Chip>
+    );
   }
   if (status === "Running") {
-    return <Chip tone="accent">{cancelRequested ? "Canceling…" : "Running"}</Chip>;
+    return (
+      <Chip tone="info" icon={<span className="h-2.5 w-2.5 animate-spin rounded-full border-[1.5px] border-accent/30 border-t-accent" />}>
+        {cancelRequested ? "Canceling…" : "Running"}
+      </Chip>
+    );
   }
   if (status === "Queued") {
-    return <Chip tone="tint">Queued</Chip>;
+    return (
+      <Chip tone={retrying ? "warn" : "mark"} icon={<Clock />}>
+        {retrying ? "Retry queued" : "Queued"}
+      </Chip>
+    );
   }
   if (status === "Canceled") {
-    return <Chip tone="muted">Canceled</Chip>;
+    return (
+      <Chip tone="muted" icon={<Ban />}>
+        Canceled
+      </Chip>
+    );
   }
-  return <Chip tone="outline">Succeeded</Chip>;
+  return (
+    <Chip tone="success" icon={<CircleCheck />}>
+      Succeeded
+    </Chip>
+  );
+}
+
+function StatusBadge({ status, cancelRequested }: { status: string; cancelRequested: boolean }) {
+  return <JobStatusChip status={status} cancelRequested={cancelRequested} />;
 }
 
 function SectionTitle({ children }: { children: ReactNode }) {
-  return <h3 className="mb-1 text-[11px] font-bold uppercase tracking-[0.06em] text-accent">{children}</h3>;
+  return <h3 className="eyebrow mb-1.5">{children}</h3>;
 }
 
 function Facts({ rows }: { rows: [string, string | null | undefined][] }) {

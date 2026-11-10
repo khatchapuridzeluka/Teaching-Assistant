@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import Editor, { type OnMount } from "@monaco-editor/react";
 import { type CodeFile, type CodeMistake, type CodeStrength, codeFileUrl } from "../api/client";
 import { useCodeFileText, useCodeFiles } from "../api/hooks";
+import { severityColor, strengthColor } from "../theme";
+import { FileCode2 } from "lucide-react";
 import { ErrorPanel, Spinner } from "./ui";
 
 const languages: Record<string, string> = {
@@ -17,8 +19,7 @@ const extension = (path: string) => path.split(".").pop()?.toLowerCase() ?? "";
 type Severity = CodeMistake["severity"];
 
 const severityOrder: Severity[] = ["Major", "Minor", "Style"];
-export const severityColor: Record<Severity, string> = { Major: "#dc2626", Minor: "#d97706", Style: "#64748b" };
-export const strengthColor = "#15803d";
+export { severityColor, strengthColor };
 
 export type CodeFocus = { file: string; line: number; key: number };
 
@@ -67,7 +68,7 @@ export function CodeBrowser({
   }
 
   return (
-    <div className={`@container flex flex-col overflow-hidden rounded-[10px] border border-line bg-white @lg:flex-row ${className}`}>
+    <div className={`@container flex flex-col overflow-hidden rounded-[10px] border border-line bg-white shadow-card @lg:flex-row ${className}`}>
       <FileList files={files.data} selected={selected} onSelect={setSelected} mistakes={mistakes} />
       <div className="flex min-w-0 flex-1 flex-col">
         {selected && (
@@ -105,10 +106,10 @@ function FileList({
   }, [files]);
 
   return (
-    <nav className="max-h-[132px] w-full shrink-0 overflow-y-auto border-b border-line py-2 @lg:max-h-none @lg:w-[160px] @lg:border-b-0 @lg:border-r @2xl:w-[220px]">
+    <nav className="max-h-[132px] w-full shrink-0 overflow-y-auto border-b border-line bg-paper/70 py-2 @lg:max-h-none @lg:w-[170px] @lg:border-b-0 @lg:border-r @2xl:w-[220px]">
       {groups.map(([folder, folderFiles]) => (
         <div key={folder} className="mb-1">
-          {folder && <div className="truncate px-3 pb-0.5 pt-2 text-[10px] font-bold uppercase tracking-[0.06em] text-ink-muted">{folder}/</div>}
+          {folder && <div className="eyebrow truncate px-3 pb-1 pt-2 normal-case tracking-normal">{folder}/</div>}
           {folderFiles.map((file) => {
             const name = file.path.slice(file.path.lastIndexOf("/") + 1);
             const own = mistakes.filter((m) => m.file === file.path);
@@ -118,14 +119,15 @@ function FileList({
                 key={file.path}
                 onClick={() => onSelect(file.path)}
                 title={own.length > 0 ? `${file.path} · ${own.length} mistake(s)` : file.path}
-                className={`flex w-full items-center justify-between gap-2 px-3 py-1 text-left text-xs ${
-                  file.path === selected ? "bg-accent-tint font-bold text-accent" : "hover:bg-paper"
+                className={`flex w-full items-center gap-1.5 border-l-2 px-3 py-1 text-left font-mono text-[11.5px] transition-colors ${
+                  file.path === selected ? "border-l-accent bg-white font-semibold text-accent-strong" : "border-l-transparent text-ink-soft hover:bg-white/70"
                 }`}
               >
-                <span className="truncate">{name}</span>
+                <FileCode2 className={`h-3.5 w-3.5 shrink-0 ${file.path === selected ? "text-accent" : "text-ink-faint"}`} />
+                <span className="min-w-0 flex-1 truncate">{name}</span>
                 {worst && (
                   <span
-                    className="shrink-0 rounded-full px-1.5 text-[10px] font-bold leading-4 text-white"
+                    className="shrink-0 rounded-full px-1.5 font-sans text-[10px] font-bold leading-4 text-white"
                     style={{ backgroundColor: severityColor[worst] }}
                   >
                     {own.length}
@@ -211,7 +213,7 @@ function FileView({
   return (
     <>
       <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-2 text-xs">
-        <b className="truncate">{path}</b>
+        <b className="truncate font-mono text-[11.5px] font-semibold">{path}</b>
         {mistakes.length + strengths.length > 0 && (
           <span className="shrink-0 text-ink-muted">
             Hover a dot to read it{strengths.length > 0 ? " · green marks a strength" : ""}
@@ -231,8 +233,14 @@ function FileView({
           <Editor
             value={text.data ?? ""}
             language={languages[ext] ?? "plaintext"}
+            theme="marking-desk"
             onMount={(ed, monaco) => setEditor({ editor: ed, monaco })}
             options={{
+              fontFamily: '"JetBrains Mono Variable", Consolas, monospace',
+              fontLigatures: false,
+              lineHeight: 20,
+              padding: { top: 10, bottom: 10 },
+              scrollbar: { verticalScrollbarSize: 10, horizontalScrollbarSize: 10 },
               readOnly: true,
               domReadOnly: true,
               minimap: { enabled: false },

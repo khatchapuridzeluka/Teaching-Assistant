@@ -3,7 +3,8 @@ import { Link, useParams } from "react-router";
 import type { GradebookColumn, StudentAssignmentResult } from "../api/client";
 import { useGradebook, useSyncCourse } from "../api/hooks";
 import { CourseName } from "../components/Layout";
-import { Avatar, Button, Card, EmptyState, ErrorPanel, PageHeader, Spinner } from "../components/ui";
+import { Download, RefreshCw } from "lucide-react";
+import { Avatar, Button, buttonClass, Card, EmptyState, ErrorPanel, PageHeader, Spinner, Stat, StatStrip } from "../components/ui";
 import { formatDate, formatDay, initials } from "../format";
 
 type SortKey = "name" | "best" | "worst";
@@ -45,16 +46,16 @@ export function GradebookPage() {
         }
         actions={
           <>
-            <Button onClick={() => sync.mutate()} disabled={sync.isPending}>
+            <Button icon={<RefreshCw className={sync.isPending ? "animate-spin" : ""} />} onClick={() => sync.mutate()} disabled={sync.isPending}>
               {sync.isPending ? "Syncing…" : "Sync course"}
             </Button>
             {synced && (
               <a
                 href={`/api/courses/${courseId}/gradebook/export`}
                 download
-                className="inline-flex h-[34px] items-center rounded-lg border border-accent bg-accent px-3.5 font-semibold text-white hover:bg-accent/90"
+                className={buttonClass("primary")}
               >
-                Export CSV
+                <Download className="h-4 w-4" /> Export CSV
               </a>
             )}
           </>
@@ -76,7 +77,7 @@ export function GradebookPage() {
 
       {data && synced && (
         <>
-          <div className="grid grid-cols-2 border-t border-line md:grid-cols-4">
+          <StatStrip>
             <Stat label="Students" value={data.students.length} note="enrolled" />
             <Stat
               label="Class average"
@@ -85,7 +86,7 @@ export function GradebookPage() {
             />
             <Stat label="Waiting for a grade" value={waiting} note="turned in, not returned yet" />
             <Stat label="Missing" value={missing} note="past due, nothing turned in" />
-          </div>
+          </StatStrip>
 
           <Card className="overflow-hidden">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-[18px] py-3">
@@ -95,7 +96,7 @@ export function GradebookPage() {
                 <select
                   value={sort}
                   onChange={(e) => setSort(e.target.value as SortKey)}
-                  className="h-8 rounded-lg border border-line bg-white px-2 text-xs text-ink"
+                  className="field"
                 >
                   {(Object.keys(sortLabels) as SortKey[]).map((key) => (
                     <option key={key} value={key}>
@@ -151,7 +152,7 @@ export function GradebookPage() {
                         </td>
                       ))}
                       <td className="sticky right-0 z-10 border-b border-l border-line bg-white px-3 py-2 text-right group-hover:bg-paper">
-                        <b className="text-[13px]">{student.overallPercent == null ? "–" : `${Math.round(student.overallPercent)}%`}</b>
+                        <b className="font-mono text-[12.5px] font-semibold">{student.overallPercent == null ? "–" : `${Math.round(student.overallPercent)}%`}</b>
                         {student.possible > 0 && (
                           <div className="text-[11px] text-ink-muted">
                             {round(student.earned)}/{round(student.possible)}
@@ -168,7 +169,7 @@ export function GradebookPage() {
                     </td>
                     {data.assignments.map((assignment) => (
                       <td key={assignment.id} className="sticky bottom-0 z-20 border-r border-t border-line bg-paper-dark px-3 py-2.5">
-                        <b className="text-[13px]">{assignment.averagePercent == null ? "–" : `${Math.round(assignment.averagePercent)}%`}</b>
+                        <b className="font-mono text-[12.5px] font-semibold">{assignment.averagePercent == null ? "–" : `${Math.round(assignment.averagePercent)}%`}</b>
                         <div className="text-[11px] text-ink-muted">
                           {assignment.graded} graded
                           {assignment.awaitingGrade > 0 && ` · ${assignment.awaitingGrade} waiting`}
@@ -177,7 +178,7 @@ export function GradebookPage() {
                       </td>
                     ))}
                     <td className="sticky bottom-0 right-0 z-30 border-l border-t border-line bg-paper-dark px-3 py-2.5 text-right">
-                      <b className="text-[13px]">{data.classAveragePercent == null ? "–" : `${Math.round(data.classAveragePercent)}%`}</b>
+                      <b className="font-mono text-[12.5px] font-semibold">{data.classAveragePercent == null ? "–" : `${Math.round(data.classAveragePercent)}%`}</b>
                     </td>
                   </tr>
                 </tfoot>
@@ -214,7 +215,7 @@ function cellContent(result: StudentAssignmentResult): ReactNode {
       return (
         <span className="whitespace-nowrap">
           {improved && <span className="text-ink-muted">{round(result.initialGrade!)} → </span>}
-          <b className="text-[13px]">{round(result.finalGrade!)}</b>
+          <b className="font-mono text-[12.5px] font-semibold">{round(result.finalGrade!)}</b>
           {result.late && <span className="ml-1 text-[10px] font-semibold uppercase text-ink-muted">late</span>}
         </span>
       );
@@ -222,7 +223,7 @@ function cellContent(result: StudentAssignmentResult): ReactNode {
     case "AwaitingGrade":
       return <span className="rounded-full bg-accent-tint px-2 py-0.5 text-[11px] font-semibold text-accent">turned in</span>;
     case "Missing":
-      return <span className="text-[11px] font-semibold text-[#8f2d2d]">missing · 0</span>;
+      return <span className="text-[11px] font-semibold text-danger">missing · 0</span>;
     case "NotDue":
       return <span className="text-[11px] text-ink-muted">not due</span>;
     case "NotSubmitted":
@@ -239,21 +240,12 @@ function Legend() {
       </span>
       <span className="rounded-full bg-accent-tint px-2 py-0.5 font-semibold text-accent">turned in</span>
       <span>waiting for your grade</span>
-      <span className="font-semibold text-[#8f2d2d]">missing · 0</span>
+      <span className="font-semibold text-danger">missing · 0</span>
       <span>past due</span>
     </div>
   );
 }
 
-function Stat({ label, value, note }: { label: string; value: ReactNode; note: string }) {
-  return (
-    <div className="border-b border-line px-4 py-3 md:border-b-0 md:border-r md:last:border-r-0">
-      <div className="text-xs text-ink-muted">{label}</div>
-      <div className="text-[22px] font-bold leading-tight">{value}</div>
-      <div className="text-[11px] text-ink-muted">{note}</div>
-    </div>
-  );
-}
 
 function round(value: number) {
   return Math.round(value * 10) / 10;

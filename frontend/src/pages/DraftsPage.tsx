@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Link, useParams, useSearchParams } from "react-router";
@@ -8,8 +8,10 @@ import { CodeBrowser, type CodeFocus } from "../components/CodeBrowser";
 import { CourseName } from "../components/Layout";
 import { keptMistakes, keptStrengths, ReportChip, ReportEditor } from "../components/ReportEditor";
 import { MistakeList, StrengthList } from "../components/SubmissionDetail";
-import { Avatar, Button, Card, Chip, EmptyState, ErrorPanel, PageHeader, Spinner } from "../components/ui";
+import { Avatar, Button, Card, Chip, EmptyState, ErrorPanel, PageHeader, Spinner, Stat, StatStrip } from "../components/ui";
 import { formatDate, initials } from "../format";
+import { ArrowLeft, ChevronRight, ClipboardList, ExternalLink, Gauge, Pencil, Sparkles, Trash2, Users } from "lucide-react";
+import { severityColor } from "../theme";
 
 export function DraftsPage() {
   const { courseId = "" } = useParams();
@@ -75,18 +77,18 @@ export function DraftsPage() {
   const average = scored.length > 0 ? scored.reduce((sum, d) => sum + (d.score! / d.maxScore!) * 100, 0) / scored.length : null;
 
   return (
-    <div className="flex flex-col gap-3 lg:h-[calc(100dvh-112px)] lg:min-h-[640px]">
+    <div className="flex flex-col gap-3 lg:h-[calc(100dvh-72px)] lg:min-h-[640px]">
       <PageHeader
         title="AI drafts"
         subtitle={
           <>
-            <CourseName courseId={courseId} /> · reviews drafted by the AI, saved for you to check; editing and approving come next
+            <CourseName courseId={courseId} /> · reviews drafted by the AI, saved for you to check, edit and approve
           </>
         }
         actions={
           !overview && (
-            <Button onClick={() => setSearchParams(new URLSearchParams())} title="Back to choosing an assignment or a student">
-              ← Overview
+            <Button icon={<ArrowLeft />} onClick={() => setSearchParams(new URLSearchParams())} title="Back to choosing an assignment or a student">
+              Overview
             </Button>
           )
         }
@@ -97,7 +99,7 @@ export function DraftsPage() {
 
       {everything.data && allDrafts.length === 0 && (
         <Card className="flex flex-1 items-center justify-center">
-          <EmptyState>
+          <EmptyState icon={<Sparkles />}>
             <div className="font-semibold text-ink">No drafts yet</div>
             Open an assignment and use "Grade with AI" on a student; every grading is saved here as a draft.
           </EmptyState>
@@ -106,12 +108,12 @@ export function DraftsPage() {
 
       {allDrafts.length > 0 && (
         <>
-          <div className="grid shrink-0 grid-cols-2 border-t border-line md:grid-cols-4">
-            <Stat label="Drafts" value={allDrafts.length} note="waiting for your review" />
-            <Stat label="Assignments" value={assignmentOptions.length} note="with drafts" />
-            <Stat label="Students" value={studentOptions.length} note="with drafts" />
-            <Stat label="Average AI score" value={average == null ? "–" : `${Math.round(average)}%`} note="of the maximum, before bonus" />
-          </div>
+          <StatStrip>
+            <Stat compact icon={<Sparkles />} label="Drafts" value={allDrafts.length} note="waiting for your review" />
+            <Stat compact icon={<ClipboardList />} label="Assignments" value={assignmentOptions.length} note="with drafts" />
+            <Stat compact icon={<Users />} label="Students" value={studentOptions.length} note="with drafts" />
+            <Stat compact icon={<Gauge />} label="Average AI score" value={average == null ? "–" : `${Math.round(average)}%`} note="of the maximum, before bonus" />
+          </StatStrip>
 
           {overview ? (
             <DraftsOverview
@@ -139,7 +141,7 @@ export function DraftsPage() {
                       value={assignmentId ?? ""}
                       onChange={(e) => setParam("assignment", e.target.value || undefined)}
                       aria-label="Filter by assignment"
-                      className="h-8 cursor-pointer rounded-lg border border-line bg-white px-1.5 text-xs font-semibold hover:border-accent"
+                      className="field px-1.5 font-medium"
                     >
                       <option value="">All their assignments</option>
                       {assignmentOptions
@@ -157,7 +159,7 @@ export function DraftsPage() {
                       value=""
                       onChange={(e) => setParam("assignment", e.target.value || undefined)}
                       aria-label="Filter by assignment"
-                      className="h-8 cursor-pointer rounded-lg border border-line bg-white px-1.5 text-xs font-semibold hover:border-accent"
+                      className="field px-1.5 font-medium"
                     >
                       <option value="">All assignments</option>
                       {assignmentOptions.map((a) => (
@@ -170,7 +172,7 @@ export function DraftsPage() {
                       value=""
                       onChange={(e) => setParam("student", e.target.value || undefined)}
                       aria-label="Filter by student"
-                      className="h-8 cursor-pointer rounded-lg border border-line bg-white px-1.5 text-xs font-semibold hover:border-accent"
+                      className="field px-1.5 font-medium"
                     >
                       <option value="">All students</option>
                       {studentOptions.map((x) => (
@@ -186,7 +188,7 @@ export function DraftsPage() {
                     {rows.length} {rows.length === 1 ? "draft" : "drafts"} shown
                   </span>
                   <label className="flex shrink-0 cursor-pointer items-center gap-1.5 text-xs text-ink-muted">
-                    <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} className="accent-[#2f5e4e]" />
+                    <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} className="accent-accent" />
                     Earlier & discarded
                   </label>
                 </div>
@@ -319,7 +321,7 @@ function OverviewCard({
       <ul className="min-h-0 flex-1 divide-y divide-paper-dark overflow-y-auto">
         {rows.map((row) => (
           <li key={row.id}>
-            <button onClick={row.onOpen} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-paper/60">
+            <button onClick={row.onOpen} className="group flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-paper">
               {avatars && <Avatar text={initials(row.label)} userId={row.id} />}
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-semibold">{row.label}</span>
@@ -329,17 +331,17 @@ function OverviewCard({
                 </span>
               </span>
               <span className="hidden shrink-0 text-right sm:block">
-                <b className="block tabular-nums">{row.summary.average == null ? "–" : `${Math.round(row.summary.average)}%`}</b>
+                <b className="num block text-[13px]">{row.summary.average == null ? "–" : `${Math.round(row.summary.average)}%`}</b>
                 <span className="text-[11px] text-ink-muted">avg AI score</span>
               </span>
               <span className="flex w-20 shrink-0 flex-col items-end">
-                <b className="tabular-nums">{row.summary.count}</b>
+                <b className="num text-[13px]">{row.summary.count}</b>
                 <span className="text-[11px] text-ink-muted">
                   {row.summary.count === 1 ? "draft" : "drafts"}
                   {row.summary.major > 0 && ` · ${row.summary.major} major`}
                 </span>
               </span>
-              <span className="shrink-0 text-ink-muted">›</span>
+              <ChevronRight className="h-4 w-4 shrink-0 text-ink-faint transition-transform group-hover:translate-x-0.5 group-hover:text-accent" />
             </button>
           </li>
         ))}
@@ -412,7 +414,7 @@ function DraftRow({
         onClick={onOpen}
         aria-current={selected}
         className={`flex w-full items-start gap-2.5 border-l-[3px] py-2.5 pl-3 pr-3 text-left ${
-          selected ? "border-l-accent bg-accent-tint/60" : "border-l-transparent hover:bg-paper/60"
+          selected ? "border-l-accent bg-accent-tint/60" : "border-l-transparent hover:bg-paper"
         } ${draft.status === "Discarded" ? "text-ink-muted" : ""}`}
       >
         {!leadWithAssignment && <Avatar text={initials(draft.studentName)} userId={draft.studentId} />}
@@ -430,9 +432,9 @@ function DraftRow({
           {draft.status === "Discarded" ? (
             <Chip tone="muted">Discarded</Chip>
           ) : draft.reportStatus === "Approved" ? (
-            <Chip tone="accent">Approved</Chip>
+            <Chip tone="success">Approved</Chip>
           ) : draft.reportStatus === "InReview" ? (
-            <Chip tone="ink">In review</Chip>
+            <Chip tone="mark">In review</Chip>
           ) : (
             !draft.current && <Chip tone="dashed">Earlier</Chip>
           )}
@@ -474,46 +476,39 @@ function DraftDetail({
 
   return (
     <section className="@container flex min-h-0 min-w-0 flex-1 flex-col">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-white px-4 py-3 sm:px-5">
-        <button onClick={onBack} className="w-full text-left text-xs font-semibold text-accent @2xl/workspace:hidden">
-          ← All drafts
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-white px-4 py-2.5 sm:px-5">
+        <button onClick={onBack} className="flex w-full items-center gap-1 text-left text-xs font-semibold text-accent @2xl/workspace:hidden">
+          <ArrowLeft className="h-3.5 w-3.5" /> All drafts
         </button>
         <div className="flex min-w-0 items-center gap-3">
-          <Avatar text={initials(draft.studentName)} userId={draft.studentId} />
+          <Avatar text={initials(draft.studentName)} userId={draft.studentId} size="lg" />
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <b className="truncate text-[15px]">{draft.studentName}</b>
+              <b className="truncate font-display text-[19px] font-semibold leading-tight">{draft.studentName}</b>
               {draft.status === "Discarded" ? (
                 <Chip tone="muted">Discarded</Chip>
               ) : draft.current ? (
-                <Chip tone="tint">Current draft</Chip>
+                <Chip tone="info">Current draft</Chip>
               ) : (
                 <Chip tone="dashed">Earlier draft</Chip>
               )}
               {report && <ReportChip report={report} />}
             </div>
             <div className="truncate text-xs text-ink-muted">
-              {assignmentTitle} · v{draft.versionNumber} · saved {formatDate(draft.createdAt)} · {draft.model}
+              {assignmentTitle} · <span className="font-mono text-[11px]">v{draft.versionNumber}</span> · saved {formatDate(draft.createdAt)} ·{" "}
+              <span className="font-mono text-[11px]">{draft.model}</span>
             </div>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-lg">
+          <span className="mr-1 [&_b]:text-[20px] [&_span]:text-[13px]">
             <Score draft={showReport ? { score: report.score, maxScore: draft.maxScore, bonus: report.bonus } : draft} />
           </span>
-          {draft.status === "Draft" && grading && (
-            <Button
-              small
-              variant={report?.status === "Approved" ? "outline" : "primary"}
-              onClick={() => setEditing(true)}
-              title="Correct the score, feedback and mistakes; saved as your report, the AI draft stays as it was"
-            >
-              {report ? "Edit report" : "Edit draft"}
-            </Button>
-          )}
           {draft.status === "Draft" && report == null && (
             <Button
               small
+              variant="ghost"
+              icon={<Trash2 />}
               onClick={() => discard.mutate(draft.id)}
               disabled={discard.isPending}
               title="Throw this draft away; it stays in the history"
@@ -522,10 +517,21 @@ function DraftDetail({
             </Button>
           )}
           <Link to={workspace}>
-            <Button small variant="dark" title="Open the student in the assignment workspace (files, versions, grade again)">
-              Open in assignment →
+            <Button small icon={<ExternalLink />} title="Open the student in the assignment workspace (files, versions, grade again)">
+              Open in assignment
             </Button>
           </Link>
+          {draft.status === "Draft" && grading && (
+            <Button
+              small
+              icon={<Pencil />}
+              variant={report?.status === "Approved" ? "outline" : "primary"}
+              onClick={() => setEditing(true)}
+              title="Correct the score, feedback and mistakes; saved as your report, the AI draft stays as it was"
+            >
+              {report ? "Edit report" : "Review & approve"}
+            </Button>
+          )}
         </div>
       </header>
 
@@ -540,7 +546,7 @@ function DraftDetail({
                 onClick={() => setTab(key)}
                 aria-pressed={tab === key}
                 className={`-mb-px border-b-2 px-3 py-2 text-xs font-semibold ${
-                  tab === key ? "border-accent text-ink" : "border-transparent text-ink-muted hover:text-ink"
+                  tab === key ? "border-accent text-accent-strong" : "border-transparent text-ink-muted hover:text-ink"
                 }`}
               >
                 {key === "review" ? `Review · ${mistakes.length} mistakes` : "Code"}
@@ -549,14 +555,14 @@ function DraftDetail({
           </nav>
 
           <div
-            className={`min-h-0 overflow-y-auto @4xl:block @4xl:w-[44%] @4xl:max-w-[560px] @4xl:flex-none @4xl:border-r @4xl:border-line ${
+            className={`min-h-0 overflow-y-auto bg-paper/60 @4xl:block @4xl:w-[44%] @4xl:max-w-[560px] @4xl:flex-none @4xl:border-r @4xl:border-line ${
               tab === "review" ? "block flex-1" : "hidden"
             }`}
           >
             <div className="flex flex-col gap-4 p-4 sm:p-5">
               {report && (
                 <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <h3 className="text-[11px] font-bold uppercase tracking-[0.06em] text-accent">
+                  <h3 className="eyebrow">
                     {showReport ? "Your report" : "AI draft"}
                   </h3>
                   <span className="text-ink-muted">
@@ -571,7 +577,7 @@ function DraftDetail({
                   </button>
                 </div>
               )}
-              <div className="markdown rounded-[10px] border border-line bg-white px-5 py-4">
+              <div className="markdown surface px-5 py-4">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{showReport ? report.review : grading.review}</ReactMarkdown>
               </div>
               <MistakeList
@@ -611,7 +617,7 @@ function DraftDetail({
             </div>
           </div>
 
-          <div className={`min-h-0 min-w-0 flex-1 flex-col p-2 sm:p-4 @4xl:flex ${tab === "code" ? "flex" : "hidden"}`}>
+          <div className={`min-h-0 min-w-0 flex-1 flex-col p-2 sm:p-3 @4xl:flex ${tab === "code" ? "flex" : "hidden"}`}>
             <CodeBrowser versionId={draft.versionId} className="h-full" mistakes={mistakes} strengths={strengths} focus={focus} />
           </div>
         </div>
@@ -637,15 +643,15 @@ function Score({ draft }: { draft: Pick<AssignmentGrading, "score" | "maxScore" 
   }
 
   return (
-    <span className="whitespace-nowrap tabular-nums">
-      <b>{points(draft.score)}</b>
-      <span className="text-ink-muted"> / {draft.maxScore ?? "–"}</span>
-      {draft.bonus ? <span className="text-xs text-ink-muted"> +{points(draft.bonus)}</span> : null}
+    <span className="whitespace-nowrap font-mono text-[12px]">
+      <b className="font-semibold">{points(draft.score)}</b>
+      <span className="text-ink-faint">/{draft.maxScore ?? "–"}</span>
+      {draft.bonus ? <span className="font-semibold text-success"> +{points(draft.bonus)}</span> : null}
     </span>
   );
 }
 
-const severityDot: Record<"major" | "minor" | "style", string> = { major: "#dc2626", minor: "#d97706", style: "#64748b" };
+const severityDot: Record<"major" | "minor" | "style", string> = { major: severityColor.Major, minor: severityColor.Minor, style: severityColor.Style };
 
 function SeverityCounts({ draft }: { draft: AssignmentGrading }) {
   const parts = (["major", "minor", "style"] as const).filter((key) => draft[key] > 0);
@@ -665,17 +671,6 @@ function SeverityCounts({ draft }: { draft: AssignmentGrading }) {
   );
 }
 
-function Stat({ label, value, note }: { label: string; value: ReactNode; note: string }) {
-  return (
-    <div className="min-w-0 border-line px-3 py-2.5 even:border-l [&:nth-child(n+3)]:border-t sm:px-4 md:[&:nth-child(n+3)]:border-t-0 md:[&:not(:first-child)]:border-l">
-      <div className="text-xs text-ink-muted">{label}</div>
-      <div className="flex items-baseline gap-2">
-        <b className="whitespace-nowrap text-[22px] leading-tight tracking-tight">{value}</b>
-        <span className="truncate text-[11px] font-semibold text-accent">{note}</span>
-      </div>
-    </div>
-  );
-}
 
 function countBy<T>(items: T[], key: (item: T) => string): Map<string, number> {
   const counts = new Map<string, number>();

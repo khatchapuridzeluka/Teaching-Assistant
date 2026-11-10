@@ -13,10 +13,10 @@ export function StrengthsCard({ courseId, userId }: { courseId: string; userId: 
   const link = `/courses/${courseId}/students/${userId}/strengths`;
 
   return (
-    <section className="rounded-[10px] border border-line bg-white">
+    <section className="surface">
       <div className="flex items-start justify-between gap-2 border-b border-line px-4 py-2.5">
         <div>
-          <b className="text-xs">Strengths</b>
+          <h3 className="text-[13px] font-semibold">Strengths</h3>
           <div className="text-[11px] text-ink-muted">From approved reports · shown in most assignments first</div>
         </div>
         {categories.length > 0 && (
@@ -52,12 +52,12 @@ function StrengthCategoryRow({ category, most }: { category: StrengthCategoryInf
       <div className="flex items-center justify-between gap-2 text-xs">
         <b>{categoryLabels[category.category] ?? category.category}</b>
         <span className="flex items-center gap-1.5">
-          {category.improvedSinceAssignmentTitle && <Chip tone="accent">Improved</Chip>}
-          {category.consistent && <Chip tone="ink">Consistent</Chip>}
+          {category.improvedSinceAssignmentTitle && <Chip tone="success">Improved</Chip>}
+          {category.consistent && <Chip tone="info">Consistent</Chip>}
         </span>
       </div>
       <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-paper-dark" aria-hidden>
-        <div className="h-full rounded-full" style={{ width: `${(category.count / most) * 100}%`, backgroundColor: strengthColor }} />
+        <div className="bar-fill h-full rounded-full" style={{ width: `${(category.count / most) * 100}%`, backgroundColor: strengthColor }} />
       </div>
       <div className="mt-1 text-[11px] text-ink-muted">
         {category.count} {category.count === 1 ? "strength" : "strengths"} in {category.assignments}{" "}
@@ -94,12 +94,12 @@ export function StrengthRow({ strength }: { strength: StudentStrengthInfo }) {
 function StrengthLabelChip({ strength }: { strength: StudentStrengthInfo }) {
   const since = strength.sinceAssignmentTitle;
   if (strength.label === "Improved") {
-    return <Chip tone="accent">Improved{since ? ` · mistakes in ${since}` : ""}</Chip>;
+    return <Chip tone="success">Improved{since ? ` · mistakes in ${since}` : ""}</Chip>;
   }
   if (strength.label === "Consistent") {
-    return <Chip tone="ink">Consistent{since ? ` · since ${since}` : ""}</Chip>;
+    return <Chip tone="info">Consistent{since ? ` · since ${since}` : ""}</Chip>;
   }
-  return <Chip tone="tint">New</Chip>;
+  return <Chip tone="outline">New</Chip>;
 }
 
 export function summarize(data: StudentStrengths): string {

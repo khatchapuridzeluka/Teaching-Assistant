@@ -22,10 +22,10 @@ export function MistakeCategoriesCard({ courseId, userId }: { courseId: string; 
   const most = Math.max(1, ...categories.map((c) => c.count));
 
   return (
-    <section className="rounded-[10px] border border-line bg-white">
+    <section className="surface">
       <div className="flex items-start justify-between gap-2 border-b border-line px-4 py-2.5">
         <div>
-          <b className="text-xs">Mistake categories</b>
+          <h3 className="text-[13px] font-semibold">Mistake categories</h3>
           <div className="text-[11px] text-ink-muted">From approved reports · most points lost first</div>
         </div>
         {categories.length > 0 && (
@@ -57,12 +57,12 @@ function CategoryRow({ category, most }: { category: MistakeCategoryInfo; most: 
       <div className="flex items-center justify-between gap-2 text-xs">
         <b>{categoryLabels[category.category] ?? category.category}</b>
         <span className="flex items-center gap-1.5">
-          {category.repeated && <Chip tone="ink">Repeated</Chip>}
-          {category.pointsLost > 0 && <b className="tabular-nums text-[#8f2d2d]">−{round(category.pointsLost)}</b>}
+          {category.repeated && <Chip tone="warn">Repeated</Chip>}
+          {category.pointsLost > 0 && <b className="rounded bg-danger-tint px-1 font-mono text-[11px] text-danger-ink">−{round(category.pointsLost)}</b>}
         </span>
       </div>
       <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-paper-dark" aria-hidden>
-        <div className="h-full rounded-full bg-accent" style={{ width: `${(category.count / most) * 100}%` }} />
+        <div className="bar-fill h-full rounded-full bg-ink-muted/55" style={{ width: `${(category.count / most) * 100}%` }} />
       </div>
       <div className="mt-1 text-[11px] text-ink-muted">
         {category.count} {category.count === 1 ? "mistake" : "mistakes"} in {category.assignments}{" "}
@@ -80,9 +80,9 @@ export function MistakeHistoryCard({ courseId, userId }: { courseId: string; use
   const repeated = list.filter((m) => m.label === "Repeated").length;
 
   return (
-    <section className="rounded-[10px] border border-line bg-white">
+    <section className="surface">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-2.5">
-        <b className="text-xs">Mistake history</b>
+        <h3 className="text-[13px] font-semibold">Mistake history</h3>
         <span className="flex items-center gap-3 text-[11px] text-ink-muted">
           {list.length > 0
             ? `${list.length} from approved reports · ${repeated} repeated from an earlier assignment`
@@ -122,13 +122,13 @@ export function MistakeRow({ mistake }: { mistake: StudentMistakeInfo }) {
       <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: severityColor[mistake.severity] }} />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-          <b>{mistake.severity}</b>
+          <b style={{ color: severityColor[mistake.severity] }}>{mistake.severity}</b>
           <span className="text-ink-muted">{categoryLabels[mistake.category] ?? mistake.category}</span>
-          {mistake.points != null && mistake.points > 0 && <b className="text-[#8f2d2d]">−{round(mistake.points)}</b>}
+          {mistake.points != null && mistake.points > 0 && <b className="rounded bg-danger-tint px-1 font-mono text-[11px] text-danger-ink">−{round(mistake.points)}</b>}
           {mistake.label === "Repeated" ? (
-            <Chip tone="ink">Repeated{mistake.repeatedFromAssignmentTitle ? ` · since ${mistake.repeatedFromAssignmentTitle}` : ""}</Chip>
+            <Chip tone="warn">Repeated{mistake.repeatedFromAssignmentTitle ? ` · since ${mistake.repeatedFromAssignmentTitle}` : ""}</Chip>
           ) : (
-            <Chip tone="tint">New</Chip>
+            <Chip tone="info">New</Chip>
           )}
           {mistake.decision === "Edited" && <span className="text-[11px] text-ink-muted">edited by you</span>}
         </div>

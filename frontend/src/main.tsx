@@ -11,7 +11,7 @@ import { AssignmentsPage } from "./pages/AssignmentsPage";
 import { ComingSoonPage } from "./pages/ComingSoonPage";
 import { CourseOverviewPage } from "./pages/CourseOverviewPage";
 import { CommonMistakesPage } from "./pages/CommonMistakesPage";
-import { CoursesPage } from "./pages/CoursesPage";
+import { HomePage } from "./pages/HomePage";
 import { DraftsPage } from "./pages/DraftsPage";
 import { GradebookPage } from "./pages/GradebookPage";
 import { InstructionsPage } from "./pages/InstructionsPage";
@@ -31,9 +31,9 @@ const queryClient = new QueryClient({
 const router = createBrowserRouter([
   {
     element: <Layout />,
-    handle: { crumbs: () => [{ label: "Courses", to: "/" }] } satisfies CrumbHandle,
+    handle: { crumbs: () => [{ label: "Home", to: "/" }] } satisfies CrumbHandle,
     children: [
-      { path: "/", element: <CoursesPage /> },
+      { path: "/", element: <HomePage /> },
       {
         path: "/courses/:courseId",
         handle: {

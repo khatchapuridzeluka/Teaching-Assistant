@@ -68,7 +68,7 @@ export function DocxView({ blob, className = "max-h-[720px]" }: { blob: UseQuery
   }
 
   return (
-    <div className={`overflow-auto rounded-[10px] border border-line bg-white ${className}`}>
+    <div className={`overflow-auto surface ${className}`}>
       {blob.isLoading && (
         <div className="px-4 py-3">
           <Spinner label="Loading document…" />

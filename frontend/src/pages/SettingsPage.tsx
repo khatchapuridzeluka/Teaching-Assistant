@@ -2,12 +2,13 @@ import { useState } from "react";
 import { useConnectGoogle, useDisconnectGoogle, useGoogleStatus, useModelHealth } from "../api/hooks";
 import type { GoogleStatus } from "../api/client";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { Cpu, Lock, Plug } from "lucide-react";
 import { Button, Card, CardHeader, Chip, type ChipTone, ErrorPanel, PageHeader, Spinner } from "../components/ui";
 
 export function SettingsPage() {
   return (
     <>
-      <PageHeader title="Connections" subtitle="Where submissions come from and which model drafts the grades." />
+      <PageHeader title="Settings" subtitle="Connections: where submissions come from and which model drafts the grades." />
       <div className="grid grid-cols-1 gap-[18px] lg:grid-cols-2">
         <GoogleConnection />
         <ModelHealth />
@@ -17,9 +18,9 @@ export function SettingsPage() {
 }
 
 const stateChip: Record<GoogleStatus["state"], { tone: ChipTone; label: string }> = {
-  Connected: { tone: "accent", label: "Connected" },
-  NotConnected: { tone: "outline", label: "Not connected" },
-  ReconnectRequired: { tone: "ink", label: "Reconnect required" },
+  Connected: { tone: "success", label: "Connected" },
+  NotConnected: { tone: "warn", label: "Not connected" },
+  ReconnectRequired: { tone: "warn", label: "Reconnect required" },
   NotConfigured: { tone: "muted", label: "Not configured" },
 };
 
@@ -41,6 +42,7 @@ function GoogleConnection() {
   return (
     <Card>
       <CardHeader
+        icon={<Plug />}
         title="Google Classroom"
         subtitle="Read-only access: the app can never publish grades."
         actions={state && <Chip tone={stateChip[state].tone}>{stateChip[state].label}</Chip>}
@@ -54,8 +56,11 @@ function GoogleConnection() {
           <ul className="flex flex-col">
             {status.data.grantedScopes.map((scope) => (
               <li key={scope} className="flex items-center justify-between border-b border-paper-dark py-1.5 text-xs last:border-b-0">
-                <span>{scopeNames[scope] ?? scope}</span>
-                <Chip tone="tint">read-only</Chip>
+                <span className="flex items-center gap-2">
+                  <Lock className="h-3.5 w-3.5 text-ink-faint" />
+                  {scopeNames[scope] ?? scope}
+                </span>
+                <Chip tone="muted">read-only</Chip>
               </li>
             ))}
           </ul>
@@ -110,14 +115,15 @@ function ModelHealth() {
   return (
     <Card>
       <CardHeader
+        icon={<Cpu />}
         title="Grading model"
         subtitle="Sends one short test prompt (uses a few tokens)."
-        actions={result && <Chip tone={result.healthy ? "accent" : "ink"}>{result.healthy ? `Healthy · ${result.latencyMs} ms` : "Unavailable"}</Chip>}
+        actions={result && <Chip tone={result.healthy ? "success" : "danger"}>{result.healthy ? `Healthy · ${result.latencyMs} ms` : "Unavailable"}</Chip>}
       />
       <div className="flex flex-col gap-3 px-[18px] py-3.5">
         {result && (
           <div className="flex flex-col text-xs">
-            <div className="flex justify-between py-1"><span>Model</span><b>{result.model}</b></div>
+            <div className="flex justify-between py-1"><span>Model</span><b className="font-mono">{result.model}</b></div>
             <div className="flex justify-between py-1"><span>Reply</span><b>{result.reply ?? "–"}</b></div>
             {result.error && <div className="pt-1 text-ink-muted">{result.error}</div>}
           </div>

@@ -1,61 +1,295 @@
 @import "tailwindcss";
-@import "@fontsource-variable/inter";
+@import "@fontsource/firago/400.css";
+@import "@fontsource/firago/400-italic.css";
+@import "@fontsource/firago/500.css";
+@import "@fontsource/firago/600.css";
+@import "@fontsource/firago/700.css";
+@import "@fontsource-variable/noto-sans-georgian";
+@import "@fontsource-variable/jetbrains-mono";
 
+/*
+  Design language: a marking desk. Navy ink, cobalt for what you can act on, highlighter yellow for what waits for
+  you, red pen for mistakes, a green tick for what is done. FiraGO for all text, titles and numbers (Noto Sans
+  Georgian covers Georgian), JetBrains Mono only for code, file names and keys.
+*/
 @theme {
-  --font-sans: "Inter Variable", "Segoe UI", system-ui, sans-serif;
-  --font-mono: Consolas, "Courier New", monospace;
+  --font-sans: "FiraGO", "Noto Sans Georgian Variable", "Segoe UI", system-ui, sans-serif;
+  --font-display: "FiraGO", "Noto Sans Georgian Variable", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", Consolas, "Courier New", monospace;
 
-  --color-ink: #1f2326;
-  --color-ink-muted: #6b6e70;
-  --color-ink-soft: #3a3f43;
-  --color-paper: #f3f1ec;
-  --color-paper-dark: #edebe7;
-  --color-line: #dedcd7;
-  --color-accent: #2f5e4e;
-  --color-accent-tint: #e4ece8;
+  --color-ink: #16203a;
+  --color-ink-soft: #2b3757;
+  --color-ink-muted: #5d6985;
+  --color-ink-faint: #8f99b1;
+  --color-paper: #f4f5f9;
+  --color-paper-dark: #e9ecf3;
+  --color-line: #dcdfea;
+
+  --color-accent: #1857d6;
+  --color-accent-strong: #1146b4;
+  --color-accent-tint: #e7eeff;
+
+  --color-navy: #0f1a36;
+  --color-navy-soft: #1c2a4f;
+  --color-navy-line: #2a3960;
+
+  --color-mark: #ffd23f;
+  --color-mark-tint: #fff3c2;
+  --color-mark-ink: #6b4700;
+
+  --color-danger: #cf3a2b;
+  --color-danger-tint: #ffe7e2;
+  --color-danger-ink: #9c2318;
+
+  --color-success: #1c8a4e;
+  --color-success-tint: #dcf5e6;
+  --color-success-ink: #0f5d33;
+
+  --color-warn: #d98200;
+  --color-warn-tint: #ffefcc;
+  --color-warn-ink: #7a4a00;
+
+  --shadow-card: 0 1px 2px rgb(22 32 58 / 0.05);
+  --shadow-raised: 0 6px 16px -6px rgb(15 26 54 / 0.18), 0 1px 3px rgb(15 26 54 / 0.06);
+  --shadow-pop: 0 24px 60px -16px rgb(15 26 54 / 0.38), 0 4px 12px rgb(15 26 54 / 0.1);
+
+  --animate-rise: rise 460ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  --animate-fade: fade 220ms ease-out backwards;
+  --animate-pop: pop 260ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+  --animate-sheet: sheet 280ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  --animate-slide-left: slide-left 300ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  --animate-slide-right: slide-right 280ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  --animate-grow: grow 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-stamp: stamp 420ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
 }
 
-body {
-  @apply bg-paper font-sans text-[13px] leading-normal text-ink antialiased;
+@keyframes rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
-
-.markdown > * + * { @apply mt-2; }
-.markdown ul { @apply list-disc pl-5; }
-.markdown ol { @apply list-decimal pl-5; }
-.markdown li + li { @apply mt-0.5; }
-.markdown h1, .markdown h2, .markdown h3 { @apply text-[13px] font-bold; }
-.markdown strong { @apply font-bold; }
-.markdown a { @apply text-accent underline; }
-.markdown code { @apply rounded bg-white px-1 py-0.5 font-mono text-[12px]; }
-.markdown pre { @apply overflow-x-auto rounded-lg bg-ink p-3 text-[12px] text-white; }
-.markdown pre code { @apply bg-transparent p-0 text-white; }
-.markdown table { @apply block max-w-full overflow-x-auto border-collapse text-[12px]; }
-.markdown th, .markdown td { @apply border border-line px-2 py-1 text-left; }
-.markdown blockquote { @apply border-l-2 border-line pl-3 text-ink-muted; }
-
+@keyframes fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes pop {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes sheet {
+  from { opacity: 0; transform: translateY(14px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes slide-left {
+  from { transform: translateX(28px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes slide-right {
+  from { transform: translateX(-24px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes grow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+@keyframes grow-y {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+@keyframes stamp {
+  0% { opacity: 0; transform: scale(1.6) rotate(-8deg); }
+  60% { opacity: 1; transform: scale(0.96) rotate(1deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0); }
+}
+@keyframes pulse-dot {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(24 87 214 / 0.45); }
+  50% { box-shadow: 0 0 0 5px rgb(24 87 214 / 0); }
+}
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
 @keyframes toast-in {
   from { opacity: 0; transform: translateY(-12px) scale(0.98); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
-
 @keyframes toast-out {
   from { opacity: 1; transform: translateY(0) scale(1); }
   to { opacity: 0; transform: translateY(-12px) scale(0.98); }
 }
 
-.toast-enter { animation: toast-in 380ms cubic-bezier(0.22, 1, 0.36, 1) both; }
-.toast-leave { animation: toast-out 300ms ease-in both; }
+@layer base {
+  html {
+    color-scheme: light;
+  }
 
-@media (prefers-reduced-motion: reduce) {
-  .toast-enter, .toast-leave { animation-duration: 1ms; }
+  body {
+    @apply bg-paper font-sans text-[13px] leading-normal text-ink antialiased;
+    /* Squared-notebook dots: atmosphere without a gradient. */
+    background-image: radial-gradient(circle at 1px 1px, rgb(22 32 58 / 0.075) 1px, transparent 0);
+    background-size: 22px 22px;
+    font-feature-settings: "tnum" 0, "ss01" 0;
+  }
+
+  ::selection {
+    background: var(--color-mark);
+    color: var(--color-ink);
+  }
+
+  button:not(:disabled),
+  select:not(:disabled),
+  summary,
+  [role="tab"] {
+    cursor: pointer;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    outline-offset: 0;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(93 105 133 / 0.35) transparent;
+  }
+
+  .font-mono,
+  code,
+  pre {
+    font-variant-ligatures: none;
+  }
 }
 
+/* ---------- Small shared pieces ---------- */
+
+@utility eyebrow {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--color-ink-muted);
+}
+
+@utility num {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+@utility field {
+  height: 32px;
+  border-radius: 7px;
+  border: 1px solid var(--color-line);
+  background: #fff;
+  padding-inline: 10px;
+  font-size: 12px;
+  color: var(--color-ink);
+  transition: border-color 120ms, box-shadow 120ms;
+  &:hover {
+    border-color: var(--color-ink-faint);
+  }
+  &:focus,
+  &:focus-visible {
+    outline: none;
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 3px rgb(24 87 214 / 0.16);
+  }
+}
+
+@utility surface {
+  border-radius: 10px;
+  border: 1px solid var(--color-line);
+  background: #fff;
+  box-shadow: var(--shadow-card);
+}
+
+@layer components {
+  /* Each direct child of a page fades up a moment after the one before it. */
+  .stagger > * {
+    animation: rise 460ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+  .stagger > *:nth-child(1) { animation-delay: 0ms; }
+  .stagger > *:nth-child(2) { animation-delay: 50ms; }
+  .stagger > *:nth-child(3) { animation-delay: 100ms; }
+  .stagger > *:nth-child(4) { animation-delay: 150ms; }
+  .stagger > *:nth-child(5) { animation-delay: 200ms; }
+  .stagger > *:nth-child(6) { animation-delay: 250ms; }
+  .stagger > *:nth-child(n + 7) { animation-delay: 300ms; }
+
+  .modal-overlay {
+    background: rgb(15 26 54 / 0.46);
+    backdrop-filter: blur(3px);
+    animation: fade 180ms ease-out backwards;
+  }
+  .modal-panel {
+    animation: sheet 280ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+    box-shadow: var(--shadow-pop);
+  }
+
+  .live-dot {
+    animation: pulse-dot 1.6s ease-in-out infinite;
+  }
+
+  .skeleton {
+    border-radius: 6px;
+    background: linear-gradient(90deg, var(--color-paper-dark) 25%, #f6f7fb 50%, var(--color-paper-dark) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s linear infinite;
+  }
+
+  .bar-fill {
+    transform-origin: left center;
+    animation: grow 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .toast-enter { animation: toast-in 380ms cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+  .toast-leave { animation: toast-out 300ms ease-in both; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 1ms !important;
+  }
+}
+
+@layer components {
+  /* ---------- Markdown (AI reviews, agent replies) ---------- */
+
+  .markdown > * + * { @apply mt-2.5; }
+  .markdown ul { @apply list-disc pl-5; }
+  .markdown ol { @apply list-decimal pl-5; }
+  .markdown li + li { @apply mt-0.5; }
+  .markdown li::marker { color: var(--color-ink-faint); }
+  .markdown h1, .markdown h2, .markdown h3 { @apply font-display text-[16px] font-semibold leading-snug; }
+  .markdown h1:not(:first-child), .markdown h2:not(:first-child), .markdown h3:not(:first-child) { @apply mt-4; }
+  .markdown strong { @apply font-semibold; }
+  .markdown a { @apply text-accent underline; }
+  .markdown code { @apply rounded bg-paper-dark px-1 py-0.5 font-mono text-[11.5px] text-ink-soft; }
+  .markdown pre { @apply overflow-x-auto rounded-lg bg-navy p-3 text-[12px] text-white; }
+  .markdown pre code { @apply bg-transparent p-0 text-white; }
+  .markdown table { @apply block max-w-full overflow-x-auto border-collapse text-[12px]; }
+  .markdown th, .markdown td { @apply border border-line px-2.5 py-1.5 text-left align-top; }
+  .markdown th { @apply bg-paper font-semibold; }
+  .markdown blockquote { @apply border-l-2 border-mark pl-3 text-ink-muted; }
+  .markdown hr { @apply border-line; }
+}
+
+/* ---------- Code viewer marks ---------- */
+
 .mistake-glyph { cursor: pointer; }
-.mistake-glyph-Major { background: radial-gradient(circle, #dc2626 0 4px, transparent 4.5px); }
-.mistake-glyph-Minor { background: radial-gradient(circle, #d97706 0 4px, transparent 4.5px); }
-.mistake-glyph-Style { background: radial-gradient(circle, #64748b 0 4px, transparent 4.5px); }
-.mistake-line-Major { background: rgb(220 38 38 / 0.08); }
-.mistake-line-Minor { background: rgb(217 119 6 / 0.08); }
-.mistake-line-Style { background: rgb(100 116 139 / 0.08); }
-.strength-glyph { cursor: pointer; background: radial-gradient(circle, #15803d 0 4px, transparent 4.5px); }
-.strength-line { background: rgb(21 128 61 / 0.08); }
+.mistake-glyph-Major { background: radial-gradient(circle, #cf3a2b 0 4px, transparent 4.5px); }
+.mistake-glyph-Minor { background: radial-gradient(circle, #e0921a 0 4px, transparent 4.5px); }
+.mistake-glyph-Style { background: radial-gradient(circle, #8391ad 0 4px, transparent 4.5px); }
+.mistake-line-Major { background: rgb(207 58 43 / 0.09); }
+.mistake-line-Minor { background: rgb(224 146 26 / 0.11); }
+.mistake-line-Style { background: rgb(131 145 173 / 0.11); }
+.strength-glyph { cursor: pointer; background: radial-gradient(circle, #1c8a4e 0 4px, transparent 4.5px); }
+.strength-line { background: rgb(28 138 78 / 0.09); }

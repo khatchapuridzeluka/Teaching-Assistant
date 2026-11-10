@@ -11,9 +11,9 @@ const isPdf = (file: StoredFile) => file.mimeType === "application/pdf" || file.
 const isDocx = (file: StoredFile) => file.mimeType === docxMimeType || file.name.toLowerCase().endsWith(".docx");
 
 const versionChip: Record<string, { tone: ChipTone; label: string }> = {
-  Ready: { tone: "tint", label: "All files stored" },
-  PartiallySupported: { tone: "outline", label: "Some files not stored" },
-  Failed: { tone: "ink", label: "Nothing stored" },
+  Ready: { tone: "success", label: "All files stored" },
+  PartiallySupported: { tone: "warn", label: "Some files not stored" },
+  Failed: { tone: "danger", label: "Nothing stored" },
 };
 
 export function PreviewPanel({
@@ -49,10 +49,10 @@ export function PreviewPanel({
 
   return (
     <div className="fixed inset-0 z-40 flex">
-      <aside className="flex h-full w-full flex-col bg-paper">
+      <aside className="flex h-full w-full animate-fade flex-col bg-paper">
         <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-line bg-white px-4 py-3 sm:px-6 sm:py-4">
           <div className="min-w-0">
-            <div className="truncate text-[15px] font-bold">{submission.studentName}</div>
+            <div className="truncate font-display text-[19px] font-semibold leading-tight">{submission.studentName}</div>
             <div className="text-xs text-ink-muted">
               Fetched {formatDate(version.fetchedAt)} · turned in {formatDate(version.turnedInAt)} · our stored copy
             </div>
@@ -64,7 +64,7 @@ export function PreviewPanel({
                 key={v.id}
                 onClick={() => setVersionId(v.id)}
                 className={`h-7 rounded-lg border px-2.5 text-xs font-semibold ${
-                  v.id === version.id ? "border-ink bg-ink text-white" : "border-line bg-white hover:bg-paper"
+                  v.id === version.id ? "border-navy bg-navy text-white" : "border-line bg-white hover:bg-paper"
                 }`}
               >
                 v{v.number}
@@ -95,7 +95,7 @@ export function PreviewPanel({
                     <button
                       key={file.id}
                       onClick={() => setEnlarged(file)}
-                      className="group overflow-hidden rounded-[10px] border border-line bg-white text-left hover:border-accent"
+                      className="group overflow-hidden surface text-left hover:border-accent"
                     >
                       <img src={storedFileUrl(file.id)} alt={file.name} loading="lazy" className="h-40 w-full bg-paper-dark object-contain" />
                       <div className="truncate border-t border-line px-2.5 py-1.5 text-xs font-semibold">{file.name}</div>
@@ -107,7 +107,7 @@ export function PreviewPanel({
 
             {pdfs.map((file) => (
               <Section key={file.id} title={file.name} action={<DownloadLink file={file} />}>
-                <iframe src={storedFileUrl(file.id)} title={file.name} className="h-[70dvh] w-full rounded-[10px] border border-line bg-white sm:h-[640px]" />
+                <iframe src={storedFileUrl(file.id)} title={file.name} className="h-[70dvh] w-full surface sm:h-[640px]" />
               </Section>
             ))}
 
@@ -119,7 +119,7 @@ export function PreviewPanel({
 
             {others.length > 0 && (
               <Section title="Other files">
-                <ul className="flex flex-col divide-y divide-paper-dark rounded-[10px] border border-line bg-white">
+                <ul className="flex flex-col divide-y divide-paper-dark surface">
                   {others.map((file) => (
                     <li key={file.id} className="flex items-center justify-between gap-4 px-4 py-2.5">
                       <div className="min-w-0">
@@ -154,7 +154,7 @@ export function PreviewPanel({
         <div className="fixed inset-0 z-50 flex flex-col bg-ink/90 p-6" onClick={(e) => (e.stopPropagation(), setEnlarged(null))}>
           <div className="mb-3 flex items-center justify-between text-white">
             <b className="truncate">{enlarged.name}</b>
-            <span className="text-xs text-[#a9abac]">Click anywhere or press Esc to close</span>
+            <span className="text-xs text-white/60">Click anywhere or press Esc to close</span>
           </div>
           <img src={storedFileUrl(enlarged.id)} alt={enlarged.name} className="min-h-0 flex-1 object-contain" />
         </div>
@@ -167,7 +167,7 @@ function Section({ title, action, children }: { title: string; action?: ReactNod
   return (
     <section>
       <div className="mb-2 flex items-center justify-between gap-4">
-        <h3 className="truncate text-[11px] font-bold uppercase tracking-[0.06em] text-accent">{title}</h3>
+        <h3 className="truncate eyebrow">{title}</h3>
         {action}
       </div>
       {children}

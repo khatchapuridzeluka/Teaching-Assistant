@@ -7,13 +7,13 @@ import { FilterChips } from "../components/FilterChips";
 import { CourseName } from "../components/Layout";
 import { StudentOverviewCard } from "../components/StudentOverview";
 import { categoryLabels, MistakeRow } from "../components/StudentMistakes";
-import { Avatar, Button, Card, CardHeader, EmptyState, ErrorPanel, PageHeader, Spinner } from "../components/ui";
+import { Avatar, Button, Card, CardHeader, EmptyState, ErrorPanel, PageHeader, Spinner, Stat, StatStrip } from "../components/ui";
 import { formatDay, initials } from "../format";
 
 const severityShades: Record<MistakeSeverity, string> = {
-  Major: "#1f4a3d",
-  Minor: "#4f8c76",
-  Style: "#a8d1c1",
+  Major: "#cf3a2b",
+  Minor: "#e0921a",
+  Style: "#8391ad",
 };
 
 const severities: MistakeSeverity[] = ["Major", "Minor", "Style"];
@@ -104,11 +104,11 @@ export function StudentMistakesPage() {
           />
           <Card className="flex flex-col gap-3 px-[18px] py-3">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="mr-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-muted">Assignment</span>
+              <span className="mr-1 eyebrow">Assignment</span>
               <select
                 value={filter.assignmentId ?? ""}
                 onChange={(e) => setFilter("assignment", e.target.value || undefined)}
-                className="h-8 rounded-lg border border-line bg-white px-2 text-xs"
+                className="field"
               >
                 <option value="">All assignments</option>
                 {data.assignmentOptions.map((a) => (
@@ -150,7 +150,7 @@ export function StudentMistakesPage() {
             />
           </Card>
 
-          <div className="grid grid-cols-2 border-t border-line md:grid-cols-3 xl:grid-cols-6">
+          <StatStrip columns={6}>
             <Stat label="Mistakes" value={data.total} note={filtered ? `of ${data.recorded} recorded` : "recorded"} />
             <Stat
               label="Points lost · Classroom"
@@ -165,7 +165,7 @@ export function StudentMistakesPage() {
             <Stat label="Major" value={major ? `${round(major.percent)}%` : "–"} note={`${major?.count ?? 0} of ${data.total}`} />
             <Stat label="Repeated" value={repeated ? `${round(repeated.percent)}%` : "–"} note="same category, earlier assignment" />
             <Stat label="Categories" value={data.categories.length} note="with at least one mistake" />
-          </div>
+          </StatStrip>
 
           <ScoresCard assignments={data.assignments} />
 
@@ -182,11 +182,11 @@ export function StudentMistakesPage() {
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={data.categories.map((c) => ({ ...c, name: categoryLabels[c.category] ?? c.category }))} layout="vertical" margin={{ top: 0, right: 72, bottom: 0, left: 8 }}>
                         <XAxis type="number" hide allowDecimals={false} />
-                        <YAxis type="category" dataKey="name" width={130} tick={{ fontSize: 12, fill: "#1f2326" }} tickLine={false} axisLine={false} />
-                        <Tooltip cursor={{ fill: "rgba(31,35,38,0.06)" }} content={<CategoryTooltip />} />
+                        <YAxis type="category" dataKey="name" width={130} tick={{ fontSize: 12, fill: "#16203a" }} tickLine={false} axisLine={false} />
+                        <Tooltip cursor={{ fill: "rgba(22,32,58,0.06)" }} content={<CategoryTooltip />} />
                         <Bar
                           dataKey="count"
-                          fill="#2f5e4e"
+                          fill="#1857d6"
                           radius={[0, 4, 4, 0]}
                           maxBarSize={18}
                           isAnimationActive={false}
@@ -197,7 +197,7 @@ export function StudentMistakesPage() {
                             dataKey="percent"
                             position="right"
                             formatter={(value: unknown) => `${round(Number(value))}%`}
-                            style={{ fontSize: 11, fill: "#6b6e70" }}
+                            style={{ fontSize: 11, fill: "#5d6985" }}
                           />
                         </Bar>
                       </BarChart>
@@ -225,10 +225,10 @@ export function StudentMistakesPage() {
                         }))}
                         margin={{ top: 8, right: 12, bottom: 0, left: 0 }}
                       >
-                        <CartesianGrid vertical={false} stroke="#ecebe7" />
-                        <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#6b6e70" }} tickLine={false} axisLine={{ stroke: "#dedcd7" }} />
-                        <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#6b6e70" }} tickLine={false} axisLine={false} width={28} />
-                        <Tooltip cursor={{ fill: "rgba(31,35,38,0.06)" }} content={<AssignmentTooltip />} />
+                        <CartesianGrid vertical={false} stroke="#e9ecf3" />
+                        <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#5d6985" }} tickLine={false} axisLine={{ stroke: "#dcdfea" }} />
+                        <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#5d6985" }} tickLine={false} axisLine={false} width={28} />
+                        <Tooltip cursor={{ fill: "rgba(22,32,58,0.06)" }} content={<AssignmentTooltip />} />
                         {severities.map((s, i) => (
                           <Bar
                             key={s}
@@ -264,7 +264,7 @@ export function StudentMistakesPage() {
                     label: l.key === "Repeated" ? "Repeated from an earlier assignment" : "New",
                     count: l.count,
                     percent: l.percent,
-                    color: l.key === "Repeated" ? "#1f2326" : "#9fc7b8",
+                    color: l.key === "Repeated" ? "#16203a" : "#a9c1f4",
                   }))}
                   onPick={(key) => setFilter("label", key)}
                 />
@@ -366,7 +366,7 @@ function ScoreRow({ scores }: { scores: AssignmentScores }) {
         ) : difference === 0 ? (
           <span className="text-ink-muted">same</span>
         ) : (
-          <span className="font-semibold text-[#8f2d2d]" title="Classroom grade minus your report's score (with bonus)">
+          <span className="font-semibold text-danger" title="Classroom grade minus your report's score (with bonus)">
             Classroom {difference > 0 ? "+" : "−"}
             {round(Math.abs(difference))}
           </span>
@@ -514,15 +514,6 @@ function TooltipLine({ label, value, color }: { label: string; value: string; co
   );
 }
 
-function Stat({ label, value, note }: { label: string; value: ReactNode; note: string }) {
-  return (
-    <div className="border-b border-line px-4 py-3 md:border-b-0 md:border-r md:last:border-r-0">
-      <div className="text-xs text-ink-muted">{label}</div>
-      <div className="text-[22px] font-bold leading-tight">{value}</div>
-      <div className="text-[11px] text-ink-muted">{note}</div>
-    </div>
-  );
-}
 
 function round(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);

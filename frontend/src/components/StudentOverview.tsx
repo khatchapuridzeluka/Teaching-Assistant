@@ -6,6 +6,7 @@ import { strengthColor } from "./CodeBrowser";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useTrackJob } from "./JobToasts";
 import { categoryLabels } from "./StudentMistakes";
+import { Sparkles } from "lucide-react";
 import { Button, Chip, ErrorPanel } from "./ui";
 
 const texts: Record<StudentAnalysisKind, { title: string; empty: string; confirm: string; job: string; records: string }> = {
@@ -66,10 +67,13 @@ export function StudentOverviewCard({
   }
 
   return (
-    <section className="rounded-[10px] border border-line bg-white">
+    <section className="surface">
       <div className="flex flex-wrap items-start justify-between gap-2 border-b border-line px-4 py-2.5">
         <div className="min-w-0">
-          <b className="text-xs">{text.title}</b>
+          <h3 className="flex items-center gap-1.5 text-[13px] font-semibold">
+            <Sparkles className="h-3.5 w-3.5 text-warn" />
+            {text.title}
+          </h3>
           <div className="text-[11px] text-ink-muted">
             {data
               ? `From ${data.records} ${text.records} in ${data.assignments} approved ${data.assignments === 1 ? "assignment" : "assignments"} · ${formatDate(data.createdAt)} · ${data.model}`
@@ -77,8 +81,8 @@ export function StudentOverviewCard({
           </div>
         </div>
         <span className="flex items-center gap-2">
-          {data?.outdated && <Chip tone="ink">Reports changed since</Chip>}
-          <Button small onClick={() => setConfirming(true)} disabled={analyze.isPending || jobId !== null}>
+          {data?.outdated && <Chip tone="warn">Reports changed since</Chip>}
+          <Button small icon={<Sparkles />} onClick={() => setConfirming(true)} disabled={analyze.isPending || jobId !== null}>
             {jobId ? "Analyzing…" : analyze.isPending ? "Queuing…" : data ? "Analyze again" : "Analyze with AI"}
           </Button>
         </span>
@@ -100,14 +104,14 @@ export function StudentOverviewCard({
         <div className="flex flex-col gap-3 px-4 py-3">
           <p className="whitespace-pre-line text-[13px] leading-relaxed">{data.summary}</p>
           {data.nextSteps && (
-            <div className="rounded-lg border border-accent/25 bg-accent-tint/60 px-3 py-2">
-              <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-accent">What to work on next</div>
+            <div className="rounded-lg border-l-4 border-mark bg-mark-tint/50 px-3 py-2">
+              <div className="eyebrow text-mark-ink">What to work on next</div>
               <p className="mt-1 whitespace-pre-line text-[13px] leading-relaxed">{data.nextSteps}</p>
             </div>
           )}
           {data.groups.length > 0 && (
             <div className="flex flex-col gap-2">
-              <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-accent">Skills · {data.groups.filter((g) => !g.ungrouped).length}</div>
+              <div className="eyebrow">Skills · {data.groups.filter((g) => !g.ungrouped).length}</div>
               {data.groups.map((group, i) => (
                 <SkillGroup key={i} group={group} />
               ))}
@@ -144,7 +148,7 @@ function SkillGroup({ group }: { group: StudentStrengthGroup }) {
             {group.count} {group.count === 1 ? "strength" : "strengths"} · {group.assignments}{" "}
             {group.assignments === 1 ? "assignment" : "assignments"}
           </span>
-          {group.assignments > 1 && <Chip tone="ink">Shown again</Chip>}
+          {group.assignments > 1 && <Chip tone="success">Shown again</Chip>}
           <span className="ml-auto text-[11px] text-ink-muted">
             {group.categories.map((c) => categoryLabels[c] ?? c).join(", ")}
           </span>
@@ -182,7 +186,7 @@ function JobWatch({ jobId, onDone }: { jobId: string; onDone: () => void }) {
     <div className="flex items-center justify-between gap-2 border-b border-line px-4 py-2 text-xs">
       {job?.status === "Failed" ? (
         <>
-          <span className="text-[#8f2d2d]">The analysis failed: {job.error ?? "unknown error"}</span>
+          <span className="text-danger">The analysis failed: {job.error ?? "unknown error"}</span>
           <button onClick={onDone} className="font-semibold text-accent hover:underline">
             Dismiss
           </button>

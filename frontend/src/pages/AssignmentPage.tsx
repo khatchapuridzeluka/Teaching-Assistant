@@ -1,4 +1,4 @@
-import { type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
+import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useParams, useSearchParams } from "react-router";
 import type {
@@ -28,9 +28,12 @@ import { ConfirmDialog } from "../components/ConfirmDialog";
 import { InstructionsBar } from "../components/InstructionsCard";
 import { useTrackJob } from "../components/JobToasts";
 import { PreviewPanel } from "../components/PreviewPanel";
+import { SubmissionBoard } from "../components/SubmissionBoard";
 import { hasWork, stateChip, SubmissionDetail } from "../components/SubmissionDetail";
-import { Avatar, Button, Card, Chip, ErrorPanel, PageHeader, Spinner } from "../components/ui";
+import { Avatar, Button, Card, Chip, CountTabs, ErrorPanel, Menu, Modal, Notice, PageHeader, SearchField, Segmented, Spinner, Stat, StatStrip } from "../components/ui";
 import { formatDate, formatDay, initials } from "../format";
+import { severityColor } from "../theme";
+import { CircleCheck, CircleDashed, CloudDownload, Ellipsis, ExternalLink, Files, LayoutList, PackageOpen, Send, Sparkles, SquareKanban, Undo2, UserX } from "lucide-react";
 
 export function AssignmentPage() {
   const { courseId = "", assignmentId = "" } = useParams();
@@ -67,6 +70,19 @@ export function AssignmentPage() {
   const [pickedVersions, setPickedVersions] = useState<Record<string, string>>({});
   const [searchParams, setSearchParams] = useSearchParams();
   const [showDetail, setShowDetail] = useState(false);
+  const view = searchParams.get("view") === "board" ? "board" : "list";
+
+  function setView(next: "list" | "board") {
+    setSearchParams((params) => {
+      if (next === "board") {
+        params.set("view", "board");
+      } else {
+        params.delete("view");
+      }
+      return params;
+    }, { replace: true });
+  }
+
   const latestJob = new Map<string, JobInfo>();
   for (const job of jobs.data ?? []) {
     if (job.versionId && !latestJob.has(job.versionId)) {
@@ -127,33 +143,68 @@ export function AssignmentPage() {
   const pastDue = assignment?.dueAt != null && new Date(assignment.dueAt).getTime() < Date.now();
 
   return (
-    <div className="flex flex-col gap-3 lg:h-[calc(100dvh-112px)] lg:min-h-[640px]">
+    <div className="flex flex-col gap-3 lg:h-[calc(100dvh-72px)] lg:min-h-[640px]">
       <PageHeader
         title={assignment?.title ?? "Assignment"}
         subtitle={assignment && `Due ${formatDate(assignment.dueAt)} · ${assignment.maxPoints ?? "–"} points · read-only from Classroom`}
         actions={
           <>
-            {assignment?.link && (
-              <a href={assignment.link} target="_blank" rel="noreferrer">
-                <Button>Classroom ↗</Button>
-              </a>
-            )}
+            <Segmented
+              label="View"
+              value={view}
+              onChange={setView}
+              options={[
+                {
+                  value: "list",
+                  label: (
+                    <span className="flex items-center gap-1.5">
+                      <LayoutList className="h-3.5 w-3.5" /> List
+                    </span>
+                  ),
+                },
+                {
+                  value: "board",
+                  label: (
+                    <span className="flex items-center gap-1.5">
+                      <SquareKanban className="h-3.5 w-3.5" /> Board
+                    </span>
+                  ),
+                },
+              ]}
+            />
+            <Menu
+              label="More actions"
+              trigger={<Ellipsis className="h-4 w-4" />}
+              items={[
+                ...((gradings.data?.length ?? 0) > 0
+                  ? [
+                      {
+                        label: `Saved drafts (${gradings.data!.filter((g) => g.status === "Draft").length})`,
+                        hint: "Every AI draft saved for this assignment",
+                        icon: <Files />,
+                        onClick: () => setDraftsOpen(true),
+                      },
+                    ]
+                  : []),
+                ...((stored.data?.length ?? 0) > 0
+                  ? [
+                      {
+                        label: extract.isPending ? "Extracting…" : "Re-extract code",
+                        hint: "Rebuild the extracted code from the stored files; nothing is downloaded",
+                        icon: <PackageOpen />,
+                        disabled: extract.isPending || fetch.isPending,
+                        onClick: () => extract.mutate(),
+                      },
+                    ]
+                  : []),
+                ...(assignment?.link
+                  ? [{ label: "Open in Classroom", hint: "The assignment in Google Classroom, in a new tab", icon: <ExternalLink />, href: assignment.link }]
+                  : []),
+              ]}
+            />
             {(stored.data?.length ?? 0) > 0 && (
               <Button
-                onClick={() => extract.mutate()}
-                disabled={extract.isPending || fetch.isPending}
-                title="Rebuild the extracted code from the stored files; nothing is downloaded"
-              >
-                {extract.isPending ? "Extracting…" : "Re-extract"}
-              </Button>
-            )}
-            {(gradings.data?.length ?? 0) > 0 && (
-              <Button onClick={() => setDraftsOpen(true)} title="Every saved AI draft of this assignment">
-                Drafts ({gradings.data!.filter((g) => g.status === "Draft").length})
-              </Button>
-            )}
-            {(stored.data?.length ?? 0) > 0 && (
-              <Button
+                icon={<Sparkles />}
                 onClick={() => setConfirmGradeAll(true)}
                 disabled={gradeAll.isPending || fetch.isPending}
                 title="Queue an AI grading for every student without a draft; they run in the background, 3 at a time"
@@ -161,7 +212,7 @@ export function AssignmentPage() {
                 {gradeAll.isPending ? "Queuing…" : "Grade all with AI"}
               </Button>
             )}
-            <Button variant="primary" onClick={() => fetch.mutate()} disabled={fetch.isPending}>
+            <Button variant="primary" icon={<CloudDownload />} onClick={() => fetch.mutate()} disabled={fetch.isPending}>
               {fetch.isPending ? "Fetching…" : "Fetch from Classroom"}
             </Button>
           </>
@@ -169,16 +220,18 @@ export function AssignmentPage() {
       />
 
       {submissions.data && (
-        <div className="grid shrink-0 grid-cols-2 border-t border-line md:grid-cols-4">
-          <Stat label="Turned in" value={`${withWork.length} / ${all.length}`} note="including returned" />
-          <Stat label="Returned" value={counts.returned} note="in Classroom" />
-          <Stat label="AI drafts" value={`${drafts} / ${withWork.length}`} note="saved, waiting for review" />
+        <StatStrip>
+          <Stat compact icon={<Send />} label="Turned in" value={`${withWork.length} / ${all.length}`} note="including returned" />
+          <Stat compact icon={<Undo2 />} label="Returned" value={counts.returned} note="in Classroom" />
+          <Stat compact icon={<Sparkles />} label="AI drafts" value={`${drafts} / ${withWork.length}`} note="saved, waiting for review" />
           <Stat
+            compact
+            icon={<UserX />}
             label="Not submitted"
             value={counts.missing}
             note={assignment?.dueAt ? (pastDue ? "past due" : `due ${formatDay(assignment.dueAt)}`) : "no due date"}
           />
-        </div>
+        </StatStrip>
       )}
 
       {assignment && (
@@ -188,9 +241,9 @@ export function AssignmentPage() {
       )}
 
       {fetch.isPending && (
-        <Banner>
+        <Notice>
           <Spinner label="Fetching… downloading new and changed submissions from Google Drive." />
-        </Banner>
+        </Notice>
       )}
       {fetch.isError && <ErrorPanel error={fetch.error} />}
       {fetch.data && <FetchBanner summary={fetch.data} onDismiss={() => fetch.reset()} />}
@@ -218,7 +271,24 @@ export function AssignmentPage() {
 
       {submissions.isLoading && <Spinner />}
       {submissions.isError && <ErrorPanel error={submissions.error} />}
-      {submissions.data && (
+      {submissions.data && view === "board" && (
+        <SubmissionBoard
+          submissions={all}
+          versionOf={versionOf}
+          reviews={reviews}
+          storedById={storedById}
+          gradingVersionIds={gradingVersionIds}
+          onOpen={(submission) => {
+            setSearchParams((params) => {
+              params.set("student", submission.id);
+              params.delete("view");
+              return params;
+            }, { replace: true });
+            setShowDetail(true);
+          }}
+        />
+      )}
+      {submissions.data && view === "list" && (
         <Card className="@container/workspace flex h-[calc(100dvh-96px)] min-h-[460px] shrink-0 overflow-hidden lg:h-auto lg:min-h-[420px] lg:flex-1 lg:shrink">
           <StudentList
             hidden={showDetail}
@@ -288,18 +358,6 @@ export function AssignmentPage() {
           onClose={() => setDraftsOpen(false)}
         />
       )}
-    </div>
-  );
-}
-
-function Stat({ label, value, note }: { label: string; value: ReactNode; note: string }) {
-  return (
-    <div className="min-w-0 border-line px-3 py-2.5 even:border-l [&:nth-child(n+3)]:border-t sm:px-4 md:[&:nth-child(n+3)]:border-t-0 md:[&:not(:first-child)]:border-l">
-      <div className="text-xs text-ink-muted">{label}</div>
-      <div className="flex items-baseline gap-2">
-        <b className="whitespace-nowrap text-[22px] leading-tight tracking-tight">{value}</b>
-        <span className="truncate text-[11px] font-semibold text-accent">{note}</span>
-      </div>
     </div>
   );
 }
@@ -398,41 +456,20 @@ function StudentList({
 
   return (
     <aside
-      className={`w-full shrink-0 flex-col bg-white @2xl/workspace:flex @2xl/workspace:w-[260px] @2xl/workspace:border-r @2xl/workspace:border-line @4xl/workspace:w-[300px] @7xl/workspace:w-[340px] ${
+      className={`w-full shrink-0 flex-col bg-white @2xl/workspace:flex @2xl/workspace:w-[270px] @2xl/workspace:border-r @2xl/workspace:border-line @4xl/workspace:w-[300px] @7xl/workspace:w-[340px] ${
         hidden ? "hidden" : "flex"
       }`}
     >
-      <div className="flex shrink-0 flex-col gap-2 border-b border-line p-3">
-        <div className="grid grid-cols-4 rounded-lg border border-line bg-paper p-0.5" role="tablist" aria-label="Filter students">
-          {(Object.keys(filters) as Filter[]).map((key) => (
-            <button
-              key={key}
-              role="tab"
-              aria-selected={filter === key}
-              onClick={() => onFilter(key)}
-              className={`flex flex-col items-center rounded-md px-1 py-1 leading-tight ${
-                filter === key ? "bg-white text-ink shadow-sm" : "text-ink-muted hover:text-ink"
-              }`}
-            >
-              <b className={`text-[13px] ${filter === key ? "text-accent" : ""}`}>{counts[key]}</b>
-              <span className="text-[10px] font-semibold">{filters[key].label}</span>
-            </button>
-          ))}
-        </div>
+      <div className="flex shrink-0 flex-col gap-2 border-b border-line p-2.5">
+        <CountTabs
+          label="Filter students"
+          value={filter}
+          onChange={onFilter}
+          options={(Object.keys(filters) as Filter[]).map((key) => ({ value: key, label: filters[key].label, count: counts[key] }))}
+        />
         <div className="flex gap-2">
-          <input
-            value={query}
-            onChange={(e) => onQuery(e.target.value)}
-            placeholder="Search students"
-            aria-label="Search students"
-            className="h-8 min-w-0 flex-1 rounded-lg border border-line bg-white px-2.5 text-xs outline-none focus:border-accent"
-          />
-          <select
-            value={sort}
-            onChange={(e) => onSort(e.target.value as SortOption)}
-            aria-label="Sort students"
-            className="h-8 cursor-pointer rounded-lg border border-line bg-white px-1.5 text-xs font-semibold hover:border-accent"
-          >
+          <SearchField value={query} onChange={onQuery} placeholder="Search students" className="flex-1" />
+          <select value={sort} onChange={(e) => onSort(e.target.value as SortOption)} aria-label="Sort students" className="field px-1.5 font-medium">
             {(Object.keys(sortLabels) as SortOption[]).map((key) => (
               <option key={key} value={key}>
                 {sortLabels[key]}
@@ -455,19 +492,18 @@ function StudentList({
             const previous = rows[i - 1];
             const files = submission.attachments.length;
             return (
-              <li
-                key={submission.id}
-                className={`border-b border-paper-dark ${!working && previous && hasWork(previous) ? "border-t-2 border-t-line" : ""}`}
-              >
+              <li key={submission.id} className={`border-b border-paper-dark ${!working && previous && hasWork(previous) ? "border-t-2 border-t-line" : ""}`}>
                 <button
                   id={`student-${submission.id}`}
                   onClick={() => onSelect(submission)}
                   aria-current={isSelected}
-                  className={`flex w-full items-center gap-2.5 border-l-[3px] py-2.5 pl-3 pr-3 text-left ${
-                    isSelected ? "border-l-accent bg-accent-tint/60" : "border-l-transparent hover:bg-paper/60"
+                  className={`flex w-full items-center gap-2.5 border-l-[3px] py-2.5 pl-3 pr-3 text-left transition-colors ${
+                    isSelected ? "border-l-accent bg-accent-tint/60" : "border-l-transparent hover:bg-paper"
                   }`}
                 >
-                  <Avatar text={initials(submission.studentName)} userId={submission.studentId} />
+                  <span className={working ? "" : "opacity-60 grayscale"}>
+                    <Avatar text={initials(submission.studentName)} userId={submission.studentId} />
+                  </span>
                   <span className="min-w-0 flex-1">
                     <span className={`block truncate font-semibold ${working ? "" : "text-ink-muted"}`}>{submission.studentName}</span>
                     <span className="block truncate text-[11px] text-ink-muted">
@@ -477,24 +513,40 @@ function StudentList({
                     </span>
                   </span>
                   <span className="flex shrink-0 flex-col items-end gap-1">
-                    <Chip tone={state.tone}>{state.label}</Chip>
                     {version && gradingVersionIds.has(version.id) ? (
-                      <span className="text-[11px] font-semibold text-accent">
-                        {gradingVersionIds.get(version.id) === "Queued" ? "Queued…" : "Grading…"}
-                      </span>
+                      <Chip tone="info" icon={<span className="h-2.5 w-2.5 animate-spin rounded-full border-[1.5px] border-accent/30 border-t-accent" />}>
+                        {gradingVersionIds.get(version.id) === "Queued" ? "Queued" : "Grading"}
+                      </Chip>
                     ) : review?.reportStatus === "Approved" ? (
-                      <span className="text-[11px] font-semibold text-accent">✓ Report approved</span>
+                      <Chip tone="success" icon={<CircleCheck />}>
+                        Approved
+                      </Chip>
                     ) : review?.reportStatus === "InReview" ? (
-                      <span className="text-[11px] font-semibold text-accent">Report in review</span>
+                      <Chip tone="mark">In review</Chip>
                     ) : review ? (
-                      <span className="text-[11px] font-semibold text-accent">
-                        Draft {review.score != null ? `${points(review.score)}/${review.maxScore ?? "–"}` : ""} · {mistakeCount(review)}{" "}
-                        {mistakeCount(review) === 1 ? "mistake" : "mistakes"}
+                      <Chip tone="warn" icon={<Sparkles />}>
+                        Draft
+                      </Chip>
+                    ) : (
+                      <Chip tone={state.tone}>{state.label}</Chip>
+                    )}
+                    {review ? (
+                      <span className="flex items-center gap-1.5 font-mono text-[11px] text-ink-muted">
+                        {review.score != null && (
+                          <b className="font-semibold text-ink">
+                            {points(review.score)}
+                            <span className="font-normal text-ink-faint">/{review.maxScore ?? "–"}</span>
+                          </b>
+                        )}
+                        <SeverityDots draft={review} />
                       </span>
                     ) : working && submission.late ? (
-                      <Chip tone="dashed">Late</Chip>
+                      <Chip tone="warn">Late</Chip>
                     ) : working && !storedById.has(submission.id) ? (
-                      <span className="text-[11px] text-ink-muted">Not fetched</span>
+                      <span className="flex items-center gap-1 text-[11px] text-ink-faint">
+                        <CircleDashed className="h-3 w-3" />
+                        Not fetched
+                      </span>
                     ) : null}
                   </span>
                 </button>
@@ -505,10 +557,6 @@ function StudentList({
       )}
     </aside>
   );
-}
-
-function Banner({ children }: { children: ReactNode }) {
-  return <div className="shrink-0 rounded-[10px] border border-line bg-white px-4 py-2.5 text-xs">{children}</div>;
 }
 
 function FetchBanner({ summary, onDismiss }: { summary: FetchSummary; onDismiss: () => void }) {
@@ -569,30 +617,30 @@ function ResultBanner({ title, text, problems, onDismiss }: { title: string; tex
   const [open, setOpen] = useState(false);
 
   return (
-    <Banner>
-      <div className="flex items-center gap-3">
-        <b className="shrink-0">{title}</b>
-        <span className="min-w-0 flex-1 truncate text-ink-muted" title={text}>{text}</span>
-        {problems.length > 0 && (
-          <button onClick={() => setOpen(!open)} aria-expanded={open} className="shrink-0 font-semibold text-ink underline">
+    <Notice
+      tone={problems.length > 0 ? "warn" : "success"}
+      title={title}
+      onDismiss={onDismiss}
+      action={
+        problems.length > 0 && (
+          <button onClick={() => setOpen(!open)} aria-expanded={open} className="shrink-0 font-semibold text-warn-ink underline">
             {problems.length} need{problems.length === 1 ? "s" : ""} your attention {open ? "▴" : "▾"}
           </button>
-        )}
-        <button onClick={onDismiss} aria-label="Dismiss" className="shrink-0 px-1 text-ink-muted hover:text-ink">
-          ✕
-        </button>
-      </div>
+        )
+      }
+    >
+      {text}
       {open && (
-        <ul className="mt-2 flex max-h-[140px] flex-col gap-1 overflow-y-auto border-t border-line pt-2">
+        <ul className="mt-2 flex max-h-[140px] flex-col gap-1 overflow-y-auto border-t border-warn/20 pt-2">
           {problems.map((problem, i) => (
             <li key={i} className="flex gap-2">
-              <b className="shrink-0">{problem.studentName}</b>
-              <span className="text-ink-muted">{problem.detail}</span>
+              <b className="shrink-0 text-ink">{problem.studentName}</b>
+              <span>{problem.detail}</span>
             </li>
           ))}
         </ul>
       )}
-    </Banner>
+    </Notice>
   );
 }
 
@@ -616,111 +664,106 @@ function DraftsModal({
   const [showAll, setShowAll] = useState(false);
   const shown = showAll ? drafts : drafts.filter((d) => d.current);
 
-  useEffect(() => {
-    const onKey = (e: globalThis.KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-ink/50 p-2 sm:p-6" onClick={onClose}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Saved drafts"
-        onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[90dvh] w-full max-w-[920px] flex-col overflow-hidden rounded-xl border border-line bg-white shadow-xl"
-      >
-        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-3">
-          <div>
-            <b className="text-[15px]">Saved drafts</b>
-            <div className="text-xs text-ink-muted">AI gradings saved for your review. Click one to open it next to the code.</div>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="flex rounded-lg border border-line bg-paper p-0.5 text-xs font-semibold" role="tablist" aria-label="Which drafts">
-              {[false, true].map((all) => (
-                <button
-                  key={String(all)}
-                  role="tab"
-                  aria-selected={showAll === all}
-                  onClick={() => setShowAll(all)}
-                  className={`rounded-md px-2.5 py-1 ${showAll === all ? "bg-white text-ink shadow-sm" : "text-ink-muted hover:text-ink"}`}
-                >
-                  {all ? `All (${drafts.length})` : `Current (${drafts.filter((d) => d.current).length})`}
-                </button>
-              ))}
-            </div>
-            <Button small onClick={onClose}>
-              Close
-            </Button>
-          </div>
-        </header>
-
-        {shown.length === 0 ? (
-          <div className="px-5 py-10 text-center text-ink-muted">No current drafts; every draft was discarded.</div>
-        ) : (
-          <div className="overflow-auto">
-            <table className="w-full border-collapse text-left">
-              <thead className="sticky top-0">
-                <tr className="border-b border-line bg-[#faf9f6] text-[11px] uppercase tracking-[0.06em] text-ink-muted">
-                  <th className="px-4 py-2.5 font-semibold">Student</th>
-                  <th className="px-3 py-2.5 font-semibold">Score</th>
-                  <th className="px-3 py-2.5 font-semibold">Mistakes</th>
-                  <th className="hidden px-3 py-2.5 font-semibold sm:table-cell">Graded</th>
-                  <th className="px-3 py-2.5 font-semibold">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {shown.map((draft) => (
-                  <tr
-                    key={draft.id}
-                    onClick={() => onOpen(draft)}
-                    className={`cursor-pointer border-b border-paper-dark hover:bg-paper/60 ${draft.status === "Discarded" ? "text-ink-muted" : ""}`}
-                  >
-                    <td className="px-4 py-2.5">
-                      <div className="font-semibold">{draft.studentName}</div>
-                      <div className="text-[11px] text-ink-muted">v{draft.versionNumber}</div>
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2.5 tabular-nums">
-                      {draft.score != null ? (
-                        <>
-                          <b>{points(draft.score)}</b>
-                          <span className="text-ink-muted"> / {draft.maxScore ?? "–"}</span>
-                          {draft.bonus ? <span className="text-ink-muted"> +{points(draft.bonus)}</span> : null}
-                        </>
-                      ) : (
-                        <span className="text-xs text-ink-muted">in the review text</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <SeverityCounts draft={draft} />
-                    </td>
-                    <td className="hidden whitespace-nowrap px-3 py-2.5 text-xs text-ink-muted sm:table-cell">{formatDate(draft.createdAt)}</td>
-                    <td className="px-3 py-2.5">
-                      {draft.status === "Discarded" ? (
-                        <Chip tone="muted">Discarded</Chip>
-                      ) : draft.current ? (
-                        <Chip tone="tint">Current draft</Chip>
-                      ) : (
-                        <Chip tone="dashed">Earlier draft</Chip>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </div>
+    <Modal
+      title="Saved drafts"
+      subtitle="AI gradings saved for your review. Click one to open it next to the code."
+      size="max-w-[920px]"
+      onClose={onClose}
+      headerExtra={
+        <Segmented
+          label="Which drafts"
+          value={showAll ? "all" : "current"}
+          onChange={(value) => setShowAll(value === "all")}
+          options={[
+            { value: "current", label: "Current", count: drafts.filter((d) => d.current).length },
+            { value: "all", label: "All", count: drafts.length },
+          ]}
+        />
+      }
+    >
+      {shown.length === 0 ? (
+        <div className="px-5 py-10 text-center text-ink-muted">No current drafts; every draft was discarded.</div>
+      ) : (
+        <table className="w-full border-collapse text-left">
+          <thead className="sticky top-0">
+            <tr className="border-b border-line bg-paper">
+              <th className="eyebrow px-4 py-2.5">Student</th>
+              <th className="eyebrow px-3 py-2.5">Score</th>
+              <th className="eyebrow px-3 py-2.5">Mistakes</th>
+              <th className="eyebrow hidden px-3 py-2.5 sm:table-cell">Graded</th>
+              <th className="eyebrow px-3 py-2.5">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {shown.map((draft) => (
+              <tr
+                key={draft.id}
+                onClick={() => onOpen(draft)}
+                className={`cursor-pointer border-b border-paper-dark transition-colors hover:bg-paper ${draft.status === "Discarded" ? "text-ink-muted" : ""}`}
+              >
+                <td className="px-4 py-2.5">
+                  <div className="flex items-center gap-2.5">
+                    <Avatar text={initials(draft.studentName)} userId={draft.studentId} size="sm" />
+                    <span className="font-semibold">{draft.studentName}</span>
+                    <span className="font-mono text-[11px] text-ink-faint">v{draft.versionNumber}</span>
+                  </div>
+                </td>
+                <td className="whitespace-nowrap px-3 py-2.5 font-mono text-xs">
+                  {draft.score != null ? (
+                    <>
+                      <b>{points(draft.score)}</b>
+                      <span className="text-ink-faint">/{draft.maxScore ?? "–"}</span>
+                      {draft.bonus ? <span className="text-success"> +{points(draft.bonus)}</span> : null}
+                    </>
+                  ) : (
+                    <span className="font-sans text-ink-muted">in the review text</span>
+                  )}
+                </td>
+                <td className="px-3 py-2.5">
+                  <SeverityCounts draft={draft} />
+                </td>
+                <td className="hidden whitespace-nowrap px-3 py-2.5 text-xs text-ink-muted sm:table-cell">{formatDate(draft.createdAt)}</td>
+                <td className="px-3 py-2.5">
+                  {draft.status === "Discarded" ? (
+                    <Chip tone="muted">Discarded</Chip>
+                  ) : draft.current ? (
+                    <Chip tone="info">Current draft</Chip>
+                  ) : (
+                    <Chip tone="dashed">Earlier draft</Chip>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </Modal>
   );
 }
 
-const severityDot: Record<"major" | "minor" | "style", string> = { major: "#dc2626", minor: "#d97706", style: "#64748b" };
+function SeverityDots({ draft }: { draft: AssignmentGrading }) {
+  const parts = (["major", "minor", "style"] as const).filter((key) => draft[key] > 0);
+  if (parts.length === 0) {
+    return null;
+  }
+
+  return (
+    <span
+      className="flex items-center gap-1.5"
+      title={`${mistakeCount(draft)} ${mistakeCount(draft) === 1 ? "mistake" : "mistakes"}: ${parts.map((key) => `${draft[key]} ${key}`).join(", ")}`}
+    >
+      {parts.map((key) => (
+        <span key={key} className="flex items-center gap-0.5">
+          <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: severityDot[key] }} />
+          {draft[key]}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+const severityDot: Record<"major" | "minor" | "style", string> = { major: severityColor.Major, minor: severityColor.Minor, style: severityColor.Style };
 
 function SeverityCounts({ draft }: { draft: AssignmentGrading }) {
   const parts = (["major", "minor", "style"] as const).filter((key) => draft[key] > 0);

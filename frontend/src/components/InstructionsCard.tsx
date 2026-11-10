@@ -4,6 +4,7 @@ import { type Assignment, type InstructionsFile, instructionsFileUrl } from "../
 import { useInstructions, useInstructionsFileBlob } from "../api/hooks";
 import { formatDate } from "../format";
 import { DocxView } from "./DocxPreview";
+import { BookOpen } from "lucide-react";
 import { Button, Chip } from "./ui";
 
 type FileType = "pdf" | "docx" | "image" | "video" | "link" | "other";
@@ -116,9 +117,11 @@ export function InstructionsBar({ courseId, assignment }: { courseId: string; as
   const [open, setOpen] = useState<Material | null>(null);
 
   return (
-    <div className="border-y border-line">
-      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 py-2.5 md:flex-nowrap">
-        <span className="shrink-0 text-[11px] font-bold uppercase tracking-[0.06em] text-ink-muted">Instructions</span>
+    <div className="surface">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 px-3.5 py-2 md:flex-nowrap">
+        <span className="eyebrow flex shrink-0 items-center gap-1.5">
+          <BookOpen className="h-3.5 w-3.5" /> Instructions
+        </span>
         {stored ? (
           <Chip tone="tint">
             v{stored.number} · stored {formatDate(stored.fetchedAt)}
@@ -140,9 +143,9 @@ export function InstructionsBar({ courseId, assignment }: { courseId: string; as
               key={m.file.id}
               onClick={() => setOpen(m)}
               title={`${m.file.name} · ${m.storedUrl ? "sent to the AI" : "not sent to the AI"}`}
-              className="flex h-7 max-w-[170px] shrink-0 items-center gap-1.5 rounded-lg border border-line bg-white px-2 text-xs hover:border-accent"
+              className="flex h-7 max-w-[170px] shrink-0 items-center gap-1.5 rounded-md border border-line bg-paper px-2 text-xs transition-colors hover:border-accent hover:bg-white"
             >
-              <span className="text-[9px] font-bold tracking-wide text-accent">{typeLabel[m.type]}</span>
+              <span className="font-mono text-[9px] font-bold tracking-wide text-accent">{typeLabel[m.type]}</span>
               <span className="truncate">{m.file.name}</span>
             </button>
           ))}
@@ -161,7 +164,7 @@ export function InstructionsBar({ courseId, assignment }: { courseId: string; as
       </div>
       <InstructionsNotes state={state} />
       {expanded && (
-        <p className="mb-3 max-h-[220px] overflow-y-auto whitespace-pre-wrap rounded-[10px] border border-line bg-white px-[18px] py-3 leading-relaxed">
+        <p className="mx-3.5 mb-3 max-h-[220px] animate-fade overflow-y-auto whitespace-pre-wrap rounded-lg bg-paper px-4 py-3 leading-relaxed">
           {text || "No task statement; the task is in the attached materials."}
         </p>
       )}
@@ -196,17 +199,17 @@ function InstructionsModal({
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-ink/50 p-2 sm:p-6" onClick={onClose}>
+    <div className="modal-overlay fixed inset-0 z-40 flex items-center justify-center p-2 sm:p-6" onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"
         aria-label={`${assignment.title} instructions`}
         onClick={(e) => e.stopPropagation()}
-        className="flex h-[94dvh] w-full max-w-[1100px] flex-col overflow-hidden rounded-xl border border-line bg-white shadow-xl sm:h-[88vh]"
+        className="flex h-[94dvh] w-full max-w-[1100px] flex-col overflow-hidden rounded-xl border border-line bg-white modal-panel sm:h-[88vh]"
       >
         <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-line px-4 py-3 sm:px-[18px]">
           <div className="flex min-w-0 flex-wrap items-center gap-2.5">
-            <b className="truncate text-[15px]">{assignment.title} · instructions</b>
+            <b className="truncate font-display text-[19px] font-semibold">{assignment.title} · instructions</b>
             <InstructionsStatus state={state} />
           </div>
           <div className="flex shrink-0 items-center gap-2">

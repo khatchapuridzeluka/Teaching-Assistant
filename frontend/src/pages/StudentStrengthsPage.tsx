@@ -9,14 +9,14 @@ import { CourseName } from "../components/Layout";
 import { StudentOverviewCard } from "../components/StudentOverview";
 import { categoryLabels } from "../components/StudentMistakes";
 import { StrengthRow, summarize } from "../components/StudentStrengths";
-import { Avatar, Button, Card, CardHeader, EmptyState, ErrorPanel, PageHeader, Spinner } from "../components/ui";
+import { Avatar, Button, Card, CardHeader, EmptyState, ErrorPanel, PageHeader, Spinner, Stat, StatStrip } from "../components/ui";
 import { formatDay, initials } from "../format";
 
 const mistakeColor = "#9a3412";
 
 const labelInfo: Record<StrengthLabel, { label: string; color: string }> = {
-  New: { label: "New", color: "#9fc7b8" },
-  Consistent: { label: "Consistent · also a strength earlier", color: "#1f2326" },
+  New: { label: "New", color: "#a9c1f4" },
+  Consistent: { label: "Consistent · also a strength earlier", color: "#16203a" },
   Improved: { label: "Improved · was a mistake earlier", color: strengthColor },
 };
 
@@ -100,11 +100,11 @@ export function StudentStrengthsPage() {
           />
           <Card className="flex flex-col gap-3 px-[18px] py-3">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="mr-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-muted">Assignment</span>
+              <span className="mr-1 eyebrow">Assignment</span>
               <select
                 value={filter.assignmentId ?? ""}
                 onChange={(e) => setFilter("assignment", e.target.value || undefined)}
-                className="h-8 rounded-lg border border-line bg-white px-2 text-xs"
+                className="field"
               >
                 <option value="">All assignments</option>
                 {data.assignmentOptions.map((a) => (
@@ -146,13 +146,13 @@ export function StudentStrengthsPage() {
             <p className="px-[18px] py-3 text-[13px] leading-relaxed">{summarize(data)}</p>
           </Card>
 
-          <div className="grid grid-cols-2 border-t border-line md:grid-cols-5">
+          <StatStrip columns={5}>
             <Stat label="Strengths" value={data.total} note={filtered ? `of ${data.recorded} recorded` : "recorded"} />
             <Stat label="Assignments" value={assignmentsWithStrengths} note="with at least one strength" />
             <Stat label="Areas" value={data.categories.length} note="categories with a strength" />
             <Stat label="Consistent" value={count("Consistent")} note="also a strength earlier" />
             <Stat label="Improved" value={count("Improved")} note="was a mistake earlier" />
-          </div>
+          </StatStrip>
 
           {data.total === 0 ? (
             <Card>
@@ -171,8 +171,8 @@ export function StudentStrengthsPage() {
                         margin={{ top: 0, right: 48, bottom: 0, left: 8 }}
                       >
                         <XAxis type="number" hide allowDecimals={false} />
-                        <YAxis type="category" dataKey="name" width={130} tick={{ fontSize: 12, fill: "#1f2326" }} tickLine={false} axisLine={false} />
-                        <Tooltip cursor={{ fill: "rgba(31,35,38,0.06)" }} content={<CategoryTooltip />} />
+                        <YAxis type="category" dataKey="name" width={130} tick={{ fontSize: 12, fill: "#16203a" }} tickLine={false} axisLine={false} />
+                        <Tooltip cursor={{ fill: "rgba(22,32,58,0.06)" }} content={<CategoryTooltip />} />
                         <Bar
                           dataKey="count"
                           fill={strengthColor}
@@ -182,7 +182,7 @@ export function StudentStrengthsPage() {
                           cursor="pointer"
                           onClick={(item) => setFilter("category", (item.payload as { category?: MistakeCategory } | undefined)?.category)}
                         >
-                          <LabelList dataKey="count" position="right" style={{ fontSize: 11, fill: "#6b6e70" }} />
+                          <LabelList dataKey="count" position="right" style={{ fontSize: 11, fill: "#5d6985" }} />
                         </Bar>
                       </BarChart>
                     </ResponsiveContainer>
@@ -202,10 +202,10 @@ export function StudentStrengthsPage() {
                         margin={{ top: 8, right: 12, bottom: 0, left: 0 }}
                         barGap={2}
                       >
-                        <CartesianGrid vertical={false} stroke="#ecebe7" />
-                        <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#6b6e70" }} tickLine={false} axisLine={{ stroke: "#dedcd7" }} />
-                        <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#6b6e70" }} tickLine={false} axisLine={false} width={28} />
-                        <Tooltip cursor={{ fill: "rgba(31,35,38,0.06)" }} content={<AssignmentTooltip />} />
+                        <CartesianGrid vertical={false} stroke="#e9ecf3" />
+                        <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#5d6985" }} tickLine={false} axisLine={{ stroke: "#dcdfea" }} />
+                        <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#5d6985" }} tickLine={false} axisLine={false} width={28} />
+                        <Tooltip cursor={{ fill: "rgba(22,32,58,0.06)" }} content={<AssignmentTooltip />} />
                         {(["strengths", "mistakes"] as const).map((key) => (
                           <Bar
                             key={key}
@@ -350,15 +350,6 @@ function TooltipLine({ label, value, color }: { label: string; value: string; co
   );
 }
 
-function Stat({ label, value, note }: { label: string; value: ReactNode; note: string }) {
-  return (
-    <div className="border-b border-line px-4 py-3 md:border-b-0 md:border-r md:last:border-r-0">
-      <div className="text-xs text-ink-muted">{label}</div>
-      <div className="text-[22px] font-bold leading-tight">{value}</div>
-      <div className="text-[11px] text-ink-muted">{note}</div>
-    </div>
-  );
-}
 
 function round(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);

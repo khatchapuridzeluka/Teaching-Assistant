@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { Bar, BarChart, CartesianGrid, Cell, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { CommonMistakes, MistakeGroup } from "../api/client";
@@ -7,8 +7,9 @@ import { severityColor } from "../components/CodeBrowser";
 import { useTrackJob } from "../components/JobToasts";
 import { CourseName } from "../components/Layout";
 import { categoryLabels } from "../components/StudentMistakes";
-import { Button, Card, CardHeader, Chip, EmptyState, ErrorPanel, PageHeader, Spinner } from "../components/ui";
+import { Button, Card, CardHeader, Chip, EmptyState, ErrorPanel, PageHeader, Spinner, Stat, StatStrip } from "../components/ui";
 import { formatAge } from "../format";
+import { ChartColumn, Lightbulb, Sparkles } from "lucide-react";
 
 export function CommonMistakesPage() {
   const { courseId = "" } = useParams();
@@ -52,7 +53,7 @@ export function CommonMistakesPage() {
               value={assignmentId}
               onChange={(e) => setSearchParams({ assignment: e.target.value }, { replace: true })}
               aria-label="Assignment"
-              className="h-[34px] max-w-[260px] rounded-lg border border-line bg-white px-2 text-[13px] font-semibold"
+              className="field h-[34px] max-w-[260px] text-[13px] font-medium"
             >
               {(assignments.data ?? []).map((a) => (
                 <option key={a.id} value={a.id}>
@@ -62,6 +63,7 @@ export function CommonMistakesPage() {
             </select>
             <Button
               variant="primary"
+              icon={<Sparkles />}
               onClick={start}
               disabled={!assignmentId || analyze.isPending || running !== undefined}
               title="Send this assignment's current draft mistakes (no names) to the AI to group them; one model call"
@@ -84,7 +86,7 @@ export function CommonMistakesPage() {
 
       {analysis.data === null && !running && (
         <Card>
-          <EmptyState>
+          <EmptyState icon={<ChartColumn />}>
             <div className="font-semibold text-ink">Not analyzed yet</div>
             Grade the students first (Grade all on the assignment page), then click Analyze. Your report's version of a mistake is used
             where you edited one; rejected mistakes are left out.
@@ -103,24 +105,26 @@ export function CommonMistakesPage() {
               {data.summary || "This analysis has no overview; it was made before overviews existed. Analyze again to get one."}
             </p>
             {data.nextLecture && (
-              <div className="mx-[18px] mb-4 rounded-[10px] border-l-4 border-accent bg-accent-tint/50 px-4 py-3">
-                <h4 className="text-[11px] font-bold uppercase tracking-[0.06em] text-accent">For the next lecture</h4>
+              <div className="mx-[18px] mb-4 rounded-lg border-l-4 border-mark bg-mark-tint/50 px-4 py-3">
+                <h4 className="eyebrow flex items-center gap-1.5 text-mark-ink">
+                  <Lightbulb className="h-3.5 w-3.5" /> For the next lecture
+                </h4>
                 <p className="mt-1 text-[14px] leading-relaxed">{data.nextLecture}</p>
               </div>
             )}
           </Card>
 
-          <div className="grid grid-cols-2 border-t border-line md:grid-cols-5">
+          <StatStrip columns={5}>
             <Stat label="Mistakes" value={data.mistakes} note={`${data.students} students, sent without names`} />
             <Stat label="Major" value={data.major} note={share(data.major, data.mistakes)} />
             <Stat label="Minor" value={data.minor} note={share(data.minor, data.mistakes)} />
             <Stat label="Style" value={data.style} note={`${share(data.style, data.mistakes)} · cost no points`} />
             <Stat label="Groups" value={groups.filter((g) => !g.ungrouped).length} note="problems found across the class" />
-          </div>
+          </StatStrip>
 
           <Charts data={data} />
 
-          <h2 className="mt-1 text-[15px] font-bold">All mistakes, by group</h2>
+          <h2 className="mt-1 font-display text-[20px] font-semibold">All mistakes, by group</h2>
           <div className="flex flex-col gap-3">
             {groups.map((group, i) => (
               <GroupCard key={group.id} rank={i + 1} group={group} courseId={courseId} assignmentId={assignmentId} />
@@ -132,7 +136,7 @@ export function CommonMistakesPage() {
   );
 }
 
-const severityShades = { Major: "#1f4a3d", Minor: "#4f8c76", Style: "#a8d1c1" } as const;
+const severityShades = { Major: "#cf3a2b", Minor: "#e0921a", Style: "#8391ad" } as const;
 
 function Charts({ data }: { data: CommonMistakes }) {
   const levels = (["Major", "Minor", "Style"] as const).map((level) => ({
@@ -152,12 +156,12 @@ function Charts({ data }: { data: CommonMistakes }) {
         <div className="h-[200px] px-2 py-3">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={levels} margin={{ top: 16, right: 12, bottom: 0, left: 0 }}>
-              <CartesianGrid vertical={false} stroke="#ecebe7" />
-              <XAxis dataKey="level" tick={{ fontSize: 12, fill: "#1f2326" }} tickLine={false} axisLine={{ stroke: "#dedcd7" }} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#6b6e70" }} tickLine={false} axisLine={false} width={28} />
-              <Tooltip cursor={{ fill: "rgba(31,35,38,0.06)" }} content={<LevelTooltip />} />
+              <CartesianGrid vertical={false} stroke="#e9ecf3" />
+              <XAxis dataKey="level" tick={{ fontSize: 12, fill: "#16203a" }} tickLine={false} axisLine={{ stroke: "#dcdfea" }} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#5d6985" }} tickLine={false} axisLine={false} width={28} />
+              <Tooltip cursor={{ fill: "rgba(22,32,58,0.06)" }} content={<LevelTooltip />} />
               <Bar dataKey="count" maxBarSize={48} radius={[4, 4, 0, 0]} isAnimationActive={false}>
-                <LabelList dataKey="count" position="top" style={{ fontSize: 11, fill: "#1f2326" }} />
+                <LabelList dataKey="count" position="top" style={{ fontSize: 11, fill: "#16203a" }} />
                 {levels.map((l) => (
                   <Cell key={l.level} fill={severityShades[l.level]} />
                 ))}
@@ -176,10 +180,10 @@ function Charts({ data }: { data: CommonMistakes }) {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={top} layout="vertical" margin={{ top: 0, right: 56, bottom: 0, left: 8 }}>
                 <XAxis type="number" hide domain={[0, data.students]} allowDecimals={false} />
-                <YAxis type="category" dataKey="name" width={220} tick={{ fontSize: 12, fill: "#1f2326" }} tickLine={false} axisLine={false} />
-                <Tooltip cursor={{ fill: "rgba(31,35,38,0.06)" }} content={<GroupTooltip />} />
-                <Bar dataKey="students" fill="#2f5e4e" radius={[0, 4, 4, 0]} maxBarSize={16} isAnimationActive={false}>
-                  <LabelList dataKey="percent" position="right" formatter={(v: unknown) => `${round(Number(v))}%`} style={{ fontSize: 11, fill: "#6b6e70" }} />
+                <YAxis type="category" dataKey="name" width={220} tick={{ fontSize: 12, fill: "#16203a" }} tickLine={false} axisLine={false} />
+                <Tooltip cursor={{ fill: "rgba(22,32,58,0.06)" }} content={<GroupTooltip />} />
+                <Bar dataKey="students" fill="#1857d6" radius={[0, 4, 4, 0]} maxBarSize={16} isAnimationActive={false}>
+                  <LabelList dataKey="percent" position="right" formatter={(v: unknown) => `${round(Number(v))}%`} style={{ fontSize: 11, fill: "#5d6985" }} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -239,11 +243,11 @@ function GroupCard({ rank, group, courseId, assignmentId }: { rank: number; grou
   return (
     <Card className={group.ungrouped ? "opacity-80" : ""}>
       <div className="flex flex-wrap items-start gap-x-4 gap-y-2 px-[18px] py-3">
-        <span className="mt-0.5 w-6 shrink-0 text-[15px] font-bold text-ink-muted tabular-nums">{group.ungrouped ? "·" : rank}</span>
+        <span className="num mt-0.5 w-6 shrink-0 text-[15px] text-ink-faint">{group.ungrouped ? "·" : rank}</span>
         <div className="min-w-0 flex-1">
           <h3 className="text-[14px] font-bold">{group.title}</h3>
           <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
-            <Chip tone={group.studentPercent >= 50 ? "accent" : "tint"}>
+            <Chip tone={group.studentPercent >= 50 ? "warn" : "info"}>
               {group.students} {group.students === 1 ? "student" : "students"} · {round(group.studentPercent)}%
             </Chip>
             {group.averagePoints != null && group.averagePoints > 0 && <Chip tone="outline">avg −{round(group.averagePoints)} pts</Chip>}
@@ -253,7 +257,7 @@ function GroupCard({ rank, group, courseId, assignmentId }: { rank: number; grou
                 {s.count} {s.key}
               </span>
             ))}
-            {group.approvedAt && <Chip tone="ink">Explanation approved</Chip>}
+            {group.approvedAt && <Chip tone="success">Explanation approved</Chip>}
           </div>
         </div>
       </div>
@@ -266,7 +270,7 @@ function GroupCard({ rank, group, courseId, assignmentId }: { rank: number; grou
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 rows={4}
-                className="w-full resize-y rounded-[10px] border border-line bg-white px-3 py-2 text-[13px]"
+                className="field h-auto w-full resize-y px-3 py-2 text-[13px]"
               />
               {approve.isError && <ErrorPanel error={approve.error} />}
               <div className="flex flex-wrap justify-end gap-2">
@@ -288,7 +292,7 @@ function GroupCard({ rank, group, courseId, assignmentId }: { rank: number; grou
             </div>
           ) : (
             <div className="flex flex-wrap items-start gap-3">
-              <p className="min-w-0 flex-1 rounded-[10px] border border-line bg-paper/60 px-3 py-2 text-[13px]">
+              <p className="min-w-0 flex-1 rounded-lg border border-line bg-paper/60 px-3 py-2 text-[13px] leading-relaxed">
                 {group.approvedExplanation ?? group.explanation}
                 {!group.approvedExplanation && <span className="ml-1 text-[11px] text-ink-muted">· AI draft</span>}
               </p>
@@ -324,7 +328,7 @@ function GroupCard({ rank, group, courseId, assignmentId }: { rank: number; grou
                         {m.studentName}
                       </Link>
                       <span className="text-ink-muted">{categoryLabels[m.category] ?? m.category}</span>
-                      {m.points != null && m.points > 0 && <b className="text-[#8f2d2d]">−{round(m.points)}</b>}
+                      {m.points != null && m.points > 0 && <b className="text-danger">−{round(m.points)}</b>}
                       {name && (
                         <span className="font-mono text-ink-muted">
                           {name}
@@ -344,15 +348,6 @@ function GroupCard({ rank, group, courseId, assignmentId }: { rank: number; grou
   );
 }
 
-function Stat({ label, value, note }: { label: string; value: ReactNode; note: string }) {
-  return (
-    <div className="border-b border-line px-4 py-3 md:border-b-0 md:border-r md:last:border-r-0">
-      <div className="text-xs text-ink-muted">{label}</div>
-      <div className="text-[22px] font-bold leading-tight">{value}</div>
-      <div className="text-[11px] text-ink-muted">{note}</div>
-    </div>
-  );
-}
 
 function round(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);

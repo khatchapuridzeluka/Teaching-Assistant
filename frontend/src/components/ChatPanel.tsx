@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { sendChat } from "../api/chat";
+import { ArrowUp, MessageSquarePlus, Sparkles, Square, X } from "lucide-react";
 import { Button } from "./ui";
 import { useChatHistory } from "./useChatHistory";
 
@@ -49,18 +50,22 @@ export function ChatPanel({ page, onClose }: { page: string | null; onClose: () 
   }
 
   return (
-    <aside className="flex h-full w-full max-w-[400px] shrink-0 flex-col border-l border-line bg-white xl:w-[400px]">
-      <header className="flex items-center justify-between gap-3 border-b border-line px-[18px] py-3.5">
+    <aside className="flex h-full w-full max-w-[400px] shrink-0 animate-slide-left flex-col border-l border-line bg-white xl:w-[400px]">
+      <header className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
         <div className="flex min-w-0 items-center gap-2.5">
-          <AgentMark size="h-7 w-7" text="text-[11px]" />
+          <AgentMark size="h-8 w-8" />
           <div className="min-w-0">
-            <div className="text-sm font-bold">Ask agent</div>
+            <div className="font-display text-[17px] font-semibold leading-tight">Ask agent</div>
             <div className="truncate text-[11px] text-ink-muted">{page ?? "General question"}</div>
           </div>
         </div>
-        <div className="flex shrink-0 gap-1.5">
-          <Button small onClick={clear} disabled={waiting || turns.length === 0}>New chat</Button>
-          <Button small onClick={onClose}>Close</Button>
+        <div className="flex shrink-0 gap-1">
+          <Button small variant="ghost" icon={<MessageSquarePlus />} onClick={clear} disabled={waiting || turns.length === 0} title="Start a new conversation">
+            New
+          </Button>
+          <Button small variant="ghost" className="px-1.5" onClick={onClose} aria-label="Close" title="Close">
+            <X className="h-4 w-4" />
+          </Button>
         </div>
       </header>
 
@@ -71,13 +76,15 @@ export function ChatPanel({ page, onClose }: { page: string | null; onClose: () 
               Ask about teaching, rubrics or feedback wording, or paste code to review. The agent cannot see your courses
               or submissions yet.
             </p>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="eyebrow mt-1">Try</div>
+            <div className="flex flex-col gap-1.5">
               {suggestions.map((suggestion) => (
                 <button
                   key={suggestion}
                   onClick={() => send(suggestion)}
-                  className="rounded-full border border-line bg-white px-2.5 py-1 text-left text-[11px] font-semibold hover:border-accent"
+                  className="flex items-start gap-2 rounded-lg border border-line bg-white px-3 py-2 text-left text-xs font-medium shadow-card transition-all hover:-translate-y-px hover:border-accent hover:shadow-raised"
                 >
+                  <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warn" />
                   {suggestion}
                 </button>
               ))}
@@ -87,14 +94,14 @@ export function ChatPanel({ page, onClose }: { page: string | null; onClose: () 
           <div className="flex flex-col gap-3.5">
             {turns.map((turn, i) =>
               turn.role === "User" ? (
-                <div key={i} className="max-w-[88%] self-end whitespace-pre-wrap rounded-xl rounded-br-sm bg-ink px-3 py-2.5 text-white">
+                <div key={i} className="max-w-[88%] animate-rise self-end whitespace-pre-wrap rounded-xl rounded-br-sm bg-navy px-3 py-2.5 text-white">
                   {turn.text}
                 </div>
               ) : (
-                <div key={i} className="flex min-w-0 items-start gap-2">
+                <div key={i} className="flex min-w-0 animate-rise items-start gap-2">
                   <AgentMark size="mt-0.5 h-6 w-6" />
                   <div
-                    className={`min-w-0 flex-1 rounded-xl rounded-tl-sm px-3.5 py-3 ${turn.error ? "border border-l-4 border-line border-l-ink bg-white" : "bg-paper"}`}
+                    className={`min-w-0 flex-1 rounded-xl rounded-tl-sm px-3.5 py-3 ${turn.error ? "border border-danger/30 bg-danger-tint/50 text-danger-ink" : "bg-paper"}`}
                   >
                     <div className="markdown">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>{turn.text}</ReactMarkdown>
@@ -124,7 +131,7 @@ export function ChatPanel({ page, onClose }: { page: string | null; onClose: () 
           send(input);
         }}
       >
-        <div className="rounded-[10px] border border-line focus-within:border-accent">
+        <div className="rounded-[10px] border border-line bg-white transition-shadow focus-within:border-accent focus-within:shadow-[0_0_0_3px_rgb(24_87_214/0.16)]">
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -136,13 +143,17 @@ export function ChatPanel({ page, onClose }: { page: string | null; onClose: () 
             }}
             rows={3}
             placeholder="Ask the agent…"
-            className="block w-full resize-none rounded-[10px] px-3 pt-2.5 outline-none"
+            className="block w-full resize-none rounded-[10px] bg-transparent px-3 pt-2.5 outline-none placeholder:text-ink-faint"
           />
           <div className="flex justify-end px-2 pb-2">
             {waiting ? (
-              <Button small type="button" onClick={() => abort.current?.abort()}>Stop</Button>
+              <Button small type="button" icon={<Square />} onClick={() => abort.current?.abort()}>
+                Stop
+              </Button>
             ) : (
-              <Button small variant="primary" type="submit" disabled={!input.trim()}>Send</Button>
+              <Button small variant="primary" type="submit" icon={<ArrowUp />} disabled={!input.trim()}>
+                Send
+              </Button>
             )}
           </div>
         </div>
@@ -154,13 +165,10 @@ export function ChatPanel({ page, onClose }: { page: string | null; onClose: () 
   );
 }
 
-function AgentMark({ size, text = "text-[10px]" }: { size: string; text?: string }) {
+function AgentMark({ size }: { size: string; text?: string }) {
   return (
-    <span
-      aria-hidden="true"
-      className={`flex shrink-0 items-center justify-center rounded-md bg-accent font-bold text-white ${size} ${text}`}
-    >
-      TA
+    <span aria-hidden="true" className={`flex shrink-0 items-center justify-center rounded-lg bg-mark text-navy ${size}`}>
+      <Sparkles className="h-[55%] w-[55%]" />
     </span>
   );
 }

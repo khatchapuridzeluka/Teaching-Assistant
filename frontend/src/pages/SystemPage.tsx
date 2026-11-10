@@ -2,9 +2,10 @@ import { createContext, type ReactNode, useContext, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import type { JobOverviewItem, JobStatus, JobType } from "../api/client";
 import { useCourses, useJobAction, useJobChildren, useJobOverview } from "../api/hooks";
-import { Avatar, Button, Card, Chip, EmptyState, ErrorPanel, PageHeader, Spinner } from "../components/ui";
+import { Avatar, Button, Card, EmptyState, ErrorPanel, PageHeader, Spinner, Stat, StatStrip, Tabs } from "../components/ui";
 import { FilterChips } from "../components/FilterChips";
-import { JobDetailsModal, JobIcon } from "../components/JobDetails";
+import { JobDetailsModal, JobIcon, JobStatusChip } from "../components/JobDetails";
+import { Ban, CircleCheck, CircleX, Clock, Cpu, ListChecks, Play } from "lucide-react";
 import { UsageView } from "../components/UsageView";
 import { formatAge, formatDate, initials } from "../format";
 
@@ -49,20 +50,15 @@ export function SystemPage() {
   return (
     <>
       <PageHeader title="System" subtitle="What runs in the background and what it costs in model tokens" />
-      <nav className="flex gap-1 border-b border-line" aria-label="System sections">
-        {(["queue", "usage"] as const).map((key) => (
-          <button
-            key={key}
-            onClick={() => setSearchParams(key === "queue" ? {} : { tab: key }, { replace: true })}
-            aria-pressed={tab === key}
-            className={`-mb-px border-b-2 px-3 py-2 text-[13px] font-semibold ${
-              tab === key ? "border-accent text-ink" : "border-transparent text-ink-muted hover:text-ink"
-            }`}
-          >
-            {key === "queue" ? "Queue" : "Model usage"}
-          </button>
-        ))}
-      </nav>
+      <Tabs
+        label="System sections"
+        value={tab}
+        onChange={(key) => setSearchParams(key === "queue" ? {} : { tab: key }, { replace: true })}
+        tabs={[
+          { value: "queue", label: "Queue", icon: <ListChecks /> },
+          { value: "usage", label: "Model usage", icon: <Cpu /> },
+        ]}
+      />
       {tab === "queue" ? <QueueView /> : <UsageView />}
     </>
   );
@@ -104,13 +100,13 @@ function QueueView() {
       {overview.isLoading && <Spinner />}
 
       {counts && (
-        <div className="grid grid-cols-2 border-t border-line md:grid-cols-5">
-          <Stat label="Running" value={counts.running} note="right now" />
-          <Stat label="Queued" value={counts.queued} note="waiting for a free slot" />
-          <Stat label="Succeeded" value={counts.succeeded} note="last 24 hours" />
-          <Stat label="Failed" value={counts.failed} note="last 24 hours" tone={counts.failed > 0 ? "bad" : undefined} />
-          <Stat label="Canceled" value={counts.canceled} note="last 24 hours" />
-        </div>
+        <StatStrip columns={5}>
+          <Stat label="Running" value={counts.running} note="right now" icon={<Play />} tone={counts.running > 0 ? "mark" : undefined} />
+          <Stat label="Queued" value={counts.queued} note="waiting for a free slot" icon={<Clock />} />
+          <Stat label="Succeeded" value={counts.succeeded} note="last 24 hours" icon={<CircleCheck />} />
+          <Stat label="Failed" value={counts.failed} note="last 24 hours" icon={<CircleX />} tone={counts.failed > 0 ? "bad" : undefined} />
+          <Stat label="Canceled" value={counts.canceled} note="last 24 hours" icon={<Ban />} />
+        </StatStrip>
       )}
 
       {opened && (
@@ -135,12 +131,14 @@ function QueueView() {
                   key={filter.label}
                   onClick={() => setStatus(filter.key)}
                   aria-pressed={selected}
-                  className={`inline-flex h-7 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold ${
-                    selected ? "border-accent bg-accent text-white" : "border-line bg-white text-ink hover:border-accent"
+                  className={`inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors ${
+                    selected
+                      ? "border-accent bg-accent-tint font-semibold text-accent-strong shadow-[inset_0_0_0_1px_var(--color-accent)]"
+                      : "border-line bg-white text-ink-soft hover:border-ink-faint hover:bg-paper"
                   }`}
                 >
                   {filter.label}
-                  {count != null && <span className={selected ? "text-white/80" : "text-ink-muted"}>{count}</span>}
+                  {count != null && <span className={`font-mono text-[10.5px] ${selected ? "text-accent" : "text-ink-faint"}`}>{count}</span>}
                 </button>
               );
             })}
@@ -210,8 +208,8 @@ function GroupProgress({ item, expanded, onToggle }: { item: JobOverviewItem; ex
   return (
     <div className="mt-1.5 flex flex-col gap-1">
       <div className="flex h-1.5 w-full max-w-[280px] overflow-hidden rounded-full bg-paper-dark" aria-hidden>
-        <div className="h-full bg-accent" style={{ width: `${(counts.succeeded / total) * 100}%` }} />
-        <div className="h-full bg-[#8f2d2d]" style={{ width: `${(counts.failed / total) * 100}%` }} />
+        <div className="bar-fill h-full bg-success" style={{ width: `${(counts.succeeded / total) * 100}%` }} />
+        <div className="h-full bg-danger" style={{ width: `${(counts.failed / total) * 100}%` }} />
         <div className="h-full bg-ink-muted/40" style={{ width: `${(counts.canceled / total) * 100}%` }} />
       </div>
       <div className="flex flex-wrap items-center gap-x-2 text-[11px] text-ink-muted">
@@ -220,7 +218,7 @@ function GroupProgress({ item, expanded, onToggle }: { item: JobOverviewItem; ex
         </span>
         {counts.running > 0 && <span>· {counts.running} running</span>}
         {counts.queued > 0 && <span>· {counts.queued} waiting</span>}
-        {counts.failed > 0 && <span className="font-semibold text-[#8f2d2d]">· {counts.failed} failed</span>}
+        {counts.failed > 0 && <span className="font-semibold text-danger">· {counts.failed} failed</span>}
         {counts.canceled > 0 && <span>· {counts.canceled} canceled</span>}
         <button onClick={onToggle} aria-expanded={expanded} className="font-semibold text-accent hover:underline">
           {item.job.type === "GradeStudent"
@@ -251,7 +249,7 @@ function ChildJobs({ parentId, courseName }: { parentId: string; courseName: str
   return (
     <>
       {(children.data ?? []).map((child) => (
-        <li key={child.job.id} className="border-l-4 border-accent-tint bg-paper/40">
+        <li key={child.job.id} className="border-l-4 border-accent/30 bg-paper/60">
           <JobRowBody
             item={child}
             courseName={courseName}
@@ -295,7 +293,7 @@ function JobRowBody({
   const Row = nested ? "div" : "li";
 
   return (
-    <Row className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-[18px] py-3 @4xl:grid-cols-[110px_minmax(0,1fr)_150px_170px_auto]">
+    <Row className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-[18px] py-3 @4xl:grid-cols-[110px_minmax(0,1fr)_150px_170px_200px]">
       <div className="@4xl:order-none order-3 col-span-2 flex flex-wrap items-center gap-1.5 @4xl:col-span-1">
         <StatusChip item={item} />
       </div>
@@ -314,7 +312,7 @@ function JobRowBody({
               "—"}
           </div>
           {job.error && (
-            <div className="mt-0.5 line-clamp-2 text-xs text-[#8f2d2d]" title={job.error}>
+            <div className="mt-0.5 line-clamp-2 text-xs text-danger" title={job.error}>
               {job.error}
             </div>
           )}
@@ -359,19 +357,7 @@ function JobRowBody({
 
 function StatusChip({ item }: { item: JobOverviewItem }) {
   const { job } = item;
-  if (job.status === "Failed") {
-    return <span className="inline-flex h-[22px] items-center rounded-full bg-[#8f2d2d] px-2.5 text-[11px] font-semibold text-white">Failed</span>;
-  }
-  if (job.status === "Running") {
-    return <Chip tone="accent">{job.cancelRequested ? "Canceling…" : "Running"}</Chip>;
-  }
-  if (job.status === "Queued") {
-    return <Chip tone="tint">{job.attempts > 0 ? "Retry queued" : "Queued"}</Chip>;
-  }
-  if (job.status === "Canceled") {
-    return <Chip tone="muted">Canceled</Chip>;
-  }
-  return <Chip tone="outline">Succeeded</Chip>;
+  return <JobStatusChip status={job.status} cancelRequested={job.cancelRequested} retrying={job.status === "Queued" && job.attempts > 0} />;
 }
 
 function Timing({ item }: { item: JobOverviewItem }) {
@@ -394,15 +380,6 @@ function Timing({ item }: { item: JobOverviewItem }) {
   return <span>{job.finishedAt ? `finished ${formatAge(job.finishedAt)} ago` : "—"}</span>;
 }
 
-function Stat({ label, value, note, tone }: { label: string; value: ReactNode; note: string; tone?: "bad" }) {
-  return (
-    <div className="border-b border-line px-4 py-3 md:border-b-0 md:border-r md:last:border-r-0">
-      <div className="text-xs text-ink-muted">{label}</div>
-      <div className={`text-[22px] font-bold leading-tight ${tone === "bad" ? "text-[#8f2d2d]" : ""}`}>{value}</div>
-      <div className="text-[11px] text-ink-muted">{note}</div>
-    </div>
-  );
-}
 
 function formatSeconds(ms: number): string {
   const seconds = Math.max(0, Math.round(ms / 1000));

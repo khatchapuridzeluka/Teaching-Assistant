@@ -1,16 +1,16 @@
-import { type ReactNode, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { ModelCallItem, ModelCallPurpose, ModelUsageTotal } from "../api/client";
 import { FilterChips } from "./FilterChips";
 import { useModelUsage } from "../api/hooks";
 import { formatDate, formatDay } from "../format";
-import { Card, CardHeader, Chip, EmptyState, ErrorPanel, Spinner } from "./ui";
+import { Card, CardHeader, Chip, EmptyState, ErrorPanel, Spinner, Stat, StatStrip } from "./ui";
 
 const series = [
-  { key: "uncached", label: "Prompt, not cached", color: "#2a78d6" },
-  { key: "cached", label: "Prompt, from cache", color: "#eb6834" },
-  { key: "output", label: "Output", color: "#1baf7a" },
+  { key: "uncached", label: "Prompt, not cached", color: "#1857d6" },
+  { key: "cached", label: "Prompt, from cache", color: "#a9c1f4" },
+  { key: "output", label: "Output", color: "#f2b400" },
 ] as const;
 
 const purposeLabels: Record<string, string> = {
@@ -87,7 +87,7 @@ export function UsageView() {
 
       {data && hasCalls && (
         <>
-          <div className="grid grid-cols-2 border-t border-line md:grid-cols-5">
+          <StatStrip columns={5}>
             <Stat
               label={`Calls · ${workLabel}`}
               value={summary?.calls ?? 0}
@@ -97,7 +97,7 @@ export function UsageView() {
             <Stat label="Output per call" value={summary?.calls ? tokens(summary.averageOutputTokens) : "–"} note="tokens written, on average" />
             <Stat label="From cache" value={percent(summary?.cacheHitRate)} note="share of the prompt tokens" />
             <Stat label="Time per call" value={summary?.calls ? seconds(summary.averageDurationMs) : "–"} note="average" />
-          </div>
+          </StatStrip>
 
           <Card>
             <CardHeader title="Tokens per day" subtitle={`${workLabel}, last ${days} days`} />
@@ -107,23 +107,23 @@ export function UsageView() {
             <div className="h-[240px] px-2 pb-3 pt-1">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} margin={{ top: 8, right: 12, bottom: 0, left: 4 }} barCategoryGap="20%">
-                  <CartesianGrid vertical={false} stroke="#ecebe7" />
+                  <CartesianGrid vertical={false} stroke="#e9ecf3" />
                   <XAxis
                     dataKey="date"
                     tickFormatter={(d: string) => formatDay(d)}
-                    tick={{ fontSize: 11, fill: "#6b6e70" }}
+                    tick={{ fontSize: 11, fill: "#5d6985" }}
                     tickLine={false}
-                    axisLine={{ stroke: "#dedcd7" }}
+                    axisLine={{ stroke: "#dcdfea" }}
                     minTickGap={24}
                   />
                   <YAxis
                     tickFormatter={(v: number) => tokens(v)}
-                    tick={{ fontSize: 11, fill: "#6b6e70" }}
+                    tick={{ fontSize: 11, fill: "#5d6985" }}
                     tickLine={false}
                     axisLine={false}
                     width={44}
                   />
-                  <Tooltip cursor={{ fill: "rgba(31,35,38,0.06)" }} content={<DayTooltip />} />
+                  <Tooltip cursor={{ fill: "rgba(22,32,58,0.06)" }} content={<DayTooltip />} />
                   {series.map((s, i) => (
                     <Bar
                       key={s.key}
@@ -227,7 +227,7 @@ function PurposeRow({ total, selected, onSelect }: { total: ModelUsageTotal; sel
         </button>
       </td>
       <td className="px-3 py-2">{total.calls}</td>
-      <td className={`px-3 py-2 ${total.failed > 0 ? "font-semibold text-[#8f2d2d]" : ""}`}>{total.failed}</td>
+      <td className={`px-3 py-2 ${total.failed > 0 ? "font-semibold text-danger" : ""}`}>{total.failed}</td>
       <td className="px-3 py-2">{tokens(prompt)}</td>
       <td className="px-3 py-2">{percent(total.cacheHitRate)}</td>
       <td className="px-3 py-2">{tokens(total.outputTokens)}</td>
@@ -251,7 +251,7 @@ function CallRow({ call }: { call: ModelCallItem }) {
           {call.succeeded ? (
             <Chip tone="outline">{purposeLabels[call.purpose] ?? call.purpose}</Chip>
           ) : (
-            <span className="inline-flex h-[22px] items-center rounded-full bg-[#8f2d2d] px-2.5 text-[11px] font-semibold text-white">
+            <span className="inline-flex h-[22px] items-center rounded-full bg-danger px-2.5 text-[11px] font-semibold text-white">
               {purposeLabels[call.purpose] ?? call.purpose} failed
             </span>
           )}
@@ -269,7 +269,7 @@ function CallRow({ call }: { call: ModelCallItem }) {
           {call.assignmentTitle && <span className="truncate text-ink-muted">· {call.assignmentTitle}</span>}
         </div>
         {call.error && (
-          <div className="mt-0.5 line-clamp-2 text-[#8f2d2d]" title={call.error}>
+          <div className="mt-0.5 line-clamp-2 text-danger" title={call.error}>
             {call.error}
           </div>
         )}
@@ -341,15 +341,6 @@ function DayTooltip({ active, label, payload }: DayTooltipProps) {
   );
 }
 
-function Stat({ label, value, note }: { label: string; value: ReactNode; note: string }) {
-  return (
-    <div className="border-b border-line px-4 py-3 md:border-b-0 md:border-r md:last:border-r-0">
-      <div className="text-xs text-ink-muted">{label}</div>
-      <div className="text-[22px] font-bold leading-tight">{value}</div>
-      <div className="text-[11px] text-ink-muted">{note}</div>
-    </div>
-  );
-}
 
 function tokens(value: number): string {
   if (value >= 1_000_000) {

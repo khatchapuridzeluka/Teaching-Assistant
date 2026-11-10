@@ -1,6 +1,7 @@
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router";
+import { ArrowRight, CircleCheck, Loader, TriangleAlert, X } from "lucide-react";
 import type { JobInfo } from "../api/client";
 import { useJob } from "../api/hooks";
 
@@ -101,7 +102,7 @@ export function JobToastProvider({ children }: { children: ReactNode }) {
       {tracked.map((entry) => (
         <JobWatcher key={entry.jobId} entry={entry} onChange={onChange} />
       ))}
-      <div className="pointer-events-none fixed inset-x-0 top-3 z-[60] flex flex-col items-center gap-2 px-4">
+      <div className="pointer-events-none fixed inset-x-0 top-[58px] z-[60] lg:top-4 flex flex-col items-center gap-2 px-4">
         {toasts.map((toast) => (
           <ToastCard key={toast.id} toast={toast} onClose={() => dismiss(toast.id)} />
         ))}
@@ -122,32 +123,34 @@ function JobWatcher({ entry, onChange }: { entry: TrackedJob; onChange: (entry: 
   return null;
 }
 
-const toneStyles: Record<ToastTone, string> = {
-  info: "bg-accent text-white",
-  success: "bg-accent text-white",
-  error: "bg-[#8f2d2d] text-white",
+const toneStyles: Record<ToastTone, { bar: string; icon: ReactNode }> = {
+  info: { bar: "bg-mark", icon: <Loader className="h-4 w-4 text-mark" /> },
+  success: { bar: "bg-[#4ade80]", icon: <CircleCheck className="h-4 w-4 text-[#4ade80]" /> },
+  error: { bar: "bg-[#ff8a7a]", icon: <TriangleAlert className="h-4 w-4 text-[#ff8a7a]" /> },
 };
 
 function ToastCard({ toast, onClose }: { toast: Toast; onClose: () => void }) {
+  const tone = toneStyles[toast.tone];
   return (
     <div
       role="status"
-      className={`pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-[10px] px-4 py-3 text-xs shadow-lg ${toneStyles[toast.tone]} ${
+      className={`pointer-events-auto relative flex w-full max-w-sm items-start gap-3 overflow-hidden rounded-[10px] bg-navy py-3 pl-5 pr-3 text-xs text-white shadow-pop ${
         toast.leaving ? "toast-leave" : "toast-enter"
       }`}
     >
-      <span className="mt-0.5 text-sm leading-none">{toast.tone === "success" ? "✓" : toast.tone === "error" ? "!" : "•"}</span>
+      <span className={`absolute inset-y-0 left-0 w-1 ${tone.bar}`} aria-hidden />
+      <span className="mt-0.5 shrink-0">{tone.icon}</span>
       <div className="min-w-0 flex-1">
         <b className="block text-[13px]">{toast.title}</b>
-        <span className="block break-words opacity-90">{toast.detail}</span>
+        <span className="block break-words text-white/75">{toast.detail}</span>
         {toast.link && (
-          <Link to={toast.link.to} onClick={onClose} className="mt-1 inline-block font-semibold underline">
-            {toast.link.label}
+          <Link to={toast.link.to} onClick={onClose} className="mt-1.5 inline-flex items-center gap-1 font-semibold text-mark hover:underline">
+            {toast.link.label} <ArrowRight className="h-3 w-3" />
           </Link>
         )}
       </div>
-      <button onClick={onClose} aria-label="Dismiss" className="shrink-0 text-sm leading-none opacity-80 hover:opacity-100">
-        ×
+      <button onClick={onClose} aria-label="Dismiss" className="shrink-0 rounded p-0.5 text-white/60 hover:bg-white/10 hover:text-white">
+        <X className="h-3.5 w-3.5" />
       </button>
     </div>
   );

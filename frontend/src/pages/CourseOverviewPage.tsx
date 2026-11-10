@@ -1,30 +1,39 @@
-import type { ReactNode } from "react";
 import { Link, useParams } from "react-router";
-import { useAssignments, useCourses } from "../api/hooks";
-import { CourseName } from "../components/Layout";
-import { Button, Card, CardHeader, Chip, EmptyState, ErrorPanel, PageHeader, Spinner } from "../components/ui";
-import { formatDate } from "../format";
-import { coursePath, courseSections } from "../navigation";
+import { ArrowRight, CalendarClock, ClipboardList, ExternalLink, GraduationCap, PartyPopper, Sparkles, Users } from "lucide-react";
+import { useAssignments, useCourseGradings, useCourses, useGradebook } from "../api/hooks";
+import { AssignmentTable } from "../components/AssignmentTable";
+import { Score, SeverityDots } from "../components/bits";
+import { CourseName, CourseTile } from "../components/Layout";
+import { Avatar, Button, Card, CardHeader, EmptyState, ErrorPanel, PageHeader, Spinner, Stat, StatStrip } from "../components/ui";
+import { formatDate, initials } from "../format";
+import { coursePath } from "../navigation";
 
 export function CourseOverviewPage() {
   const { courseId = "" } = useParams();
   const course = useCourses().data?.find((c) => c.id === courseId);
   const assignments = useAssignments(courseId);
+  const gradebook = useGradebook(courseId);
+  const gradings = useCourseGradings(courseId);
 
   const now = Date.now();
   const nextDue = assignments.data
     ?.filter((a) => a.dueAt && new Date(a.dueAt).getTime() > now)
     .sort((a, b) => new Date(a.dueAt!).getTime() - new Date(b.dueAt!).getTime())[0];
+  const waiting = (gradings.data ?? []).filter((d) => d.reportStatus !== "Approved");
+  const titles = new Map((assignments.data ?? []).map((a) => [a.id, a.title]));
+  const book = gradebook.data;
+  const synced = book?.syncedAt != null;
 
   return (
     <>
       <PageHeader
+        lead={<CourseTile courseId={courseId} name={course?.name ?? "Course"} size="lg" />}
         title={<CourseName courseId={courseId} />}
         subtitle={course && `${course.section ?? "No section"} · ${course.state.toLowerCase()} in Google Classroom`}
         actions={
           course?.link && (
             <a href={course.link} target="_blank" rel="noreferrer">
-              <Button>Open in Classroom ↗</Button>
+              <Button icon={<ExternalLink />}>Open in Classroom</Button>
             </a>
           )
         }
@@ -32,83 +41,121 @@ export function CourseOverviewPage() {
 
       {assignments.isError && <ErrorPanel error={assignments.error} />}
 
-      <Card>
-        <div className="grid grid-cols-2 gap-px overflow-hidden rounded-[10px] bg-line md:grid-cols-4">
-          <Tile label="Assignments" value={assignments.data?.length ?? "–"} note="published in Classroom" />
-          <Tile
-            label="Next deadline"
-            value={nextDue ? formatDate(nextDue.dueAt) : "None"}
-            note={nextDue ? nextDue.title : "no upcoming due dates"}
-            small
-          />
-          <Tile label="Drafts to review" value="–" note="soon: Review queue" muted />
-          <Tile label="Students" value="–" note="soon: Students" muted />
-        </div>
-      </Card>
-
-      <Card>
-        <CardHeader
-          title="Recent assignments"
-          actions={
-            <Link to={coursePath(courseId, "assignments")} className="text-xs font-semibold text-accent">
-              All assignments →
-            </Link>
-          }
+      <StatStrip>
+        <Stat label="Assignments" value={assignments.data?.length ?? "–"} note="published in Classroom" icon={<ClipboardList />} />
+        <Stat
+          label="Next deadline"
+          value={nextDue ? formatDate(nextDue.dueAt) : "None"}
+          note={nextDue ? nextDue.title : "no upcoming due dates"}
+          icon={<CalendarClock />}
         />
-        {assignments.isLoading && (
-          <div className="px-[18px] py-3">
-            <Spinner />
-          </div>
-        )}
-        {assignments.data?.length === 0 && <EmptyState>This course has no published assignments.</EmptyState>}
-        <ul>
-          {assignments.data?.slice(0, 4).map((assignment) => (
-            <li key={assignment.id} className="border-b border-paper-dark last:border-b-0">
-              <Link
-                to={`${coursePath(courseId, "assignments")}/${assignment.id}`}
-                className="flex items-center justify-between gap-4 px-[18px] py-2.5 hover:bg-paper/60"
-              >
-                <span className="truncate font-semibold">{assignment.title}</span>
-                <span className="shrink-0 text-xs text-ink-muted">
-                  Due {formatDate(assignment.dueAt)}
-                  <span className="hidden sm:inline"> · {assignment.maxPoints ?? "–"} points</span>
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </Card>
+        <Stat
+          label="Drafts to review"
+          value={gradings.data ? waiting.length : "–"}
+          note={waiting.length > 0 ? "AI drafts waiting for you" : "nothing waiting"}
+          tone={waiting.length > 0 ? "mark" : undefined}
+          icon={<Sparkles />}
+        />
+        <Stat
+          label="Class average"
+          value={book?.classAveragePercent == null ? "–" : `${Math.round(book.classAveragePercent)}%`}
+          note={synced ? `${book!.students.length} students · missing work as 0` : "sync the course on Students"}
+          icon={<GraduationCap />}
+        />
+      </StatStrip>
 
-      <div>
-        <h2 className="mb-2.5 text-[11px] font-bold uppercase tracking-[0.06em] text-accent">In this course</h2>
-        <div className="grid grid-cols-1 gap-[14px] md:grid-cols-2 xl:grid-cols-3">
-          {courseSections
-            .filter((section) => section.path !== "")
-            .map((section) => (
-              <Link key={section.path} to={coursePath(courseId, section.path)}>
-                <Card className="flex h-full flex-col gap-1.5 p-[16px] transition-colors hover:border-accent">
-                  <div className="flex items-center justify-between gap-3">
-                    <b className="text-sm">{section.label}</b>
-                    <Chip tone={section.ready ? "tint" : "dashed"}>{section.ready ? "Ready" : "Soon"}</Chip>
-                  </div>
-                  <p className="text-xs text-ink-muted">{section.description}</p>
-                </Card>
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,380px)]">
+        <Card className="overflow-hidden">
+          <CardHeader
+            icon={<ClipboardList />}
+            title="Assignments"
+            subtitle="Newest first · graded, waiting and missing as Classroom has them"
+            actions={
+              <Link to={coursePath(courseId, "assignments")} className="text-xs font-semibold text-accent hover:underline">
+                All assignments →
               </Link>
-            ))}
+            }
+          />
+          {assignments.isLoading && (
+            <div className="px-[18px] py-3">
+              <Spinner />
+            </div>
+          )}
+          {assignments.data?.length === 0 && <EmptyState icon={<ClipboardList />}>This course has no published assignments.</EmptyState>}
+          {assignments.data && (
+            <AssignmentTable
+              courseId={courseId}
+              assignments={assignments.data.slice(0, 6)}
+              columns={book?.assignments}
+              drafts={gradings.data}
+              students={book?.students.length}
+            />
+          )}
+        </Card>
+
+        <div className="flex min-w-0 flex-col gap-4">
+          <Card className="overflow-hidden">
+            <CardHeader
+              icon={<Sparkles />}
+              title="Waiting for your review"
+              subtitle="AI drafts of this course"
+              actions={
+                waiting.length > 0 && (
+                  <Link to={coursePath(courseId, "drafts")} className="text-xs font-semibold text-accent hover:underline">
+                    All {waiting.length} →
+                  </Link>
+                )
+              }
+            />
+            {gradings.isLoading && (
+              <div className="px-[18px] py-3">
+                <Spinner />
+              </div>
+            )}
+            {gradings.data && waiting.length === 0 && (
+              <EmptyState icon={<PartyPopper />}>
+                <div className="font-semibold text-ink">Nothing to review</div>
+                Open an assignment and grade with AI; drafts wait here for you.
+              </EmptyState>
+            )}
+            <ul className="divide-y divide-paper-dark">
+              {waiting.slice(0, 6).map((draft) => (
+                <li key={draft.id}>
+                  <Link
+                    to={`${coursePath(courseId, "assignments")}/${draft.assignmentId}?student=${encodeURIComponent(draft.submissionId)}`}
+                    className="group flex items-center gap-3 px-[18px] py-2.5 transition-colors hover:bg-paper"
+                  >
+                    <Avatar text={initials(draft.studentName)} userId={draft.studentId} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-semibold">{draft.studentName}</span>
+                      <span className="block truncate text-[11px] text-ink-muted">{titles.get(draft.assignmentId) ?? "Assignment"}</span>
+                    </span>
+                    <span className="flex shrink-0 flex-col items-end gap-0.5">
+                      <Score score={draft.score} max={draft.maxScore} bonus={draft.bonus} />
+                      <SeverityDots major={draft.major} minor={draft.minor} style={draft.style} empty="no mistakes" />
+                    </span>
+                    <ArrowRight className="h-4 w-4 shrink-0 text-ink-faint transition-transform group-hover:translate-x-0.5 group-hover:text-accent" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </Card>
+
+          <Link
+            to={coursePath(courseId, "students")}
+            className="surface group flex items-center gap-3 px-[18px] py-3.5 transition-all hover:-translate-y-0.5 hover:border-ink-faint hover:shadow-raised"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-paper text-ink-muted">
+              <Users className="h-[18px] w-[18px]" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block font-semibold">Students and profiles</span>
+              <span className="block truncate text-xs text-ink-muted">Grades per assignment, mistake history and strengths for every student</span>
+            </span>
+            <ArrowRight className="h-4 w-4 shrink-0 text-ink-faint transition-transform group-hover:translate-x-0.5 group-hover:text-accent" />
+          </Link>
         </div>
       </div>
     </>
-  );
-}
-
-function Tile({ label, value, note, small, muted }: { label: string; value: ReactNode; note: string; small?: boolean; muted?: boolean }) {
-  return (
-    <div className="min-w-0 bg-white px-[18px] py-3.5">
-      <div className="text-xs text-ink-muted">{label}</div>
-      <div className={`truncate font-bold leading-tight tracking-tight ${small ? "py-1.5 text-[17px]" : "text-[28px]"} ${muted ? "text-ink-muted" : ""}`}>
-        {value}
-      </div>
-      <div className={`truncate text-xs font-semibold ${muted ? "text-ink-muted" : "text-accent"}`}>{note}</div>
-    </div>
   );
 }

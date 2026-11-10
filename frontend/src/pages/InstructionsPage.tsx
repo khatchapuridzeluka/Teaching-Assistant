@@ -24,7 +24,7 @@ export function InstructionsPage() {
       <Card>
         <InstructionsNotes state={state} />
         <div className="px-[18px] py-3.5">
-          <div className="mb-1 text-[11px] font-bold uppercase tracking-[0.06em] text-accent">Task statement</div>
+          <div className="mb-1 eyebrow">Task statement</div>
           {state.text ? (
             <p className="whitespace-pre-wrap leading-relaxed">{state.text}</p>
           ) : (
