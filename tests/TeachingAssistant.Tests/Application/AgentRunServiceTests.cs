@@ -22,7 +22,7 @@ public class AgentRunServiceTests
     private AgentRunService Service()
     {
         var agentTools = new AgentTools(_jobs, new JobReporter(_jobs, _jobs, _jobs), _runContext);
-        var gradingTools = new GradingTools(null!, null!, _runContext, TimeProvider.System);
+        var gradingTools = new GradingTools(null!, null!, null!, _runContext, TimeProvider.System);
         return new AgentRunService(_chats, _jobs, _jobs, _model, _tools, _studentTools, agentTools, gradingTools, _runContext,
             new ModelCallContext(), TimeProvider.System);
     }
@@ -186,6 +186,7 @@ public class AgentRunServiceTests
             if (entry.ToolName == "grade_student_assignment")
             {
                 _runContext.RecordQueuedJob(grading.Id);
+                _runContext.RecordLinks([new AgentLink(AgentLinkKind.Submission, "Nino's submission", "course-1", "a-4", "sub-1")]);
             }
             else if (entry.ToolName == "wait_for_jobs")
             {
@@ -209,6 +210,8 @@ public class AgentRunServiceTests
         Assert.NotNull(run.WaitUntil);
         Assert.Equal(5, run.Messages.Count); // the turn stopped after the wait
         Assert.Equal(grading.Id, run.Messages[2].JobId); // the grading's result links to its job
+        Assert.Equal("Nino's submission", Assert.Single(run.Messages[2].Links).Label);
+        Assert.Empty(run.Messages[4].Links);
         Assert.Null(run.Messages[4].JobId);
     }
 

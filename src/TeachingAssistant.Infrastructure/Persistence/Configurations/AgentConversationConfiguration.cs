@@ -55,6 +55,7 @@ public class AgentMessageConfiguration : IEntityTypeConfiguration<AgentMessage>
         builder.Property(m => m.Role).HasConversion<string>();
         builder.Property(m => m.Text).HasColumnType("text");
         builder.Property(m => m.ToolCalls).HasColumnType("jsonb");
+        builder.Property(m => m.Links).HasColumnType("jsonb");
 
         builder.HasOne<AgentConversation>()
             .WithMany()

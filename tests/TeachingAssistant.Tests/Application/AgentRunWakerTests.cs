@@ -1,3 +1,4 @@
+using TeachingAssistant.Application.Contracts;
 using TeachingAssistant.Application.Jobs;
 using TeachingAssistant.Application.Models;
 using TeachingAssistant.Application.Services;
@@ -38,7 +39,7 @@ public class AgentRunWakerTests
         var versionId = Guid.NewGuid();
         var job = new Job(JobType.GradeVersion, JobPayloads.Write(new GradeVersionPayload(versionId)), Now);
         _jobs.Jobs.Add(job);
-        _jobs.Subjects.Add(new JobSubject(versionId, 2, "course-1", "a-4", "Assignment 4", "sub-1", "s-1", student));
+        _jobs.Subjects.Add(new JobSubject(versionId, 2, "course-1", "a-4", "Assignment 4", $"sub-{student}", "s-1", student));
         if (score is { } points)
         {
             var grading = new AiGrading(versionId, "model", "review", points, 100, null, 1, [], [], "{}", [], Now);
@@ -77,6 +78,12 @@ public class AgentRunWakerTests
         Assert.Contains($"- Grading of Nino's Assignment 4, version 2: draft ready, score 78 of 100 (job id {first.Id})", notice.Text);
         Assert.Contains("- Grading of Giorgi's Assignment 4, version 2: draft ready, score 64 of 100", notice.Text);
 
+        Assert.Equal(
+        [
+            new AgentLink(AgentLinkKind.Submission, "Nino's draft · Assignment 4", "course-1", "a-4", "sub-Nino"),
+        ], AgentLinks.Read(notice.Links).Where(l => l.Label.StartsWith("Nino")));
+        Assert.Equal(2, AgentLinks.Read(notice.Links).Count);
+
         var resumed = _jobs.Jobs.Single(j => j.Type == JobType.AgentRun);
         Assert.Equal(run.Id, JobPayloads.Read<AgentRunPayload>(resumed.Payload).RunId);
         Assert.Equal(resumed.Id, run.JobId);
@@ -105,9 +112,10 @@ public class AgentRunWakerTests
         var notice = _chats.Messages[^1].Text;
         Assert.Contains("Common mistakes analysis ready: 40 mistakes from 15 students.", notice);
         Assert.Contains("Overview: Most students mixed up composition and inheritance.", notice);
-        Assert.Contains("  - Inheritance used for code reuse: 2 students, 3 mistakes\n  - Public fields: 1 students, 1 mistakes", notice);
+        Assert.Contains("  - Inheritance used for code reuse: 2 students, 3 mistakes\n  - Public fields: 1 student, 1 mistake", notice);
         Assert.Contains("(2 mistakes not grouped)", notice);
         Assert.Contains("For the next lecture: Revisit composition with one worked example.", notice);
+        Assert.Equal([new AgentLink(AgentLinkKind.CommonMistakes, "Common mistakes", "course-1", "a-4")], AgentLinks.Read(_chats.Messages[^1].Links));
     }
 
     private static ClusterMember Member(string studentId)
@@ -130,6 +138,34 @@ public class AgentRunWakerTests
         Assert.Equal(AgentRunStatus.Queued, run.Status);
         Assert.Contains("Not everything has finished after 30 minutes:", _chats.Messages[^1].Text);
         Assert.Contains("Grading of Nino's Assignment 4, version 2: still queued", _chats.Messages[^1].Text);
+        Assert.Null(_chats.Messages[^1].Links); // nothing finished, so nothing to open yet
+    }
+
+    [Fact]
+    public async Task ARun_IsWokenAsSoonAsItsOwnTurnEnds_WhenItsJobFinishedBeforeItStartedWaiting()
+    {
+        var analysis = new Job(JobType.AnalyzeMistakes, JobPayloads.Write(new AnalyzeMistakesPayload("course-1", "a-4")), Now,
+            courseId: "course-1", assignmentId: "a-4");
+        _jobs.Jobs.Add(analysis);
+        analysis.Start("worker", Now, TimeSpan.FromMinutes(10));
+        analysis.Fail("No student of this assignment has an AI draft yet.", temporary: false, Now);
+
+        var conversation = new AgentConversation(Now);
+        var run = new AgentRun(conversation.Id, Now);
+        _chats.Conversations.Add(conversation);
+        _chats.Runs.Add(run);
+        var turn = new Job(JobType.AgentRun, JobPayloads.Write(new AgentRunPayload(run.Id)), Now, maxAttempts: 1);
+        _jobs.Jobs.Add(turn);
+        run.AttachJob(turn.Id);
+        run.Start(Now);
+        run.WaitFor([analysis.Id], Now + AgentRun.WaitLimit);
+        Finish(turn, null);
+
+        await Waker().OnJobFinishedAsync(analysis.Id, TestContext.Current.CancellationToken); // nothing: the analysis finished earlier
+        await Waker().OnJobFinishedAsync(turn.Id, TestContext.Current.CancellationToken); // the turn ending wakes it
+
+        Assert.Equal(AgentRunStatus.Queued, run.Status);
+        Assert.Contains("Common mistakes analysis failed: No student of this assignment has an AI draft yet.", _chats.Messages[^1].Text);
     }
 
     [Fact]

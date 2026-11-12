@@ -24,7 +24,8 @@ public class StudentMistakeServiceTests
         _mistakes.Approve("a2", (MistakeSeverity.Major, MistakeCategory.Correctness, 5), (MistakeSeverity.Minor, MistakeCategory.Naming, 3));
     }
 
-    private StudentMistakeService Service() => new(_mistakes, _assignments, _submissions, _mistakes);
+    private StudentMistakeService Service() =>
+        new(new StudentRecordCollector(new NoDrafts(), _mistakes, _submissions, _mistakes, new NoDrafts()), _assignments, _submissions);
 
     [Fact]
     public async Task Breakdowns_GiveCountsAndPercents_PerCategorySeverityLabelAndAssignment()
@@ -40,6 +41,7 @@ public class StudentMistakeServiceTests
         Assert.Equal((2, 1, 0, 1, 1, 8.0), (result.Assignments[1].Total, result.Assignments[1].Major, result.Assignments[1].Style,
             result.Assignments[1].Minor, result.Assignments[1].Repeated, result.Assignments[1].PointsLost));
         Assert.Equal("Assignment 2", result.Mistakes[0].AssignmentTitle);
+        Assert.All(result.Mistakes, m => Assert.Equal(StudentRecordSource.Approved, m.Source));
     }
 
     [Fact]
@@ -109,6 +111,32 @@ public class StudentMistakeServiceTests
         public void AddRange(IEnumerable<StudentMistake> mistakes) => throw new NotSupportedException();
 
         public void RemoveRange(IEnumerable<StudentMistake> mistakes) => throw new NotSupportedException();
+    }
+
+    private sealed class NoDrafts : IGradingStore, IStudentStrengthStore
+    {
+        public Task<IReadOnlyList<GradingSummary>> GetSummariesAsync(
+            SubmissionSource source, string courseId, string? assignmentId, string? studentId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<GradingSummary>>([]);
+
+        public Task<IReadOnlyList<AiGrading>> GetByVersionsAsync(IReadOnlyCollection<Guid> versionIds, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<AiGrading?> FindAsync(Guid gradingId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public void Add(AiGrading grading) => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<StudentStrength>> GetByStudentAsync(string courseId, string studentId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<StudentStrength>>([]);
+
+        public Task<IReadOnlyList<StudentStrength>> GetByReportAsync(Guid reportId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public void AddRange(IEnumerable<StudentStrength> strengths) => throw new NotSupportedException();
+
+        public void RemoveRange(IEnumerable<StudentStrength> strengths) => throw new NotSupportedException();
+
+        public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
     private sealed class FakeSubmissions : ISubmissionStore

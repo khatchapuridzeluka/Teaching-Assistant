@@ -16,9 +16,10 @@ public class StudentAnalysisService : IStudentAnalysisService
     private const string MistakesPrompt =
         """
         You help a university programming teacher (Advanced Java, C++ basics) give one student feedback on the mistakes
-        they make across the course. The student is called "the student" and is never named. You get every assignment
-        the teacher has reviewed and approved for this student, in due-date order, with the points it was out of, the
-        points its mistakes cost, and each mistake the teacher kept: its severity, category, the points it cost, whether
+        they make across the course. The student is called "the student" and is never named. You get every graded
+        assignment of this student, in due-date order: the teacher's report where they reviewed it, otherwise the AI
+        draft that the teacher has not checked yet. For each you get the points it was out of, the points its mistakes
+        cost, and each mistake: its severity, category, the points it cost, whether
         it is new or repeated (the same category in an earlier assignment), and a short description. The trends at the
         end are counted in code and are exact.
 
@@ -51,8 +52,9 @@ public class StudentAnalysisService : IStudentAnalysisService
     private const string StrengthsPrompt =
         """
         You help a university programming teacher (Advanced Java, C++ basics) see what one student is good at across the
-        course. The student is called "the student" and is never named. You get every strength the teacher kept in the
-        student's approved reports, numbered, in due-date order of their assignments: the assignment, its category,
+        course. The student is called "the student" and is never named. You get every strength from the student's graded
+        assignments (the teacher's report where they reviewed it, otherwise the AI draft that the teacher has not checked
+        yet), numbered, in due-date order of their assignments: the assignment, its category,
         whether it is new, consistent (the same category was a strength in an earlier assignment) or improved (the same
         category was a mistake in an earlier assignment), and a short description of what the code showed. The counts at
         the end are exact.
@@ -101,8 +103,7 @@ public class StudentAnalysisService : IStudentAnalysisService
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    private readonly IStudentMistakeStore _mistakes;
-    private readonly IStudentStrengthStore _strengths;
+    private readonly StudentRecordCollector _records;
     private readonly ICourseAssignmentStore _assignments;
     private readonly IStudentAnalysisStore _analyses;
     private readonly ILanguageModel _languageModel;
@@ -110,11 +111,10 @@ public class StudentAnalysisService : IStudentAnalysisService
     private readonly TimeProvider _timeProvider;
 
     public StudentAnalysisService(
-        IStudentMistakeStore mistakes, IStudentStrengthStore strengths, ICourseAssignmentStore assignments,
-        IStudentAnalysisStore analyses, ILanguageModel languageModel, ModelCallContext callContext, TimeProvider timeProvider)
+        StudentRecordCollector records, ICourseAssignmentStore assignments, IStudentAnalysisStore analyses, ILanguageModel languageModel,
+        ModelCallContext callContext, TimeProvider timeProvider)
     {
-        _mistakes = mistakes;
-        _strengths = strengths;
+        _records = records;
         _assignments = assignments;
         _analyses = analyses;
         _languageModel = languageModel;
@@ -125,8 +125,7 @@ public class StudentAnalysisService : IStudentAnalysisService
     public async Task<Guid> AnalyzeAsync(
         string courseId, string studentId, StudentAnalysisKind kind, CancellationToken cancellationToken = default)
     {
-        var mistakes = await _mistakes.GetByStudentAsync(courseId, studentId, cancellationToken);
-        var strengths = await _strengths.GetByStudentAsync(courseId, studentId, cancellationToken);
+        var (mistakes, strengths, _) = await _records.CollectAsync(courseId, studentId, cancellationToken);
         var assignments = (await _assignments.GetByCourseAsync(SubmissionSource.GoogleClassroom, courseId, cancellationToken))
             .ToDictionary(a => a.ExternalAssignmentId);
 
@@ -155,7 +154,7 @@ public class StudentAnalysisService : IStudentAnalysisService
             if (mistakes.Count == 0)
             {
                 throw new InvalidRequestException(
-                    "This student has no recorded mistakes yet. Approve a report first (Edit draft → Approve).");
+                    "This student has no mistakes in any graded assignment yet: no current AI draft or report lists one. Grade an assignment first.");
             }
 
             var reply = await _languageModel.AnalyzeAsync(MistakesPrompt,
@@ -169,7 +168,7 @@ public class StudentAnalysisService : IStudentAnalysisService
             if (strengths.Count == 0)
             {
                 throw new InvalidRequestException(
-                    "This student has no recorded strengths yet. Strengths are recorded when you approve a report whose AI draft noted some.");
+                    "This student has no strengths in any graded assignment yet: no current AI draft or report lists one. Grade an assignment first.");
             }
 
             var ordered = Ordered(strengths, DueAt);
@@ -195,8 +194,7 @@ public class StudentAnalysisService : IStudentAnalysisService
             return null;
         }
 
-        var mistakes = await _mistakes.GetByStudentAsync(courseId, studentId, cancellationToken);
-        var strengths = await _strengths.GetByStudentAsync(courseId, studentId, cancellationToken);
+        var (mistakes, strengths, _) = await _records.CollectAsync(courseId, studentId, cancellationToken);
         var outdated = kind == StudentAnalysisKind.Mistakes
             ? analysis.IsOutdated(mistakes.Count, Latest(mistakes.Select(m => m.ApprovedAt)))
             : analysis.IsOutdated(strengths.Count, Latest(strengths.Select(s => s.ApprovedAt)));
@@ -206,14 +204,14 @@ public class StudentAnalysisService : IStudentAnalysisService
         {
             var titles = (await _assignments.GetByCourseAsync(SubmissionSource.GoogleClassroom, courseId, cancellationToken))
                 .ToDictionary(a => a.ExternalAssignmentId, a => a.Title);
-            var byId = strengths.ToDictionary(s => s.Id);
+            var byId = strengths.ToDictionary(Key);
             foreach (var group in analysis.Groups.OrderBy(g => g.Position))
             {
                 var members = group.StrengthIds.Where(byId.ContainsKey).Select(id => byId[id]).ToList();
                 groups.Add(new StrengthGroupResponse(group.Title, group.Explanation, group.Ungrouped, members.Count,
                     members.Select(m => m.AssignmentId).Distinct().Count(),
                     members.Select(m => m.Category).Distinct().ToList(),
-                    members.Select(m => new GroupedStrength(m.Id, titles.GetValueOrDefault(m.AssignmentId), m.Category, m.Message)).ToList()));
+                    members.Select(m => new GroupedStrength(Key(m), titles.GetValueOrDefault(m.AssignmentId), m.Category, m.Message)).ToList()));
             }
         }
 
@@ -322,17 +320,22 @@ public class StudentAnalysisService : IStudentAnalysisService
             }
 
             used.UnionWith(ids);
-            result.Add(new StrengthGroup(group.Title, group.Explanation ?? "", false, ids.Select(id => ordered[id - 1].Id)));
+            result.Add(new StrengthGroup(group.Title, group.Explanation ?? "", false, ids.Select(id => Key(ordered[id - 1]))));
         }
 
         var leftover = Enumerable.Range(1, ordered.Count).Where(id => !used.Contains(id)).ToList();
         if (leftover.Count > 0)
         {
             result.Add(new StrengthGroup("Not grouped", "Strengths the analysis did not put in a group.", true,
-                leftover.Select(id => ordered[id - 1].Id)));
+                leftover.Select(id => Key(ordered[id - 1]))));
         }
 
         return result;
+    }
+
+    internal static Guid Key(StudentStrength strength)
+    {
+        return strength.SourceStrengthId ?? strength.ReportStrengthId;
     }
 
     private static List<StudentStrength> Ordered(IReadOnlyList<StudentStrength> strengths, Func<string, DateTimeOffset?> dueAt)

@@ -42,6 +42,12 @@ public class AgentChatService : IAgentChatService
         result you have not received. Approving drafts is the teacher's decision: a fresh draft is not approved yet,
         and work that uses only approved reports does not include it until the teacher approves it.
 
+        When a step cannot run because something it needs is missing (no current drafts, submissions not fetched yet,
+        no instructions stored), do not stop at reporting the failure: say what is missing, which step would provide
+        it and what that costs, and offer to do it and then continue with the original request. Do a free step (a
+        fetch, a lookup) right away; ask first when the step is paid. Once the teacher agrees, carry out the whole
+        chain: the missing step, wait for it, then what they first asked for.
+
         What no tool gives you, you cannot see or do; say so plainly, and never claim to have done something that no
         tool did. You can always help without tools: explaining concepts, drafting rubric criteria or feedback
         wording, reviewing code the teacher pastes, or planning lessons.

@@ -195,7 +195,8 @@ public class AgentRunService : IAgentRunService
         if (entry.Role == AgentMessageRole.Tool)
         {
             var jobId = _runContext.TakeQueuedJob();
-            _chats.Add(conversation.AddToolResult(run.Id, entry.ToolCallId ?? "", entry.ToolName ?? "", entry.Text, jobId, now));
+            _chats.Add(conversation.AddToolResult(run.Id, entry.ToolCallId ?? "", entry.ToolName ?? "", entry.Text, jobId, now,
+                AgentLinks.Write(_runContext.TakeLinks())));
         }
         else
         {
@@ -262,7 +263,7 @@ public class AgentRunService : IAgentRunService
             ? []
             : JsonSerializer.Deserialize<List<AgentToolCall>>(message.ToolCalls, JsonOptions)!.Select(c => c.Name).ToList();
         return new AgentMessageResponse(message.Id, message.RunId, message.Sequence, message.Role, message.Text, calls, message.ToolName,
-            message.JobId, message.CreatedAt);
+            message.JobId, AgentLinks.Read(message.Links), message.CreatedAt);
     }
 
     private static string? Blank(string? value)

@@ -9,35 +9,28 @@ namespace TeachingAssistant.Application.Services;
 
 public class StudentMistakeService : IStudentMistakeService
 {
-    private readonly IStudentMistakeStore _mistakes;
+    private readonly StudentRecordCollector _records;
     private readonly ICourseAssignmentStore _assignments;
     private readonly ISubmissionStore _submissions;
-    private readonly IGradingReportStore _reports;
 
-    public StudentMistakeService(
-        IStudentMistakeStore mistakes, ICourseAssignmentStore assignments, ISubmissionStore submissions, IGradingReportStore reports)
+    public StudentMistakeService(StudentRecordCollector records, ICourseAssignmentStore assignments, ISubmissionStore submissions)
     {
-        _mistakes = mistakes;
+        _records = records;
         _assignments = assignments;
         _submissions = submissions;
-        _reports = reports;
     }
 
     public async Task<StudentMistakesResponse> GetAsync(
         string courseId, string studentId, StudentMistakeFilter? filter = null, CancellationToken cancellationToken = default)
     {
         filter ??= new StudentMistakeFilter();
-        var mistakes = await _mistakes.GetByStudentAsync(courseId, studentId, cancellationToken);
+        var records = await _records.CollectAsync(courseId, studentId, cancellationToken);
+        var mistakes = records.Mistakes;
         var assignments = (await _assignments.GetByCourseAsync(SubmissionSource.GoogleClassroom, courseId, cancellationToken))
             .ToDictionary(a => a.ExternalAssignmentId);
         var classroom = (await _submissions.GetByCourseAsync(SubmissionSource.GoogleClassroom, courseId, cancellationToken))
             .Where(s => s.StudentId == studentId)
             .ToDictionary(s => s.AssignmentId);
-        var latestReports = mistakes
-            .GroupBy(m => m.AssignmentId)
-            .ToDictionary(g => g.Key, g => g.MaxBy(m => m.ApprovedAt)!.ReportId);
-        var reportScores = (await _reports.GetScoresAsync(latestReports.Values.Distinct().ToList(), cancellationToken))
-            .ToDictionary(r => r.ReportId);
 
         DateTimeOffset? DueAt(string assignmentId)
         {
@@ -67,9 +60,9 @@ public class StudentMistakeService : IStudentMistakeService
             .AsEnumerable()
             .Reverse()
             .Select(l => new StudentMistakeResponse(l.Mistake.Id, l.Mistake.AssignmentId, Title(l.Mistake.AssignmentId),
-                DueAt(l.Mistake.AssignmentId), l.Mistake.VersionId, l.Mistake.ReportId, l.Mistake.File, l.Mistake.StartLine,
+                DueAt(l.Mistake.AssignmentId), l.Mistake.VersionId, ReportOf(l.Mistake.ReportId), l.Mistake.File, l.Mistake.StartLine,
                 l.Mistake.EndLine, l.Mistake.Severity, l.Mistake.Category, l.Mistake.Message, l.Mistake.Points, l.Mistake.Decision,
-                l.Label, Title(l.FirstAssignmentId), l.Mistake.ApprovedAt))
+                l.Label, Title(l.FirstAssignmentId), l.Mistake.ApprovedAt, records.SourceOf(l.Mistake.AssignmentId)))
             .ToList();
 
         var categories = MistakeHistory.Trends(selected.Select(l => l.Mistake), DueAt)
@@ -90,7 +83,7 @@ public class StudentMistakeService : IStudentMistakeService
             .Select(g =>
             {
                 var submission = classroom.GetValueOrDefault(g.Key);
-                var score = latestReports.TryGetValue(g.Key, out var reportId) ? reportScores.GetValueOrDefault(reportId) : null;
+                var score = records.Assignments.GetValueOrDefault(g.Key)?.Score;
                 var maxPoints = assignments.GetValueOrDefault(g.Key)?.MaxPoints ?? score?.MaxScore;
                 return new MistakeAssignmentResponse(g.Key, Title(g.Key), DueAt(g.Key), g.Count(),
                     g.Count(l => l.Mistake.Severity == MistakeSeverity.Major),
@@ -104,7 +97,8 @@ public class StudentMistakeService : IStudentMistakeService
                     score?.Score,
                     score?.Bonus,
                     score?.AiScore,
-                    score?.AiBonus);
+                    score?.AiBonus,
+                    records.SourceOf(g.Key));
             })
             .ToList();
 
@@ -115,6 +109,11 @@ public class StudentMistakeService : IStudentMistakeService
 
         return new StudentMistakesResponse(total, mistakes.Count, selected.Sum(l => l.Mistake.Points ?? 0), classroomLost,
             classroomGraded.Count, history, categories, severities, labels, byAssignment, options);
+    }
+
+    internal static Guid? ReportOf(Guid reportId)
+    {
+        return reportId == Guid.Empty ? null : reportId;
     }
 
     private static MistakeShare<T> Share<T>(T key, int count, int total)

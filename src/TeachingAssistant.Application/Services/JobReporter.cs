@@ -1,4 +1,5 @@
 using System.Globalization;
+using TeachingAssistant.Application.Contracts;
 using TeachingAssistant.Application.Interfaces;
 using TeachingAssistant.Application.Jobs;
 using TeachingAssistant.Domain.Jobs;
@@ -33,6 +34,42 @@ public class JobReporter
         }
 
         return string.Join("\n", lines);
+    }
+
+    public async Task<IReadOnlyList<AgentLink>> LinksAsync(IReadOnlyList<Job> jobs, CancellationToken cancellationToken = default)
+    {
+        var finished = jobs.Where(j => j.Status == JobStatus.Succeeded).ToList();
+        var versionIds = finished.Where(j => j.Type == JobType.GradeVersion)
+            .Select(j => JobPayloads.Read<GradeVersionPayload>(j.Payload).VersionId)
+            .ToList();
+        var subjects = (await _jobs.GetSubjectsAsync(versionIds, cancellationToken)).ToDictionary(s => s.VersionId);
+
+        var links = new List<AgentLink>();
+        foreach (var job in finished)
+        {
+            if (job.Type == JobType.GradeVersion
+                && subjects.GetValueOrDefault(JobPayloads.Read<GradeVersionPayload>(job.Payload).VersionId) is { } s)
+            {
+                links.Add(new AgentLink(AgentLinkKind.Submission, $"{s.StudentName}'s draft · {s.AssignmentTitle ?? "assignment"}",
+                    s.CourseId, s.AssignmentId, s.SubmissionId));
+            }
+            else if (job is { Type: JobType.GradeAssignment, CourseId: { } courseId, AssignmentId: { } assignmentId })
+            {
+                links.Add(new AgentLink(AgentLinkKind.Assignment, "The assignment's drafts", courseId, assignmentId));
+            }
+            else if (job is { Type: JobType.GradeStudent, CourseId: { } studentCourse })
+            {
+                var student = JobPayloads.Read<GradeStudentPayload>(job.Payload);
+                links.Add(new AgentLink(AgentLinkKind.Student, $"{student.StudentName ?? "The student"}'s profile", studentCourse,
+                    StudentId: student.StudentId));
+            }
+            else if (job is { Type: JobType.AnalyzeMistakes, CourseId: { } mistakesCourse, AssignmentId: { } mistakesAssignment })
+            {
+                links.Add(new AgentLink(AgentLinkKind.CommonMistakes, "Common mistakes", mistakesCourse, mistakesAssignment));
+            }
+        }
+
+        return links;
     }
 
     private async Task<string> DescribeAsync(
@@ -88,13 +125,19 @@ public class JobReporter
 
         var groups = analysis.Clusters
             .Where(c => !c.Ungrouped)
-            .OrderByDescending(c => c.Members.Select(m => m.StudentId).Distinct().Count())
-            .Select(c => $"  - {c.Title}: {c.Members.Select(m => m.StudentId).Distinct().Count()} students, {c.Members.Count} mistakes")
+            .Select(c => (c.Title, Students: c.Members.Select(m => m.StudentId).Distinct().Count(), Mistakes: c.Members.Count))
+            .OrderByDescending(c => c.Students)
+            .Select(c => $"  - {c.Title}: {Count(c.Students, "student")}, {Count(c.Mistakes, "mistake")}")
             .ToList();
         var ungrouped = analysis.Clusters.Where(c => c.Ungrouped).Sum(c => c.Members.Count);
         var rest = ungrouped > 0 ? $"\n  ({ungrouped} mistakes not grouped)" : "";
         return $"Common mistakes analysis ready: {analysis.Mistakes} mistakes from {analysis.Students} students.\n"
             + $"  Overview: {analysis.Summary}\n  Groups:\n{string.Join("\n", groups)}{rest}\n  For the next lecture: {analysis.NextLecture}";
+    }
+
+    private static string Count(int count, string noun)
+    {
+        return $"{count} {noun}{(count == 1 ? "" : "s")}";
     }
 
     private async Task<string> ScoreAsync(Job job, CancellationToken cancellationToken)

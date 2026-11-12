@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { Link } from "react-router";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ApiError } from "../api/client";
 import {
   type AgentConversation,
+  type AgentLink,
   type AgentMessage,
   type AgentRun,
   isRunFinished,
@@ -14,7 +16,7 @@ import {
   useStartAgentRun,
 } from "../api/chat";
 import { useJob } from "../api/hooks";
-import { ArrowUp, CircleCheck, Hourglass, MessageSquarePlus, Sparkles, Square, X } from "lucide-react";
+import { ArrowRight, ArrowUp, CircleCheck, Hourglass, MessageSquarePlus, Sparkles, Square, X } from "lucide-react";
 import { Button } from "./ui";
 import { useChatConversationId } from "./useChatHistory";
 
@@ -56,6 +58,7 @@ export function ChatPanel({ page, onClose }: { page: OpenPage; onClose: () => vo
   const storedIds = new Set(stored.map((m) => m.id));
   const live = (run.data?.messages ?? []).filter((m) => !storedIds.has(m.id));
   const messages = [...stored, ...live].sort((a, b) => a.sequence - b.sequence);
+  const lastOfRun = new Map(messages.map((m) => [m.runId, m.id]));
   const activeRunId = conversation.data?.activeRunId ?? null;
   const finished = run.data !== undefined && isRunFinished(run.data.status);
   const waiting = start.isPending || (runId !== null && !finished);
@@ -188,7 +191,10 @@ export function ChatPanel({ page, onClose }: { page: OpenPage; onClose: () => vo
         ) : (
           <div className="flex flex-col gap-3.5">
             {messages.map((message) => (
-              <Message key={message.id} message={message} />
+              <div key={message.id} className="contents">
+                <Message message={message} />
+                {lastOfRun.get(message.runId) === message.id && <RunLinks links={linksOf(messages, message.runId)} onOpen={onClose} />}
+              </div>
             ))}
             {waiting && <Working run={run.data} />}
             {failure && <Reply text={failure} error />}
@@ -260,7 +266,17 @@ function Message({ message }: { message: AgentMessage }) {
   }
 
   if (message.role === "Notice") {
-    return <div className="pl-8 text-[11px] text-ink-muted">{message.text}</div>;
+    const finished = message.text.startsWith("The background work you waited for has finished");
+    return (
+      <details className="pl-8 text-[11px] text-ink-muted">
+        <summary className="flex cursor-pointer list-none items-center gap-1.5">
+          {finished ? <CircleCheck className="h-3.5 w-3.5 text-success" /> : <Hourglass className="h-3.5 w-3.5" />}
+          {finished ? "The background work finished" : "Still waiting for the background work"}
+          <span className="text-accent">· details</span>
+        </summary>
+        <p className="mt-1 whitespace-pre-wrap rounded-lg bg-paper px-2.5 py-2">{message.text}</p>
+      </details>
+    );
   }
 
   return (
@@ -273,6 +289,61 @@ function Message({ message }: { message: AgentMessage }) {
       ))}
       {message.text && <Reply text={message.text} />}
     </>
+  );
+}
+
+function linksOf(messages: AgentMessage[], runId: string): AgentLink[] {
+  const seen = new Set<string>();
+  return messages
+    .filter((m) => m.runId === runId)
+    .flatMap((m) => m.links ?? [])
+    .filter((link) => {
+      const key = `${link.kind}:${link.courseId}:${link.assignmentId ?? ""}:${link.submissionId ?? ""}:${link.studentId ?? ""}`;
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+}
+
+function linkPath(link: AgentLink): string {
+  const course = `/courses/${link.courseId}`;
+  switch (link.kind) {
+    case "CommonMistakes":
+      return `${course}/mistakes?assignment=${link.assignmentId ?? ""}`;
+    case "Submission":
+      return `${course}/assignments/${link.assignmentId ?? ""}?student=${link.submissionId ?? ""}`;
+    case "Assignment":
+      return `${course}/assignments/${link.assignmentId ?? ""}`;
+    case "Student":
+      return `${course}/students?student=${link.studentId ?? ""}`;
+  }
+}
+
+function RunLinks({ links, onOpen }: { links: AgentLink[]; onOpen: () => void }) {
+  if (links.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="flex flex-wrap gap-1.5 pl-8">
+      {links.map((link) => (
+        <Link
+          key={linkPath(link)}
+          to={linkPath(link)}
+          onClick={() => {
+            if (window.matchMedia("(max-width: 1279px)").matches) {
+              onOpen();
+            }
+          }}
+          className="flex items-center gap-1 rounded-full border border-line bg-white px-2.5 py-1 text-[11px] font-semibold text-accent transition-colors hover:border-accent"
+        >
+          {link.label}
+          <ArrowRight className="h-3 w-3" />
+        </Link>
+      ))}
+    </div>
   );
 }
 

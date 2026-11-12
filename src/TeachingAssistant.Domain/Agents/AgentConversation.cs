@@ -31,15 +31,16 @@ public class AgentConversation
         return Add(new AgentMessage(Id, runId, MessageCount, AgentMessageRole.Assistant, text, at, toolCalls: toolCalls));
     }
 
-    public AgentMessage AddToolResult(Guid runId, string toolCallId, string toolName, string text, Guid? jobId, DateTimeOffset at)
+    public AgentMessage AddToolResult(
+        Guid runId, string toolCallId, string toolName, string text, Guid? jobId, DateTimeOffset at, string? links = null)
     {
         return Add(new AgentMessage(Id, runId, MessageCount, AgentMessageRole.Tool, text, at, toolCallId: toolCallId, toolName: toolName,
-            jobId: jobId));
+            jobId: jobId, links: links));
     }
 
-    public AgentMessage AddNotice(Guid runId, string text, Guid? jobId, DateTimeOffset at)
+    public AgentMessage AddNotice(Guid runId, string text, Guid? jobId, DateTimeOffset at, string? links = null)
     {
-        return Add(new AgentMessage(Id, runId, MessageCount, AgentMessageRole.Notice, text, at, jobId: jobId));
+        return Add(new AgentMessage(Id, runId, MessageCount, AgentMessageRole.Notice, text, at, jobId: jobId, links: links));
     }
 
     private AgentMessage Add(AgentMessage message)

@@ -8,14 +8,12 @@ namespace TeachingAssistant.Application.Services;
 
 public class StudentStrengthService : IStudentStrengthService
 {
-    private readonly IStudentStrengthStore _strengths;
-    private readonly IStudentMistakeStore _mistakes;
+    private readonly StudentRecordCollector _records;
     private readonly ICourseAssignmentStore _assignments;
 
-    public StudentStrengthService(IStudentStrengthStore strengths, IStudentMistakeStore mistakes, ICourseAssignmentStore assignments)
+    public StudentStrengthService(StudentRecordCollector records, ICourseAssignmentStore assignments)
     {
-        _strengths = strengths;
-        _mistakes = mistakes;
+        _records = records;
         _assignments = assignments;
     }
 
@@ -23,8 +21,8 @@ public class StudentStrengthService : IStudentStrengthService
         string courseId, string studentId, StudentStrengthFilter? filter = null, CancellationToken cancellationToken = default)
     {
         filter ??= new StudentStrengthFilter();
-        var strengths = await _strengths.GetByStudentAsync(courseId, studentId, cancellationToken);
-        var mistakes = await _mistakes.GetByStudentAsync(courseId, studentId, cancellationToken);
+        var records = await _records.CollectAsync(courseId, studentId, cancellationToken);
+        var (mistakes, strengths) = (records.Mistakes, records.Strengths);
         var assignments = (await _assignments.GetByCourseAsync(SubmissionSource.GoogleClassroom, courseId, cancellationToken))
             .ToDictionary(a => a.ExternalAssignmentId);
 
@@ -55,9 +53,9 @@ public class StudentStrengthService : IStudentStrengthService
             .AsEnumerable()
             .Reverse()
             .Select(l => new StudentStrengthResponse(l.Strength.Id, l.Strength.AssignmentId, Title(l.Strength.AssignmentId),
-                DueAt(l.Strength.AssignmentId), l.Strength.VersionId, l.Strength.ReportId, l.Strength.File, l.Strength.StartLine,
-                l.Strength.EndLine, l.Strength.Category, l.Strength.Message, l.Strength.Decision, l.Label,
-                Title(l.SinceAssignmentId), l.Strength.ApprovedAt))
+                DueAt(l.Strength.AssignmentId), l.Strength.VersionId, StudentMistakeService.ReportOf(l.Strength.ReportId), l.Strength.File,
+                l.Strength.StartLine, l.Strength.EndLine, l.Strength.Category, l.Strength.Message, l.Strength.Decision, l.Label,
+                Title(l.SinceAssignmentId), l.Strength.ApprovedAt, records.SourceOf(l.Strength.AssignmentId)))
             .ToList();
 
         var categories = StrengthHistory.Trends(selected.Select(l => l.Strength), mistakes, DueAt)

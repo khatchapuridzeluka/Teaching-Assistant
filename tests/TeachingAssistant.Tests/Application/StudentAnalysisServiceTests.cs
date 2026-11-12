@@ -16,7 +16,8 @@ public class StudentAnalysisServiceTests
     private readonly Fakes _fakes = new();
     private readonly ModelCallContext _context = new();
 
-    private StudentAnalysisService Service() => new(_fakes, _fakes, _fakes, _fakes, _fakes, _context, TimeProvider.System);
+    private StudentAnalysisService Service() =>
+        new(new StudentRecordCollector(_fakes, _fakes, _fakes, _fakes, _fakes), _fakes, _fakes, _fakes, _context, TimeProvider.System);
 
     [Fact]
     public async Task MistakesAnalysis_SendsOnlyMistakesWithPointsAndLabels_NeverTheNameOrStrengths()
@@ -92,6 +93,38 @@ public class StudentAnalysisServiceTests
     }
 
     [Fact]
+    public async Task TheAnalysis_ReadsTheCurrentDraft_ItsReportInReview_OrElseTheApprovedRecords()
+    {
+        _fakes.Assignment("a1", "Assignment 1", Now.AddDays(-30));
+        _fakes.Assignment("a2", "Assignment 2", Now.AddDays(-20));
+        _fakes.Assignment("a3", "Assignment 3", Now.AddDays(-10));
+        _fakes.Approve("a1", grade: 80, mistakes: [], strengths: [MistakeCategory.Design]);
+        _fakes.Resubmit("a1");
+        _fakes.Grade("a2", grade: 70, mistakes: [], strengths: [MistakeCategory.Naming], report: false);
+        _fakes.Grade("a3", grade: 90, mistakes: [], strengths: [MistakeCategory.Correctness], report: true);
+        _fakes.Grade("a4", grade: 50, mistakes: [], strengths: [MistakeCategory.ErrorHandling], report: false, discard: true);
+        _fakes.Reply = """{ "overview": "o", "groups": [] }""";
+
+        await Service().AnalyzeAsync("course", "student", StudentAnalysisKind.Strengths, TestContext.Current.CancellationToken);
+
+        var prompt = _fakes.Prompt!;
+        Assert.Contains("[1] Assignment 1 · Design · new · Design done well", prompt);
+        Assert.Contains("[2] Assignment 2 · Naming · new · Naming done well", prompt);
+        Assert.Contains("[3] Assignment 3 · Correctness · new · Correctness done well", prompt);
+        Assert.DoesNotContain("ErrorHandling", prompt);
+
+        var latest = (await Service().GetLatestAsync("course", "student", StudentAnalysisKind.Strengths, TestContext.Current.CancellationToken))!;
+        Assert.False(latest.Outdated);
+        Assert.Equal(3, Assert.Single(latest.Groups).Count);
+
+        var records = await new StudentRecordCollector(_fakes, _fakes, _fakes, _fakes, _fakes)
+            .CollectAsync("course", "student", TestContext.Current.CancellationToken);
+        Assert.Equal((StudentRecordSource.Approved, StudentRecordSource.Draft, StudentRecordSource.InReview),
+            (records.SourceOf("a1"), records.SourceOf("a2"), records.SourceOf("a3")));
+        Assert.Equal(((double?)70, (double?)null), (records.Assignments["a2"].Score!.AiScore, records.Assignments["a2"].Score!.Score));
+    }
+
+    [Fact]
     public async Task Analyze_WithoutRecordsOfThatKind_IsRejected_AndNothingIsAsked()
     {
         _fakes.Approve("a1", grade: 70, mistakes: [MistakeCategory.Naming], strengths: []);
@@ -102,8 +135,11 @@ public class StudentAnalysisServiceTests
     }
 
     private sealed class Fakes : IStudentMistakeStore, IStudentStrengthStore, ICourseAssignmentStore, ISubmissionStore, IGradingReportStore,
-        IStudentAnalysisStore, ILanguageModel
+        IGradingStore, IStudentAnalysisStore, ILanguageModel
     {
+        private readonly List<AiGrading> _gradings = [];
+        private readonly List<GradingReport> _reports = [];
+
         private readonly List<StudentMistake> _mistakes = [];
         private readonly List<StudentStrength> _strengths = [];
         private readonly List<CourseAssignment> _assignments = [];
@@ -119,6 +155,38 @@ public class StudentAnalysisServiceTests
 
         public void Approve(string assignmentId, double grade, MistakeCategory[] mistakes, MistakeCategory[] strengths)
         {
+            var (submission, grading) = Graded(assignmentId, grade, mistakes, strengths);
+            var report = new GradingReport(grading, submission, grading.CreatedAt);
+            report.Approve(grading.CreatedAt);
+            _reports.Add(report);
+            _mistakes.AddRange(StudentMistake.FromApprovedReport(report, submission));
+            _strengths.AddRange(StudentStrength.FromApprovedReport(report, submission));
+        }
+
+        public void Grade(
+            string assignmentId, double grade, MistakeCategory[] mistakes, MistakeCategory[] strengths, bool report, bool discard = false)
+        {
+            var (submission, grading) = Graded(assignmentId, grade, mistakes, strengths);
+            if (report)
+            {
+                _reports.Add(new GradingReport(grading, submission, grading.CreatedAt));
+            }
+
+            if (discard)
+            {
+                grading.Discard(grading.CreatedAt);
+            }
+        }
+
+        public void Resubmit(string assignmentId)
+        {
+            var at = Now.AddMinutes(++_approvals);
+            _submissions.Single(s => s.AssignmentId == assignmentId).AddVersion(VersionStatus.Ready, null, "hash2", "path2", at, at, []);
+        }
+
+        private (Submission Submission, AiGrading Grading) Graded(
+            string assignmentId, double grade, MistakeCategory[] mistakes, MistakeCategory[] strengths)
+        {
             var at = Now.AddMinutes(++_approvals);
             var submission = new Submission(SubmissionSource.GoogleClassroom, "course", assignmentId, "student", "Ana Beridze",
                 $"sub-{assignmentId}", "folder", at);
@@ -127,12 +195,30 @@ public class StudentAnalysisServiceTests
             var grading = new AiGrading(version.Id, "model", "review", grade, 100, null, 1, [], [], "{}",
                 mistakes.Select(c => new GradingMistake("A.java", 1, 1, MistakeSeverity.Minor, c, $"{c} slip", 2)), at,
                 strengths.Select(c => new GradingStrength(null, null, null, c, $"{c} done well")));
-            var report = new GradingReport(grading, submission, at);
-            report.Approve(at);
             _submissions.Add(submission);
-            _mistakes.AddRange(StudentMistake.FromApprovedReport(report, submission));
-            _strengths.AddRange(StudentStrength.FromApprovedReport(report, submission));
+            _gradings.Add(grading);
+            return (submission, grading);
         }
+
+        Task<IReadOnlyList<GradingSummary>> IGradingStore.GetSummariesAsync(
+            SubmissionSource source, string courseId, string? assignmentId, string? studentId, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<GradingSummary>>(_gradings
+                .Select(g =>
+                {
+                    var submission = _submissions.Single(s => s.Versions.Any(v => v.Id == g.VersionId));
+                    var number = submission.Versions.Single(v => v.Id == g.VersionId).Number;
+                    return new GradingSummary(g.Id, g.VersionId, number, submission.AssignmentId, submission.ExternalSubmissionId,
+                        submission.StudentId, submission.StudentName, g.Status, g.Score, g.MaxScore, g.Bonus, 0, 0, 0, g.Model, g.CreatedAt, null);
+                })
+                .ToList());
+
+        Task<IReadOnlyList<AiGrading>> IGradingStore.GetByVersionsAsync(IReadOnlyCollection<Guid> versionIds, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        Task<AiGrading?> IGradingStore.FindAsync(Guid gradingId, CancellationToken cancellationToken) =>
+            Task.FromResult(_gradings.FirstOrDefault(g => g.Id == gradingId));
+
+        void IGradingStore.Add(AiGrading grading) => throw new NotSupportedException();
 
         Task<IReadOnlyList<StudentMistake>> IStudentMistakeStore.GetByStudentAsync(string courseId, string studentId, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<StudentMistake>>(_mistakes.ToList());
@@ -169,7 +255,7 @@ public class StudentAnalysisServiceTests
             throw new NotSupportedException();
 
         Task<Submission?> ISubmissionStore.FindByVersionAsync(Guid versionId, CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
+            Task.FromResult(_submissions.FirstOrDefault(s => s.Versions.Any(v => v.Id == versionId)));
 
         Task<string?> ISubmissionStore.FindVersionPathAsync(Guid versionId, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
@@ -177,7 +263,7 @@ public class StudentAnalysisServiceTests
         void ISubmissionStore.Add(Submission submission) => throw new NotSupportedException();
 
         Task<GradingReport?> IGradingReportStore.FindByGradingAsync(Guid gradingId, CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
+            Task.FromResult(_reports.FirstOrDefault(r => r.GradingId == gradingId));
 
         Task<IReadOnlyList<ReportScore>> IGradingReportStore.GetScoresAsync(IReadOnlyCollection<Guid> reportIds, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<ReportScore>>([]);

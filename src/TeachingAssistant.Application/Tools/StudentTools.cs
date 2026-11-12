@@ -139,6 +139,8 @@ public class StudentTools
             }
 
             _context.RecordQueuedJob(job.Id);
+            _context.RecordLinks([new AgentLink(AgentLinkKind.Submission, $"{submission.StudentName}'s submission", courseId, assignmentId,
+                submission.ExternalSubmissionId)]);
             if (job.CreatedAt < started)
             {
                 return $"A grading of {submission.StudentName}'s version {version.Number} is already in progress (job id {job.Id}); "
@@ -171,6 +173,7 @@ public class StudentTools
         var started = _timeProvider.GetUtcNow();
         var job = await _jobService.QueueGradeStudentAsync(courseId, studentId, regrade, cancellationToken);
         _context.RecordQueuedJob(job.Id);
+        _context.RecordLinks([new AgentLink(AgentLinkKind.Student, "The student's profile", courseId, StudentId: studentId)]);
         if (job.CreatedAt < started)
         {
             return $"Grading all of this student's assignments is already in progress (job id {job.Id}); nothing new was started. "

@@ -1,8 +1,11 @@
 using System.ComponentModel;
 using TeachingAssistant.Application.Contracts;
 using TeachingAssistant.Application.Exceptions;
+using TeachingAssistant.Application.Interfaces;
 using TeachingAssistant.Application.Interfaces.Services;
 using TeachingAssistant.Application.Models;
+using TeachingAssistant.Domain.Grading;
+using TeachingAssistant.Domain.Ingestion;
 
 namespace TeachingAssistant.Application.Tools;
 
@@ -10,13 +13,16 @@ public class GradingTools
 {
     private readonly ISubmissionFetchService _fetchService;
     private readonly IJobService _jobService;
+    private readonly IGradingStore _gradings;
     private readonly AgentRunContext _context;
     private readonly TimeProvider _timeProvider;
 
-    public GradingTools(ISubmissionFetchService fetchService, IJobService jobService, AgentRunContext context, TimeProvider timeProvider)
+    public GradingTools(
+        ISubmissionFetchService fetchService, IJobService jobService, IGradingStore gradings, AgentRunContext context, TimeProvider timeProvider)
     {
         _fetchService = fetchService;
         _jobService = jobService;
+        _gradings = gradings;
         _context = context;
         _timeProvider = timeProvider;
     }
@@ -33,9 +39,21 @@ public class GradingTools
         [Description("The id of the assignment")] string assignmentId,
         CancellationToken cancellationToken = default)
     {
+        var drafts = (await _gradings.GetSummariesAsync(SubmissionSource.GoogleClassroom, courseId, assignmentId, null, cancellationToken))
+            .Count(g => g.Status == GradingStatus.Draft);
+        if (drafts == 0)
+        {
+            return "Not started: no student of this assignment has a current AI draft (none were graded yet, or every draft was "
+                + "discarded), and the analysis reads the drafts. The step that provides them is grade_all_students for this "
+                + "assignment (regrade is not needed, since no current draft exists): one paid grading per student who turned in work. "
+                + "Offer the teacher to grade them first and then run the analysis; once they agree, grade, wait for the gradings, "
+                + "then call this again.";
+        }
+
         var started = _timeProvider.GetUtcNow();
         var job = await _jobService.QueueAnalyzeMistakesAsync(courseId, assignmentId, cancellationToken);
         _context.RecordQueuedJob(job.Id);
+        _context.RecordLinks([new AgentLink(AgentLinkKind.CommonMistakes, "Common mistakes", courseId, assignmentId)]);
         if (job.CreatedAt < started)
         {
             return $"A Common mistakes analysis of this assignment is already in progress (job id {job.Id}); nothing new was started. "
@@ -64,6 +82,11 @@ public class GradingTools
         {
             await _fetchService.FetchAsync(courseId, assignmentId, cancellationToken);
             var result = await _jobService.QueueGradeAssignmentAsync(courseId, assignmentId, regrade, cancellationToken);
+            if (result.Job is not null)
+            {
+                _context.RecordLinks([new AgentLink(AgentLinkKind.Assignment, "The assignment's drafts", courseId, assignmentId)]);
+            }
+
             return Describe(result, regrade);
         }
         catch (Exception ex) when (ex is SubmissionSourceNotConnectedException or SubmissionSourceNotFoundException

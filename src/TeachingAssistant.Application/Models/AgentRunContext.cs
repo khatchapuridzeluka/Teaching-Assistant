@@ -1,3 +1,5 @@
+using TeachingAssistant.Application.Contracts;
+
 namespace TeachingAssistant.Application.Models;
 
 public record AgentRunHooks(Func<AgentEntry, Task> OnStep, Func<bool> ShouldStop);
@@ -5,6 +7,7 @@ public record AgentRunHooks(Func<AgentEntry, Task> OnStep, Func<bool> ShouldStop
 public class AgentRunContext
 {
     private readonly Queue<Guid> _queuedJobs = new();
+    private readonly List<AgentLink> _links = [];
 
     public Guid? RunId { get; private set; }
 
@@ -20,6 +23,19 @@ public class AgentRunContext
         WaitFor = null;
         StepLimitReached = false;
         _queuedJobs.Clear();
+        _links.Clear();
+    }
+
+    public void RecordLinks(IEnumerable<AgentLink> links)
+    {
+        _links.AddRange(links);
+    }
+
+    public IReadOnlyList<AgentLink> TakeLinks()
+    {
+        var links = _links.ToList();
+        _links.Clear();
+        return links;
     }
 
     public void RecordQueuedJob(Guid jobId)

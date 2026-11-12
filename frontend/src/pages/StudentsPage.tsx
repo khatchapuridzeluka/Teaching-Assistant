@@ -9,8 +9,8 @@ import { MistakeCategoriesCard, MistakeHistoryCard } from "../components/Student
 import { StrengthsCard } from "../components/StudentStrengths";
 import { StudentOverviewCard } from "../components/StudentOverview";
 import { stateChip } from "../components/SubmissionDetail";
-import { Avatar, Button, Card, Chip, CountTabs, EmptyState, ErrorPanel, Meter, Modal, Notice, PageHeader, SearchField, Spinner, Stat, StatStrip } from "../components/ui";
-import { ArrowLeft, ArrowRight, CalendarX, Clock, GraduationCap, RefreshCw, Send, Sparkles, Table2, TrendingUp, Users } from "lucide-react";
+import { Avatar, Button, buttonClass, Card, Chip, CountTabs, EmptyState, ErrorPanel, Meter, Modal, Notice, PageHeader, SearchField, Spinner, Stat, StatStrip } from "../components/ui";
+import { ArrowLeft, ArrowRight, Award, CalendarX, CircleAlert, Clock, GraduationCap, RefreshCw, Send, Sparkles, Table2, TrendingUp, Users } from "lucide-react";
 import { formatDate, formatDay, initials } from "../format";
 
 export function StudentsPage() {
@@ -39,7 +39,7 @@ export function StudentsPage() {
   };
   const search = query.trim().toLowerCase();
   const rows = sortStudents(all.filter((s) => filters[filter].matches(s) && s.name.toLowerCase().includes(search)), sort);
-  const selected = all.find((s) => s.id === searchParams.get("student")) ?? rows[0];
+  const selected = all.find((s) => s.id === searchParams.get("student") || s.externalUserId === searchParams.get("student")) ?? rows[0];
 
   function select(student: CourseStudent, open = true) {
     setSearchParams((params) => {
@@ -378,6 +378,22 @@ function StudentProfile({
             <div className="text-xs text-ink-muted">
               {student.turnedIn} of {assignments.length} assignments turned in
             </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Link
+              to={`/courses/${courseId}/students/${student.externalUserId}/mistakes`}
+              className={buttonClass("outline", true)}
+              title="Every mistake of this student's graded assignments, with filters and charts"
+            >
+              <CircleAlert className="h-3.5 w-3.5" /> Mistakes
+            </Link>
+            <Link
+              to={`/courses/${courseId}/students/${student.externalUserId}/strengths`}
+              className={buttonClass("outline", true)}
+              title="Every strength of this student's graded assignments, with filters and charts"
+            >
+              <Award className="h-3.5 w-3.5" /> Strengths
+            </Link>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2">

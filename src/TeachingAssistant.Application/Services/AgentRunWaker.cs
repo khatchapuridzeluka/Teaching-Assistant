@@ -1,6 +1,7 @@
 using TeachingAssistant.Application.Interfaces;
 using TeachingAssistant.Application.Interfaces.Services;
 using TeachingAssistant.Application.Jobs;
+using TeachingAssistant.Application.Models;
 using TeachingAssistant.Domain.Agents;
 using TeachingAssistant.Domain.Jobs;
 
@@ -66,8 +67,14 @@ public class AgentRunWaker : IAgentRunWaker
         }
 
         var run = await _chats.FindRunAsync(JobPayloads.Read<AgentRunPayload>(job.Payload).RunId, cancellationToken);
-        if (run is null || run.IsFinished || run.Status == AgentRunStatus.Waiting || run.JobId != job.Id)
+        if (run is null || run.IsFinished || run.JobId != job.Id)
         {
+            return;
+        }
+
+        if (run.Status == AgentRunStatus.Waiting)
+        {
+            await TryWakeAsync(run, cancellationToken);
             return;
         }
 
@@ -118,7 +125,8 @@ public class AgentRunWaker : IAgentRunWaker
             : $"Not everything has finished after {(int)AgentRun.WaitLimit.TotalMinutes} minutes:\n{results}\n"
               + "You can wait again for the jobs still in progress, or tell the teacher where things stand.";
 
-        _chats.Add(conversation.AddNotice(run.Id, text, null, now));
+        var links = await _reporter.LinksAsync(jobs, cancellationToken);
+        _chats.Add(conversation.AddNotice(run.Id, text, null, now, AgentLinks.Write(links)));
         run.Resume();
 
         var job = new Job(JobType.AgentRun, JobPayloads.Write(new AgentRunPayload(run.Id)), now, courseId: run.CourseId,

@@ -5,6 +5,7 @@ import type { components } from "./schema";
 export type AgentRun = components["schemas"]["AgentRunResponse"];
 export type AgentRunStatus = components["schemas"]["AgentRunStatus"];
 export type AgentMessage = components["schemas"]["AgentMessageResponse"];
+export type AgentLink = components["schemas"]["AgentLink"];
 export type AgentConversation = components["schemas"]["AgentConversationResponse"];
 export type StartAgentRunRequest = components["schemas"]["StartAgentRunRequest"];
 

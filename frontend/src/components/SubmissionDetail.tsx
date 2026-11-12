@@ -2,12 +2,13 @@ import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { CodeMistake, CodeStrength, JobInfo, StoredFile, StoredSubmission, StoredVersion, Submission } from "../api/client";
-import { useDiscardGrading, useGradingReport, useReview, useVersionGradings } from "../api/hooks";
+import { useGradingReport, useReview, useVersionGradings } from "../api/hooks";
 import { formatDate, formatDay, initials } from "../format";
 import { CodeBrowser, type CodeFocus, severityColor, strengthColor } from "./CodeBrowser";
+import { DiscardDraftButton } from "./DiscardDraftButton";
 import { keptMistakes, keptStrengths, ReportEditor } from "./ReportEditor";
 import { Avatar, Button, Chip, type ChipTone, ErrorPanel, Notice, Spinner } from "./ui";
-import { ArrowLeft, BadgeCheck, CircleCheck, Eye, FileArchive, FileCode2, FileText, Image as ImageIcon, Maximize2, Minimize2, Pencil, Sparkles, ThumbsUp, Trash2 } from "lucide-react";
+import { ArrowLeft, BadgeCheck, CircleCheck, Eye, FileArchive, FileCode2, FileText, Image as ImageIcon, Maximize2, Minimize2, Pencil, Sparkles, ThumbsUp } from "lucide-react";
 
 export const stateChip: Record<string, { tone: ChipTone; label: string }> = {
   TURNED_IN: { tone: "info", label: "Turned in" },
@@ -48,7 +49,6 @@ export function SubmissionDetail({
 }) {
   const current = useReview(version?.id).data ?? undefined;
   const history = useVersionGradings(version?.id).data ?? [];
-  const discard = useDiscardGrading();
   const [viewingId, setViewingId] = useState<string | null>(null);
   const review = (viewingId ? history.find((g) => g.id === viewingId) : undefined) ?? current;
   const grading = job !== undefined && (job.status === "Queued" || job.status === "Running");
@@ -227,7 +227,9 @@ export function SubmissionDetail({
                             {showReport ? <BadgeCheck className="h-3.5 w-3.5 text-success" /> : <Sparkles className="h-3.5 w-3.5 text-warn" />}
                             {showReport ? "Your report" : "AI draft"}
                           </h3>
-                          {showReport ? (
+                          {review.status === "Discarded" ? (
+                            <Chip tone="muted">Discarded</Chip>
+                          ) : showReport ? (
                             report.status === "Approved" ? (
                               <Chip tone="success" icon={<CircleCheck />} className="animate-stamp">
                                 Approved {formatDate(report.approvedAt)}
@@ -235,8 +237,6 @@ export function SubmissionDetail({
                             ) : (
                               <Chip tone="info">In review · saved {formatDate(report.updatedAt)}</Chip>
                             )
-                          ) : review.status === "Discarded" ? (
-                            <Chip tone="muted">Discarded</Chip>
                           ) : (
                             <Chip tone="warn">Waiting for your review · {formatDate(review.createdAt)}</Chip>
                           )}
@@ -281,17 +281,12 @@ export function SubmissionDetail({
                             ))}
                           </select>
                         )}
-                        {review.status === "Draft" && report == null && (
-                          <Button
-                            small
-                            variant="ghost"
-                            icon={<Trash2 />}
-                            onClick={() => discard.mutate(review.id)}
-                            disabled={discard.isPending}
+                        {review.status === "Draft" && (
+                          <DiscardDraftButton
+                            gradingId={review.id}
+                            reportStatus={report?.status}
                             title="Throw this draft away; it stays in the history and the previous draft becomes current"
-                          >
-                            {discard.isPending ? "Discarding…" : "Discard"}
-                          </Button>
+                          />
                         )}
                         {review.status === "Draft" && (
                           <Button

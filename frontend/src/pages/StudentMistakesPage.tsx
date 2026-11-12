@@ -6,7 +6,7 @@ import { useCourseStudents, useStudentMistakes } from "../api/hooks";
 import { FilterChips } from "../components/FilterChips";
 import { CourseName } from "../components/Layout";
 import { StudentOverviewCard } from "../components/StudentOverview";
-import { categoryLabels, MistakeRow } from "../components/StudentMistakes";
+import { categoryLabels, MistakeRow, SourceChip } from "../components/StudentMistakes";
 import { Avatar, Button, Card, CardHeader, EmptyState, ErrorPanel, PageHeader, Spinner, Stat, StatStrip } from "../components/ui";
 import { formatDay, initials } from "../format";
 
@@ -66,7 +66,7 @@ export function StudentMistakesPage() {
         }
         subtitle={
           <>
-            <CourseName courseId={courseId} /> · from approved reports · labels compare with assignments due earlier
+            <CourseName courseId={courseId} /> · from AI drafts and your reports · labels compare with assignments due earlier
           </>
         }
         actions={
@@ -161,7 +161,7 @@ export function StudentMistakesPage() {
                   : "no grade returned in Classroom yet"
               }
             />
-            <Stat label="Noted in reports" value={round(data.pointsLost)} note="per-mistake deductions you approved" />
+            <Stat label="Noted in reports" value={round(data.pointsLost)} note="per-mistake deductions in drafts and reports" />
             <Stat label="Major" value={major ? `${round(major.percent)}%` : "–"} note={`${major?.count ?? 0} of ${data.total}`} />
             <Stat label="Repeated" value={repeated ? `${round(repeated.percent)}%` : "–"} note="same category, earlier assignment" />
             <Stat label="Categories" value={data.categories.length} note="with at least one mistake" />
@@ -328,7 +328,12 @@ function ScoreRow({ scores }: { scores: AssignmentScores }) {
 
   return (
     <tr className="border-b border-line last:border-b-0">
-      <td className="px-[18px] py-2 font-semibold">{scores.title ?? "Assignment"}</td>
+      <td className="px-[18px] py-2 font-semibold">
+        <span className="flex flex-wrap items-center gap-2">
+          {scores.title ?? "Assignment"}
+          <SourceChip source={scores.source} />
+        </span>
+      </td>
       <td className="px-3 py-2">
         {scores.classroomFinal == null ? (
           <span className="text-ink-muted">not returned</span>
@@ -392,7 +397,10 @@ function MistakeList({ mistakes }: { mistakes: NonNullable<ReturnType<typeof use
       {groups.map((group) => (
         <div key={group.id} className="border-b border-paper-dark last:border-b-0">
           <div className="flex items-center justify-between gap-2 bg-paper/60 px-4 py-1.5 text-[11px]">
-            <b>{group.title ?? "Assignment"}</b>
+            <span className="flex flex-wrap items-center gap-2">
+              <b>{group.title ?? "Assignment"}</b>
+              <SourceChip source={group.items[0].source} />
+            </span>
             <span className="text-ink-muted">
               {group.items.length} · {group.dueAt ? `due ${formatDay(group.dueAt)}` : ""}
             </span>

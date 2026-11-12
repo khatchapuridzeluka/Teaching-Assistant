@@ -1,5 +1,6 @@
 import { Link } from "react-router";
 import type { MistakeCategoryInfo, StudentMistakeInfo } from "../api/client";
+import type { components } from "../api/schema";
 import { useStudentMistakes } from "../api/hooks";
 import { formatDay } from "../format";
 import { severityColor } from "./CodeBrowser";
@@ -16,6 +17,18 @@ export const categoryLabels: Record<string, string> = {
   Other: "Other",
 };
 
+export type RecordSource = components["schemas"]["StudentRecordSource"];
+
+export function SourceChip({ source }: { source: RecordSource }) {
+  if (source === "Draft") {
+    return <Chip tone="muted">AI draft, not reviewed</Chip>;
+  }
+  if (source === "InReview") {
+    return <Chip tone="info">Your report · in review</Chip>;
+  }
+  return <Chip tone="success">Approved</Chip>;
+}
+
 export function MistakeCategoriesCard({ courseId, userId }: { courseId: string; userId: string }) {
   const mistakes = useStudentMistakes(courseId, userId);
   const categories = mistakes.data?.categories ?? [];
@@ -26,7 +39,7 @@ export function MistakeCategoriesCard({ courseId, userId }: { courseId: string; 
       <div className="flex items-start justify-between gap-2 border-b border-line px-4 py-2.5">
         <div>
           <h3 className="text-[13px] font-semibold">Mistake categories</h3>
-          <div className="text-[11px] text-ink-muted">From approved reports · most points lost first</div>
+          <div className="text-[11px] text-ink-muted">From AI drafts and your reports · most points lost first</div>
         </div>
         {categories.length > 0 && (
           <Link to={`/courses/${courseId}/students/${userId}/mistakes`} className="shrink-0 text-xs font-semibold text-accent hover:underline">
@@ -40,7 +53,7 @@ export function MistakeCategoriesCard({ courseId, userId }: { courseId: string; 
         </div>
       )}
       {mistakes.data && categories.length === 0 && (
-        <p className="px-4 py-3 text-xs text-ink-muted">Nothing yet: mistakes appear here once you approve a report for this student.</p>
+        <p className="px-4 py-3 text-xs text-ink-muted">Nothing yet: mistakes appear here once an assignment of this student is graded.</p>
       )}
       <ul className="divide-y divide-paper-dark">
         {categories.map((category) => (
@@ -85,7 +98,7 @@ export function MistakeHistoryCard({ courseId, userId }: { courseId: string; use
         <h3 className="text-[13px] font-semibold">Mistake history</h3>
         <span className="flex items-center gap-3 text-[11px] text-ink-muted">
           {list.length > 0
-            ? `${list.length} from approved reports · ${repeated} repeated from an earlier assignment`
+            ? `${list.length} from drafts and reports · ${repeated} repeated from an earlier assignment`
             : "Labelled new or repeated against earlier assignments"}
           {list.length > 0 && (
             <Link to={`/courses/${courseId}/students/${userId}/mistakes`} className="text-xs font-semibold text-accent hover:underline">
@@ -96,13 +109,16 @@ export function MistakeHistoryCard({ courseId, userId }: { courseId: string; use
       </div>
       {mistakes.data && list.length === 0 && (
         <p className="px-4 py-3 text-xs text-ink-muted">
-          No approved reports yet. Edit and approve a draft for this student and its mistakes are tracked here.
+          No graded assignments with mistakes yet. Once an assignment is graded, its AI draft (or your report on it) is tracked here.
         </p>
       )}
       {groups.map((group) => (
         <div key={group.assignmentId} className="border-b border-paper-dark last:border-b-0">
           <div className="flex items-center justify-between gap-2 bg-paper/60 px-4 py-1.5 text-[11px]">
-            <b>{group.title ?? "Assignment"}</b>
+            <span className="flex flex-wrap items-center gap-2">
+              <b>{group.title ?? "Assignment"}</b>
+              <SourceChip source={group.items[0].source} />
+            </span>
             <span className="text-ink-muted">{group.dueAt ? `due ${formatDay(group.dueAt)}` : ""}</span>
           </div>
           <ul className="divide-y divide-paper-dark">

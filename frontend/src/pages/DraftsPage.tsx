@@ -3,14 +3,15 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Link, useParams, useSearchParams } from "react-router";
 import type { AssignmentGrading } from "../api/client";
-import { useAssignments, useCourseGradings, useDiscardGrading, useGradingReport, useVersionGradings } from "../api/hooks";
+import { useAssignments, useCourseGradings, useGradingReport, useVersionGradings } from "../api/hooks";
 import { CodeBrowser, type CodeFocus } from "../components/CodeBrowser";
+import { DiscardDraftButton } from "../components/DiscardDraftButton";
 import { CourseName } from "../components/Layout";
 import { keptMistakes, keptStrengths, ReportChip, ReportEditor } from "../components/ReportEditor";
 import { MistakeList, StrengthList } from "../components/SubmissionDetail";
 import { Avatar, Button, Card, Chip, EmptyState, ErrorPanel, PageHeader, Spinner, Stat, StatStrip } from "../components/ui";
 import { formatDate, initials } from "../format";
-import { ArrowLeft, ChevronRight, ClipboardList, ExternalLink, Gauge, Pencil, Sparkles, Trash2, Users } from "lucide-react";
+import { ArrowLeft, ChevronRight, ClipboardList, ExternalLink, Gauge, Pencil, Sparkles, Users } from "lucide-react";
 import { severityColor } from "../theme";
 
 export function DraftsPage() {
@@ -456,7 +457,6 @@ function DraftDetail({
   onBack: () => void;
 }) {
   const history = useVersionGradings(draft.versionId);
-  const discard = useDiscardGrading();
   const grading = history.data?.find((g) => g.id === draft.id);
   const report = useGradingReport(draft.id).data;
   const [editing, setEditing] = useState(false);
@@ -492,7 +492,7 @@ function DraftDetail({
               ) : (
                 <Chip tone="dashed">Earlier draft</Chip>
               )}
-              {report && <ReportChip report={report} />}
+              {report && draft.status !== "Discarded" && <ReportChip report={report} />}
             </div>
             <div className="truncate text-xs text-ink-muted">
               {assignmentTitle} · <span className="font-mono text-[11px]">v{draft.versionNumber}</span> · saved {formatDate(draft.createdAt)} ·{" "}
@@ -504,17 +504,8 @@ function DraftDetail({
           <span className="mr-1 [&_b]:text-[20px] [&_span]:text-[13px]">
             <Score draft={showReport ? { score: report.score, maxScore: draft.maxScore, bonus: report.bonus } : draft} />
           </span>
-          {draft.status === "Draft" && report == null && (
-            <Button
-              small
-              variant="ghost"
-              icon={<Trash2 />}
-              onClick={() => discard.mutate(draft.id)}
-              disabled={discard.isPending}
-              title="Throw this draft away; it stays in the history"
-            >
-              {discard.isPending ? "Discarding…" : "Discard"}
-            </Button>
+          {draft.status === "Draft" && (
+            <DiscardDraftButton gradingId={draft.id} reportStatus={report?.status} title="Throw this draft away; it stays in the history" />
           )}
           <Link to={workspace}>
             <Button small icon={<ExternalLink />} title="Open the student in the assignment workspace (files, versions, grade again)">

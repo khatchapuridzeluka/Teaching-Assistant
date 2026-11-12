@@ -28,7 +28,7 @@ public record StudentMistakeResponse(
     string? AssignmentTitle,
     DateTimeOffset? AssignmentDueAt,
     Guid VersionId,
-    Guid ReportId,
+    Guid? ReportId,
     string? File,
     int? StartLine,
     int? EndLine,
@@ -39,7 +39,8 @@ public record StudentMistakeResponse(
     MistakeDecision Decision,
     MistakeLabel Label,
     string? RepeatedFromAssignmentTitle,
-    DateTimeOffset ApprovedAt);
+    DateTimeOffset ApprovedAt,
+    StudentRecordSource Source);
 
 public record MistakeCategoryResponse(
     MistakeCategory Category,
@@ -69,6 +70,7 @@ public record MistakeAssignmentResponse(
     double? ReportScore,
     double? ReportBonus,
     double? AiScore,
-    double? AiBonus);
+    double? AiBonus,
+    StudentRecordSource Source);
 
 public record MistakeAssignmentOption(string AssignmentId, string? Title, DateTimeOffset? DueAt, int Count);

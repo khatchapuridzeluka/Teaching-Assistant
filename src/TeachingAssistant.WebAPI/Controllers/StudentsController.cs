@@ -40,7 +40,7 @@ public class StudentsController : ControllerBase
     }
 
     /// <summary>
-    /// Returns a student's recorded mistakes in the course (kept and edited mistakes of approved reports), newest assignment first, each labelled new or repeated (same category in an earlier assignment; labels always come from the full history), with breakdowns by category, severity, label and assignment; filterable by assignment, category, severity and label.
+    /// Returns a student's mistakes in the course (from each graded assignment's current draft: your report when you saved one, otherwise the AI draft, and the approved records when the latest version has no current draft; each item and assignment says which (Draft, InReview, Approved)), newest assignment first, each labelled new or repeated (same category in an earlier assignment; labels always come from the full history), with breakdowns by category, severity, label and assignment; filterable by assignment, category, severity and label.
     /// </summary>
     /// <response code="200">Mistakes retrieved successfully; empty lists when the student has no approved report yet</response>
     [HttpGet("{userId}/mistakes")]
@@ -53,7 +53,7 @@ public class StudentsController : ControllerBase
     }
 
     /// <summary>
-    /// Returns a student's recorded strengths in the course (kept and edited strengths of approved reports), newest assignment first, each labelled new, consistent (same category was a strength in an earlier assignment) or improved (same category was a mistake in an earlier assignment), with breakdowns by category and label and strengths vs. mistakes per assignment; filterable by assignment, category and label.
+    /// Returns a student's strengths in the course (from each graded assignment's current draft: your report when you saved one, otherwise the AI draft, and the approved records when the latest version has no current draft; each item and assignment says which (Draft, InReview, Approved)), newest assignment first, each labelled new, consistent (same category was a strength in an earlier assignment) or improved (same category was a mistake in an earlier assignment), with breakdowns by category and label and strengths vs. mistakes per assignment; filterable by assignment, category and label.
     /// </summary>
     /// <response code="200">Strengths retrieved successfully; empty lists when the student has no approved report with strengths yet</response>
     [HttpGet("{userId}/strengths")]
@@ -86,7 +86,7 @@ public class StudentsController : ControllerBase
     }
 
     /// <summary>
-    /// Queues an AI analysis of the student from their approved reports: Mistakes sends only the kept mistakes with their points and labels, Strengths sends only the kept strengths to be grouped into skills; trends are counted in code and the student is never named.
+    /// Queues an AI analysis of the student from each graded assignment's current draft (your report when you saved one, otherwise the AI draft; the approved records when the latest version has no current draft): Mistakes sends only the kept mistakes with their points and labels, Strengths sends only the kept strengths to be grouped into skills; trends are counted in code and the student is never named.
     /// </summary>
     /// <response code="202">Analysis queued (or the running one is returned); follow it with GET /jobs/{jobId}</response>
     [HttpPost("{userId}/analysis")]

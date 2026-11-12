@@ -17,7 +17,7 @@ export function StrengthsCard({ courseId, userId }: { courseId: string; userId: 
       <div className="flex items-start justify-between gap-2 border-b border-line px-4 py-2.5">
         <div>
           <h3 className="text-[13px] font-semibold">Strengths</h3>
-          <div className="text-[11px] text-ink-muted">From approved reports · shown in most assignments first</div>
+          <div className="text-[11px] text-ink-muted">From AI drafts and your reports · shown in most assignments first</div>
         </div>
         {categories.length > 0 && (
           <Link to={link} className="shrink-0 text-xs font-semibold text-accent hover:underline">
@@ -32,8 +32,8 @@ export function StrengthsCard({ courseId, userId }: { courseId: string; userId: 
       )}
       {data && categories.length === 0 && (
         <p className="px-4 py-3 text-xs text-ink-muted">
-          Nothing yet: strengths appear here once you approve a report whose AI draft noted some (drafts graded before strengths existed
-          have none).
+          Nothing yet: strengths appear here once a graded assignment of this student notes some (drafts graded before strengths
+          existed have none).
         </p>
       )}
       {data && categories.length > 0 && <p className="border-b border-paper-dark px-4 py-2.5 text-xs leading-relaxed">{summarize(data)}</p>}

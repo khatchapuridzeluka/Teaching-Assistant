@@ -9,7 +9,26 @@ public class StudentStrength
     {
     }
 
-    private StudentStrength(GradingReport report, ReportStrength strength, Submission submission)
+    private StudentStrength(AiGrading grading, GradingStrength strength, Submission submission)
+    {
+        Id = Guid.CreateVersion7();
+        StudentId = submission.StudentId;
+        CourseId = submission.CourseId;
+        AssignmentId = submission.AssignmentId;
+        SubmissionId = submission.Id;
+        VersionId = grading.VersionId;
+        GradingId = grading.Id;
+        SourceStrengthId = strength.Id;
+        File = strength.File;
+        StartLine = strength.StartLine;
+        EndLine = strength.EndLine;
+        Category = strength.Category;
+        Message = strength.Message;
+        Decision = MistakeDecision.Kept;
+        ApprovedAt = grading.CreatedAt;
+    }
+
+    private StudentStrength(GradingReport report, ReportStrength strength, Submission submission, DateTimeOffset at)
     {
         Id = Guid.CreateVersion7();
         StudentId = submission.StudentId;
@@ -27,7 +46,7 @@ public class StudentStrength
         Category = strength.Category;
         Message = strength.Message;
         Decision = strength.Decision;
-        ApprovedAt = report.ApprovedAt!.Value;
+        ApprovedAt = at;
     }
 
     public Guid Id { get; private set; }
@@ -71,15 +90,39 @@ public class StudentStrength
             throw new InvalidOperationException($"Report {report.Id} is not approved; only approved strengths are recorded.");
         }
 
+        return FromReport(report, submission);
+    }
+
+    public static IReadOnlyList<StudentStrength> FromReport(GradingReport report, Submission submission)
+    {
         if (submission.Versions.All(v => v.Id != report.VersionId))
         {
             throw new ArgumentException($"Report {report.Id} is not about a version of submission {submission.Id}.", nameof(submission));
         }
 
+        var at = report.ApprovedAt ?? report.UpdatedAt;
         return report.Strengths
             .Where(s => s.Decision != MistakeDecision.Rejected)
             .OrderBy(s => s.Position)
-            .Select(s => new StudentStrength(report, s, submission))
+            .Select(s => new StudentStrength(report, s, submission, at))
+            .ToList();
+    }
+
+    public static IReadOnlyList<StudentStrength> FromDraft(AiGrading grading, Submission submission)
+    {
+        if (grading.Status != GradingStatus.Draft)
+        {
+            throw new InvalidOperationException($"Grading {grading.Id} was discarded; only current drafts describe a student.");
+        }
+
+        if (submission.Versions.All(v => v.Id != grading.VersionId))
+        {
+            throw new ArgumentException($"Grading {grading.Id} is not about a version of submission {submission.Id}.", nameof(submission));
+        }
+
+        return grading.Strengths
+            .OrderBy(s => s.Position)
+            .Select(s => new StudentStrength(grading, s, submission))
             .ToList();
     }
 }

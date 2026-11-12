@@ -53,6 +53,7 @@ public class AgentTools
         var running = jobs.Where(j => !j.IsFinished).Select(j => j.Id).ToList();
         if (running.Count == 0)
         {
+            _context.RecordLinks(await _reporter.LinksAsync(jobs, cancellationToken));
             return $"All of these jobs have already finished:\n{await _reporter.DescribeAsync(jobs, cancellationToken)}";
         }
 

@@ -19,7 +19,7 @@ public class AgentMessage
 
     internal AgentMessage(
         Guid conversationId, Guid runId, int sequence, AgentMessageRole role, string text, DateTimeOffset createdAt,
-        string? toolCalls = null, string? toolCallId = null, string? toolName = null, Guid? jobId = null)
+        string? toolCalls = null, string? toolCallId = null, string? toolName = null, Guid? jobId = null, string? links = null)
     {
         if (role == AgentMessageRole.Tool && (string.IsNullOrWhiteSpace(toolCallId) || string.IsNullOrWhiteSpace(toolName)))
         {
@@ -38,6 +38,7 @@ public class AgentMessage
         Role = role;
         Text = text.Trim();
         ToolCalls = toolCalls;
+        Links = links;
         ToolCallId = toolCallId;
         ToolName = toolName;
         JobId = jobId;
@@ -57,6 +58,8 @@ public class AgentMessage
     public string Text { get; private set; } = "";
 
     public string? ToolCalls { get; private set; }
+
+    public string? Links { get; private set; }
 
     public string? ToolCallId { get; private set; }
 

@@ -13,18 +13,18 @@ const texts: Record<StudentAnalysisKind, { title: string; empty: string; confirm
   Mistakes: {
     title: "AI feedback on mistakes",
     empty:
-      "Not analyzed yet. The AI gets only the mistakes you kept in approved reports, with their points and new / repeated labels, and writes feedback and what to work on next.",
+      "Not analyzed yet. The AI gets only the mistakes of each graded assignment (your report where you reviewed it, otherwise the AI draft), with their points and new / repeated labels, and writes feedback and what to work on next.",
     confirm:
-      "The AI reads every mistake you kept in the approved reports, with its points and label, and writes feedback of at most 200 words and what to work on next. The name is never sent.",
+      "The AI reads every mistake of the graded assignments (your report where you reviewed it, otherwise the AI draft), with its points and label, and writes feedback of at most 200 words and what to work on next. The name is never sent.",
     job: "mistakes feedback",
     records: "mistakes",
   },
   Strengths: {
     title: "AI strengths analysis",
     empty:
-      "Not analyzed yet. The AI gets only the strengths you kept in approved reports, groups similar ones into skills and writes what the student is good at. It gets better as more assignments are approved.",
+      "Not analyzed yet. The AI gets only the strengths of each graded assignment (your report where you reviewed it, otherwise the AI draft), groups similar ones into skills and writes what the student is good at. It gets better as more assignments are graded.",
     confirm:
-      "The AI reads every strength you kept in the approved reports, groups similar ones into skills and writes an overview of at most 150 words. The name is never sent.",
+      "The AI reads every strength of the graded assignments (your report where you reviewed it, otherwise the AI draft), groups similar ones into skills and writes an overview of at most 150 words. The name is never sent.",
     job: "strengths analysis",
     records: "strengths",
   },
@@ -76,8 +76,8 @@ export function StudentOverviewCard({
           </h3>
           <div className="text-[11px] text-ink-muted">
             {data
-              ? `From ${data.records} ${text.records} in ${data.assignments} approved ${data.assignments === 1 ? "assignment" : "assignments"} · ${formatDate(data.createdAt)} · ${data.model}`
-              : "Written by the AI from the approved reports; the name is never sent"}
+              ? `From ${data.records} ${text.records} in ${data.assignments} graded ${data.assignments === 1 ? "assignment" : "assignments"} · ${formatDate(data.createdAt)} · ${data.model}`
+              : "Written by the AI from the graded assignments; the name is never sent"}
           </div>
         </div>
         <span className="flex items-center gap-2">

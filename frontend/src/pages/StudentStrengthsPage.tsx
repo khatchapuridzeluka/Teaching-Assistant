@@ -8,6 +8,7 @@ import { FilterChips } from "../components/FilterChips";
 import { CourseName } from "../components/Layout";
 import { StudentOverviewCard } from "../components/StudentOverview";
 import { categoryLabels } from "../components/StudentMistakes";
+import { SourceChip } from "../components/StudentMistakes";
 import { StrengthRow, summarize } from "../components/StudentStrengths";
 import { Avatar, Button, Card, CardHeader, EmptyState, ErrorPanel, PageHeader, Spinner, Stat, StatStrip } from "../components/ui";
 import { formatDay, initials } from "../format";
@@ -61,7 +62,7 @@ export function StudentStrengthsPage() {
         }
         subtitle={
           <>
-            <CourseName courseId={courseId} /> · from approved reports · labels compare with assignments due earlier
+            <CourseName courseId={courseId} /> · from AI drafts and your reports · labels compare with assignments due earlier
           </>
         }
         actions={
@@ -271,7 +272,10 @@ function StrengthList({ strengths }: { strengths: StudentStrengthInfo[] }) {
       {groups.map((group) => (
         <div key={group.id} className="border-b border-paper-dark last:border-b-0">
           <div className="flex items-center justify-between gap-2 bg-paper/60 px-4 py-1.5 text-[11px]">
-            <b>{group.title ?? "Assignment"}</b>
+            <span className="flex flex-wrap items-center gap-2">
+              <b>{group.title ?? "Assignment"}</b>
+              <SourceChip source={group.items[0].source} />
+            </span>
             <span className="text-ink-muted">
               {group.items.length} · {group.dueAt ? `due ${formatDay(group.dueAt)}` : ""}
             </span>

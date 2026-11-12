@@ -1,5 +1,8 @@
 using System.Reflection;
 using TeachingAssistant.Application.Contracts;
+using TeachingAssistant.Application.Interfaces;
+using TeachingAssistant.Domain.Grading;
+using TeachingAssistant.Domain.Ingestion;
 using TeachingAssistant.Application.Interfaces.Services;
 using TeachingAssistant.Application.Jobs;
 using TeachingAssistant.Application.Models;
@@ -18,7 +21,7 @@ public class GradingToolsTests
 
     private GradingTools Tools()
     {
-        return new GradingTools(_fakes, _fakes, _context, new Clock(Now.AddMinutes(1)));
+        return new GradingTools(_fakes, _fakes, _fakes, _context, new Clock(Now.AddMinutes(1)));
     }
 
     [Fact]
@@ -43,6 +46,7 @@ public class GradingToolsTests
         Assert.Equal([false], _fakes.Regrade);
         Assert.StartsWith($"Grading queued for 12 of 15 students (job id {_fakes.Result.Job!.Id}). 3 already had an AI draft and were skipped.", result);
         Assert.Equal(_fakes.Result.Job.Id, _context.TakeQueuedJob());
+        Assert.Equal(AgentLinkKind.Assignment, Assert.Single(_context.TakeLinks()).Kind);
     }
 
     [Fact]
@@ -85,6 +89,21 @@ public class GradingToolsTests
         Assert.Equal([("course-1", "a-4")], _fakes.Analyses);
         Assert.StartsWith($"Common mistakes analysis queued (job id {_fakes.AnalysisJob!.Id}).", result);
         Assert.Equal(_fakes.AnalysisJob.Id, _context.TakeQueuedJob());
+        Assert.Equal([new AgentLink(AgentLinkKind.CommonMistakes, "Common mistakes", "course-1", "a-4")], _context.TakeLinks());
+    }
+
+    [Fact]
+    public async Task AnalyzeCommonMistakes_RefusesAtOnce_WhenEveryDraftWasDiscarded()
+    {
+        _fakes.Drafts.Clear();
+        _fakes.Drafts.Add(GradingStatus.Discarded);
+
+        var result = await Tools().AnalyzeCommonMistakesAsync("course-1", "a-4", TestContext.Current.CancellationToken);
+
+        Assert.StartsWith("Not started: no student of this assignment has a current AI draft", result);
+        Assert.Contains("Offer the teacher to grade them first and then run the analysis", result);
+        Assert.Empty(_fakes.Analyses);
+        Assert.Null(_context.TakeQueuedJob());
     }
 
     [Fact]
@@ -108,8 +127,26 @@ public class GradingToolsTests
         return new GradeAllResponse(JobPayloads.ToResponse(job), queued, 15, alreadyDrafted, 0, 0, 0, []);
     }
 
-    private sealed class Fakes : ISubmissionFetchService, IJobService
+    private sealed class Fakes : ISubmissionFetchService, IJobService, IGradingStore
     {
+        public List<GradingStatus> Drafts { get; } = [GradingStatus.Draft];
+
+        public Task<IReadOnlyList<GradingSummary>> GetSummariesAsync(
+            SubmissionSource source, string courseId, string? assignmentId, string? studentId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<GradingSummary>>(Drafts
+                .Select(status => new GradingSummary(Guid.NewGuid(), Guid.NewGuid(), 1, "a-4", "sub", "s-1", "Nino", status, 80, 100, null, 0, 0, 0,
+                    "model", Now, null))
+                .ToList());
+
+        public Task<IReadOnlyList<AiGrading>> GetByVersionsAsync(IReadOnlyCollection<Guid> versionIds, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<AiGrading?> FindAsync(Guid gradingId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public void Add(AiGrading grading) => throw new NotSupportedException();
+
+        public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
         public List<(string CourseId, string AssignmentId)> Fetches { get; } = [];
 
         public List<bool> Regrade { get; } = [];

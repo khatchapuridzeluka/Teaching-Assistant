@@ -67,6 +67,10 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("job_id");
 
+                    b.Property<string>("Links")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("links");
+
                     b.Property<string>("Role")
                         .IsRequired()
                         .HasColumnType("text")

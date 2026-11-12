@@ -24,7 +24,7 @@ public record StudentStrengthResponse(
     string? AssignmentTitle,
     DateTimeOffset? AssignmentDueAt,
     Guid VersionId,
-    Guid ReportId,
+    Guid? ReportId,
     string? File,
     int? StartLine,
     int? EndLine,
@@ -33,7 +33,8 @@ public record StudentStrengthResponse(
     MistakeDecision Decision,
     StrengthLabel Label,
     string? SinceAssignmentTitle,
-    DateTimeOffset ApprovedAt);
+    DateTimeOffset ApprovedAt,
+    StudentRecordSource Source);
 
 public record StrengthCategoryResponse(
     MistakeCategory Category,
