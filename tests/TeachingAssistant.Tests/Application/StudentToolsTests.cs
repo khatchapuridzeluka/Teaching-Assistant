@@ -32,7 +32,7 @@ public class StudentToolsTests
             .OfType<string>()
             .Order();
 
-        Assert.Equal(["find_students", "grade_student_assignment", "list_student_assignments", "regrade_student_assignment"], names);
+        Assert.Equal(["find_students", "grade_all_assignments_of_student", "grade_student_assignment", "list_student_assignments"], names);
     }
 
     [Fact]
@@ -88,7 +88,7 @@ public class StudentToolsTests
     {
         var submission = _fakes.AddSubmission("s-1", "Nino Beridze", versions: 2);
 
-        var result = await Tools().GradeStudentAssignmentAsync("course-1", "a-4", "s-1", TestContext.Current.CancellationToken);
+        var result = await Tools().GradeStudentAssignmentAsync("course-1", "a-4", "s-1", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal([("course-1", "a-4")], _fakes.Fetches);
         Assert.Equal([submission.LatestVersion!.Id], _fakes.Queued);
@@ -101,12 +101,12 @@ public class StudentToolsTests
         var submission = _fakes.AddSubmission("s-1", "Nino Beridze", versions: 1);
         _fakes.Gradings.Add(new AiGrading(submission.LatestVersion!.Id, "model", "review", 72, 100, null, 1, [], [], "{}", [], Now));
 
-        var result = await Tools().GradeStudentAssignmentAsync("course-1", "a-4", "s-1", TestContext.Current.CancellationToken);
+        var result = await Tools().GradeStudentAssignmentAsync("course-1", "a-4", "s-1", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Empty(_fakes.Queued);
         Assert.Equal(
             "Not started: version 1 of Nino Beridze's submission already has an AI draft (score 72 of 100). "
-            + "Use regrade_student_assignment only if the teacher asks to grade it again.",
+            + "Call this again with regrade set to true only if the teacher asks to grade it again.",
             result);
     }
 
@@ -116,7 +116,7 @@ public class StudentToolsTests
         var submission = _fakes.AddSubmission("s-1", "Nino Beridze", versions: 1);
         _fakes.Gradings.Add(new AiGrading(submission.LatestVersion!.Id, "model", "review", 72, 100, null, 1, [], [], "{}", [], Now));
 
-        var result = await Tools().RegradeStudentAssignmentAsync("course-1", "a-4", "s-1", TestContext.Current.CancellationToken);
+        var result = await Tools().GradeStudentAssignmentAsync("course-1", "a-4", "s-1", regrade: true, TestContext.Current.CancellationToken);
 
         Assert.Equal([("course-1", "a-4")], _fakes.Fetches);
         Assert.Equal([submission.LatestVersion.Id], _fakes.Queued);
@@ -129,7 +129,7 @@ public class StudentToolsTests
     {
         _fakes.AddSubmission("s-1", "Nino Beridze", versions: 1);
 
-        var result = await Tools().RegradeStudentAssignmentAsync("course-1", "a-4", "s-1", TestContext.Current.CancellationToken);
+        var result = await Tools().GradeStudentAssignmentAsync("course-1", "a-4", "s-1", regrade: true, TestContext.Current.CancellationToken);
 
         Assert.StartsWith("Grading queued for Nino Beridze, version 1", result);
         Assert.DoesNotContain("history", result);
@@ -140,7 +140,7 @@ public class StudentToolsTests
     {
         _fakes.AddSubmission("s-2", "Nino Kapanadze", versions: 1);
 
-        var result = await Tools().GradeStudentAssignmentAsync("course-1", "a-4", "s-1", TestContext.Current.CancellationToken);
+        var result = await Tools().GradeStudentAssignmentAsync("course-1", "a-4", "s-1", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Empty(_fakes.Queued);
         Assert.Equal("Nothing to grade: after fetching, this student has no turned-in work stored for this assignment.", result);
@@ -152,9 +152,19 @@ public class StudentToolsTests
         _fakes.AddSubmission("s-1", "Nino Beridze", versions: 1);
         _fakes.ExistingJob = true;
 
-        var result = await Tools().GradeStudentAssignmentAsync("course-1", "a-4", "s-1", TestContext.Current.CancellationToken);
+        var result = await Tools().GradeStudentAssignmentAsync("course-1", "a-4", "s-1", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.StartsWith("A grading of Nino Beridze's version 1 is already in progress (job id ", result);
+    }
+
+    [Fact]
+    public async Task GradeAllAssignments_QueuesTheStudentJob_WithTheRegradeChoice()
+    {
+        var result = await Tools().GradeAllAssignmentsOfStudentAsync("course-1", "s-1", regrade: true, TestContext.Current.CancellationToken);
+
+        Assert.Equal([("course-1", "s-1", true)], _fakes.StudentGradings);
+        Assert.StartsWith("Grading of all this student's assignments queued (job id ", result);
+        Assert.Contains("including those that already have a draft", result);
     }
 
     [Fact]
@@ -163,7 +173,7 @@ public class StudentToolsTests
         _fakes.AddSubmission("s-1", "Nino Beridze", versions: 1);
         _fakes.QueueFailure = new InvalidRequestException("The assignment instructions are not stored yet.");
 
-        var result = await Tools().GradeStudentAssignmentAsync("course-1", "a-4", "s-1", TestContext.Current.CancellationToken);
+        var result = await Tools().GradeStudentAssignmentAsync("course-1", "a-4", "s-1", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal("Failed: The assignment instructions are not stored yet.", result);
     }
@@ -186,6 +196,8 @@ public class StudentToolsTests
         public Exception? QueueFailure { get; set; }
 
         public bool ExistingJob { get; set; }
+
+        public List<(string CourseId, string StudentId, bool Regrade)> StudentGradings { get; } = [];
 
         public Submission AddSubmission(string studentId, string name, int versions)
         {
@@ -291,18 +303,22 @@ public class StudentToolsTests
 
         public Task<JobResponse?> RetryAsync(Guid jobId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
-        public Task<GradeAllResponse> QueueGradeAssignmentAsync(string courseId, string assignmentId, CancellationToken cancellationToken = default) =>
+        public Task<GradeAllResponse> QueueGradeAssignmentAsync(string courseId, string assignmentId, bool regrade = false, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
         public Task<IReadOnlyList<JobOverviewItem>?> GetChildrenAsync(Guid jobId, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
-        public Task<JobResponse> QueueGradeStudentAsync(string courseId, string studentId, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
+        public Task<JobResponse> QueueGradeStudentAsync(string courseId, string studentId, bool regrade = false, CancellationToken cancellationToken = default)
+        {
+            StudentGradings.Add((courseId, studentId, regrade));
+            var job = Job.Group(JobType.GradeStudent, JobPayloads.Write(new GradeStudentPayload(courseId, studentId)), Now.AddMinutes(1));
+            return Task.FromResult(JobPayloads.ToResponse(job));
+        }
 
         public Task<FetchStudentWorkResult> QueueStudentGradingsAsync(
             Guid parentId, string courseId, string studentId, int fetched, IReadOnlyList<string> fetchProblems,
-            CancellationToken cancellationToken = default) =>
+            bool regrade = false, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
         public Task<JobResponse> QueueAnalyzeMistakesAsync(string courseId, string assignmentId, CancellationToken cancellationToken = default) =>

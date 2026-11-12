@@ -338,15 +338,21 @@ function StudentProfile({
   const trackJob = useTrackJob();
 
   const [confirmGrade, setConfirmGrade] = useState(false);
+  const [regradeDrafted, setRegradeDrafted] = useState(false);
 
   useEffect(() => {
     gradeStudent.reset();
     setConfirmGrade(false);
   }, [student.id]);
 
+  function openGradeAll() {
+    setRegradeDrafted(false);
+    setConfirmGrade(true);
+  }
+
   function gradeAll() {
     setConfirmGrade(false);
-    gradeStudent.mutate(undefined, {
+    gradeStudent.mutate(regradeDrafted, {
       onSuccess: (job) => {
         trackJob(job, {
           label: `${student.name} · fetching, then grading`,
@@ -384,7 +390,7 @@ function StudentProfile({
           <Button
             small
             icon={<Sparkles />}
-            onClick={() => setConfirmGrade(true)}
+            onClick={openGradeAll}
             disabled={gradeStudent.isPending}
             title="Fetch this student's turned-in work from Classroom, then queue an AI grading for every assignment without a draft"
           >
@@ -400,10 +406,31 @@ function StudentProfile({
           onConfirm={gradeAll}
           onCancel={() => setConfirmGrade(false)}
         >
-          <p>
-            First everything {student.name} turned in is fetched from Google Classroom, then every assignment without a draft gets an AI
-            grading. Assignments with a draft that is not discarded are skipped, and assignments that were not turned in are left out.
-          </p>
+          {regradeDrafted ? (
+            <p>
+              First everything {student.name} turned in is fetched from Google Classroom, then every assignment with stored work gets a new
+              AI grading, including those that already have a draft: the new draft becomes current and the earlier one stays in the
+              history. Assignments that were not turned in are left out.
+            </p>
+          ) : (
+            <p>
+              First everything {student.name} turned in is fetched from Google Classroom, then every assignment without a draft gets an
+              AI grading. Assignments with a draft that is not discarded are skipped, and assignments that were not turned in are left
+              out.
+            </p>
+          )}
+          <label className="mt-2.5 flex items-start gap-2 rounded-lg border border-line px-3 py-2 text-[13px]">
+            <input
+              type="checkbox"
+              checked={regradeDrafted}
+              onChange={(e) => setRegradeDrafted(e.target.checked)}
+              className="mt-0.5 accent-accent"
+            />
+            <span>
+              <b className="font-semibold">Also grade the ones that already have a draft</b>
+              <span className="block text-[11px] text-ink-muted">Each assignment with a draft is graded again</span>
+            </span>
+          </label>
           <p className="mt-1.5">
             Each grading is one paid AI call. They run in the background, 3 at a time; you can follow them on the System page.
           </p>

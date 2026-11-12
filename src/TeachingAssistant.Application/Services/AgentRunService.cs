@@ -24,6 +24,7 @@ public class AgentRunService : IAgentRunService
     private readonly ClassroomTools _classroomTools;
     private readonly StudentTools _studentTools;
     private readonly AgentTools _agentTools;
+    private readonly GradingTools _gradingTools;
     private readonly AgentRunContext _runContext;
     private readonly ModelCallContext _callContext;
     private readonly TimeProvider _timeProvider;
@@ -36,6 +37,7 @@ public class AgentRunService : IAgentRunService
         ClassroomTools classroomTools,
         StudentTools studentTools,
         AgentTools agentTools,
+        GradingTools gradingTools,
         AgentRunContext runContext,
         ModelCallContext callContext,
         TimeProvider timeProvider)
@@ -47,6 +49,7 @@ public class AgentRunService : IAgentRunService
         _classroomTools = classroomTools;
         _studentTools = studentTools;
         _agentTools = agentTools;
+        _gradingTools = gradingTools;
         _runContext = runContext;
         _callContext = callContext;
         _timeProvider = timeProvider;
@@ -142,7 +145,7 @@ public class AgentRunService : IAgentRunService
             var system = AgentChatService.SystemPromptFor(run.Page, run.CourseId, run.AssignmentId);
             var hooks = new AgentRunHooks(entry => SaveStepAsync(run, conversation, entry), () => _runContext.StopRequested);
             var reply = await _languageModel.RunAgentAsync(
-                system, history, [_classroomTools, _studentTools, _agentTools], hooks, cancellationToken);
+                system, history, [_classroomTools, _studentTools, _gradingTools, _agentTools], hooks, cancellationToken);
             Finish(run, reply);
         }
         catch (OperationCanceledException)

@@ -9,7 +9,7 @@ public record GradeVersionPayload(Guid VersionId, bool PartOfGradeAll = false);
 
 public record GradeVersionResult(Guid GradingId);
 
-public record GradeAssignmentPayload(string CourseId, string AssignmentId);
+public record GradeAssignmentPayload(string CourseId, string AssignmentId, bool Regrade = false);
 
 public record GradeAssignmentResult(int Succeeded, int Failed, int Canceled);
 
@@ -18,9 +18,9 @@ public record AnalyzeMistakesPayload(string CourseId, string AssignmentId);
 public record AnalyzeStudentPayload(
     string CourseId, string StudentId, string? StudentName = null, StudentAnalysisKind Kind = StudentAnalysisKind.Mistakes);
 
-public record GradeStudentPayload(string CourseId, string StudentId, string? StudentName = null);
+public record GradeStudentPayload(string CourseId, string StudentId, string? StudentName = null, bool Regrade = false);
 
-public record FetchStudentWorkPayload(string CourseId, string StudentId, Guid ParentId);
+public record FetchStudentWorkPayload(string CourseId, string StudentId, Guid ParentId, bool Regrade = false);
 
 public record FetchStudentWorkResult(
     int Fetched,

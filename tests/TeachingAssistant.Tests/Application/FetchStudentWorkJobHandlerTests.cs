@@ -36,6 +36,19 @@ public class FetchStudentWorkJobHandlerTests
         Assert.Contains(_jobs.Problems, p => p.Contains("Google said no"));
         Assert.Contains(_jobs.Problems, p => p.Contains("archive could not be opened"));
         Assert.Contains("\"queued\":0", result);
+        Assert.False(_jobs.Regrade);
+    }
+
+    [Fact]
+    public async Task RegradeIsPassedOnToTheGradingStep()
+    {
+        var parentId = Guid.NewGuid();
+
+        await new FetchStudentWorkJobHandler(_submissions, _fetch, _jobs)
+            .RunAsync(JobPayloads.Write(new FetchStudentWorkPayload("course-1", "ria", parentId, Regrade: true)),
+                TestContext.Current.CancellationToken);
+
+        Assert.True(_jobs.Regrade);
     }
 
     private sealed class FakeSubmissions : ISubmissionStore
@@ -93,14 +106,16 @@ public class FetchStudentWorkJobHandlerTests
     {
         public Guid ParentId { get; private set; }
         public int Fetched { get; private set; }
+        public bool? Regrade { get; private set; }
         public List<string> Problems { get; } = [];
 
         public Task<FetchStudentWorkResult> QueueStudentGradingsAsync(
             Guid parentId, string courseId, string studentId, int fetched, IReadOnlyList<string> fetchProblems,
-            CancellationToken cancellationToken = default)
+            bool regrade = false, CancellationToken cancellationToken = default)
         {
             ParentId = parentId;
             Fetched = fetched;
+            Regrade = regrade;
             Problems.AddRange(fetchProblems);
             return Task.FromResult(new FetchStudentWorkResult(fetched, 0, 0, 0, 0, 0, fetchProblems));
         }
@@ -120,13 +135,13 @@ public class FetchStudentWorkJobHandlerTests
 
         public Task<JobResponse?> RetryAsync(Guid jobId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
-        public Task<GradeAllResponse> QueueGradeAssignmentAsync(string courseId, string assignmentId, CancellationToken cancellationToken = default) =>
+        public Task<GradeAllResponse> QueueGradeAssignmentAsync(string courseId, string assignmentId, bool regrade = false, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
         public Task<IReadOnlyList<JobOverviewItem>?> GetChildrenAsync(Guid jobId, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
-        public Task<JobResponse> QueueGradeStudentAsync(string courseId, string studentId, CancellationToken cancellationToken = default) =>
+        public Task<JobResponse> QueueGradeStudentAsync(string courseId, string studentId, bool regrade = false, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
         public Task<JobResponse> QueueAnalyzeMistakesAsync(string courseId, string assignmentId, CancellationToken cancellationToken = default) =>

@@ -51,8 +51,18 @@ internal sealed class FakeAgentChats : IAgentChatStore
     }
 }
 
-internal sealed class FakeAgentJobs : IJobStore, IJobSignal, IGradingStore
+internal sealed class FakeAgentJobs : IJobStore, IJobSignal, IGradingStore, IMistakeAnalysisStore
 {
+    public List<MistakeAnalysis> Analyses { get; } = [];
+
+    public Task<MistakeAnalysis?> GetLatestAsync(string courseId, string assignmentId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Analyses.LastOrDefault(a => a.CourseId == courseId && a.AssignmentId == assignmentId));
+
+    public Task<MistakeAnalysis?> FindByClusterAsync(Guid clusterId, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
+
+    public void Add(MistakeAnalysis analysis) => Analyses.Add(analysis);
+
     public List<Job> Jobs { get; } = [];
 
     public List<JobSubject> Subjects { get; } = [];

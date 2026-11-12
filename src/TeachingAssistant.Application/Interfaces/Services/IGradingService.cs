@@ -9,9 +9,10 @@ public interface IGradingService
 
     Task<GradableVersion?> CheckAsync(Guid versionId, CancellationToken cancellationToken = default);
 
-    Task<GradeAllPlan> PlanGradeAllAsync(string courseId, string assignmentId, CancellationToken cancellationToken = default);
+    Task<GradeAllPlan> PlanGradeAllAsync(
+        string courseId, string assignmentId, bool regrade = false, CancellationToken cancellationToken = default);
 
-    Task<GradeAllPlan> PlanGradeStudentAsync(string courseId, string studentId, CancellationToken cancellationToken = default);
+    Task<GradeAllPlan> PlanGradeStudentAsync(string courseId, string studentId, bool regrade = false, CancellationToken cancellationToken = default);
 
     Task<string?> FindStudentNameAsync(string courseId, string studentId, CancellationToken cancellationToken = default);
 

@@ -32,7 +32,9 @@ const toolLabels: Record<string, string> = {
   find_students: "Looked up the student",
   list_student_assignments: "Listed the student's assignments",
   grade_student_assignment: "Started a grading",
-  regrade_student_assignment: "Started a grading again",
+  grade_all_students: "Started Grade all",
+  grade_all_assignments_of_student: "Started grading all the student's assignments",
+  analyze_common_mistakes: "Started the Common mistakes analysis",
   wait_for_jobs: "Waiting for the background work",
 };
 
@@ -166,7 +168,8 @@ export function ChatPanel({ page, onClose }: { page: OpenPage; onClose: () => vo
           <div className="flex flex-col gap-3">
             <p className="text-ink-muted">
               Ask about teaching, rubrics or feedback wording, or about your Classroom: the agent can list your courses, assignments, students and
-              stored submissions, fetch new submissions and start a grading for a student.
+              stored submissions, fetch new submissions, grade one student or a whole assignment, analyze an assignment's common
+              mistakes, and wait for that work to finish.
             </p>
             <div className="eyebrow mt-1">Try</div>
             <div className="flex flex-col gap-1.5">

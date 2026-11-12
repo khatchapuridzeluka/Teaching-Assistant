@@ -46,10 +46,16 @@ export function AssignmentPage() {
   const cancel = useCancelJob(courseId, assignmentId);
   const gradeAll = useGradeAll(courseId, assignmentId);
   const [confirmGradeAll, setConfirmGradeAll] = useState(false);
+  const [regradeDrafted, setRegradeDrafted] = useState(false);
+
+  function openGradeAll() {
+    setRegradeDrafted(false);
+    setConfirmGradeAll(true);
+  }
 
   function startGradeAll() {
     setConfirmGradeAll(false);
-    gradeAll.mutate(undefined, {
+    gradeAll.mutate(regradeDrafted, {
       onSuccess: (result) => {
         if (result.job) {
           trackJob(result.job, {
@@ -140,6 +146,7 @@ export function AssignmentPage() {
 
   const withWork = all.filter(hasWork);
   const drafts = withWork.filter((s) => reviews.get(versionOf.get(s.id)?.id ?? "")).length;
+  const gradeAllCount = regradeDrafted ? withWork.length : withWork.length - drafts;
   const pastDue = assignment?.dueAt != null && new Date(assignment.dueAt).getTime() < Date.now();
 
   return (
@@ -205,7 +212,7 @@ export function AssignmentPage() {
             {(stored.data?.length ?? 0) > 0 && (
               <Button
                 icon={<Sparkles />}
-                onClick={() => setConfirmGradeAll(true)}
+                onClick={openGradeAll}
                 disabled={gradeAll.isPending || fetch.isPending}
                 title="Queue an AI grading for every student without a draft; they run in the background, 3 at a time"
               >
@@ -250,15 +257,37 @@ export function AssignmentPage() {
       {confirmGradeAll && (
         <ConfirmDialog
           title={`Grade all students of ${assignment?.title ?? "this assignment"}?`}
-          confirmLabel={withWork.length - drafts > 0 ? `Grade up to ${withWork.length - drafts} students` : "Grade all"}
+          confirmLabel={gradeAllCount > 0 ? `Grade up to ${gradeAllCount} students` : "Grade all"}
           onConfirm={startGradeAll}
           onCancel={() => setConfirmGradeAll(false)}
         >
-          <p>
-            Every student whose latest version has no draft yet gets an AI grading
-            {withWork.length - drafts > 0 ? ` (up to ${withWork.length - drafts} of ${withWork.length} turned in)` : ""}. Students
-            with a draft that is not discarded are skipped.
-          </p>
+          {regradeDrafted ? (
+            <p>
+              Every student who turned in work gets a new AI grading{withWork.length > 0 ? ` (up to ${withWork.length})` : ""}, including
+              the {drafts} {drafts === 1 ? "student" : "students"} who already have a draft. The new draft becomes current; the earlier
+              one stays in the history.
+            </p>
+          ) : (
+            <p>
+              Every student whose latest version has no draft yet gets an AI grading
+              {gradeAllCount > 0 ? ` (up to ${gradeAllCount} of ${withWork.length} turned in)` : ""}. Students with a draft that is
+              not discarded are skipped.
+            </p>
+          )}
+          <label className="mt-2.5 flex items-start gap-2 rounded-lg border border-line px-3 py-2 text-[13px]">
+            <input
+              type="checkbox"
+              checked={regradeDrafted}
+              onChange={(e) => setRegradeDrafted(e.target.checked)}
+              className="mt-0.5 accent-accent"
+            />
+            <span>
+              <b className="font-semibold">Also grade the ones that already have a draft</b>
+              <span className="block text-[11px] text-ink-muted">
+                {drafts} {drafts === 1 ? "student has" : "students have"} a draft now; each is graded again
+              </span>
+            </span>
+          </label>
           <p className="mt-1.5">
             Each grading is one paid AI call. They run in the background, 3 at a time; you can follow them on the System page.
           </p>

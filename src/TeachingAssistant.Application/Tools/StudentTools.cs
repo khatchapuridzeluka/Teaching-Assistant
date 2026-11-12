@@ -96,32 +96,14 @@ public class StudentTools
         "Starts an AI grading of one student's submission of one assignment. It first fetches the assignment's submissions from "
         + "Google Classroom so the latest version is graded, then queues the grading in the background and returns at once; the "
         + "draft appears on the assignment page for the teacher to review after about a minute. Each grading is a paid AI call, so "
-        + "use it only when the teacher asks for grading. If the latest version already has an AI draft, nothing new is started.")]
+        + "use it only when the teacher asks for grading. If the latest version already has an AI draft, nothing new is started "
+        + "unless regrade is true.")]
     public Task<string> GradeStudentAssignmentAsync(
         [Description("The id of the course")] string courseId,
         [Description("The id of the assignment")] string assignmentId,
         [Description("The student id, as returned by find_students")] string studentId,
-        CancellationToken cancellationToken)
-    {
-        return GradeAsync(courseId, assignmentId, studentId, again: false, cancellationToken);
-    }
-
-    [AgentTool("regrade_student_assignment")]
-    [Description(
-        "Grades one student's submission of one assignment again, even when its latest version already has an AI draft. Like "
-        + "grade_student_assignment it fetches first and queues the grading in the background; when it finishes, the new draft "
-        + "becomes the current one and the earlier draft stays in the history. It is a paid AI call: use it only when the teacher "
-        + "explicitly asks to grade again or regrade, never to retry a grade_student_assignment that said a draft exists.")]
-    public Task<string> RegradeStudentAssignmentAsync(
-        [Description("The id of the course")] string courseId,
-        [Description("The id of the assignment")] string assignmentId,
-        [Description("The student id, as returned by find_students")] string studentId,
-        CancellationToken cancellationToken)
-    {
-        return GradeAsync(courseId, assignmentId, studentId, again: true, cancellationToken);
-    }
-
-    private Task<string> GradeAsync(string courseId, string assignmentId, string studentId, bool again, CancellationToken cancellationToken)
+        [Description("true grades again even when the latest version already has an AI draft (the new draft becomes current, the earlier one stays in the history); set it only when the teacher explicitly asks to grade again or regrade")] bool regrade = false,
+        CancellationToken cancellationToken = default)
     {
         return RunAsync(async () =>
         {
@@ -143,10 +125,10 @@ public class StudentTools
 
             var draft = (await _gradings.GetByVersionsAsync([version.Id], cancellationToken))
                 .FirstOrDefault(g => g.Status == GradingStatus.Draft);
-            if (draft is not null && !again)
+            if (draft is not null && !regrade)
             {
                 return $"Not started: version {version.Number} of {submission.StudentName}'s submission already has an AI draft "
-                    + $"({Score(draft)}). Use regrade_student_assignment only if the teacher asks to grade it again.";
+                    + $"({Score(draft)}). Call this again with regrade set to true only if the teacher asks to grade it again.";
             }
 
             var started = _timeProvider.GetUtcNow();
@@ -170,6 +152,34 @@ public class StudentTools
                 + $"(job id {job.Id}). It runs in the background and takes about a minute; the draft then appears on the assignment "
                 + $"page for the teacher to review.{replaced}";
         });
+    }
+
+    [AgentTool("grade_all_assignments_of_student")]
+    [Description(
+        "Starts AI gradings of every assignment one student turned in (like Grade all assignments on the student's profile): it "
+        + "first fetches everything the student turned in from Google Classroom, then grades each assignment whose latest "
+        + "version has no AI draft yet. All of it runs in the background under one job; this returns at once with that job id. "
+        + "Each grading is a paid AI call, so use it only when the teacher asks to grade all of a student's work.")]
+    public async Task<string> GradeAllAssignmentsOfStudentAsync(
+        [Description("The id of the course")] string courseId,
+        [Description("The student id, as returned by find_students")] string studentId,
+        [Description("true also grades again every assignment whose latest version already has an AI draft (the new drafts become "
+            + "current, the earlier ones stay in the history); set it only when the teacher explicitly asks to grade again or regrade")]
+        bool regrade = false,
+        CancellationToken cancellationToken = default)
+    {
+        var started = _timeProvider.GetUtcNow();
+        var job = await _jobService.QueueGradeStudentAsync(courseId, studentId, regrade, cancellationToken);
+        _context.RecordQueuedJob(job.Id);
+        if (job.CreatedAt < started)
+        {
+            return $"Grading all of this student's assignments is already in progress (job id {job.Id}); nothing new was started. "
+                + "Wait for it if you need the results.";
+        }
+
+        var which = regrade ? "every assignment with stored work, including those that already have a draft" : "every assignment without an AI draft";
+        return $"Grading of all this student's assignments queued (job id {job.Id}): it fetches everything they turned in, then grades "
+            + $"{which}. It runs in the background, about a minute per assignment; the drafts appear on each assignment's page.";
     }
 
     private static string Describe(CourseStudentResponse student)

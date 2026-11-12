@@ -20,15 +20,16 @@ public interface IJobService
 
     Task<JobResponse?> RetryAsync(Guid jobId, CancellationToken cancellationToken = default);
 
-    Task<GradeAllResponse> QueueGradeAssignmentAsync(string courseId, string assignmentId, CancellationToken cancellationToken = default);
+    Task<GradeAllResponse> QueueGradeAssignmentAsync(
+        string courseId, string assignmentId, bool regrade = false, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<JobOverviewItem>?> GetChildrenAsync(Guid jobId, CancellationToken cancellationToken = default);
 
-    Task<JobResponse> QueueGradeStudentAsync(string courseId, string studentId, CancellationToken cancellationToken = default);
+    Task<JobResponse> QueueGradeStudentAsync(string courseId, string studentId, bool regrade = false, CancellationToken cancellationToken = default);
 
     Task<FetchStudentWorkResult> QueueStudentGradingsAsync(
         Guid parentId, string courseId, string studentId, int fetched, IReadOnlyList<string> fetchProblems,
-        CancellationToken cancellationToken = default);
+        bool regrade = false, CancellationToken cancellationToken = default);
 
     Task<JobResponse> QueueAnalyzeMistakesAsync(string courseId, string assignmentId, CancellationToken cancellationToken = default);
 

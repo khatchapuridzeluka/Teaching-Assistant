@@ -48,7 +48,7 @@ public class FetchStudentWorkJobHandler : IJobHandler
         }
 
         var result = await _jobs.QueueStudentGradingsAsync(input.ParentId, input.CourseId, input.StudentId, fetched, problems,
-            cancellationToken);
+            input.Regrade, cancellationToken);
         return JobPayloads.Write(result);
     }
 }

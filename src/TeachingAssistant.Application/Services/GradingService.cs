@@ -150,7 +150,8 @@ public class GradingService : IGradingService
         return prepared is null ? null : new GradableVersion(prepared.Submission.CourseId, prepared.Submission.AssignmentId);
     }
 
-    public async Task<GradeAllPlan> PlanGradeAllAsync(string courseId, string assignmentId, CancellationToken cancellationToken = default)
+    public async Task<GradeAllPlan> PlanGradeAllAsync(
+        string courseId, string assignmentId, bool regrade = false, CancellationToken cancellationToken = default)
     {
         var submissions = (await _store.GetByAssignmentAsync(SubmissionSource.GoogleClassroom, assignmentId, cancellationToken))
             .Where(s => s.CourseId == courseId)
@@ -167,7 +168,7 @@ public class GradingService : IGradingService
 
         var toGrade = new List<Guid>();
         var problems = new List<string>();
-        foreach (var (submission, version) in latest.Where(x => !drafted.Contains(x.Version!.Id)))
+        foreach (var (submission, version) in latest.Where(x => regrade || !drafted.Contains(x.Version!.Id)))
         {
             try
             {
@@ -187,7 +188,7 @@ public class GradingService : IGradingService
             NotFetched: notFetched);
     }
 
-    public async Task<GradeAllPlan> PlanGradeStudentAsync(string courseId, string studentId, CancellationToken cancellationToken = default)
+    public async Task<GradeAllPlan> PlanGradeStudentAsync(string courseId, string studentId, bool regrade = false, CancellationToken cancellationToken = default)
     {
         var studentAssignments = (await _store.GetByCourseAsync(SubmissionSource.GoogleClassroom, courseId, cancellationToken))
             .Where(s => s.StudentId == studentId)
@@ -215,7 +216,7 @@ public class GradingService : IGradingService
         var toGrade = new List<Guid>();
         var assignmentIds = new Dictionary<Guid, string>();
         var problems = new List<string>();
-        foreach (var (submission, version) in latest.Where(x => !drafted.Contains(x.Version!.Id)))
+        foreach (var (submission, version) in latest.Where(x => regrade || !drafted.Contains(x.Version!.Id)))
         {
             try
             {

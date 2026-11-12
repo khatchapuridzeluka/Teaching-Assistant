@@ -244,9 +244,11 @@ export const useModelUsage = (days: number, purpose: ModelCallPurpose | undefine
 export const useGradeAll = (courseId: string, assignmentId: string) => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () =>
+    mutationFn: (regrade: boolean) =>
       unwrap(
-        api.POST("/courses/{courseId}/assignments/{assignmentId}/grade-all", { params: { path: { courseId, assignmentId } } }),
+        api.POST("/courses/{courseId}/assignments/{assignmentId}/grade-all", {
+          params: { path: { courseId, assignmentId }, query: { regrade } },
+        }),
       ),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["courses", courseId, "assignments", assignmentId, "jobs"] });
@@ -294,8 +296,8 @@ export const useApproveExplanation = (courseId: string, assignmentId: string) =>
 export const useGradeStudent = (courseId: string, userId: string) => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () =>
-      unwrap(api.POST("/courses/{courseId}/students/{userId}/grade-all", { params: { path: { courseId, userId } } })),
+    mutationFn: (regrade: boolean) =>
+      unwrap(api.POST("/courses/{courseId}/students/{userId}/grade-all", { params: { path: { courseId, userId }, query: { regrade } } })),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["jobs"] });
       void queryClient.invalidateQueries({ predicate: (query) => query.queryKey.includes("jobs") });

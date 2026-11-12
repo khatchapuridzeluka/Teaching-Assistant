@@ -165,6 +165,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/agent/runs/{runId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancels an agent run: a waiting run stops at once, a running one within about a minute; jobs it already started keep running. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    runId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Run canceled (or already finished) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AgentRunResponse"];
+                    };
+                };
+                /** @description No run with this ID */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/agent/conversations/{conversationId}": {
         parameters: {
             query?: never;
@@ -1442,10 +1487,12 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Queues AI grading for every student of an assignment as one parent job with a child job per student; students whose latest version already has a draft that is not discarded, or whose grading is already queued, are skipped. */
+        /** Queues AI grading for every student of an assignment as one parent job with a child job per student; students whose grading is already queued are skipped, and so are students whose latest version already has a draft that is not discarded unless regrade is true. */
         post: {
             parameters: {
-                query?: never;
+                query?: {
+                    regrade?: boolean;
+                };
                 header?: never;
                 path: {
                     courseId: string;
@@ -1490,10 +1537,12 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Queues grading of every assignment of one student as one parent job: first a fetch step downloads every assignment the student turned in (and stores missing instructions), then it queues a grading per assignment that has no draft that is not discarded. */
+        /** Queues grading of every assignment of one student as one parent job: first a fetch step downloads every assignment the student turned in (and stores missing instructions), then it queues a grading per assignment that has no draft that is not discarded, or per assignment with stored work when regrade is true. */
         post: {
             parameters: {
-                query?: never;
+                query?: {
+                    regrade?: boolean;
+                };
                 header?: never;
                 path: {
                     courseId: string;
@@ -2459,8 +2508,9 @@ export interface components {
             error?: string | null;
             /** Format: int32 */
             steps: number;
-            /** Format: uuid */
-            waitingJobId?: string | null;
+            waitingJobIds: string[];
+            /** Format: date-time */
+            waitUntil?: string | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */

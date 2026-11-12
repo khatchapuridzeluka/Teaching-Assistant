@@ -18,7 +18,7 @@ public class AgentRunWakerTests
 
     private AgentRunWaker Waker()
     {
-        return new AgentRunWaker(_chats, _jobs, _jobs, new JobReporter(_jobs, _jobs), _clock);
+        return new AgentRunWaker(_chats, _jobs, _jobs, new JobReporter(_jobs, _jobs, _jobs), _clock);
     }
 
     private AgentRun WaitingRun(params Job[] jobs)
@@ -81,6 +81,39 @@ public class AgentRunWakerTests
         Assert.Equal(run.Id, JobPayloads.Read<AgentRunPayload>(resumed.Payload).RunId);
         Assert.Equal(resumed.Id, run.JobId);
         Assert.Equal(1, _jobs.Notified);
+    }
+
+    [Fact]
+    public async Task TheNotice_CarriesTheCommonMistakesAnalysis()
+    {
+        var analysis = new MistakeAnalysis("course-1", "a-4", "model", "Most students mixed up composition and inheritance.",
+            "Revisit composition with one worked example.", 15, 40,
+        [
+            new MistakeCluster("Inheritance used for code reuse", "…", false, [Member("s-1"), Member("s-2"), Member("s-2")]),
+            new MistakeCluster("Public fields", "…", false, [Member("s-3")]),
+            new MistakeCluster("Other", "…", true, [Member("s-4"), Member("s-5")]),
+        ], Now);
+        _jobs.Analyses.Add(analysis);
+        var job = new Job(JobType.AnalyzeMistakes, JobPayloads.Write(new AnalyzeMistakesPayload("course-1", "a-4")), Now,
+            courseId: "course-1", assignmentId: "a-4");
+        _jobs.Jobs.Add(job);
+        Finish(job, JobPayloads.Write(new AnalyzeMistakesResult(analysis.Id)));
+        WaitingRun(job);
+
+        await Waker().OnJobFinishedAsync(job.Id, TestContext.Current.CancellationToken);
+
+        var notice = _chats.Messages[^1].Text;
+        Assert.Contains("Common mistakes analysis ready: 40 mistakes from 15 students.", notice);
+        Assert.Contains("Overview: Most students mixed up composition and inheritance.", notice);
+        Assert.Contains("  - Inheritance used for code reuse: 2 students, 3 mistakes\n  - Public fields: 1 students, 1 mistakes", notice);
+        Assert.Contains("(2 mistakes not grouped)", notice);
+        Assert.Contains("For the next lecture: Revisit composition with one worked example.", notice);
+    }
+
+    private static ClusterMember Member(string studentId)
+    {
+        return new ClusterMember(Guid.NewGuid(), Guid.NewGuid(), studentId, "Name", "sub", MistakeSeverity.Minor, MistakeCategory.Naming,
+            1, "message", null, null, null);
     }
 
     [Fact]
@@ -151,7 +184,7 @@ public class AgentRunWakerTests
         var grading = Grading("Nino", 78);
         var context = new AgentRunContext();
         context.Begin(Guid.NewGuid());
-        var tools = new AgentTools(_jobs, new JobReporter(_jobs, _jobs), context);
+        var tools = new AgentTools(_jobs, new JobReporter(_jobs, _jobs, _jobs), context);
 
         var result = await tools.WaitForJobsAsync([grading.Id.ToString()], TestContext.Current.CancellationToken);
 
@@ -167,7 +200,7 @@ public class AgentRunWakerTests
         var running = Grading("Giorgi", null);
         var context = new AgentRunContext();
         context.Begin(Guid.NewGuid());
-        var tools = new AgentTools(_jobs, new JobReporter(_jobs, _jobs), context);
+        var tools = new AgentTools(_jobs, new JobReporter(_jobs, _jobs, _jobs), context);
 
         var result = await tools.WaitForJobsAsync([done.Id.ToString(), running.Id.ToString()], TestContext.Current.CancellationToken);
 
@@ -180,7 +213,7 @@ public class AgentRunWakerTests
     public async Task WaitTool_RejectsAnUnknownId_AndWorksOnlyInsideARun()
     {
         var context = new AgentRunContext();
-        var tools = new AgentTools(_jobs, new JobReporter(_jobs, _jobs), context);
+        var tools = new AgentTools(_jobs, new JobReporter(_jobs, _jobs, _jobs), context);
 
         Assert.StartsWith("Waiting is not possible here", await tools.WaitForJobsAsync(["x"], TestContext.Current.CancellationToken));
 

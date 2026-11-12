@@ -83,20 +83,21 @@ public class JobService : IJobService
     }
 
     public async Task<GradeAllResponse> QueueGradeAssignmentAsync(
-        string courseId, string assignmentId, CancellationToken cancellationToken = default)
+        string courseId, string assignmentId, bool regrade = false, CancellationToken cancellationToken = default)
     {
-        var plan = await _grading.PlanGradeAllAsync(courseId, assignmentId, cancellationToken);
+        var plan = await _grading.PlanGradeAllAsync(courseId, assignmentId, regrade, cancellationToken);
         var (job, queued, alreadyQueued, problems) = await QueueGroupAsync(plan, JobType.GradeAssignment,
-            JobPayloads.Write(new GradeAssignmentPayload(courseId, assignmentId)), $"grade-all:{assignmentId}", courseId, assignmentId,
+            JobPayloads.Write(new GradeAssignmentPayload(courseId, assignmentId, regrade)), $"grade-all:{assignmentId}", courseId, assignmentId,
             "Grading all students of this assignment is already running.", cancellationToken);
         return new GradeAllResponse(job, queued, plan.Students, plan.AlreadyDrafted, alreadyQueued, plan.NoWork, plan.NotFetched, problems);
     }
 
-    public async Task<JobResponse> QueueGradeStudentAsync(string courseId, string studentId, CancellationToken cancellationToken = default)
+    public async Task<JobResponse> QueueGradeStudentAsync(
+        string courseId, string studentId, bool regrade = false, CancellationToken cancellationToken = default)
     {
         var now = _timeProvider.GetUtcNow();
         var name = await _grading.FindStudentNameAsync(courseId, studentId, cancellationToken);
-        var group = Job.Group(JobType.GradeStudent, JobPayloads.Write(new GradeStudentPayload(courseId, studentId, name)), now,
+        var group = Job.Group(JobType.GradeStudent, JobPayloads.Write(new GradeStudentPayload(courseId, studentId, name, regrade)), now,
             dedupKey: $"grade-student:{courseId}:{studentId}", courseId: courseId);
         group.SetChildTotal(1);
         var active = await _jobs.AddOrGetActiveAsync(group, cancellationToken);
@@ -105,7 +106,7 @@ public class JobService : IJobService
             return JobPayloads.ToResponse(active);
         }
 
-        var fetch = new Job(JobType.FetchStudentWork, JobPayloads.Write(new FetchStudentWorkPayload(courseId, studentId, group.Id)), now,
+        var fetch = new Job(JobType.FetchStudentWork, JobPayloads.Write(new FetchStudentWorkPayload(courseId, studentId, group.Id, regrade)), now,
             parentId: group.Id, courseId: courseId, maxAttempts: MaxGradingAttempts);
         await _jobs.AddOrGetActiveAsync(fetch, cancellationToken);
         _signal.Notify();
@@ -114,9 +115,9 @@ public class JobService : IJobService
 
     public async Task<FetchStudentWorkResult> QueueStudentGradingsAsync(
         Guid parentId, string courseId, string studentId, int fetched, IReadOnlyList<string> fetchProblems,
-        CancellationToken cancellationToken = default)
+        bool regrade = false, CancellationToken cancellationToken = default)
     {
-        var plan = await _grading.PlanGradeStudentAsync(courseId, studentId, cancellationToken);
+        var plan = await _grading.PlanGradeStudentAsync(courseId, studentId, regrade, cancellationToken);
         var problems = fetchProblems.Concat(plan.Problems).ToList();
         var parent = await _jobs.FindAsync(parentId, cancellationToken);
         if (parent is not { IsGroup: true, Status: JobStatus.Running, CancelRequested: false })
@@ -327,14 +328,14 @@ public class JobService : IJobService
         if (job.Type == JobType.GradeAssignment)
         {
             var payload = JobPayloads.Read<GradeAssignmentPayload>(job.Payload);
-            var again = await QueueGradeAssignmentAsync(payload.CourseId, payload.AssignmentId, cancellationToken);
+            var again = await QueueGradeAssignmentAsync(payload.CourseId, payload.AssignmentId, payload.Regrade, cancellationToken);
             return again.Job ?? throw new InvalidRequestException("Nothing left to grade: every student already has a draft.");
         }
 
         if (job.Type == JobType.GradeStudent)
         {
             var payload = JobPayloads.Read<GradeStudentPayload>(job.Payload);
-            return await QueueGradeStudentAsync(payload.CourseId, payload.StudentId, cancellationToken);
+            return await QueueGradeStudentAsync(payload.CourseId, payload.StudentId, payload.Regrade, cancellationToken);
         }
 
         if (job.Type == JobType.AnalyzeStudent)

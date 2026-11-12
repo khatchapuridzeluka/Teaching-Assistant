@@ -39,11 +39,26 @@ public class GradingServiceTests
         thrownAway.Discard(DateTimeOffset.UtcNow);
         _gradings.Add(thrownAway);
 
-        var plan = await Service().PlanGradeAllAsync("course-1", "assignment-1", TestContext.Current.CancellationToken);
+        var plan = await Service().PlanGradeAllAsync("course-1", "assignment-1", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(new[] { discarded, fresh }.Order(), plan.VersionIds.Order());
         Assert.Equal((3, 1, 0), (plan.Students, plan.AlreadyDrafted, plan.NoWork));
         Assert.Empty(plan.Problems);
+    }
+
+    [Fact]
+    public async Task PlanGradeAll_IncludingDrafted_GradesEveryVersionAgain()
+    {
+        _instructions.Store("Write a zoo.");
+        _storage.Code["Main.java"] = "class Main {}";
+        var drafted = _store.AddVersion(Content(ContentKind.CodeArchive, "zoo.zip", "application/zip"));
+        var fresh = _store.AddVersion(Content(ContentKind.CodeArchive, "zoo.zip", "application/zip"));
+        _gradings.Add(Draft(drafted));
+
+        var plan = await Service().PlanGradeAllAsync("course-1", "assignment-1", regrade: true, TestContext.Current.CancellationToken);
+
+        Assert.Equal(new[] { drafted, fresh }.Order(), plan.VersionIds.Order());
+        Assert.Equal(1, plan.AlreadyDrafted);
     }
 
     [Fact]
@@ -52,7 +67,7 @@ public class GradingServiceTests
         _storage.Code["Main.java"] = "class Main {}";
         _store.AddVersion(Content(ContentKind.CodeArchive, "zoo.zip", "application/zip"));
 
-        var plan = await Service().PlanGradeAllAsync("course-1", "assignment-1", TestContext.Current.CancellationToken);
+        var plan = await Service().PlanGradeAllAsync("course-1", "assignment-1", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Empty(plan.VersionIds);
         Assert.Contains(StudentName, Assert.Single(plan.Problems));
@@ -69,13 +84,28 @@ public class GradingServiceTests
         _store.AddVersionFor("assignment-1", "someone-else", Content(ContentKind.CodeArchive, "zoo.zip", "application/zip"));
         _gradings.Add(Draft(a4));
 
-        var plan = await Service().PlanGradeStudentAsync("course-1", "ria", TestContext.Current.CancellationToken);
+        var plan = await Service().PlanGradeStudentAsync("course-1", "ria", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal([a1], plan.VersionIds);
         Assert.Equal((3, 1), (plan.Students, plan.AlreadyDrafted));
         Assert.Equal("assignment-1", plan.AssignmentIds![a1]);
         Assert.False(plan.AssignmentIds.ContainsKey(a5));
         Assert.Contains("instructions are not stored", Assert.Single(plan.Problems));
+    }
+
+    [Fact]
+    public async Task PlanGradeStudent_WithRegrade_IncludesDraftedAssignments()
+    {
+        _instructions.Store("Write a zoo.");
+        _storage.Code["Main.java"] = "class Main {}";
+        var drafted = _store.AddVersionFor("assignment-1", "ria", Content(ContentKind.CodeArchive, "zoo.zip", "application/zip"));
+        _gradings.Add(Draft(drafted));
+
+        var skipped = await Service().PlanGradeStudentAsync("course-1", "ria", cancellationToken: TestContext.Current.CancellationToken);
+        var plan = await Service().PlanGradeStudentAsync("course-1", "ria", regrade: true, TestContext.Current.CancellationToken);
+
+        Assert.Empty(skipped.VersionIds);
+        Assert.Equal([drafted], plan.VersionIds);
     }
 
     [Fact]
@@ -87,7 +117,7 @@ public class GradingServiceTests
         _store.AddWithoutWork("assignment-3", "ria", "RETURNED");
         _store.AddWithoutWork("assignment-4", "ria", "CREATED");
 
-        var plan = await Service().PlanGradeStudentAsync("course-1", "ria", TestContext.Current.CancellationToken);
+        var plan = await Service().PlanGradeStudentAsync("course-1", "ria", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal([graded], plan.VersionIds);
         Assert.Equal((3, 1, 1), (plan.Students, plan.NotFetched, plan.NoWork));

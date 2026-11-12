@@ -71,7 +71,7 @@ public class JobsController : ControllerBase
     }
 
     /// <summary>
-    /// Queues AI grading for every student of an assignment as one parent job with a child job per student; students whose latest version already has a draft that is not discarded, or whose grading is already queued, are skipped.
+    /// Queues AI grading for every student of an assignment as one parent job with a child job per student; students whose grading is already queued are skipped, and so are students whose latest version already has a draft that is not discarded unless regrade is true.
     /// </summary>
     /// <response code="202">Gradings queued under a parent job (or the running grade-all for this assignment is returned)</response>
     /// <response code="200">Nothing to queue; the response says why (all drafted, no work, or problems)</response>
@@ -79,9 +79,9 @@ public class JobsController : ControllerBase
     [ProducesResponseType(typeof(GradeAllResponse), StatusCodes.Status202Accepted)]
     [ProducesResponseType(typeof(GradeAllResponse), StatusCodes.Status200OK)]
     public async Task<ActionResult<GradeAllResponse>> QueueGradeAssignmentAsync(
-        string courseId, string assignmentId, CancellationToken cancellationToken)
+        string courseId, string assignmentId, [FromQuery] bool regrade, CancellationToken cancellationToken)
     {
-        var result = await _jobService.QueueGradeAssignmentAsync(courseId, assignmentId, cancellationToken);
+        var result = await _jobService.QueueGradeAssignmentAsync(courseId, assignmentId, regrade, cancellationToken);
         if (result.Job is null)
         {
             return Ok(result);
@@ -91,14 +91,15 @@ public class JobsController : ControllerBase
     }
 
     /// <summary>
-    /// Queues grading of every assignment of one student as one parent job: first a fetch step downloads every assignment the student turned in (and stores missing instructions), then it queues a grading per assignment that has no draft that is not discarded.
+    /// Queues grading of every assignment of one student as one parent job: first a fetch step downloads every assignment the student turned in (and stores missing instructions), then it queues a grading per assignment that has no draft that is not discarded, or per assignment with stored work when regrade is true.
     /// </summary>
     /// <response code="202">Queued (or the running job for this student is returned); follow it with GET /jobs/{jobId}</response>
     [HttpPost("courses/{courseId}/students/{userId}/grade-all")]
     [ProducesResponseType(typeof(JobResponse), StatusCodes.Status202Accepted)]
-    public async Task<ActionResult<JobResponse>> QueueGradeStudentAsync(string courseId, string userId, CancellationToken cancellationToken)
+    public async Task<ActionResult<JobResponse>> QueueGradeStudentAsync(
+        string courseId, string userId, [FromQuery] bool regrade, CancellationToken cancellationToken)
     {
-        var job = await _jobService.QueueGradeStudentAsync(courseId, userId, cancellationToken);
+        var job = await _jobService.QueueGradeStudentAsync(courseId, userId, regrade, cancellationToken);
         return Accepted($"/jobs/{job.Id}", job);
     }
 

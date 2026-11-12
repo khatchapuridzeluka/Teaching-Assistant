@@ -9,11 +9,13 @@ public class JobReporter
 {
     private readonly IJobStore _jobs;
     private readonly IGradingStore _gradings;
+    private readonly IMistakeAnalysisStore _analyses;
 
-    public JobReporter(IJobStore jobs, IGradingStore gradings)
+    public JobReporter(IJobStore jobs, IGradingStore gradings, IMistakeAnalysisStore analyses)
     {
         _jobs = jobs;
         _gradings = gradings;
+        _analyses = analyses;
     }
 
     public async Task<string> DescribeAsync(IReadOnlyList<Job> jobs, CancellationToken cancellationToken = default)
@@ -63,8 +65,36 @@ public class JobReporter
             return $"{label} {job.Status.ToString().ToLowerInvariant()}{progress}{counts}";
         }
 
+        if (job is { Type: JobType.AnalyzeMistakes, Status: JobStatus.Succeeded })
+        {
+            return await DescribeAnalysisAsync(job, cancellationToken);
+        }
+
         var error = job.Status == JobStatus.Failed ? $": {job.Error ?? "unknown error"}" : "";
-        return $"{job.Type} job {job.Status.ToString().ToLowerInvariant()}{error}";
+        var name = job.Type == JobType.AnalyzeMistakes ? "Common mistakes analysis" : $"{job.Type} job";
+        return $"{name} {job.Status.ToString().ToLowerInvariant()}{error}";
+    }
+
+    private async Task<string> DescribeAnalysisAsync(Job job, CancellationToken cancellationToken)
+    {
+        var analysisId = job.Result is null ? (Guid?)null : JobPayloads.Read<AnalyzeMistakesResult>(job.Result).AnalysisId;
+        var analysis = job is { CourseId: { } courseId, AssignmentId: { } assignmentId }
+            ? await _analyses.GetLatestAsync(courseId, assignmentId, cancellationToken)
+            : null;
+        if (analysis is null || analysis.Id != analysisId)
+        {
+            return "Common mistakes analysis finished; open the assignment's Common mistakes page for the result";
+        }
+
+        var groups = analysis.Clusters
+            .Where(c => !c.Ungrouped)
+            .OrderByDescending(c => c.Members.Select(m => m.StudentId).Distinct().Count())
+            .Select(c => $"  - {c.Title}: {c.Members.Select(m => m.StudentId).Distinct().Count()} students, {c.Members.Count} mistakes")
+            .ToList();
+        var ungrouped = analysis.Clusters.Where(c => c.Ungrouped).Sum(c => c.Members.Count);
+        var rest = ungrouped > 0 ? $"\n  ({ungrouped} mistakes not grouped)" : "";
+        return $"Common mistakes analysis ready: {analysis.Mistakes} mistakes from {analysis.Students} students.\n"
+            + $"  Overview: {analysis.Summary}\n  Groups:\n{string.Join("\n", groups)}{rest}\n  For the next lecture: {analysis.NextLecture}";
     }
 
     private async Task<string> ScoreAsync(Job job, CancellationToken cancellationToken)
