@@ -5,7 +5,7 @@ import { useApiHealth, useAssignments, useCourses, useGoogleStatus, useJobOvervi
 import { formatDay } from "../format";
 import { courseCode, coursePath, courseSections, workspaceSections } from "../navigation";
 import { courseTone } from "../theme";
-import { ChatPanel } from "./ChatPanel";
+import { ChatPanel, type OpenPage } from "./ChatPanel";
 import { CommandPalette } from "./CommandPalette";
 import { JobToastProvider } from "./JobToasts";
 import { Kbd } from "./ui";
@@ -92,19 +92,19 @@ export function Layout() {
   );
 }
 
-function usePageDescription(): string | null {
+function usePageDescription(): OpenPage {
   const matches = useMatches();
   const { courseId = "", assignmentId = "" } = (matches[matches.length - 1]?.params ?? {}) as Record<string, string | undefined>;
   const course = useCourses().data?.find((c) => c.id === courseId);
   const assignment = useAssignments(courseId).data?.find((a) => a.id === assignmentId);
 
   if (assignment && course) {
-    return `Assignment '${assignment.title}' in course '${course.name}'`;
+    return { description: `Assignment '${assignment.title}' in course '${course.name}'`, courseId: course.id, assignmentId: assignment.id };
   }
   if (course) {
-    return `Course '${course.name}' (list of assignments)`;
+    return { description: `Course '${course.name}' (list of assignments)`, courseId: course.id };
   }
-  return null;
+  return { description: null };
 }
 
 function LogoMark({ className = "h-7 w-7" }: { className?: string }) {

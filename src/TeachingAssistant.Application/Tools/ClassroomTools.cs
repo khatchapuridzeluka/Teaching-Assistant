@@ -62,9 +62,12 @@ public class ClassroomTools
         return RunAsync(async () =>
         {
             var summary = await _fetchService.FetchAsync(courseId, assignmentId, cancellationToken);
-            return $"Fetch finished. Turned in: {summary.Submissions}. New submissions stored: {summary.NewSubmissions}. "
-                + $"New versions of earlier submissions: {summary.NewVersions}. Unchanged, skipped: {summary.Unchanged}. "
-                + $"Not turned in: {summary.NotSubmitted}. Submissions with a problem: {summary.Problems.Count}. "
+            var turnedIn = summary.Submissions - summary.NotSubmitted;
+            return $"Fetch finished. Students on the assignment: {summary.Submissions}, of whom {turnedIn} turned in and "
+                + $"{summary.NotSubmitted} did not. Of those turned in: {summary.NewSubmissions} stored for the first time, "
+                + $"{summary.NewVersions} stored as a new version, {summary.Unchanged} unchanged and skipped. "
+                + $"Problems noted during the fetch (a file that could not be downloaded or read, missing instructions): "
+                + $"{summary.Problems.Count}; the teacher sees them with the Fetch button on the assignment page. "
                 + $"New version of the task instructions: {(summary.NewInstructions ? "yes" : "no")}.";
         });
     }

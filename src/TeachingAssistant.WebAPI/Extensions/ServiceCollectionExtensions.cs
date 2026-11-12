@@ -50,6 +50,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ICourseAssignmentStore, CourseAssignmentStore>();
         services.AddScoped<IGradingStore, GradingStore>();
         services.AddScoped<IJobStore, JobStore>();
+        services.AddScoped<IAgentChatStore, AgentChatStore>();
         services.AddScoped<IReviewQueueStore, ReviewQueueStore>();
         services.AddScoped<IGradingReportStore, GradingReportStore>();
         services.AddScoped<IStudentMistakeStore, StudentMistakeStore>();
@@ -122,7 +123,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IInstructionsService, InstructionsService>();
         services.AddScoped<IStoredSubmissionService, StoredSubmissionService>();
         services.AddScoped<ClassroomTools>();
+        services.AddScoped<StudentTools>();
         services.AddScoped<IAgentChatService, AgentChatService>();
+        services.AddScoped<IAgentRunService, AgentRunService>();
         services.AddScoped<IGradingService, GradingService>();
         services.AddScoped<IGradingDraftService, GradingDraftService>();
         services.AddScoped<IReviewQueueService, ReviewQueueService>();
@@ -138,6 +141,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IJobHandler, AnalyzeMistakesJobHandler>();
         services.AddScoped<IJobHandler, AnalyzeStudentJobHandler>();
         services.AddScoped<IJobHandler, FetchStudentWorkJobHandler>();
+        services.AddScoped<IJobHandler, AgentRunJobHandler>();
         services.AddScoped<ICourseSyncService, CourseSyncService>();
         services.AddScoped<IStudentService, StudentService>();
         services.AddScoped<IGradebookService, GradebookService>();

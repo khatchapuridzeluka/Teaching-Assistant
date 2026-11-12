@@ -3,6 +3,7 @@ using TeachingAssistant.Application.Exceptions;
 using TeachingAssistant.Application.Interfaces;
 using TeachingAssistant.Application.Models;
 using TeachingAssistant.Application.Services;
+using TeachingAssistant.Domain.Agents;
 using TeachingAssistant.Domain.Usage;
 
 namespace TeachingAssistant.Tests.Application;
@@ -95,10 +96,13 @@ public class RecordingLanguageModelTests
         public Task<LanguageModelReply> ChatAsync(string systemPrompt, IReadOnlyList<ChatMessage> messages, CancellationToken cancellationToken = default) =>
             Reply("chat-model");
 
-        public Task<LanguageModelReply> RunAgentAsync(
-            string systemPrompt, IReadOnlyList<ChatMessage> messages, IReadOnlyList<object> tools,
-            CancellationToken cancellationToken = default) =>
-            Reply("chat-model");
+        public async Task<AgentReply> RunAgentAsync(
+            string systemPrompt, IReadOnlyList<AgentEntry> history, IReadOnlyList<object> tools,
+            CancellationToken cancellationToken = default)
+        {
+            var reply = await Reply("chat-model");
+            return new AgentReply(reply.Model, [new AgentEntry(AgentMessageRole.Assistant, reply.Text)], reply.Usage);
+        }
 
         public Task<LanguageModelReply> AnalyzeAsync(
             string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default) =>

@@ -50,8 +50,9 @@ public class ClassroomToolsTests
         var result = await Tools().FetchSubmissionsAsync("course-1", "a-4", TestContext.Current.CancellationToken);
 
         Assert.Equal(("course-1", "a-4"), Assert.Single(_services.Fetches));
-        Assert.Contains("New submissions stored: 2", result);
-        Assert.Contains("Submissions with a problem: 1", result);
+        Assert.Contains("Students on the assignment: 5, of whom 2 turned in and 3 did not", result);
+        Assert.Contains("2 stored for the first time, 1 stored as a new version, 2 unchanged", result);
+        Assert.Contains("Problems noted during the fetch (a file that could not be downloaded or read, missing instructions): 1", result);
         Assert.DoesNotContain("Nino", result);
     }
 

@@ -4,6 +4,7 @@ using TeachingAssistant.Application.Interfaces;
 using TeachingAssistant.Application.Models;
 using TeachingAssistant.Application.Services;
 using TeachingAssistant.Application.Tools;
+using TeachingAssistant.Domain.Agents;
 
 namespace TeachingAssistant.Tests.Application;
 
@@ -165,14 +166,14 @@ public class AgentChatServiceTests
             string systemPrompt, IReadOnlyList<ChatMessage> messages, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
-        public Task<LanguageModelReply> RunAgentAsync(
-            string systemPrompt, IReadOnlyList<ChatMessage> messages, IReadOnlyList<object> tools,
+        public Task<AgentReply> RunAgentAsync(
+            string systemPrompt, IReadOnlyList<AgentEntry> history, IReadOnlyList<object> tools,
             CancellationToken cancellationToken = default)
         {
             System = systemPrompt;
-            Messages = messages;
+            Messages = history.Select(e => new ChatMessage(e.Role == AgentMessageRole.User ? ChatRole.User : ChatRole.Assistant, e.Text)).ToList();
             Tools = tools;
-            return Task.FromResult(new LanguageModelReply(ModelId, "Hello!"));
+            return Task.FromResult(new AgentReply(ModelId, [new AgentEntry(AgentMessageRole.Assistant, "Hello!")]));
         }
 
         public Task<LanguageModelReply> AnalyzeAsync(

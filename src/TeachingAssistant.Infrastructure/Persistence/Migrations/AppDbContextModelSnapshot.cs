@@ -22,6 +22,171 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("TeachingAssistant.Domain.Agents.AgentConversation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset>("LastActivityAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_activity_at");
+
+                    b.Property<int>("MessageCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("message_count");
+
+                    b.HasKey("Id")
+                        .HasName("pk_agent_conversations");
+
+                    b.HasIndex("LastActivityAt")
+                        .HasDatabaseName("ix_agent_conversations_last_activity_at");
+
+                    b.ToTable("agent_conversations", (string)null);
+                });
+
+            modelBuilder.Entity("TeachingAssistant.Domain.Agents.AgentMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("conversation_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("JobId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("job_id");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("role");
+
+                    b.Property<Guid>("RunId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("run_id");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("integer")
+                        .HasColumnName("sequence");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("text");
+
+                    b.Property<string>("ToolCallId")
+                        .HasColumnType("text")
+                        .HasColumnName("tool_call_id");
+
+                    b.Property<string>("ToolCalls")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("tool_calls");
+
+                    b.Property<string>("ToolName")
+                        .HasColumnType("text")
+                        .HasColumnName("tool_name");
+
+                    b.HasKey("Id")
+                        .HasName("pk_agent_messages");
+
+                    b.HasIndex("JobId")
+                        .HasDatabaseName("ix_agent_messages_job_id");
+
+                    b.HasIndex("RunId")
+                        .HasDatabaseName("ix_agent_messages_run_id");
+
+                    b.HasIndex("ConversationId", "Sequence")
+                        .IsUnique()
+                        .HasDatabaseName("ix_agent_messages_conversation_id_sequence");
+
+                    b.ToTable("agent_messages", (string)null);
+                });
+
+            modelBuilder.Entity("TeachingAssistant.Domain.Agents.AgentRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AssignmentId")
+                        .HasColumnType("text")
+                        .HasColumnName("assignment_id");
+
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("conversation_id");
+
+                    b.Property<string>("CourseId")
+                        .HasColumnType("text")
+                        .HasColumnName("course_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Error")
+                        .HasColumnType("text")
+                        .HasColumnName("error");
+
+                    b.Property<DateTimeOffset?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("finished_at");
+
+                    b.Property<int>("MaxSteps")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_steps");
+
+                    b.Property<string>("Page")
+                        .HasColumnType("text")
+                        .HasColumnName("page");
+
+                    b.Property<string>("Reply")
+                        .HasColumnType("text")
+                        .HasColumnName("reply");
+
+                    b.Property<DateTimeOffset?>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<int>("Steps")
+                        .HasColumnType("integer")
+                        .HasColumnName("steps");
+
+                    b.Property<Guid?>("WaitingJobId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("waiting_job_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_agent_runs");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("ix_agent_runs_status");
+
+                    b.HasIndex("WaitingJobId")
+                        .HasDatabaseName("ix_agent_runs_waiting_job_id");
+
+                    b.HasIndex("ConversationId", "CreatedAt")
+                        .HasDatabaseName("ix_agent_runs_conversation_id_created_at");
+
+                    b.ToTable("agent_runs", (string)null);
+                });
+
             modelBuilder.Entity("TeachingAssistant.Domain.Grading.AiGrading", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1599,6 +1764,45 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_model_calls_purpose_created_at");
 
                     b.ToTable("model_calls", (string)null);
+                });
+
+            modelBuilder.Entity("TeachingAssistant.Domain.Agents.AgentMessage", b =>
+                {
+                    b.HasOne("TeachingAssistant.Domain.Agents.AgentConversation", null)
+                        .WithMany()
+                        .HasForeignKey("ConversationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_agent_messages_agent_conversations_conversation_id");
+
+                    b.HasOne("TeachingAssistant.Domain.Jobs.Job", null)
+                        .WithMany()
+                        .HasForeignKey("JobId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_agent_messages_jobs_job_id");
+
+                    b.HasOne("TeachingAssistant.Domain.Agents.AgentRun", null)
+                        .WithMany()
+                        .HasForeignKey("RunId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_agent_messages_agent_runs_run_id");
+                });
+
+            modelBuilder.Entity("TeachingAssistant.Domain.Agents.AgentRun", b =>
+                {
+                    b.HasOne("TeachingAssistant.Domain.Agents.AgentConversation", null)
+                        .WithMany()
+                        .HasForeignKey("ConversationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_agent_runs_agent_conversations_conversation_id");
+
+                    b.HasOne("TeachingAssistant.Domain.Jobs.Job", null)
+                        .WithMany()
+                        .HasForeignKey("WaitingJobId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_agent_runs_jobs_waiting_job_id");
                 });
 
             modelBuilder.Entity("TeachingAssistant.Domain.Grading.AiGrading", b =>

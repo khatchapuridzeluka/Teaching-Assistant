@@ -35,6 +35,8 @@ public record AnalyzeMistakesResult(Guid AnalysisId);
 
 public record AnalyzeStudentResult(Guid AnalysisId);
 
+public record AgentRunPayload(Guid RunId);
+
 internal static class JobPayloads
 {
     private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web);

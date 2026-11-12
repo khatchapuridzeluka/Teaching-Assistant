@@ -32,6 +32,11 @@ export const jobTypeInfo: Record<JobType, { label: string; description: string }
     description:
       "An AI analysis of one student from their approved reports, never the name. Mistakes: every kept mistake with its points and new / repeated label, plus trends counted in code; the model writes feedback of at most 200 words and what to work on next. Strengths: every kept strength; the model groups similar ones into skills and writes an overview. Shown on the student's profile and on their mistakes or strengths page.",
   },
+  AgentRun: {
+    label: "Agent",
+    description:
+      "One message to the Ask agent chat, answered in the background. The agent reads the whole stored conversation, may call its tools (list courses, assignments and stored submissions, fetch submissions from Classroom) and saves every step and its reply to the conversation. It is not retried automatically, because its tools may already have done something.",
+  },
   AnalyzeMistakes: {
     label: "Common mistakes",
     description:
@@ -104,6 +109,12 @@ const iconPaths: Record<JobType, ReactNode> = {
       <circle cx="10" cy="8" r="3.5" />
       <path d="M3 20a7 7 0 0 1 11-5.7" />
       <path d="M17 13l1.2 2.6 2.8.4-2 2 .5 2.8-2.5-1.3-2.5 1.3.5-2.8-2-2 2.8-.4z" />
+    </>
+  ),
+  AgentRun: (
+    <>
+      <path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z" />
+      <path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z" />
     </>
   ),
   AnalyzeMistakes: (

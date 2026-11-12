@@ -6,6 +6,10 @@
     </ItemGroup>
 
     <ItemGroup>
+      <InternalsVisibleTo Include="TeachingAssistant.Tests" />
+    </ItemGroup>
+
+    <ItemGroup>
       <PackageReference Include="Anthropic" Version="13.3.0" />
       <PackageReference Include="EFCore.NamingConventions" Version="10.0.1" />
       <PackageReference Include="Google.Apis.Auth" Version="1.78.0" />

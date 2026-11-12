@@ -1,40 +1,30 @@
-import { useEffect, useState } from "react";
-import type { ChatMessage } from "../api/chat";
+import { useCallback, useEffect, useState } from "react";
 
-export type Turn = ChatMessage & { error?: boolean };
+const storageKey = "agent-conversation";
 
-type Conversation = { id: string; turns: Turn[] };
-
-const storageKey = "agent-chat";
-
-export function useChatHistory() {
-  const [conversation, setConversation] = useState<Conversation>(load);
+export function useChatConversationId() {
+  const [conversationId, setConversationId] = useState<string | null>(load);
 
   useEffect(() => {
     try {
-      sessionStorage.setItem(storageKey, JSON.stringify(conversation));
+      if (conversationId === null) {
+        sessionStorage.removeItem(storageKey);
+      } else {
+        sessionStorage.setItem(storageKey, conversationId);
+      }
     } catch {
     }
-  }, [conversation]);
+  }, [conversationId]);
 
-  return {
-    turns: conversation.turns,
-    add: (turn: Turn) => setConversation((current) => ({ ...current, turns: [...current.turns, turn] })),
-    clear: () => setConversation(newConversation()),
-  };
+  const clear = useCallback(() => setConversationId(null), []);
+
+  return { conversationId, setConversationId, clear };
 }
 
-function load(): Conversation {
+function load(): string | null {
   try {
-    const stored = JSON.parse(sessionStorage.getItem(storageKey) ?? "null") as Partial<Conversation> | null;
-    if (stored && typeof stored.id === "string" && Array.isArray(stored.turns)) {
-      return { id: stored.id, turns: stored.turns };
-    }
+    return sessionStorage.getItem(storageKey);
   } catch {
+    return null;
   }
-  return newConversation();
-}
-
-function newConversation(): Conversation {
-  return { id: crypto.randomUUID(), turns: [] };
 }

@@ -60,6 +60,156 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/agent/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stores the teacher's message, queues a background agent run for it and returns the run at once; without a conversation ID a new conversation is started. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["StartAgentRunRequest"];
+                    "text/json": components["schemas"]["StartAgentRunRequest"];
+                    "application/*+json": components["schemas"]["StartAgentRunRequest"];
+                };
+            };
+            responses: {
+                /** @description Run queued; follow it with GET /agent/runs/{runId} */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AgentRunResponse"];
+                    };
+                };
+                /** @description Message empty or over 8,000 characters, or the conversation's previous run has not finished */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description No conversation with this ID */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agent/runs/{runId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Returns an agent run with its status, its final reply or error, and its messages so far (tool calls and tool results included) in order. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    runId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Run retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AgentRunResponse"];
+                    };
+                };
+                /** @description No run with this ID */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agent/conversations/{conversationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Returns a stored conversation: all its messages in order and the ID of the run still in progress, if any. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    conversationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Conversation retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AgentConversationResponse"];
+                    };
+                };
+                /** @description No conversation with this ID */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/courses/{courseId}/assignments": {
         parameters: {
             query?: never;
@@ -2274,6 +2424,53 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AgentConversationResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            activeRunId?: string | null;
+            messages: components["schemas"]["AgentMessageResponse"][];
+        };
+        AgentMessageResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            runId: string;
+            /** Format: int32 */
+            sequence: number;
+            role: components["schemas"]["AgentMessageRole"];
+            text: string;
+            toolCalls: string[];
+            toolName?: string | null;
+            /** Format: uuid */
+            jobId?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        /** @enum {string} */
+        AgentMessageRole: "User" | "Assistant" | "Tool" | "Notice";
+        AgentRunResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            conversationId: string;
+            status: components["schemas"]["AgentRunStatus"];
+            reply?: string | null;
+            error?: string | null;
+            /** Format: int32 */
+            steps: number;
+            /** Format: uuid */
+            waitingJobId?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            startedAt?: string | null;
+            /** Format: date-time */
+            finishedAt?: string | null;
+            messages: components["schemas"]["AgentMessageResponse"][];
+        };
+        /** @enum {string} */
+        AgentRunStatus: "Queued" | "Running" | "Waiting" | "Succeeded" | "Failed" | "Canceled";
         ApproveExplanationRequest: {
             explanation: string;
         };
@@ -2331,6 +2528,8 @@ export interface components {
         ChatRequest: {
             messages: components["schemas"]["ChatMessage"][];
             page?: string | null;
+            courseId?: string | null;
+            assignmentId?: string | null;
         };
         ChatResponse: {
             text: string;
@@ -2711,7 +2910,7 @@ export interface components {
         /** @enum {string} */
         JobStatus: "Queued" | "Running" | "Succeeded" | "Failed" | "Canceled";
         /** @enum {string} */
-        JobType: "GradeVersion" | "GradeAssignment" | "FetchAssignment" | "SyncCourse" | "ReExtract" | "AnalyzeMistakes" | "GradeStudent" | "FetchStudentWork" | "AnalyzeStudent";
+        JobType: "GradeVersion" | "GradeAssignment" | "FetchAssignment" | "SyncCourse" | "ReExtract" | "AnalyzeMistakes" | "GradeStudent" | "FetchStudentWork" | "AnalyzeStudent" | "AgentRun";
         MistakeAssignmentOption: {
             assignmentId: string;
             title?: string | null;
@@ -3024,6 +3223,14 @@ export interface components {
             review: string;
             mistakes: components["schemas"]["ReportMistakeInput"][];
             strengths?: components["schemas"]["ReportStrengthInput"][] | null;
+        };
+        StartAgentRunRequest: {
+            text: string;
+            /** Format: uuid */
+            conversationId?: string | null;
+            page?: string | null;
+            courseId?: string | null;
+            assignmentId?: string | null;
         };
         StoredFileResponse: {
             /** Format: uuid */

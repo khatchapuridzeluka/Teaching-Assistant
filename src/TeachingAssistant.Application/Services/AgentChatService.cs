@@ -2,7 +2,9 @@ using TeachingAssistant.Application.Contracts;
 using TeachingAssistant.Application.Exceptions;
 using TeachingAssistant.Application.Interfaces;
 using TeachingAssistant.Application.Interfaces.Services;
+using TeachingAssistant.Application.Models;
 using TeachingAssistant.Application.Tools;
+using TeachingAssistant.Domain.Agents;
 
 namespace TeachingAssistant.Application.Services;
 
@@ -21,9 +23,16 @@ public class AgentChatService : IAgentChatService
 
         The tool fetches student submissions from Classroom, extracts their code and grades them against the
         teacher's rubric. You reach that data through your tools: use one whenever the teacher's request needs it.
-        Tools take course and assignment ids; when the teacher names a course or assignment whose id you do not
-        have, list them first instead of guessing an id. After a tool returns, report what it says plainly,
-        including a failure and its reason.
+        Tools take course, assignment and student ids; when the teacher names a course, assignment or student whose id
+        you do not have, look it up first (list the courses or assignments, find the student by name) instead of
+        guessing an id. If a name matches several students, ask which one is meant before doing anything for them.
+        After a tool returns, report what it says plainly, including a failure and its reason.
+
+        Grading costs money: each grading is a paid AI call. Start a grading only when the teacher asks for it, and
+        only for the students and assignments they meant. Grade again (regrade) only when the teacher explicitly asks
+        to grade again or regrade; when a grading is refused because a draft exists, tell the teacher instead of
+        regrading on your own. A grading runs in the background, so say it has been started, not that it is done; the
+        teacher reviews and approves every draft.
 
         What no tool gives you, you cannot see or do; say so plainly, and never claim to have done something that no
         tool did. You can always help without tools: explaining concepts, drafting rubric criteria or feedback
@@ -57,32 +66,37 @@ public class AgentChatService : IAgentChatService
         var messages = RecentHistory(request.Messages);
         messages.Add(question);
 
-        var reply = await _languageModel.RunAgentAsync(SystemPrompt + OpenPage(request), messages, [_classroomTools], cancellationToken);
+        var history = messages
+            .Select(m => new AgentEntry(m.Role == ChatRole.User ? AgentMessageRole.User : AgentMessageRole.Assistant, m.Text))
+            .ToList();
+        var system = SystemPromptFor(request.Page, request.CourseId, request.AssignmentId);
+
+        var reply = await _languageModel.RunAgentAsync(system, history, [_classroomTools], cancellationToken);
         return new ChatResponse(reply.Text);
     }
 
-    private static string OpenPage(ChatRequest request)
+    internal static string SystemPromptFor(string? page, string? courseId, string? assignmentId)
     {
         var ids = new List<string>();
-        if (!string.IsNullOrWhiteSpace(request.CourseId))
+        if (!string.IsNullOrWhiteSpace(courseId))
         {
-            ids.Add($"course id {request.CourseId}");
+            ids.Add($"course id {courseId}");
         }
 
-        if (!string.IsNullOrWhiteSpace(request.AssignmentId))
+        if (!string.IsNullOrWhiteSpace(assignmentId))
         {
-            ids.Add($"assignment id {request.AssignmentId}");
+            ids.Add($"assignment id {assignmentId}");
         }
 
-        if (string.IsNullOrWhiteSpace(request.Page) && ids.Count == 0)
+        if (string.IsNullOrWhiteSpace(page) && ids.Count == 0)
         {
-            return "";
+            return SystemPrompt;
         }
 
-        var page = string.IsNullOrWhiteSpace(request.Page) ? "a page" : request.Page;
+        var open = string.IsNullOrWhiteSpace(page) ? "a page" : page;
         return ids.Count == 0
-            ? $"\n\nThe teacher is currently looking at: {page}"
-            : $"\n\nThe teacher is currently looking at: {page} ({string.Join(", ", ids)})";
+            ? $"{SystemPrompt}\n\nThe teacher is currently looking at: {open}"
+            : $"{SystemPrompt}\n\nThe teacher is currently looking at: {open} ({string.Join(", ", ids)})";
     }
 
     private static List<ChatMessage> RecentHistory(IReadOnlyList<ChatMessage> messages)

@@ -525,8 +525,8 @@ public class GradingServiceTests
             string systemPrompt, IReadOnlyList<ChatMessage> messages, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
-        public Task<LanguageModelReply> RunAgentAsync(
-            string systemPrompt, IReadOnlyList<ChatMessage> messages, IReadOnlyList<object> tools,
+        public Task<AgentReply> RunAgentAsync(
+            string systemPrompt, IReadOnlyList<AgentEntry> history, IReadOnlyList<object> tools,
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
     }

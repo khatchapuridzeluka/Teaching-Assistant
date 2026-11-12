@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using TeachingAssistant.Domain.Agents;
 using TeachingAssistant.Domain.Grading;
 using TeachingAssistant.Domain.Ingestion;
 using TeachingAssistant.Domain.Jobs;
@@ -31,6 +32,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<ModelCall> ModelCalls => Set<ModelCall>();
     public DbSet<MistakeAnalysis> MistakeAnalyses => Set<MistakeAnalysis>();
     public DbSet<Job> Jobs => Set<Job>();
+    public DbSet<AgentConversation> AgentConversations => Set<AgentConversation>();
+    public DbSet<AgentRun> AgentRuns => Set<AgentRun>();
+    public DbSet<AgentMessage> AgentMessages => Set<AgentMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder) =>
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);

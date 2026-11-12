@@ -19,4 +19,6 @@ public enum JobType
     FetchStudentWork,
 
     AnalyzeStudent,
+
+    AgentRun,
 }

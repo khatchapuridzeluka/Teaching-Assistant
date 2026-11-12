@@ -70,14 +70,14 @@ public class ClaudeLanguageModel : ILanguageModel
         }
     }
 
-    public async Task<LanguageModelReply> RunAgentAsync(
-        string systemPrompt, IReadOnlyList<ChatMessage> messages, IReadOnlyList<object> tools,
+    public async Task<AgentReply> RunAgentAsync(
+        string systemPrompt, IReadOnlyList<AgentEntry> history, IReadOnlyList<object> tools,
         CancellationToken cancellationToken = default)
     {
         try
         {
-            return await ClaudeAgent.RunAsync(
-                _client, _options.Model, _options.ChatMaxTokens, systemPrompt, messages, tools, cancellationToken);
+            var chatClient = ClaudeAgent.ChatClient(_client, _options.Model, _options.ChatMaxTokens);
+            return await ClaudeAgent.RunAsync(chatClient, _options.Model, systemPrompt, history, tools, cancellationToken);
         }
         catch (Exception ex) when (Translate(ex, _options.Model) is { } translated)
         {
