@@ -6,6 +6,7 @@ import type { AssignmentGrading } from "../api/client";
 import { useAssignments, useCourseGradings, useGradingReport, useVersionGradings } from "../api/hooks";
 import { CodeBrowser, type CodeFocus } from "../components/CodeBrowser";
 import { DiscardDraftButton } from "../components/DiscardDraftButton";
+import { ExportPdfLink } from "../components/ExportPdfLink";
 import { CourseName } from "../components/Layout";
 import { keptMistakes, keptStrengths, ReportChip, ReportEditor } from "../components/ReportEditor";
 import { MistakeList, StrengthList } from "../components/SubmissionDetail";
@@ -504,6 +505,7 @@ function DraftDetail({
           <span className="mr-1 [&_b]:text-[20px] [&_span]:text-[13px]">
             <Score draft={showReport ? { score: report.score, maxScore: draft.maxScore, bonus: report.bonus } : draft} />
           </span>
+          <ExportPdfLink gradingId={draft.id} />
           {draft.status === "Draft" && (
             <DiscardDraftButton gradingId={draft.id} reportStatus={report?.status} title="Throw this draft away; it stays in the history" />
           )}

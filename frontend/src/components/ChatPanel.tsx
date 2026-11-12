@@ -16,7 +16,17 @@ import {
   useStartAgentRun,
 } from "../api/chat";
 import { useJob } from "../api/hooks";
-import { ArrowRight, ArrowUp, CircleCheck, Hourglass, MessageSquarePlus, Sparkles, Square, X } from "lucide-react";
+import {
+  ArrowRight,
+  ArrowUp,
+  CircleCheck,
+  FileDown,
+  Hourglass,
+  MessageSquarePlus,
+  Sparkles,
+  Square,
+  X,
+} from "lucide-react";
 import { Button } from "./ui";
 import { useChatConversationId } from "./useChatHistory";
 
@@ -35,14 +45,26 @@ const toolLabels: Record<string, string> = {
   list_student_assignments: "Listed the student's assignments",
   grade_student_assignment: "Started a grading",
   grade_all_students: "Started Grade all",
-  grade_all_assignments_of_student: "Started grading all the student's assignments",
+  grade_all_assignments_of_student:
+    "Started grading all the student's assignments",
   analyze_common_mistakes: "Started the Common mistakes analysis",
+  export_grading_pdf: "Prepared the PDF report",
   wait_for_jobs: "Waiting for the background work",
 };
 
-export type OpenPage = { description: string | null; courseId?: string; assignmentId?: string };
+export type OpenPage = {
+  description: string | null;
+  courseId?: string;
+  assignmentId?: string;
+};
 
-export function ChatPanel({ page, onClose }: { page: OpenPage; onClose: () => void }) {
+export function ChatPanel({
+  page,
+  onClose,
+}: {
+  page: OpenPage;
+  onClose: () => void;
+}) {
   const queryClient = useQueryClient();
   const { conversationId, setConversationId, clear } = useChatConversationId();
   const conversation = useAgentConversation(conversationId);
@@ -69,7 +91,8 @@ export function ChatPanel({ page, onClose }: { page: OpenPage; onClose: () => vo
     }
   }, [activeRunId, runId]);
 
-  const missing = conversation.error instanceof ApiError && conversation.error.status === 404;
+  const missing =
+    conversation.error instanceof ApiError && conversation.error.status === 404;
   useEffect(() => {
     if (missing) {
       clear();
@@ -85,10 +108,16 @@ export function ChatPanel({ page, onClose }: { page: OpenPage; onClose: () => vo
       setFailure(run.data.error ?? "The agent could not finish.");
     }
     if (run.data.status === "Canceled") {
-      setFailure("Stopped. Work it had already started keeps running in the background.");
+      setFailure(
+        "Stopped. Work it had already started keeps running in the background.",
+      );
     }
     const key = ["agent", "conversations", run.data.conversationId];
-    queryClient.setQueryData(key, (current: AgentConversation | undefined) => current && { ...current, activeRunId: null });
+    queryClient.setQueryData(
+      key,
+      (current: AgentConversation | undefined) =>
+        current && { ...current, activeRunId: null },
+    );
     void queryClient.invalidateQueries({ queryKey: key });
     setRunId(null);
   }, [finished, run.data, queryClient]);
@@ -116,16 +145,21 @@ export function ChatPanel({ page, onClose }: { page: OpenPage; onClose: () => vo
       {
         onSuccess: (started) => {
           setConversationId(started.conversationId);
-          queryClient.setQueryData(["agent", "conversations", started.conversationId], (current: AgentConversation | undefined) => ({
-            id: started.conversationId,
-            activeRunId: started.id,
-            messages: [...(current?.messages ?? []), ...started.messages],
-          }));
+          queryClient.setQueryData(
+            ["agent", "conversations", started.conversationId],
+            (current: AgentConversation | undefined) => ({
+              id: started.conversationId,
+              activeRunId: started.id,
+              messages: [...(current?.messages ?? []), ...started.messages],
+            }),
+          );
           setRunId(started.id);
         },
         onError: (error) => {
           setInput(question);
-          setFailure(error instanceof Error ? error.message : "Something went wrong.");
+          setFailure(
+            error instanceof Error ? error.message : "Something went wrong.",
+          );
         },
       },
     );
@@ -145,8 +179,12 @@ export function ChatPanel({ page, onClose }: { page: OpenPage; onClose: () => vo
         <div className="flex min-w-0 items-center gap-2.5">
           <AgentMark size="h-8 w-8" />
           <div className="min-w-0">
-            <div className="font-display text-[17px] font-semibold leading-tight">Ask agent</div>
-            <div className="truncate text-[11px] text-ink-muted">{page.description ?? "General question"}</div>
+            <div className="font-display text-[17px] font-semibold leading-tight">
+              Ask agent
+            </div>
+            <div className="truncate text-[11px] text-ink-muted">
+              {page.description ?? "General question"}
+            </div>
           </div>
         </div>
         <div className="flex shrink-0 gap-1">
@@ -160,7 +198,14 @@ export function ChatPanel({ page, onClose }: { page: OpenPage; onClose: () => vo
           >
             New
           </Button>
-          <Button small variant="ghost" className="px-1.5" onClick={onClose} aria-label="Close" title="Close">
+          <Button
+            small
+            variant="ghost"
+            className="px-1.5"
+            onClick={onClose}
+            aria-label="Close"
+            title="Close"
+          >
             <X className="h-4 w-4" />
           </Button>
         </div>
@@ -170,9 +215,11 @@ export function ChatPanel({ page, onClose }: { page: OpenPage; onClose: () => vo
         {empty ? (
           <div className="flex flex-col gap-3">
             <p className="text-ink-muted">
-              Ask about teaching, rubrics or feedback wording, or about your Classroom: the agent can list your courses, assignments, students and
-              stored submissions, fetch new submissions, grade one student or a whole assignment, analyze an assignment's common
-              mistakes, and wait for that work to finish.
+              Ask about teaching, rubrics or feedback wording, or about your
+              Classroom: the agent can list your courses, assignments, students
+              and stored submissions, fetch new submissions, grade one student
+              or a whole assignment, analyze an assignment's common mistakes,
+              and wait for that work to finish.
             </p>
             <div className="eyebrow mt-1">Try</div>
             <div className="flex flex-col gap-1.5">
@@ -193,7 +240,12 @@ export function ChatPanel({ page, onClose }: { page: OpenPage; onClose: () => vo
             {messages.map((message) => (
               <div key={message.id} className="contents">
                 <Message message={message} />
-                {lastOfRun.get(message.runId) === message.id && <RunLinks links={linksOf(messages, message.runId)} onOpen={onClose} />}
+                {lastOfRun.get(message.runId) === message.id && (
+                  <RunLinks
+                    links={linksOf(messages, message.runId)}
+                    onOpen={onClose}
+                  />
+                )}
               </div>
             ))}
             {waiting && <Working run={run.data} />}
@@ -237,15 +289,21 @@ export function ChatPanel({ page, onClose }: { page: OpenPage; onClose: () => vo
                 {cancel.isPending ? "Stopping…" : "Stop"}
               </Button>
             ) : (
-              <Button small variant="primary" type="submit" icon={<ArrowUp />} disabled={!input.trim()}>
+              <Button
+                small
+                variant="primary"
+                type="submit"
+                icon={<ArrowUp />}
+                disabled={!input.trim()}
+              >
                 Send
               </Button>
             )}
           </div>
         </div>
         <div className="mt-1.5 text-[11px] text-ink-muted">
-          Enter to send · Shift+Enter for a new line. The conversation is saved; the agent keeps working in the background if you close
-          the panel.
+          Enter to send · Shift+Enter for a new line. The conversation is saved;
+          the agent keeps working in the background if you close the panel.
         </div>
       </form>
     </aside>
@@ -266,15 +324,25 @@ function Message({ message }: { message: AgentMessage }) {
   }
 
   if (message.role === "Notice") {
-    const finished = message.text.startsWith("The background work you waited for has finished");
+    const finished = message.text.startsWith(
+      "The background work you waited for has finished",
+    );
     return (
       <details className="pl-8 text-[11px] text-ink-muted">
         <summary className="flex cursor-pointer list-none items-center gap-1.5">
-          {finished ? <CircleCheck className="h-3.5 w-3.5 text-success" /> : <Hourglass className="h-3.5 w-3.5" />}
-          {finished ? "The background work finished" : "Still waiting for the background work"}
+          {finished ? (
+            <CircleCheck className="h-3.5 w-3.5 text-success" />
+          ) : (
+            <Hourglass className="h-3.5 w-3.5" />
+          )}
+          {finished
+            ? "The background work finished"
+            : "Still waiting for the background work"}
           <span className="text-accent">· details</span>
         </summary>
-        <p className="mt-1 whitespace-pre-wrap rounded-lg bg-paper px-2.5 py-2">{message.text}</p>
+        <p className="mt-1 whitespace-pre-wrap rounded-lg bg-paper px-2.5 py-2">
+          {message.text}
+        </p>
       </details>
     );
   }
@@ -282,7 +350,10 @@ function Message({ message }: { message: AgentMessage }) {
   return (
     <>
       {message.toolCalls.map((tool, i) => (
-        <div key={i} className="flex items-center gap-1.5 pl-8 text-[11px] text-ink-muted">
+        <div
+          key={i}
+          className="flex items-center gap-1.5 pl-8 text-[11px] text-ink-muted"
+        >
           <CircleCheck className="h-3.5 w-3.5 text-success" />
           {toolLabels[tool] ?? `Used ${tool}`}
         </div>
@@ -318,31 +389,52 @@ function linkPath(link: AgentLink): string {
       return `${course}/assignments/${link.assignmentId ?? ""}`;
     case "Student":
       return `${course}/students?student=${link.studentId ?? ""}`;
+    case "GradingPdf":
+      return `/api/gradings/${link.gradingId ?? ""}/export/pdf`;
   }
 }
 
-function RunLinks({ links, onOpen }: { links: AgentLink[]; onOpen: () => void }) {
+function RunLinks({
+  links,
+  onOpen,
+}: {
+  links: AgentLink[];
+  onOpen: () => void;
+}) {
   if (links.length === 0) {
     return null;
   }
 
   return (
     <div className="flex flex-wrap gap-1.5 pl-8">
-      {links.map((link) => (
-        <Link
-          key={linkPath(link)}
-          to={linkPath(link)}
-          onClick={() => {
-            if (window.matchMedia("(max-width: 1279px)").matches) {
-              onOpen();
-            }
-          }}
-          className="flex items-center gap-1 rounded-full border border-line bg-white px-2.5 py-1 text-[11px] font-semibold text-accent transition-colors hover:border-accent"
-        >
-          {link.label}
-          <ArrowRight className="h-3 w-3" />
-        </Link>
-      ))}
+      {links.map((link) =>
+        link.kind === "GradingPdf" ? (
+          <a
+            key={linkPath(link)}
+            href={linkPath(link)}
+            download
+            className="flex items-center gap-1 rounded-full border border-accent bg-accent px-2.5 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-accent-strong"
+            title="Download the PDF report of this grading"
+          >
+            <FileDown className="h-3 w-3" />
+            {link.label}
+          </a>
+        ) : (
+          <Link
+            key={linkPath(link)}
+            to={linkPath(link)}
+            onClick={() => {
+              if (window.matchMedia("(max-width: 1279px)").matches) {
+                onOpen();
+              }
+            }}
+            className="flex items-center gap-1 rounded-full border border-line bg-white px-2.5 py-1 text-[11px] font-semibold text-accent transition-colors hover:border-accent"
+          >
+            {link.label}
+            <ArrowRight className="h-3 w-3" />
+          </Link>
+        ),
+      )}
     </div>
   );
 }
@@ -371,7 +463,11 @@ function Working({ run }: { run: AgentRun | undefined }) {
         <div className="min-w-0 flex-1 rounded-xl rounded-tl-sm bg-paper px-3.5 py-3">
           <div className="flex items-center gap-2 text-ink-muted">
             <Hourglass className="h-3.5 w-3.5" />
-            Waiting for {jobIds.length === 1 ? "a background job" : `${jobIds.length} background jobs`}; it continues when they finish
+            Waiting for{" "}
+            {jobIds.length === 1
+              ? "a background job"
+              : `${jobIds.length} background jobs`}
+            ; it continues when they finish
           </div>
           <ul className="mt-2 flex flex-col gap-1">
             {jobIds.map((jobId) => (
@@ -408,9 +504,19 @@ function WaitedJob({ jobId }: { jobId: string }) {
     return <li className="text-[11px] text-ink-muted">Loading…</li>;
   }
 
-  const progress = job.progressTotal ? ` · ${job.progressDone ?? 0} of ${job.progressTotal}` : "";
+  const progress = job.progressTotal
+    ? ` · ${job.progressDone ?? 0} of ${job.progressTotal}`
+    : "";
   const state =
-    job.status === "Succeeded" ? "done" : job.status === "Failed" ? "failed" : job.status === "Canceled" ? "canceled" : job.status === "Running" ? "running" : "queued";
+    job.status === "Succeeded"
+      ? "done"
+      : job.status === "Failed"
+        ? "failed"
+        : job.status === "Canceled"
+          ? "canceled"
+          : job.status === "Running"
+            ? "running"
+            : "queued";
   return (
     <li className="flex items-center gap-1.5 text-[11px]">
       {job.status === "Succeeded" ? (
@@ -430,7 +536,10 @@ function WaitedJob({ jobId }: { jobId: string }) {
 
 function AgentMark({ size }: { size: string }) {
   return (
-    <span aria-hidden="true" className={`flex shrink-0 items-center justify-center rounded-lg bg-accent text-white ${size}`}>
+    <span
+      aria-hidden="true"
+      className={`flex shrink-0 items-center justify-center rounded-lg bg-accent text-white ${size}`}
+    >
       <Sparkles className="h-[55%] w-[55%]" />
     </span>
   );

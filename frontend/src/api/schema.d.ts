@@ -2487,10 +2487,12 @@ export interface components {
             assignmentId?: string | null;
             submissionId?: string | null;
             studentId?: string | null;
+            /** Format: uuid */
+            gradingId?: string | null;
             readonly key: string;
         };
         /** @enum {string} */
-        AgentLinkKind: "CommonMistakes" | "Submission" | "Assignment" | "Student";
+        AgentLinkKind: "CommonMistakes" | "Submission" | "Assignment" | "Student" | "GradingPdf";
         AgentMessageResponse: {
             /** Format: uuid */
             id: string;

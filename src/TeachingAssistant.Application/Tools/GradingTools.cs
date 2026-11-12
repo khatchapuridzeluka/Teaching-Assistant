@@ -64,6 +64,46 @@ public class GradingTools
             + "also appears on the assignment's Common mistakes page.";
     }
 
+    [AgentTool("export_grading_pdf")]
+    [Description(
+        "Prepares the PDF report of one student's current grading of one assignment (score, review, mistakes and strengths; the "
+        + "teacher's report when one was saved, otherwise the AI draft, clearly marked as not reviewed) and attaches a download "
+        + "button for it under your answer. It is free and makes no AI call. Use it when the teacher asks for a file, a PDF, a "
+        + "report or a document of a grading. The student must have a current AI draft for the assignment: when they do not, grade "
+        + "first, wait for the grading, then call this again.")]
+    public async Task<string> ExportGradingPdfAsync(
+        [Description("The id of the course")] string courseId,
+        [Description("The id of the assignment")] string assignmentId,
+        [Description("The id of the student")] string studentId,
+        CancellationToken cancellationToken = default)
+    {
+        var current = (await _gradings.GetSummariesAsync(SubmissionSource.GoogleClassroom, courseId, assignmentId, studentId, cancellationToken))
+            .Where(g => g.Status == GradingStatus.Draft)
+            .OrderByDescending(g => g.VersionNumber)
+            .ThenByDescending(g => g.CreatedAt)
+            .FirstOrDefault();
+        if (current is null)
+        {
+            return "No PDF: this student has no current AI draft for this assignment (never graded, or every draft was discarded). "
+                + "Grade it first with grade_student_assignment (one paid grading; ask the teacher if they did not already ask for "
+                + "the grading), wait for it, then call this again.";
+        }
+
+        _context.RecordLinks([new AgentLink(AgentLinkKind.GradingPdf, $"PDF · {current.StudentName}", courseId, assignmentId,
+            current.SubmissionId, studentId, current.Id)]);
+
+        var state = current.ReportStatus switch
+        {
+            ReportStatus.Approved => "your approved report",
+            ReportStatus.InReview => "your report, still in review",
+            _ => "the AI draft, marked as not reviewed",
+        };
+        var score = current.Score is { } value ? $", score {value}{(current.MaxScore is { } max ? $" / {max}" : "")}" : "";
+        return $"The PDF report of {current.StudentName}'s grading (version {current.VersionNumber}{score}) is ready; it shows {state}. "
+            + "A download button for it appears under your answer, so tell the teacher it is there and do not write a link or URL "
+            + "yourself.";
+    }
+
     [AgentTool("grade_all_students")]
     [Description(
         "Starts AI gradings for every student of one assignment (like the Grade all button): by default only those whose latest "

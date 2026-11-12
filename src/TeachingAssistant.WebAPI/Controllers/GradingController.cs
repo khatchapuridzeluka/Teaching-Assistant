@@ -10,11 +10,13 @@ public class GradingController : ControllerBase
 {
     private readonly IGradingService _gradingService;
     private readonly IGradingDraftService _draftService;
+    private readonly IGradingExportService _exportService;
 
-    public GradingController(IGradingService gradingService, IGradingDraftService draftService)
+    public GradingController(IGradingService gradingService, IGradingDraftService draftService, IGradingExportService exportService)
     {
         _gradingService = gradingService;
         _draftService = draftService;
+        _exportService = exportService;
     }
 
     /// <summary>
@@ -91,6 +93,26 @@ public class GradingController : ControllerBase
         string courseId, string assignmentId, CancellationToken cancellationToken)
     {
         return Ok(await _draftService.GetByCourseAsync(courseId, assignmentId, studentId: null, includeAll: true, cancellationToken));
+    }
+
+    /// <summary>
+    /// Downloads one grading as a PDF report for the student: score, the review, mistakes and strengths, taken from the teacher's report when one exists and otherwise from the AI draft, with a banner saying whether it is approved; generated on request, never stored or sent anywhere.
+    /// </summary>
+    /// <response code="200">The PDF file</response>
+    /// <response code="404">No grading with this ID, or its submission is no longer stored</response>
+    [HttpGet("gradings/{gradingId:guid}/export/pdf")]
+    [Produces("application/pdf")]
+    [ProducesResponseType(typeof(FileResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ExportPdfAsync(Guid gradingId, CancellationToken cancellationToken)
+    {
+        var file = await _exportService.ExportPdfAsync(gradingId, cancellationToken);
+        if (file is null)
+        {
+            return NotFound();
+        }
+
+        return File(file.Content, file.ContentType, file.FileName);
     }
 
     /// <summary>

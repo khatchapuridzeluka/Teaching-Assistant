@@ -6,6 +6,7 @@ import { useGradingReport, useReview, useVersionGradings } from "../api/hooks";
 import { formatDate, formatDay, initials } from "../format";
 import { CodeBrowser, type CodeFocus, severityColor, strengthColor } from "./CodeBrowser";
 import { DiscardDraftButton } from "./DiscardDraftButton";
+import { ExportPdfLink } from "./ExportPdfLink";
 import { keptMistakes, keptStrengths, ReportEditor } from "./ReportEditor";
 import { Avatar, Button, Chip, type ChipTone, ErrorPanel, Notice, Spinner } from "./ui";
 import { ArrowLeft, BadgeCheck, CircleCheck, Eye, FileArchive, FileCode2, FileText, Image as ImageIcon, Maximize2, Minimize2, Pencil, Sparkles, ThumbsUp } from "lucide-react";
@@ -281,6 +282,7 @@ export function SubmissionDetail({
                             ))}
                           </select>
                         )}
+                        <ExportPdfLink gradingId={review.id} />
                         {review.status === "Draft" && (
                           <DiscardDraftButton
                             gradingId={review.id}

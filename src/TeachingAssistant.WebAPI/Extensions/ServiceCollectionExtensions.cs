@@ -63,6 +63,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ISnapshotStorage, FileSystemSnapshotStorage>();
         services.AddSingleton<IStudentPhotoStorage, FileSystemPhotoStorage>();
         services.AddSingleton<IDocumentReader, WordDocumentReader>();
+        services.AddSingleton<IGradingDocumentRenderer, QuestPdfGradingRenderer>();
 
         return services;
     }
@@ -133,6 +134,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAgentRunService, AgentRunService>();
         services.AddScoped<IGradingService, GradingService>();
         services.AddScoped<IGradingDraftService, GradingDraftService>();
+        services.AddScoped<IGradingExportService, GradingExportService>();
         services.AddScoped<IReviewQueueService, ReviewQueueService>();
         services.AddScoped<IGradingReportService, GradingReportService>();
         services.AddScoped<StudentRecordCollector>();

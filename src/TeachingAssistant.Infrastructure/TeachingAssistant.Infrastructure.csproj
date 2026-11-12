@@ -10,15 +10,21 @@
     </ItemGroup>
 
     <ItemGroup>
+      <EmbeddedResource Include="Documents\Fonts\*.ttf" />
+    </ItemGroup>
+
+    <ItemGroup>
       <PackageReference Include="Anthropic" Version="13.3.0" />
       <PackageReference Include="EFCore.NamingConventions" Version="10.0.1" />
       <PackageReference Include="Google.Apis.Auth" Version="1.78.0" />
       <PackageReference Include="Google.Apis.Classroom.v1" Version="1.77.0.4304" />
       <PackageReference Include="Google.Apis.Drive.v3" Version="1.78.0.4313" />
+      <PackageReference Include="Markdig" Version="1.6.0" />
       <PackageReference Include="Microsoft.Agents.AI" Version="1.28.0" />
       <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.14" />
       <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.14" />
       <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
+      <PackageReference Include="QuestPDF" Version="2026.9.2" />
       <PackageReference Include="SharpCompress" Version="1.0.0" />
     </ItemGroup>
 
