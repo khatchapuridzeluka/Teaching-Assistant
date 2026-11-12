@@ -11,4 +11,6 @@ public interface IAgentRunService
     Task<AgentConversationResponse?> GetConversationAsync(Guid conversationId, CancellationToken cancellationToken = default);
 
     Task ExecuteAsync(Guid runId, CancellationToken cancellationToken = default);
+
+    Task<AgentRunResponse?> CancelAsync(Guid runId, CancellationToken cancellationToken = default);
 }

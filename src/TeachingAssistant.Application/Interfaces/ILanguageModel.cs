@@ -15,7 +15,7 @@ public interface ILanguageModel
         string systemPrompt, IReadOnlyList<ChatMessage> messages, CancellationToken cancellationToken = default);
 
     Task<AgentReply> RunAgentAsync(
-        string systemPrompt, IReadOnlyList<AgentEntry> history, IReadOnlyList<object> tools,
+        string systemPrompt, IReadOnlyList<AgentEntry> history, IReadOnlyList<object> tools, AgentRunHooks? hooks = null,
         CancellationToken cancellationToken = default);
 
     Task<LanguageModelReply> GradeAsync(

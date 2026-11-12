@@ -19,6 +19,8 @@ public class AgentRun
 {
     public const int DefaultMaxSteps = 25;
 
+    public static readonly TimeSpan WaitLimit = TimeSpan.FromMinutes(30);
+
     private AgentRun()
     {
     }
@@ -48,7 +50,11 @@ public class AgentRun
 
     public AgentRunStatus Status { get; private set; }
 
-    public Guid? WaitingJobId { get; private set; }
+    public Guid? JobId { get; private set; }
+
+    public Guid[] WaitingJobIds { get; private set; } = [];
+
+    public DateTimeOffset? WaitUntil { get; private set; }
 
     public int Steps { get; private set; }
 
@@ -72,6 +78,14 @@ public class AgentRun
 
     public bool IsFinished => Status is AgentRunStatus.Succeeded or AgentRunStatus.Failed or AgentRunStatus.Canceled;
 
+    public bool IsWaitOver(DateTimeOffset now) => Status == AgentRunStatus.Waiting && WaitUntil <= now;
+
+    public void AttachJob(Guid jobId)
+    {
+        Require(AgentRunStatus.Queued, "be queued");
+        JobId = jobId;
+    }
+
     public void Start(DateTimeOffset now)
     {
         Require(AgentRunStatus.Queued, "start");
@@ -91,23 +105,26 @@ public class AgentRun
         return true;
     }
 
-    public void WaitFor(Guid jobId)
+    public void WaitFor(IReadOnlyCollection<Guid> jobIds, DateTimeOffset until)
     {
-        Require(AgentRunStatus.Running, "wait for a job");
-        Status = AgentRunStatus.Waiting;
-        WaitingJobId = jobId;
-    }
-
-    public bool Resume(Guid finishedJobId)
-    {
-        if (Status != AgentRunStatus.Waiting || WaitingJobId != finishedJobId)
+        Require(AgentRunStatus.Running, "wait for jobs");
+        if (jobIds.Count == 0)
         {
-            return false;
+            throw new ArgumentException("A run must wait for at least one job.", nameof(jobIds));
         }
 
+        Status = AgentRunStatus.Waiting;
+        WaitingJobIds = jobIds.Distinct().ToArray();
+        WaitUntil = until.ToUniversalTime();
+    }
+
+    public void Resume()
+    {
+        Require(AgentRunStatus.Waiting, "resume");
         Status = AgentRunStatus.Queued;
-        WaitingJobId = null;
-        return true;
+        WaitingJobIds = [];
+        WaitUntil = null;
+        JobId = null;
     }
 
     public void Succeed(string reply, DateTimeOffset now)
@@ -137,7 +154,8 @@ public class AgentRun
         }
 
         Status = status;
-        WaitingJobId = null;
+        WaitingJobIds = [];
+        WaitUntil = null;
         FinishedAt = now.ToUniversalTime();
     }
 

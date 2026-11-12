@@ -4,6 +4,7 @@ using TeachingAssistant.Application.Contracts;
 using TeachingAssistant.Application.Exceptions;
 using TeachingAssistant.Application.Interfaces;
 using TeachingAssistant.Application.Interfaces.Services;
+using TeachingAssistant.Application.Models;
 using TeachingAssistant.Domain.Grading;
 using TeachingAssistant.Domain.Ingestion;
 using TeachingAssistant.Domain.Profiling;
@@ -17,11 +18,15 @@ public class StudentTools
     private readonly ISubmissionStore _submissions;
     private readonly IGradingStore _gradings;
     private readonly IJobService _jobService;
+    private readonly AgentRunContext _context;
+    private readonly TimeProvider _timeProvider;
 
     public StudentTools(
         IStudentService studentService, ISubmissionFetchService fetchService, ISubmissionStore submissions, IGradingStore gradings,
-        IJobService jobService)
+        IJobService jobService, AgentRunContext context, TimeProvider timeProvider)
     {
+        _context = context;
+        _timeProvider = timeProvider;
         _studentService = studentService;
         _fetchService = fetchService;
         _submissions = submissions;
@@ -144,10 +149,18 @@ public class StudentTools
                     + $"({Score(draft)}). Use regrade_student_assignment only if the teacher asks to grade it again.";
             }
 
+            var started = _timeProvider.GetUtcNow();
             var job = await _jobService.QueueGradeVersionAsync(version.Id, cancellationToken);
             if (job is null)
             {
                 return "Nothing to grade: the stored version disappeared while starting the grading.";
+            }
+
+            _context.RecordQueuedJob(job.Id);
+            if (job.CreatedAt < started)
+            {
+                return $"A grading of {submission.StudentName}'s version {version.Number} is already in progress (job id {job.Id}); "
+                    + "nothing new was started. Wait for it if you need its result.";
             }
 
             var replaced = draft is null

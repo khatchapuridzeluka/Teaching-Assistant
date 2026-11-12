@@ -71,13 +71,13 @@ public class ClaudeLanguageModel : ILanguageModel
     }
 
     public async Task<AgentReply> RunAgentAsync(
-        string systemPrompt, IReadOnlyList<AgentEntry> history, IReadOnlyList<object> tools,
+        string systemPrompt, IReadOnlyList<AgentEntry> history, IReadOnlyList<object> tools, AgentRunHooks? hooks = null,
         CancellationToken cancellationToken = default)
     {
         try
         {
             var chatClient = ClaudeAgent.ChatClient(_client, _options.Model, _options.ChatMaxTokens);
-            return await ClaudeAgent.RunAsync(chatClient, _options.Model, systemPrompt, history, tools, cancellationToken);
+            return await ClaudeAgent.RunAsync(chatClient, _options.Model, systemPrompt, history, tools, hooks, cancellationToken);
         }
         catch (Exception ex) when (Translate(ex, _options.Model) is { } translated)
         {

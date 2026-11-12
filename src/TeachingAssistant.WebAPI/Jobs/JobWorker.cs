@@ -79,6 +79,7 @@ public class JobWorker(
         var processor = scope.ServiceProvider.GetRequiredService<IJobProcessor>();
         var recovered = await processor.RecoverExpiredLeasesAsync(cancellationToken);
         await processor.ReconcileGroupsAsync(cancellationToken);
+        await WithWakerAsync(w => w.SweepAsync(cancellationToken), "Checking waiting agent runs failed");
         _lastRecovery = timeProvider.GetUtcNow();
         if (recovered > 0)
         {
@@ -123,6 +124,7 @@ public class JobWorker(
         {
             await heartbeatStop.CancelAsync();
             await heartbeat;
+            await WithWakerAsync(w => w.OnJobFinishedAsync(job.Id, CancellationToken.None), "Waking agent runs failed");
         }
     }
 
@@ -148,6 +150,19 @@ public class JobWorker(
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Heartbeat for job {JobId} failed", jobId);
+        }
+    }
+
+    private async Task WithWakerAsync(Func<IAgentRunWaker, Task> action, string failure)
+    {
+        try
+        {
+            await using var scope = scopes.CreateAsyncScope();
+            await action(scope.ServiceProvider.GetRequiredService<IAgentRunWaker>());
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "{Failure}", failure);
         }
     }
 

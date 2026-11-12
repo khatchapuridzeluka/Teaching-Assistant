@@ -63,7 +63,7 @@ public class ModelHealthServiceTests
             throw new NotSupportedException();
 
         public Task<AgentReply> RunAgentAsync(
-            string systemPrompt, IReadOnlyList<AgentEntry> history, IReadOnlyList<object> tools,
+            string systemPrompt, IReadOnlyList<AgentEntry> history, IReadOnlyList<object> tools, AgentRunHooks? hooks = null,
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 

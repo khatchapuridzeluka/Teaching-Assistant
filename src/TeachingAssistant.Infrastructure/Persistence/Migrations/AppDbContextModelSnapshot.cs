@@ -143,6 +143,10 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("finished_at");
 
+                    b.Property<Guid?>("JobId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("job_id");
+
                     b.Property<int>("MaxSteps")
                         .HasColumnType("integer")
                         .HasColumnName("max_steps");
@@ -168,18 +172,28 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("steps");
 
-                    b.Property<Guid?>("WaitingJobId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("waiting_job_id");
+                    b.Property<DateTimeOffset?>("WaitUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("wait_until");
+
+                    b.PrimitiveCollection<Guid[]>("WaitingJobIds")
+                        .IsRequired()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("waiting_job_ids");
 
                     b.HasKey("Id")
                         .HasName("pk_agent_runs");
 
+                    b.HasIndex("JobId")
+                        .HasDatabaseName("ix_agent_runs_job_id");
+
                     b.HasIndex("Status")
                         .HasDatabaseName("ix_agent_runs_status");
 
-                    b.HasIndex("WaitingJobId")
-                        .HasDatabaseName("ix_agent_runs_waiting_job_id");
+                    b.HasIndex("WaitingJobIds")
+                        .HasDatabaseName("ix_agent_runs_waiting_job_ids");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("WaitingJobIds"), "gin");
 
                     b.HasIndex("ConversationId", "CreatedAt")
                         .HasDatabaseName("ix_agent_runs_conversation_id_created_at");
@@ -1800,9 +1814,9 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
 
                     b.HasOne("TeachingAssistant.Domain.Jobs.Job", null)
                         .WithMany()
-                        .HasForeignKey("WaitingJobId")
+                        .HasForeignKey("JobId")
                         .OnDelete(DeleteBehavior.SetNull)
-                        .HasConstraintName("fk_agent_runs_jobs_waiting_job_id");
+                        .HasConstraintName("fk_agent_runs_jobs_job_id");
                 });
 
             modelBuilder.Entity("TeachingAssistant.Domain.Grading.AiGrading", b =>

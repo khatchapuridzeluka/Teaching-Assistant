@@ -69,6 +69,23 @@ public class AgentController : ControllerBase
     }
 
     /// <summary>
+    /// Cancels an agent run: a waiting run stops at once, a running one within about a minute; jobs it already started keep running.
+    /// </summary>
+    /// <response code="200">Run canceled (or already finished)</response>
+    /// <response code="404">No run with this ID</response>
+    [HttpPost("runs/{runId:guid}/cancel")]
+    public async Task<ActionResult<AgentRunResponse>> CancelRunAsync(Guid runId, CancellationToken cancellationToken)
+    {
+        var run = await _runService.CancelAsync(runId, cancellationToken);
+        if (run is null)
+        {
+            return NotFound();
+        }
+
+        return Ok(run);
+    }
+
+    /// <summary>
     /// Returns a stored conversation: all its messages in order and the ID of the run still in progress, if any.
     /// </summary>
     /// <response code="200">Conversation retrieved successfully</response>

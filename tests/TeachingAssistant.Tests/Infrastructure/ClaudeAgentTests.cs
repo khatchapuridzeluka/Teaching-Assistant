@@ -18,7 +18,7 @@ public class ClaudeAgentTests
         var tools = new EchoTools();
 
         var reply = await ClaudeAgent.RunAsync(
-            model, "fake-model", "You are a test.", [new AgentEntry(AgentMessageRole.User, "say hi")], [tools],
+            model, "fake-model", "You are a test.", [new AgentEntry(AgentMessageRole.User, "say hi")], [tools], null,
             TestContext.Current.CancellationToken);
 
         Assert.Equal(["hi"], tools.Words);
@@ -45,12 +45,52 @@ public class ClaudeAgentTests
         ];
 
         var reply = await ClaudeAgent.RunAsync(
-            model, "fake-model", "You are a test.", history, [new EchoTools()], TestContext.Current.CancellationToken);
+            model, "fake-model", "You are a test.", history, [new EchoTools()], null, TestContext.Current.CancellationToken);
 
         Assert.Equal("Done.", reply.Text);
         Assert.Equal([ChatRole.User, ChatRole.Assistant, ChatRole.Tool, ChatRole.User], model.LastRequest.Select(m => m.Role));
         Assert.Equal("echo", Assert.Single(model.LastRequest[1].Contents.OfType<FunctionCallContent>()).Name);
         Assert.Equal("call-1", Assert.Single(model.LastRequest[2].Contents.OfType<FunctionResultContent>()).CallId);
+    }
+
+    [Fact]
+    public async Task Run_ReportsEachStepWhenItHappens()
+    {
+        var model = new ScriptedModel(
+            new ChatMessage(ChatRole.Assistant, [new FunctionCallContent("call-1", "echo", new Dictionary<string, object?> { ["word"] = "hi" })]),
+            new ChatMessage(ChatRole.Assistant, "Done."));
+        var steps = new List<string>();
+        var hooks = new AgentRunHooks(
+            entry =>
+            {
+                steps.Add($"{entry.Role}:{entry.ToolName ?? entry.ToolCalls?.FirstOrDefault()?.Name ?? entry.Text}:{model.Calls}");
+                return Task.CompletedTask;
+            },
+            () => false);
+
+        await ClaudeAgent.RunAsync(
+            model, "fake-model", "You are a test.", [new AgentEntry(AgentMessageRole.User, "say hi")], [new EchoTools()], hooks,
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(["Assistant:echo:1", "Tool:echo:1", "Assistant:Done.:2"], steps); // the tool result is reported before the second call
+    }
+
+    [Fact]
+    public async Task Run_EndsTheLoop_WhenATool_AsksToStop()
+    {
+        var model = new ScriptedModel(
+            new ChatMessage(ChatRole.Assistant, [new FunctionCallContent("call-1", "echo", new Dictionary<string, object?> { ["word"] = "wait" })]),
+            new ChatMessage(ChatRole.Assistant, "Should not be asked for."));
+        var tools = new EchoTools();
+        var hooks = new AgentRunHooks(_ => Task.CompletedTask, () => tools.Words.Contains("wait"));
+
+        var reply = await ClaudeAgent.RunAsync(
+            model, "fake-model", "You are a test.", [new AgentEntry(AgentMessageRole.User, "wait")], [tools], hooks,
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, model.Calls);
+        Assert.Equal("", reply.Text);
+        Assert.Equal(AgentMessageRole.Tool, reply.Entries[^1].Role);
     }
 
     private sealed class EchoTools

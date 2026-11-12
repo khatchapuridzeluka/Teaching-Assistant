@@ -12,23 +12,39 @@ public class AgentRunTests
     }
 
     [Fact]
-    public void ARun_WaitsForAJob_AndIsQueuedAgainOnlyWhenThatJobFinishes()
+    public void ARun_WaitsForJobsUntilADeadline_AndIsQueuedAgainWhenResumed()
     {
         var run = Run();
-        var job = Guid.NewGuid();
+        var first = Guid.NewGuid();
+        var second = Guid.NewGuid();
+        run.AttachJob(Guid.NewGuid());
 
         run.Start(Now);
-        run.WaitFor(job);
-        Assert.Equal((AgentRunStatus.Waiting, (Guid?)job), (run.Status, run.WaitingJobId));
-
-        Assert.False(run.Resume(Guid.NewGuid())); // another job finishing does not wake it
+        run.WaitFor([first, second, first], Now.AddMinutes(30));
         Assert.Equal(AgentRunStatus.Waiting, run.Status);
+        Assert.Equal([first, second], run.WaitingJobIds);
+        Assert.False(run.IsWaitOver(Now.AddMinutes(29)));
+        Assert.True(run.IsWaitOver(Now.AddMinutes(30)));
 
-        Assert.True(run.Resume(job));
-        Assert.Equal((AgentRunStatus.Queued, (Guid?)null), (run.Status, run.WaitingJobId));
+        run.Resume();
+        Assert.Equal((AgentRunStatus.Queued, (Guid?)null, (DateTimeOffset?)null, (Guid?)null), (run.Status, run.JobId, run.WaitUntil, run.JobId));
+        Assert.Empty(run.WaitingJobIds);
 
         run.Start(Now.AddMinutes(5));
         Assert.Equal(Now, run.StartedAt); // the first start is kept
+    }
+
+    [Fact]
+    public void ARun_MustWaitForAtLeastOneJob_AndOnlyWhileRunning()
+    {
+        var run = Run();
+
+        Assert.Throws<InvalidOperationException>(() => run.WaitFor([Guid.NewGuid()], Now)); // not started
+        Assert.Throws<InvalidOperationException>(() => run.Resume()); // not waiting
+
+        run.Start(Now);
+        Assert.Throws<ArgumentException>(() => run.WaitFor([], Now));
+        Assert.Throws<InvalidOperationException>(() => run.AttachJob(Guid.NewGuid())); // only a queued run gets a job
     }
 
     [Fact]
@@ -60,9 +76,11 @@ public class AgentRunTests
     {
         var failed = Run();
         failed.Start(Now);
-        failed.WaitFor(Guid.NewGuid());
+        failed.WaitFor([Guid.NewGuid()], Now.AddMinutes(30));
         failed.Fail("The model is unreachable.", Now);
-        Assert.Equal((AgentRunStatus.Failed, "The model is unreachable.", (Guid?)null), (failed.Status, failed.Error, failed.WaitingJobId));
+        Assert.Equal((AgentRunStatus.Failed, "The model is unreachable."), (failed.Status, failed.Error));
+        Assert.Empty(failed.WaitingJobIds);
+        Assert.Null(failed.WaitUntil);
 
         var canceled = Run();
         canceled.Cancel(Now);
@@ -83,7 +101,7 @@ public class AgentRunTests
         Assert.Throws<InvalidOperationException>(() => run.Start(Now));
         Assert.Throws<InvalidOperationException>(() => run.Fail("late", Now));
         Assert.Throws<InvalidOperationException>(() => run.Cancel(Now));
-        Assert.False(run.Resume(Guid.NewGuid()));
+        Assert.Throws<InvalidOperationException>(() => run.Resume());
     }
 
     [Fact]

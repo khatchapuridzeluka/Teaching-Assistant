@@ -23,6 +23,8 @@ public class AgentRunService : IAgentRunService
     private readonly ILanguageModel _languageModel;
     private readonly ClassroomTools _classroomTools;
     private readonly StudentTools _studentTools;
+    private readonly AgentTools _agentTools;
+    private readonly AgentRunContext _runContext;
     private readonly ModelCallContext _callContext;
     private readonly TimeProvider _timeProvider;
 
@@ -33,6 +35,8 @@ public class AgentRunService : IAgentRunService
         ILanguageModel languageModel,
         ClassroomTools classroomTools,
         StudentTools studentTools,
+        AgentTools agentTools,
+        AgentRunContext runContext,
         ModelCallContext callContext,
         TimeProvider timeProvider)
     {
@@ -42,6 +46,8 @@ public class AgentRunService : IAgentRunService
         _languageModel = languageModel;
         _classroomTools = classroomTools;
         _studentTools = studentTools;
+        _agentTools = agentTools;
+        _runContext = runContext;
         _callContext = callContext;
         _timeProvider = timeProvider;
     }
@@ -83,6 +89,8 @@ public class AgentRunService : IAgentRunService
         var job = new Job(JobType.AgentRun, JobPayloads.Write(new AgentRunPayload(run.Id)), now, dedupKey: $"agent-run:{run.Id}",
             courseId: run.CourseId, assignmentId: run.AssignmentId, maxAttempts: 1);
         await _jobs.AddOrGetActiveAsync(job, cancellationToken);
+        run.AttachJob(job.Id);
+        await _chats.SaveChangesAsync(cancellationToken);
         _signal.Notify();
 
         return ToResponse(run, [message]);
@@ -126,13 +134,16 @@ public class AgentRunService : IAgentRunService
         }
 
         Describe(run);
+        _runContext.Begin(run.Id);
 
         try
         {
             var history = (await _chats.GetMessagesAsync(conversation.Id, cancellationToken)).Select(ToEntry).ToList();
             var system = AgentChatService.SystemPromptFor(run.Page, run.CourseId, run.AssignmentId);
-            var reply = await _languageModel.RunAgentAsync(system, history, [_classroomTools, _studentTools], cancellationToken);
-            Record(run, conversation, reply);
+            var hooks = new AgentRunHooks(entry => SaveStepAsync(run, conversation, entry), () => _runContext.StopRequested);
+            var reply = await _languageModel.RunAgentAsync(
+                system, history, [_classroomTools, _studentTools, _agentTools], hooks, cancellationToken);
+            Finish(run, reply);
         }
         catch (OperationCanceledException)
         {
@@ -150,27 +161,63 @@ public class AgentRunService : IAgentRunService
         await _chats.SaveChangesAsync(CancellationToken.None);
     }
 
-    private void Record(AgentRun run, AgentConversation conversation, AgentReply reply)
+    public async Task<AgentRunResponse?> CancelAsync(Guid runId, CancellationToken cancellationToken = default)
     {
-        var now = _timeProvider.GetUtcNow();
-        var withinLimit = true;
-
-        foreach (var entry in reply.Entries)
+        var run = await _chats.FindRunAsync(runId, cancellationToken);
+        if (run is null)
         {
-            if (entry.Role == AgentMessageRole.Tool)
+            return null;
+        }
+
+        if (!run.IsFinished)
+        {
+            var now = _timeProvider.GetUtcNow();
+            var job = run.JobId is { } jobId && run.Status != AgentRunStatus.Waiting ? await _jobs.FindAsync(jobId, cancellationToken) : null;
+            job?.Cancel(now);
+            if (job is null || job.IsFinished)
             {
-                _chats.Add(conversation.AddToolResult(run.Id, entry.ToolCallId ?? "", entry.ToolName ?? "", entry.Text, null, now));
-                continue;
+                run.Cancel(now);
             }
 
-            withinLimit = withinLimit && run.TryTakeStep();
+            await _jobs.SaveChangesAsync(cancellationToken);
+            await _chats.SaveChangesAsync(cancellationToken);
+        }
+
+        return ToResponse(run, await _chats.GetRunMessagesAsync(runId, cancellationToken));
+    }
+
+    private async Task SaveStepAsync(AgentRun run, AgentConversation conversation, AgentEntry entry)
+    {
+        var now = _timeProvider.GetUtcNow();
+        if (entry.Role == AgentMessageRole.Tool)
+        {
+            var jobId = _runContext.TakeQueuedJob();
+            _chats.Add(conversation.AddToolResult(run.Id, entry.ToolCallId ?? "", entry.ToolName ?? "", entry.Text, jobId, now));
+        }
+        else
+        {
+            if (!run.TryTakeStep())
+            {
+                _runContext.ReachStepLimit();
+            }
+
             var toolCalls = entry.ToolCalls is { Count: > 0 } calls ? JsonSerializer.Serialize(calls, JsonOptions) : null;
             _chats.Add(conversation.AddAssistantMessage(run.Id, entry.Text, toolCalls, now));
         }
 
-        if (!withinLimit)
+        await _chats.SaveChangesAsync(CancellationToken.None);
+    }
+
+    private void Finish(AgentRun run, AgentReply reply)
+    {
+        var now = _timeProvider.GetUtcNow();
+        if (_runContext.StepLimitReached)
         {
             run.Fail($"The assistant stopped after {run.MaxSteps} steps without finishing. Ask again with a smaller request.", now);
+        }
+        else if (_runContext.WaitFor is { Count: > 0 } jobIds)
+        {
+            run.WaitFor(jobIds, now + AgentRun.WaitLimit);
         }
         else if (reply.Text.Length == 0)
         {
@@ -202,8 +249,8 @@ public class AgentRunService : IAgentRunService
 
     private static AgentRunResponse ToResponse(AgentRun run, IReadOnlyList<AgentMessage> messages)
     {
-        return new AgentRunResponse(run.Id, run.ConversationId, run.Status, run.Reply, run.Error, run.Steps, run.WaitingJobId,
-            run.CreatedAt, run.StartedAt, run.FinishedAt, messages.Select(ToResponse).ToList());
+        return new AgentRunResponse(run.Id, run.ConversationId, run.Status, run.Reply, run.Error, run.Steps, run.WaitingJobIds,
+            run.WaitUntil, run.CreatedAt, run.StartedAt, run.FinishedAt, messages.Select(ToResponse).ToList());
     }
 
     private static AgentMessageResponse ToResponse(AgentMessage message)

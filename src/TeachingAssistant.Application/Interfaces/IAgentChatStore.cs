@@ -10,6 +10,10 @@ public interface IAgentChatStore
 
     Task<AgentRun?> FindUnfinishedRunAsync(Guid conversationId, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<AgentRun>> GetRunsWaitingOnAsync(Guid jobId, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<AgentRun>> GetUnfinishedRunsAsync(CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<AgentMessage>> GetMessagesAsync(Guid conversationId, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<AgentMessage>> GetRunMessagesAsync(Guid runId, CancellationToken cancellationToken = default);

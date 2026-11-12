@@ -19,6 +19,16 @@ public class AgentChatStore(AppDbContext db) : IAgentChatStore
             .OrderByDescending(r => r.CreatedAt)
             .FirstOrDefaultAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<AgentRun>> GetRunsWaitingOnAsync(Guid jobId, CancellationToken cancellationToken = default) =>
+        await db.AgentRuns
+            .Where(r => r.Status == AgentRunStatus.Waiting && r.WaitingJobIds.Contains(jobId))
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<AgentRun>> GetUnfinishedRunsAsync(CancellationToken cancellationToken = default) =>
+        await db.AgentRuns
+            .Where(r => r.Status == AgentRunStatus.Queued || r.Status == AgentRunStatus.Running || r.Status == AgentRunStatus.Waiting)
+            .ToListAsync(cancellationToken);
+
     public async Task<IReadOnlyList<AgentMessage>> GetMessagesAsync(Guid conversationId, CancellationToken cancellationToken = default) =>
         await db.AgentMessages
             .Where(m => m.ConversationId == conversationId)

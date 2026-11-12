@@ -10,9 +10,11 @@ import {
   isRunFinished,
   useAgentConversation,
   useAgentRun,
+  useCancelAgentRun,
   useStartAgentRun,
 } from "../api/chat";
-import { ArrowUp, CircleCheck, MessageSquarePlus, Sparkles, Wrench, X } from "lucide-react";
+import { useJob } from "../api/hooks";
+import { ArrowUp, CircleCheck, Hourglass, MessageSquarePlus, Sparkles, Square, X } from "lucide-react";
 import { Button } from "./ui";
 import { useChatConversationId } from "./useChatHistory";
 
@@ -31,6 +33,7 @@ const toolLabels: Record<string, string> = {
   list_student_assignments: "Listed the student's assignments",
   grade_student_assignment: "Started a grading",
   regrade_student_assignment: "Started a grading again",
+  wait_for_jobs: "Waiting for the background work",
 };
 
 export type OpenPage = { description: string | null; courseId?: string; assignmentId?: string };
@@ -40,13 +43,17 @@ export function ChatPanel({ page, onClose }: { page: OpenPage; onClose: () => vo
   const { conversationId, setConversationId, clear } = useChatConversationId();
   const conversation = useAgentConversation(conversationId);
   const start = useStartAgentRun();
+  const cancel = useCancelAgentRun();
   const [runId, setRunId] = useState<string | null>(null);
   const run = useAgentRun(runId);
   const [input, setInput] = useState("");
   const [failure, setFailure] = useState<string | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
 
-  const messages = conversation.data?.messages ?? [];
+  const stored = conversation.data?.messages ?? [];
+  const storedIds = new Set(stored.map((m) => m.id));
+  const live = (run.data?.messages ?? []).filter((m) => !storedIds.has(m.id));
+  const messages = [...stored, ...live].sort((a, b) => a.sequence - b.sequence);
   const activeRunId = conversation.data?.activeRunId ?? null;
   const finished = run.data !== undefined && isRunFinished(run.data.status);
   const waiting = start.isPending || (runId !== null && !finished);
@@ -71,6 +78,9 @@ export function ChatPanel({ page, onClose }: { page: OpenPage; onClose: () => vo
 
     if (run.data.status === "Failed") {
       setFailure(run.data.error ?? "The agent could not finish.");
+    }
+    if (run.data.status === "Canceled") {
+      setFailure("Stopped. Work it had already started keeps running in the background.");
     }
     const key = ["agent", "conversations", run.data.conversationId];
     queryClient.setQueryData(key, (current: AgentConversation | undefined) => current && { ...current, activeRunId: null });
@@ -206,9 +216,22 @@ export function ChatPanel({ page, onClose }: { page: OpenPage; onClose: () => vo
             className="block w-full resize-none rounded-[10px] bg-transparent px-3 pt-2.5 outline-none placeholder:text-ink-faint"
           />
           <div className="flex justify-end px-2 pb-2">
-            <Button small variant="primary" type="submit" icon={<ArrowUp />} disabled={!input.trim() || waiting}>
-              Send
-            </Button>
+            {waiting ? (
+              <Button
+                small
+                type="button"
+                icon={<Square />}
+                onClick={() => runId && cancel.mutate(runId)}
+                disabled={runId === null || cancel.isPending}
+                title="Stop the agent; work it already started keeps running"
+              >
+                {cancel.isPending ? "Stopping…" : "Stop"}
+              </Button>
+            ) : (
+              <Button small variant="primary" type="submit" icon={<ArrowUp />} disabled={!input.trim()}>
+                Send
+              </Button>
+            )}
           </div>
         </div>
         <div className="mt-1.5 text-[11px] text-ink-muted">
@@ -266,19 +289,68 @@ function Reply({ text, error = false }: { text: string; error?: boolean }) {
 }
 
 function Working({ run }: { run: AgentRun | undefined }) {
-  const label = run?.status === "Running" ? "Working…" : run?.status === "Waiting" ? "Waiting for a background job…" : "Queued…";
+  const jobIds = run?.status === "Waiting" ? (run.waitingJobIds ?? []) : [];
+  if (jobIds.length > 0) {
+    return (
+      <div className="flex items-start gap-2">
+        <AgentMark size="mt-0.5 h-6 w-6" />
+        <div className="min-w-0 flex-1 rounded-xl rounded-tl-sm bg-paper px-3.5 py-3">
+          <div className="flex items-center gap-2 text-ink-muted">
+            <Hourglass className="h-3.5 w-3.5" />
+            Waiting for {jobIds.length === 1 ? "a background job" : `${jobIds.length} background jobs`}; it continues when they finish
+          </div>
+          <ul className="mt-2 flex flex-col gap-1">
+            {jobIds.map((jobId) => (
+              <WaitedJob key={jobId} jobId={jobId} />
+            ))}
+          </ul>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex items-start gap-2">
       <AgentMark size="mt-0.5 h-6 w-6" />
       <div className="flex items-center gap-2 rounded-xl rounded-tl-sm bg-paper px-3.5 py-3 text-ink-muted">
-        {run?.status === "Waiting" ? (
-          <Wrench className="h-3.5 w-3.5" />
-        ) : (
-          <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-line border-t-accent" />
-        )}
-        {label}
+        <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-line border-t-accent" />
+        {run?.status === "Running" ? "Working…" : "Queued…"}
       </div>
     </div>
+  );
+}
+
+const jobLabels: Record<string, string> = {
+  GradeVersion: "Grading",
+  GradeAssignment: "Grade all",
+  GradeStudent: "Grade student",
+  AnalyzeMistakes: "Common mistakes",
+  AnalyzeStudent: "Student analysis",
+};
+
+function WaitedJob({ jobId }: { jobId: string }) {
+  const job = useJob(jobId).data;
+  if (!job) {
+    return <li className="text-[11px] text-ink-muted">Loading…</li>;
+  }
+
+  const progress = job.progressTotal ? ` · ${job.progressDone ?? 0} of ${job.progressTotal}` : "";
+  const state =
+    job.status === "Succeeded" ? "done" : job.status === "Failed" ? "failed" : job.status === "Canceled" ? "canceled" : job.status === "Running" ? "running" : "queued";
+  return (
+    <li className="flex items-center gap-1.5 text-[11px]">
+      {job.status === "Succeeded" ? (
+        <CircleCheck className="h-3.5 w-3.5 text-success" />
+      ) : job.status === "Failed" || job.status === "Canceled" ? (
+        <X className="h-3.5 w-3.5 text-danger" />
+      ) : (
+        <span className="h-3 w-3 animate-spin rounded-full border-2 border-line border-t-accent" />
+      )}
+      <span>
+        {jobLabels[job.type] ?? job.type} {state}
+        {progress}
+      </span>
+    </li>
   );
 }
 

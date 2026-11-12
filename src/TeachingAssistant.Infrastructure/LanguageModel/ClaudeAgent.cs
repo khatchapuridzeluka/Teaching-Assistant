@@ -18,25 +18,26 @@ internal static class ClaudeAgent
 
     public static async Task<AgentReply> RunAsync(
         IChatClient chatClient, string model, string systemPrompt, IReadOnlyList<AgentEntry> history, IReadOnlyList<object> tools,
-        CancellationToken cancellationToken)
+        AgentRunHooks? hooks, CancellationToken cancellationToken)
     {
         var agent = new ChatClientAgent(
-            chatClient,
+            hooks is null ? chatClient : new StepObserver(chatClient, hooks),
             instructions: systemPrompt,
             name: "teaching-assistant",
-            tools: tools.SelectMany(ToFunctions).ToList());
+            tools: tools.SelectMany(t => ToFunctions(t, hooks)).ToList());
 
         var response = await agent.RunAsync(history.Select(ToMessage).ToList(), cancellationToken: cancellationToken);
         return new AgentReply(model, ToEntries(response.Messages), ToUsage(response.Usage));
     }
 
-    private static IEnumerable<AITool> ToFunctions(object tools)
+    private static IEnumerable<AITool> ToFunctions(object tools, AgentRunHooks? hooks)
     {
         foreach (var method in tools.GetType().GetMethods(BindingFlags.Public | BindingFlags.Instance))
         {
             if (method.GetCustomAttribute<AgentToolAttribute>() is { } tool)
             {
-                yield return AIFunctionFactory.Create(method, tools, tool.Name);
+                var function = AIFunctionFactory.Create(method, tools, tool.Name);
+                yield return hooks is null ? function : new ObservedFunction(function, hooks);
             }
         }
     }
@@ -85,23 +86,31 @@ internal static class ClaudeAgent
                 continue;
             }
 
-            if (message.Role != ChatRole.Assistant)
+            if (ToAssistantEntry(message) is { } entry)
             {
-                continue;
-            }
+                foreach (var call in entry.ToolCalls ?? [])
+                {
+                    toolNames[call.Id] = call.Name;
+                }
 
-            var calls = message.Contents.OfType<FunctionCallContent>()
-                .Select(c => new AgentToolCall(c.CallId, c.Name, JsonSerializer.Serialize(c.Arguments ?? new Dictionary<string, object?>())))
-                .ToList();
-            foreach (var call in calls)
-            {
-                toolNames[call.Id] = call.Name;
+                entries.Add(entry);
             }
-
-            entries.Add(new AgentEntry(AgentMessageRole.Assistant, message.Text.Trim(), calls.Count == 0 ? null : calls));
         }
 
         return entries;
+    }
+
+    private static AgentEntry? ToAssistantEntry(ChatMessage message)
+    {
+        if (message.Role != ChatRole.Assistant)
+        {
+            return null;
+        }
+
+        var calls = message.Contents.OfType<FunctionCallContent>()
+            .Select(c => new AgentToolCall(c.CallId, c.Name, JsonSerializer.Serialize(c.Arguments ?? new Dictionary<string, object?>())))
+            .ToList();
+        return new AgentEntry(AgentMessageRole.Assistant, message.Text.Trim(), calls.Count == 0 ? null : calls);
     }
 
     private static string ResultText(object? result)
@@ -120,5 +129,42 @@ internal static class ClaudeAgent
         return usage is null
             ? null
             : new LanguageModelUsage(usage.InputTokenCount ?? 0, usage.OutputTokenCount ?? 0, usage.CachedInputTokenCount ?? 0, 0);
+    }
+
+    private sealed class StepObserver(IChatClient inner, AgentRunHooks hooks) : DelegatingChatClient(inner)
+    {
+        public override async Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+        {
+            var response = await base.GetResponseAsync(messages, options, cancellationToken);
+            foreach (var message in response.Messages)
+            {
+                if (ToAssistantEntry(message) is { } entry)
+                {
+                    await hooks.OnStep(entry);
+                }
+            }
+
+            return response;
+        }
+    }
+
+    private sealed class ObservedFunction(AIFunction inner, AgentRunHooks hooks) : DelegatingAIFunction(inner)
+    {
+        private const string Stopped = "Not run: this turn is ending, so no more tools are called.";
+
+        protected override async ValueTask<object?> InvokeCoreAsync(AIFunctionArguments arguments, CancellationToken cancellationToken)
+        {
+            var context = FunctionInvokingChatClient.CurrentContext;
+            var result = hooks.ShouldStop() ? Stopped : await base.InvokeCoreAsync(arguments, cancellationToken);
+
+            await hooks.OnStep(new AgentEntry(AgentMessageRole.Tool, ResultText(result), ToolCallId: context?.CallContent.CallId, ToolName: Name));
+            if (hooks.ShouldStop() && context is not null)
+            {
+                context.Terminate = true;
+            }
+
+            return result;
+        }
     }
 }

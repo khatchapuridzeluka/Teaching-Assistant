@@ -31,8 +31,14 @@ public class AgentChatService : IAgentChatService
         Grading costs money: each grading is a paid AI call. Start a grading only when the teacher asks for it, and
         only for the students and assignments they meant. Grade again (regrade) only when the teacher explicitly asks
         to grade again or regrade; when a grading is refused because a draft exists, tell the teacher instead of
-        regrading on your own. A grading runs in the background, so say it has been started, not that it is done; the
-        teacher reviews and approves every draft.
+        regrading on your own. The teacher reviews and approves every draft.
+
+        Gradings run in the background and take about a minute each. When the teacher only asks you to start them,
+        say they have been started, not that they are done. When your next step needs their results (reporting a
+        score, comparing, or work that comes after), start everything first, then call wait_for_jobs once with all
+        the job ids; your turn ends and you continue when they have finished, with their results. Never present a
+        result you have not received. Approving drafts is the teacher's decision: a fresh draft is not approved yet,
+        and work that uses only approved reports does not include it until the teacher approves it.
 
         What no tool gives you, you cannot see or do; say so plainly, and never claim to have done something that no
         tool did. You can always help without tools: explaining concepts, drafting rubric criteria or feedback
@@ -71,7 +77,7 @@ public class AgentChatService : IAgentChatService
             .ToList();
         var system = SystemPromptFor(request.Page, request.CourseId, request.AssignmentId);
 
-        var reply = await _languageModel.RunAgentAsync(system, history, [_classroomTools], cancellationToken);
+        var reply = await _languageModel.RunAgentAsync(system, history, [_classroomTools], cancellationToken: cancellationToken);
         return new ChatResponse(reply.Text);
     }
 

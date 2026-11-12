@@ -58,7 +58,7 @@ public class RecordingLanguageModelTests
     [Fact]
     public async Task AnAgentRun_IsRecordedAsChat()
     {
-        await Recorder().RunAgentAsync("system", [], [], TestContext.Current.CancellationToken);
+        await Recorder().RunAgentAsync("system", [], [], cancellationToken: TestContext.Current.CancellationToken);
 
         var call = Assert.Single(_calls.Calls);
         Assert.Equal((ModelCallPurpose.Chat, true), (call.Purpose, call.Succeeded));
@@ -97,7 +97,7 @@ public class RecordingLanguageModelTests
             Reply("chat-model");
 
         public async Task<AgentReply> RunAgentAsync(
-            string systemPrompt, IReadOnlyList<AgentEntry> history, IReadOnlyList<object> tools,
+            string systemPrompt, IReadOnlyList<AgentEntry> history, IReadOnlyList<object> tools, AgentRunHooks? hooks = null,
             CancellationToken cancellationToken = default)
         {
             var reply = await Reply("chat-model");

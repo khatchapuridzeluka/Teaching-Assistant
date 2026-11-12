@@ -12,15 +12,18 @@ namespace TeachingAssistant.Tests.Application;
 
 public class AgentRunServiceTests
 {
-    private readonly FakeChats _chats = new();
-    private readonly FakeJobs _jobs = new();
+    private readonly FakeAgentChats _chats = new();
+    private readonly FakeAgentJobs _jobs = new();
     private readonly ScriptedModel _model = new();
+    private readonly AgentRunContext _runContext = new();
     private readonly ClassroomTools _tools = new(null!, null!, null!, null!); // never called here: only the model calls tools
-    private readonly StudentTools _studentTools = new(null!, null!, null!, null!, null!);
+    private readonly StudentTools _studentTools = new(null!, null!, null!, null!, null!, null!, TimeProvider.System);
 
     private AgentRunService Service()
     {
-        return new AgentRunService(_chats, _jobs, _jobs, _model, _tools, _studentTools, new ModelCallContext(), TimeProvider.System);
+        var agentTools = new AgentTools(_jobs, new JobReporter(_jobs, _jobs), _runContext);
+        return new AgentRunService(_chats, _jobs, _jobs, _model, _tools, _studentTools, agentTools, _runContext, new ModelCallContext(),
+            TimeProvider.System);
     }
 
     private async Task<AgentRunResponse> StartAsync(string text, Guid? conversationId = null)
@@ -44,6 +47,7 @@ public class AgentRunServiceTests
         var job = Assert.Single(_jobs.Jobs);
         Assert.Equal((JobType.AgentRun, 1, "course-1", "assignment-4"), (job.Type, job.MaxAttempts, job.CourseId, job.AssignmentId));
         Assert.Equal(run.Id, JobPayloads.Read<AgentRunPayload>(job.Payload).RunId);
+        Assert.Equal(job.Id, _chats.Runs.Single().JobId);
         Assert.Equal(1, _jobs.Notified);
     }
 
@@ -90,7 +94,9 @@ public class AgentRunServiceTests
 
         Assert.Equal("what courses do I have?", Assert.Single(_model.History!).Text);
         Assert.Contains("(course id course-1, assignment id assignment-4)", _model.System);
-        Assert.Equal([_tools, _studentTools], _model.Tools!);
+        Assert.Equal(3, _model.Tools!.Count);
+        Assert.Same(_tools, _model.Tools[0]);
+        Assert.Same(_studentTools, _model.Tools[1]);
     }
 
     [Fact]
@@ -152,6 +158,112 @@ public class AgentRunServiceTests
     }
 
     [Fact]
+    public async Task Execute_SavesEachStepAsItHappens()
+    {
+        var started = await StartAsync("what courses do I have?");
+        var savesBefore = _chats.Saves;
+        _model.Reply = new AgentReply("fake-model",
+        [
+            new AgentEntry(AgentMessageRole.Assistant, "", [new AgentToolCall("call-1", "list_courses", "{}")]),
+            new AgentEntry(AgentMessageRole.Tool, "- Java II", ToolCallId: "call-1", ToolName: "list_courses"),
+            new AgentEntry(AgentMessageRole.Assistant, "Java II."),
+        ]);
+
+        await Service().ExecuteAsync(started.Id, TestContext.Current.CancellationToken);
+
+        Assert.True(_chats.Saves - savesBefore >= 4); // the start, one save per step, and the end
+    }
+
+    [Fact]
+    public async Task Execute_EndsTheTurnAndWaits_WhenTheModelWaitsForAJob()
+    {
+        var started = await StartAsync("grade Nino and tell me the score");
+        var grading = new Job(JobType.GradeVersion, JobPayloads.Write(new GradeVersionPayload(Guid.NewGuid())), DateTimeOffset.UtcNow);
+        _jobs.Jobs.Add(grading);
+        _model.OnTool = entry =>
+        {
+            if (entry.ToolName == "grade_student_assignment")
+            {
+                _runContext.RecordQueuedJob(grading.Id);
+            }
+            else if (entry.ToolName == "wait_for_jobs")
+            {
+                _runContext.RequestWait([grading.Id]);
+            }
+        };
+        _model.Reply = new AgentReply("fake-model",
+        [
+            new AgentEntry(AgentMessageRole.Assistant, "", [new AgentToolCall("call-1", "grade_student_assignment", "{}")]),
+            new AgentEntry(AgentMessageRole.Tool, $"Grading queued (job id {grading.Id})", ToolCallId: "call-1", ToolName: "grade_student_assignment"),
+            new AgentEntry(AgentMessageRole.Assistant, "", [new AgentToolCall("call-2", "wait_for_jobs", "{}")]),
+            new AgentEntry(AgentMessageRole.Tool, "Waiting for 1 job", ToolCallId: "call-2", ToolName: "wait_for_jobs"),
+            new AgentEntry(AgentMessageRole.Assistant, "This must not be reached."),
+        ]);
+
+        await Service().ExecuteAsync(started.Id, TestContext.Current.CancellationToken);
+
+        var run = (await Service().GetAsync(started.Id, TestContext.Current.CancellationToken))!;
+        Assert.Equal(AgentRunStatus.Waiting, run.Status);
+        Assert.Equal([grading.Id], run.WaitingJobIds);
+        Assert.NotNull(run.WaitUntil);
+        Assert.Equal(5, run.Messages.Count); // the turn stopped after the wait
+        Assert.Equal(grading.Id, run.Messages[2].JobId); // the grading's result links to its job
+        Assert.Null(run.Messages[4].JobId);
+    }
+
+    [Fact]
+    public async Task Execute_StopsAtTheStepLimit()
+    {
+        var started = await StartAsync("loop forever");
+        var entries = new List<AgentEntry>();
+        for (var i = 0; i < AgentRun.DefaultMaxSteps + 1; i++)
+        {
+            entries.Add(new AgentEntry(AgentMessageRole.Assistant, "", [new AgentToolCall($"call-{i}", "list_courses", "{}")]));
+            entries.Add(new AgentEntry(AgentMessageRole.Tool, "- Java II", ToolCallId: $"call-{i}", ToolName: "list_courses"));
+        }
+
+        _model.Reply = new AgentReply("fake-model", entries);
+
+        await Service().ExecuteAsync(started.Id, TestContext.Current.CancellationToken);
+
+        var run = (await Service().GetAsync(started.Id, TestContext.Current.CancellationToken))!;
+        Assert.Equal(AgentRunStatus.Failed, run.Status);
+        Assert.StartsWith($"The assistant stopped after {AgentRun.DefaultMaxSteps} steps", run.Error);
+        Assert.Equal(AgentMessageRole.Tool, run.Messages[^1].Role); // every tool call kept its result
+    }
+
+    [Fact]
+    public async Task Cancel_StopsAQueuedRunAndItsJob()
+    {
+        var started = await StartAsync("hi");
+
+        var run = (await Service().CancelAsync(started.Id, TestContext.Current.CancellationToken))!;
+
+        Assert.Equal(AgentRunStatus.Canceled, run.Status);
+        Assert.Equal(JobStatus.Canceled, Assert.Single(_jobs.Jobs).Status);
+    }
+
+    [Fact]
+    public async Task Cancel_StopsAWaitingRun_ButNotTheJobsItStarted()
+    {
+        var started = await StartAsync("grade and wait");
+        var grading = new Job(JobType.GradeVersion, JobPayloads.Write(new GradeVersionPayload(Guid.NewGuid())), DateTimeOffset.UtcNow);
+        _jobs.Jobs.Add(grading);
+        _model.OnTool = _ => _runContext.RequestWait([grading.Id]);
+        _model.Reply = new AgentReply("fake-model",
+        [
+            new AgentEntry(AgentMessageRole.Assistant, "", [new AgentToolCall("call-1", "wait_for_jobs", "{}")]),
+            new AgentEntry(AgentMessageRole.Tool, "Waiting", ToolCallId: "call-1", ToolName: "wait_for_jobs"),
+        ]);
+        await Service().ExecuteAsync(started.Id, TestContext.Current.CancellationToken);
+
+        var run = (await Service().CancelAsync(started.Id, TestContext.Current.CancellationToken))!;
+
+        Assert.Equal(AgentRunStatus.Canceled, run.Status);
+        Assert.Equal(JobStatus.Queued, grading.Status);
+    }
+
+    [Fact]
     public async Task Execute_DoesNothing_ForAFinishedRun()
     {
         var started = await StartAsync("hi");
@@ -169,6 +281,8 @@ public class AgentRunServiceTests
 
         public Exception? Failure { get; set; }
 
+        public Action<AgentEntry>? OnTool { get; set; }
+
         public int Calls { get; private set; }
 
         public string? System { get; private set; }
@@ -181,15 +295,39 @@ public class AgentRunServiceTests
 
         public string GradingModelId => "fake-grading-model";
 
-        public Task<AgentReply> RunAgentAsync(
-            string systemPrompt, IReadOnlyList<AgentEntry> history, IReadOnlyList<object> tools,
+        public async Task<AgentReply> RunAgentAsync(
+            string systemPrompt, IReadOnlyList<AgentEntry> history, IReadOnlyList<object> tools, AgentRunHooks? hooks = null,
             CancellationToken cancellationToken = default)
         {
             Calls++;
             System = systemPrompt;
-            History = history;
+            History = history.ToList();
             Tools = tools;
-            return Failure is null ? Task.FromResult(Reply) : Task.FromException<AgentReply>(Failure);
+            if (Failure is not null)
+            {
+                throw Failure;
+            }
+
+            foreach (var entry in Reply.Entries)
+            {
+                if (hooks is null)
+                {
+                    break;
+                }
+
+                if (entry.Role == AgentMessageRole.Tool)
+                {
+                    OnTool?.Invoke(entry);
+                }
+
+                await hooks.OnStep(entry);
+                if (entry.Role == AgentMessageRole.Tool && hooks.ShouldStop())
+                {
+                    return new AgentReply(Reply.Model, Reply.Entries.TakeWhile(e => e != entry).Append(entry).ToList());
+                }
+            }
+
+            return Reply;
         }
 
         public Task<LanguageModelReply> CompleteAsync(string prompt, CancellationToken cancellationToken = default) =>
@@ -206,87 +344,5 @@ public class AgentRunServiceTests
         public Task<LanguageModelReply> AnalyzeAsync(
             string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
-    }
-
-    private sealed class FakeChats : IAgentChatStore
-    {
-        public List<AgentConversation> Conversations { get; } = [];
-
-        public List<AgentRun> Runs { get; } = [];
-
-        public List<AgentMessage> Messages { get; } = [];
-
-        public Task<AgentConversation?> FindConversationAsync(Guid conversationId, CancellationToken cancellationToken = default) =>
-            Task.FromResult(Conversations.FirstOrDefault(c => c.Id == conversationId));
-
-        public Task<AgentRun?> FindRunAsync(Guid runId, CancellationToken cancellationToken = default) =>
-            Task.FromResult(Runs.FirstOrDefault(r => r.Id == runId));
-
-        public Task<AgentRun?> FindUnfinishedRunAsync(Guid conversationId, CancellationToken cancellationToken = default) =>
-            Task.FromResult(Runs.FirstOrDefault(r => r.ConversationId == conversationId && !r.IsFinished));
-
-        public Task<IReadOnlyList<AgentMessage>> GetMessagesAsync(Guid conversationId, CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<AgentMessage>>(Messages.Where(m => m.ConversationId == conversationId).OrderBy(m => m.Sequence).ToList());
-
-        public Task<IReadOnlyList<AgentMessage>> GetRunMessagesAsync(Guid runId, CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<AgentMessage>>(Messages.Where(m => m.RunId == runId).OrderBy(m => m.Sequence).ToList());
-
-        public void Add(AgentConversation conversation) => Conversations.Add(conversation);
-
-        public void Add(AgentRun run) => Runs.Add(run);
-
-        public void Add(AgentMessage message) => Messages.Add(message);
-
-        public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
-    }
-
-    private sealed class FakeJobs : IJobStore, IJobSignal
-    {
-        public List<Job> Jobs { get; } = [];
-
-        public int Notified { get; private set; }
-
-        public void Notify() => Notified++;
-
-        public Task<Job> AddOrGetActiveAsync(Job job, CancellationToken cancellationToken = default)
-        {
-            Jobs.Add(job);
-            return Task.FromResult(job);
-        }
-
-        public Task<Job?> ClaimNextAsync(string workerId, DateTimeOffset now, TimeSpan lease, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task<Job?> FindAsync(Guid jobId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-
-        public Task<IReadOnlyList<Job>> GetByAssignmentAsync(string assignmentId, int limit, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task<IReadOnlyList<Job>> GetExpiredLeasesAsync(DateTimeOffset now, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task<IReadOnlyList<Job>> GetRecentAsync(
-            JobStatus? status, JobType? type, string? courseId, string? assignmentId, int limit, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task<IReadOnlyDictionary<JobStatus, int>> CountByStatusAsync(
-            DateTimeOffset finishedSince, JobType? type, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task<IReadOnlyList<JobSubject>> GetSubjectsAsync(
-            IReadOnlyCollection<Guid> versionIds, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task<IReadOnlyList<Job>> GetChildrenAsync(Guid parentId, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task<IReadOnlyList<JobChildCount>> CountChildrenAsync(
-            IReadOnlyCollection<Guid> parentIds, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task<IReadOnlyList<Job>> GetOpenGroupsAsync(CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 }

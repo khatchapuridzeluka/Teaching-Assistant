@@ -21,7 +21,7 @@ public class StudentToolsTests
 
     private StudentTools Tools()
     {
-        return new StudentTools(_fakes, _fakes, _fakes, _fakes, _fakes);
+        return new StudentTools(_fakes, _fakes, _fakes, _fakes, _fakes, new AgentRunContext(), new FixedTime(Now.AddMinutes(1)));
     }
 
     [Fact]
@@ -147,6 +147,17 @@ public class StudentToolsTests
     }
 
     [Fact]
+    public async Task Grade_SaysAGradingIsAlreadyInProgress_InsteadOfClaimingANewOne()
+    {
+        _fakes.AddSubmission("s-1", "Nino Beridze", versions: 1);
+        _fakes.ExistingJob = true;
+
+        var result = await Tools().GradeStudentAssignmentAsync("course-1", "a-4", "s-1", TestContext.Current.CancellationToken);
+
+        Assert.StartsWith("A grading of Nino Beridze's version 1 is already in progress (job id ", result);
+    }
+
+    [Fact]
     public async Task Grade_ReturnsTheReason_WhenTheGradingCannotStart()
     {
         _fakes.AddSubmission("s-1", "Nino Beridze", versions: 1);
@@ -155,6 +166,11 @@ public class StudentToolsTests
         var result = await Tools().GradeStudentAssignmentAsync("course-1", "a-4", "s-1", TestContext.Current.CancellationToken);
 
         Assert.Equal("Failed: The assignment instructions are not stored yet.", result);
+    }
+
+    private sealed class FixedTime(DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => now;
     }
 
     private sealed class Fakes : IStudentService, ISubmissionFetchService, ISubmissionStore, IGradingStore, IJobService
@@ -168,6 +184,8 @@ public class StudentToolsTests
         public List<Guid> Queued { get; } = [];
 
         public Exception? QueueFailure { get; set; }
+
+        public bool ExistingJob { get; set; }
 
         public Submission AddSubmission(string studentId, string name, int versions)
         {
@@ -256,7 +274,7 @@ public class StudentToolsTests
             }
 
             Queued.Add(versionId);
-            var job = new Job(JobType.GradeVersion, JobPayloads.Write(new GradeVersionPayload(versionId)), Now);
+            var job = new Job(JobType.GradeVersion, JobPayloads.Write(new GradeVersionPayload(versionId)), ExistingJob ? Now : Now.AddMinutes(1));
             return Task.FromResult<JobResponse?>(JobPayloads.ToResponse(job));
         }
 

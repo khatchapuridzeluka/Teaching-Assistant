@@ -31,6 +31,11 @@ export const useAgentRun = (runId: string | null) =>
     },
   });
 
+export const useCancelAgentRun = () =>
+  useMutation({
+    mutationFn: (runId: string) => unwrap(api.POST("/agent/runs/{runId}/cancel", { params: { path: { runId } } })),
+  });
+
 export const useStartAgentRun = () =>
   useMutation({
     mutationFn: (request: StartAgentRunRequest) => unwrap(api.POST("/agent/runs", { body: request })),

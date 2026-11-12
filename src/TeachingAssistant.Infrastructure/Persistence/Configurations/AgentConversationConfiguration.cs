@@ -33,12 +33,13 @@ public class AgentRunConfiguration : IEntityTypeConfiguration<AgentRun>
             .OnDelete(DeleteBehavior.Cascade);
         builder.HasOne<Job>()
             .WithMany()
-            .HasForeignKey(r => r.WaitingJobId)
+            .HasForeignKey(r => r.JobId)
             .OnDelete(DeleteBehavior.SetNull);
 
         builder.HasIndex(r => new { r.ConversationId, r.CreatedAt });
-        builder.HasIndex(r => r.WaitingJobId);
+        builder.HasIndex(r => r.WaitingJobIds).HasMethod("gin");
         builder.HasIndex(r => r.Status);
+        builder.HasIndex(r => r.JobId);
 
         builder.Ignore(r => r.IsFinished);
     }
