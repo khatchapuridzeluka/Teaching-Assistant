@@ -16,16 +16,18 @@ public class StudentsController : ControllerBase
     private readonly IStudentMistakeService _mistakeService;
     private readonly IStudentStrengthService _strengthService;
     private readonly IStudentAnalysisService _analysisService;
+    private readonly IStudentOverviewService _overviewService;
     private readonly IJobService _jobService;
 
     public StudentsController(
         IStudentService studentService, IStudentMistakeService mistakeService, IStudentStrengthService strengthService,
-        IStudentAnalysisService analysisService, IJobService jobService)
+        IStudentAnalysisService analysisService, IStudentOverviewService overviewService, IJobService jobService)
     {
         _studentService = studentService;
         _mistakeService = mistakeService;
         _strengthService = strengthService;
         _analysisService = analysisService;
+        _overviewService = overviewService;
         _jobService = jobService;
     }
 
@@ -40,7 +42,7 @@ public class StudentsController : ControllerBase
     }
 
     /// <summary>
-    /// Returns a student's mistakes in the course (from each graded assignment's current draft: your report when you saved one, otherwise the AI draft, and the approved records when the latest version has no current draft; each item and assignment says which (Draft, InReview, Approved)), newest assignment first, each labelled new or repeated (same category in an earlier assignment; labels always come from the full history), with breakdowns by category, severity, label and assignment; filterable by assignment, category, severity and label.
+    /// Returns a student's mistakes in the course (per graded assignment: your newest report when you saved one, even if a newer AI draft exists, otherwise the newest AI draft; each item and assignment says which (Draft, InReview, Approved)), newest assignment first, each labelled new or repeated (same category in an earlier assignment; labels always come from the full history), with breakdowns by category, severity, label and assignment; filterable by assignment, category, severity and label.
     /// </summary>
     /// <response code="200">Mistakes retrieved successfully; empty lists when the student has no approved report yet</response>
     [HttpGet("{userId}/mistakes")]
@@ -53,7 +55,7 @@ public class StudentsController : ControllerBase
     }
 
     /// <summary>
-    /// Returns a student's strengths in the course (from each graded assignment's current draft: your report when you saved one, otherwise the AI draft, and the approved records when the latest version has no current draft; each item and assignment says which (Draft, InReview, Approved)), newest assignment first, each labelled new, consistent (same category was a strength in an earlier assignment) or improved (same category was a mistake in an earlier assignment), with breakdowns by category and label and strengths vs. mistakes per assignment; filterable by assignment, category and label.
+    /// Returns a student's strengths in the course (per graded assignment: your newest report when you saved one, even if a newer AI draft exists, otherwise the newest AI draft; each item and assignment says which (Draft, InReview, Approved)), newest assignment first, each labelled new, consistent (same category was a strength in an earlier assignment) or improved (same category was a mistake in an earlier assignment), with breakdowns by category and label and strengths vs. mistakes per assignment; filterable by assignment, category and label.
     /// </summary>
     /// <response code="200">Strengths retrieved successfully; empty lists when the student has no approved report with strengths yet</response>
     [HttpGet("{userId}/strengths")]
@@ -66,7 +68,17 @@ public class StudentsController : ControllerBase
     }
 
     /// <summary>
-    /// Returns the latest AI analysis of the student's mistakes (feedback of at most 200 words and what to work on next) or strengths (the strengths grouped into skills and an overview), with what it was based on and whether reports changed since.
+    /// Returns the full overview of a student, counted in code from the same records as the mistakes and strengths pages: a score per graded assignment (your report's where you reviewed it, otherwise the AI draft's), mistakes and strengths per assignment and per category, and the top mistake and strength categories.
+    /// </summary>
+    /// <response code="200">Overview retrieved successfully; empty lists when nothing is graded yet</response>
+    [HttpGet("{userId}/overview")]
+    public async Task<ActionResult<StudentOverviewResponse>> GetOverviewAsync(string courseId, string userId, CancellationToken cancellationToken)
+    {
+        return Ok(await _overviewService.GetAsync(courseId, userId, cancellationToken));
+    }
+
+    /// <summary>
+    /// Returns the latest AI analysis of the student's mistakes (feedback of at most 200 words and what to work on next) strengths (the strengths grouped into skills and an overview) or the full overview (an overall picture of at most 250 words and what to work on next), with what it was based on and whether reports changed since.
     /// </summary>
     /// <response code="200">Analysis retrieved successfully</response>
     /// <response code="204">The student has not been analyzed for this kind yet</response>
@@ -86,7 +98,7 @@ public class StudentsController : ControllerBase
     }
 
     /// <summary>
-    /// Queues an AI analysis of the student from each graded assignment's current draft (your report when you saved one, otherwise the AI draft; the approved records when the latest version has no current draft): Mistakes sends only the kept mistakes with their points and labels, Strengths sends only the kept strengths to be grouped into skills; trends are counted in code and the student is never named.
+    /// Queues an AI analysis of the student from each graded assignment (your newest report when you saved one, otherwise the newest AI draft): Mistakes sends only the kept mistakes with their points and labels, Strengths sends only the kept strengths to be grouped into skills, Overview sends the scores with both mistakes and strengths for an overall picture; trends are counted in code and the student is never named.
     /// </summary>
     /// <response code="202">Analysis queued (or the running one is returned); follow it with GET /jobs/{jobId}</response>
     [HttpPost("{userId}/analysis")]

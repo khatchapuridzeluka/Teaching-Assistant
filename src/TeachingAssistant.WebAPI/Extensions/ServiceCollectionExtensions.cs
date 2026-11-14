@@ -141,6 +141,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IStudentMistakeService, StudentMistakeService>();
         services.AddScoped<IStudentStrengthService, StudentStrengthService>();
         services.AddScoped<IStudentAnalysisService, StudentAnalysisService>();
+        services.AddScoped<IStudentOverviewService, StudentOverviewService>();
         services.AddScoped<IModelUsageService, ModelUsageService>();
         services.AddScoped<IMistakeAnalysisService, MistakeAnalysisService>();
         services.AddScoped<IJobService, JobService>();
