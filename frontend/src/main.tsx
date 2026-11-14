@@ -19,6 +19,7 @@ import { ReviewQueuePage } from "./pages/ReviewQueuePage";
 import { SystemPage } from "./pages/SystemPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { StudentMistakesPage } from "./pages/StudentMistakesPage";
+import { StudentOverviewPage } from "./pages/StudentOverviewPage";
 import { StudentStrengthsPage } from "./pages/StudentStrengthsPage";
 import { StudentsPage } from "./pages/StudentsPage";
 
@@ -73,6 +74,13 @@ const router = createBrowserRouter([
             path: "students",
             element: <StudentsPage />,
             handle: { crumbs: () => [{ label: "Students" }] } satisfies CrumbHandle,
+          },
+          {
+            path: "students/:userId/overview",
+            element: <StudentOverviewPage />,
+            handle: {
+              crumbs: ({ courseId }) => [{ label: "Students", to: `/courses/${courseId}/students` }, { label: "Overview" }],
+            } satisfies CrumbHandle,
           },
           {
             path: "students/:userId/mistakes",

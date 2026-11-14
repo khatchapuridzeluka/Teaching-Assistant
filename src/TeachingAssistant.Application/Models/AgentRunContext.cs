@@ -8,6 +8,7 @@ public class AgentRunContext
 {
     private readonly Queue<Guid> _queuedJobs = new();
     private readonly List<AgentLink> _links = [];
+    private readonly List<string> _replies = [];
 
     public Guid? RunId { get; private set; }
 
@@ -24,6 +25,7 @@ public class AgentRunContext
         StepLimitReached = false;
         _queuedJobs.Clear();
         _links.Clear();
+        _replies.Clear();
     }
 
     public void RecordLinks(IEnumerable<AgentLink> links)
@@ -36,6 +38,19 @@ public class AgentRunContext
         var links = _links.ToList();
         _links.Clear();
         return links;
+    }
+
+    public void RecordReplies(IEnumerable<string> replies)
+    {
+        _replies.Clear();
+        _replies.AddRange(replies);
+    }
+
+    public string[] TakeReplies()
+    {
+        var replies = _replies.ToArray();
+        _replies.Clear();
+        return replies;
     }
 
     public void RecordQueuedJob(Guid jobId)

@@ -28,20 +28,19 @@ public class StudentRecordCollector
 
     public async Task<StudentRecords> CollectAsync(string courseId, string studentId, CancellationToken cancellationToken = default)
     {
-        var latestDrafts = (await _gradings.GetSummariesAsync(SubmissionSource.GoogleClassroom, courseId, null, studentId, cancellationToken))
+        var current = (await _gradings.GetSummariesAsync(SubmissionSource.GoogleClassroom, courseId, null, studentId, cancellationToken))
             .Where(g => g.Status == GradingStatus.Draft)
             .GroupBy(g => g.AssignmentId)
-            .Select(g => g.OrderByDescending(d => d.VersionNumber).ThenByDescending(d => d.CreatedAt).First())
+            .Select(g => Current(g.ToList()))
             .ToList();
 
         var mistakes = new List<StudentMistake>();
         var strengths = new List<StudentStrength>();
         var assignments = new Dictionary<string, StudentRecordAssignment>();
-        foreach (var summary in latestDrafts)
+        foreach (var summary in current)
         {
             var submission = await _submissions.FindByVersionAsync(summary.VersionId, cancellationToken);
-            if (submission is null || submission.LatestVersion?.Id != summary.VersionId
-                || await _gradings.FindAsync(summary.Id, cancellationToken) is not { } draft)
+            if (submission is null || await _gradings.FindAsync(summary.Id, cancellationToken) is not { } draft)
             {
                 continue;
             }
@@ -86,5 +85,18 @@ public class StudentRecordCollector
         }
 
         return new StudentRecords(mistakes, strengths, assignments);
+    }
+
+    /// <summary>
+    /// Picks the grading an assignment's records come from: the newest one with a report (the teacher reviewed it, so it wins
+    /// over any AI draft, even a newer one or one of a newer version), otherwise the newest AI draft.
+    /// </summary>
+    internal static GradingSummary Current(IReadOnlyList<GradingSummary> gradings)
+    {
+        var newestFirst = gradings
+            .OrderByDescending(g => g.VersionNumber)
+            .ThenByDescending(g => g.CreatedAt)
+            .ToList();
+        return newestFirst.FirstOrDefault(g => g.ReportStatus is not null) ?? newestFirst[0];
     }
 }

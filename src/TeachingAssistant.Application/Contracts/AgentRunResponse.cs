@@ -29,6 +29,7 @@ public record AgentMessageResponse(
     string? ToolName,
     Guid? JobId,
     IReadOnlyList<AgentLink> Links,
+    IReadOnlyList<string> Replies,
     DateTimeOffset CreatedAt);
 
 public record AgentConversationResponse(Guid Id, Guid? ActiveRunId, IReadOnlyList<AgentMessageResponse> Messages);

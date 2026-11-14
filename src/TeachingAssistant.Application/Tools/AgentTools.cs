@@ -9,6 +9,9 @@ namespace TeachingAssistant.Application.Tools;
 
 public class AgentTools
 {
+    private const int MaxReplies = 3;
+    private const int MaxReplyLength = 60;
+
     private readonly IJobStore _jobs;
     private readonly JobReporter _reporter;
     private readonly AgentRunContext _context;
@@ -18,6 +21,33 @@ public class AgentTools
         _jobs = jobs;
         _reporter = reporter;
         _context = context;
+    }
+
+    [AgentTool("suggest_replies")]
+    [Description(
+        "Shows one to three short answers as buttons under your reply, so the teacher answers your question with one click instead "
+        + "of typing. Call it whenever you end your turn with a question to the teacher: a yes / no before a paid or irreversible "
+        + "step (\"Yes, grade it\", \"No, leave it\"), or a choice between a few options (which student, which assignment). Write your "
+        + "question in the same message as this call, as your last step; after it returns, end your turn without writing "
+        + "anything more, and never list the answers in your text. Each answer is sent as the "
+        + "teacher's own message, so write it in their words, first person, short and complete on its own, the one you recommend first.")]
+    public string SuggestReplies(
+        [Description("The answers, recommended first, each at most 60 characters")] string[] replies)
+    {
+        var kept = replies
+            .Select(r => r.Trim())
+            .Where(r => r.Length is > 0 and <= MaxReplyLength)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(MaxReplies)
+            .ToList();
+        if (kept.Count == 0)
+        {
+            return $"No buttons shown: give one to {MaxReplies} answers of at most {MaxReplyLength} characters.";
+        }
+
+        _context.RecordReplies(kept);
+        return $"{kept.Count} {(kept.Count == 1 ? "button is" : "buttons are")} shown under your question. End your turn now; "
+            + "do not repeat the question or list the answers.";
     }
 
     [AgentTool("wait_for_jobs")]

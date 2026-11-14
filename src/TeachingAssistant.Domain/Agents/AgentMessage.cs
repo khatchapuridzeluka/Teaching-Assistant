@@ -19,7 +19,8 @@ public class AgentMessage
 
     internal AgentMessage(
         Guid conversationId, Guid runId, int sequence, AgentMessageRole role, string text, DateTimeOffset createdAt,
-        string? toolCalls = null, string? toolCallId = null, string? toolName = null, Guid? jobId = null, string? links = null)
+        string? toolCalls = null, string? toolCallId = null, string? toolName = null, Guid? jobId = null, string? links = null,
+        string[]? replies = null)
     {
         if (role == AgentMessageRole.Tool && (string.IsNullOrWhiteSpace(toolCallId) || string.IsNullOrWhiteSpace(toolName)))
         {
@@ -39,6 +40,7 @@ public class AgentMessage
         Text = text.Trim();
         ToolCalls = toolCalls;
         Links = links;
+        Replies = replies is { Length: > 0 } ? replies : null;
         ToolCallId = toolCallId;
         ToolName = toolName;
         JobId = jobId;
@@ -60,6 +62,9 @@ public class AgentMessage
     public string? ToolCalls { get; private set; }
 
     public string? Links { get; private set; }
+
+    /// <summary>Short answers the teacher can send with one click, offered by the agent with its question.</summary>
+    public string[]? Replies { get; private set; }
 
     public string? ToolCallId { get; private set; }
 

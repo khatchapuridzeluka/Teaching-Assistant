@@ -37,6 +37,7 @@ const toolLabels: Record<string, string> = {
   grade_all_students: "Started Grade all",
   grade_all_assignments_of_student: "Started grading all the student's assignments",
   analyze_common_mistakes: "Started the Common mistakes analysis",
+  analyze_student: "Analyzed the student",
   export_grading_pdf: "Prepared the PDF report",
   wait_for_jobs: "Waiting for the background work",
 };
@@ -60,6 +61,8 @@ export function ChatPanel({ page, onClose }: { page: OpenPage; onClose: () => vo
   const live = (run.data?.messages ?? []).filter((m) => !storedIds.has(m.id));
   const messages = [...stored, ...live].sort((a, b) => a.sequence - b.sequence);
   const lastOfRun = new Map(messages.map((m) => [m.runId, m.id]));
+  const last = messages[messages.length - 1];
+  const quickReplies = last && last.role === "Assistant" ? repliesOf(messages, last.runId) : [];
   const activeRunId = conversation.data?.activeRunId ?? null;
   const finished = run.data !== undefined && isRunFinished(run.data.status);
   const waiting = start.isPending || (runId !== null && !finished);
@@ -197,6 +200,7 @@ export function ChatPanel({ page, onClose }: { page: OpenPage; onClose: () => vo
                 {lastOfRun.get(message.runId) === message.id && <RunLinks links={linksOf(messages, message.runId)} onOpen={onClose} />}
               </div>
             ))}
+            {!waiting && !failure && quickReplies.length > 0 && <QuickReplies replies={quickReplies} onPick={send} />}
             {waiting && <Working run={run.data} />}
             {failure && <Reply text={failure} error />}
             <div ref={bottom} />
@@ -282,7 +286,7 @@ function Message({ message }: { message: AgentMessage }) {
 
   return (
     <>
-      {message.toolCalls.map((tool, i) => (
+      {message.toolCalls.filter((tool) => tool !== "suggest_replies").map((tool, i) => (
         <div key={i} className="flex items-center gap-1.5 pl-8 text-[11px] text-ink-muted">
           <CircleCheck className="h-3.5 w-3.5 text-success" />
           {toolLabels[tool] ?? `Used ${tool}`}
@@ -290,6 +294,33 @@ function Message({ message }: { message: AgentMessage }) {
       ))}
       {message.text && <Reply text={message.text} />}
     </>
+  );
+}
+
+/** The answers the agent offered with its question: those of the run's last suggest_replies call. */
+function repliesOf(messages: AgentMessage[], runId: string): string[] {
+  const offered = messages.filter((m) => m.runId === runId && (m.replies?.length ?? 0) > 0);
+  return offered.length === 0 ? [] : offered[offered.length - 1].replies;
+}
+
+function QuickReplies({ replies, onPick }: { replies: string[]; onPick: (text: string) => void }) {
+  return (
+    <div className="flex flex-wrap gap-1.5 pl-8" role="group" aria-label="Quick answers">
+      {replies.map((reply, i) => (
+        <button
+          key={reply}
+          onClick={() => onPick(reply)}
+          className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
+            i === 0
+              ? "border-accent bg-accent text-white hover:bg-accent-strong"
+              : "border-line bg-white text-ink hover:border-accent hover:text-accent"
+          }`}
+          title="Send this answer"
+        >
+          {reply}
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -321,6 +352,12 @@ function linkPath(link: AgentLink): string {
       return `${course}/students?student=${link.studentId ?? ""}`;
     case "GradingPdf":
       return `/api/gradings/${link.gradingId ?? ""}/export/pdf`;
+    case "StudentOverview":
+      return `${course}/students/${link.studentId ?? ""}/overview`;
+    case "StudentMistakes":
+      return `${course}/students/${link.studentId ?? ""}/mistakes`;
+    case "StudentStrengths":
+      return `${course}/students/${link.studentId ?? ""}/strengths`;
   }
 }
 

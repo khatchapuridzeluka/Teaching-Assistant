@@ -25,6 +25,7 @@ public class AgentRunService : IAgentRunService
     private readonly StudentTools _studentTools;
     private readonly AgentTools _agentTools;
     private readonly GradingTools _gradingTools;
+    private readonly StudentAnalysisTools _analysisTools;
     private readonly AgentRunContext _runContext;
     private readonly ModelCallContext _callContext;
     private readonly TimeProvider _timeProvider;
@@ -38,6 +39,7 @@ public class AgentRunService : IAgentRunService
         StudentTools studentTools,
         AgentTools agentTools,
         GradingTools gradingTools,
+        StudentAnalysisTools analysisTools,
         AgentRunContext runContext,
         ModelCallContext callContext,
         TimeProvider timeProvider)
@@ -50,6 +52,7 @@ public class AgentRunService : IAgentRunService
         _studentTools = studentTools;
         _agentTools = agentTools;
         _gradingTools = gradingTools;
+        _analysisTools = analysisTools;
         _runContext = runContext;
         _callContext = callContext;
         _timeProvider = timeProvider;
@@ -145,7 +148,7 @@ public class AgentRunService : IAgentRunService
             var system = AgentChatService.SystemPromptFor(run.Page, run.CourseId, run.AssignmentId);
             var hooks = new AgentRunHooks(entry => SaveStepAsync(run, conversation, entry), () => _runContext.StopRequested);
             var reply = await _languageModel.RunAgentAsync(
-                system, history, [_classroomTools, _studentTools, _gradingTools, _agentTools], hooks, cancellationToken);
+                system, history, [_classroomTools, _studentTools, _gradingTools, _analysisTools, _agentTools], hooks, cancellationToken);
             Finish(run, reply);
         }
         catch (OperationCanceledException)
@@ -196,7 +199,7 @@ public class AgentRunService : IAgentRunService
         {
             var jobId = _runContext.TakeQueuedJob();
             _chats.Add(conversation.AddToolResult(run.Id, entry.ToolCallId ?? "", entry.ToolName ?? "", entry.Text, jobId, now,
-                AgentLinks.Write(_runContext.TakeLinks())));
+                AgentLinks.Write(_runContext.TakeLinks()), _runContext.TakeReplies()));
         }
         else
         {
@@ -263,7 +266,7 @@ public class AgentRunService : IAgentRunService
             ? []
             : JsonSerializer.Deserialize<List<AgentToolCall>>(message.ToolCalls, JsonOptions)!.Select(c => c.Name).ToList();
         return new AgentMessageResponse(message.Id, message.RunId, message.Sequence, message.Role, message.Text, calls, message.ToolName,
-            message.JobId, AgentLinks.Read(message.Links), message.CreatedAt);
+            message.JobId, AgentLinks.Read(message.Links), message.Replies ?? [], message.CreatedAt);
     }
 
     private static string? Blank(string? value)

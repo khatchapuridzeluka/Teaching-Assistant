@@ -11,6 +11,12 @@ public enum AgentLinkKind
     Student,
 
     GradingPdf,
+
+    StudentOverview,
+
+    StudentMistakes,
+
+    StudentStrengths,
 }
 
 public record AgentLink(

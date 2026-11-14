@@ -125,6 +125,76 @@ public class StudentAnalysisServiceTests
     }
 
     [Fact]
+    public async Task AReport_WinsOverANewerDraft_OfTheSameOrANewerVersion_AndWithoutReportTheNewestDraftCounts()
+    {
+        _fakes.Assignment("a1", "Assignment 1", Now.AddDays(-30));
+        _fakes.Assignment("a2", "Assignment 2", Now.AddDays(-20));
+        _fakes.Assignment("a3", "Assignment 3", Now.AddDays(-10));
+        _fakes.Grade("a1", grade: 60, mistakes: [], strengths: [MistakeCategory.Design], report: true);
+        _fakes.GradeAgain("a1", grade: 99, mistakes: [], strengths: [MistakeCategory.Naming]);
+        _fakes.Approve("a2", grade: 80, mistakes: [], strengths: [MistakeCategory.Correctness]);
+        _fakes.Resubmit("a2");
+        _fakes.GradeAgain("a2", grade: 95, mistakes: [], strengths: [MistakeCategory.Readability]);
+        _fakes.Grade("a3", grade: 50, mistakes: [], strengths: [MistakeCategory.Encapsulation], report: false);
+        _fakes.GradeAgain("a3", grade: 70, mistakes: [], strengths: [MistakeCategory.ErrorHandling]);
+
+        var records = await new StudentRecordCollector(_fakes, _fakes, _fakes, _fakes, _fakes)
+            .CollectAsync("course", "student", TestContext.Current.CancellationToken);
+
+        Assert.Equal(
+            [MistakeCategory.Design, MistakeCategory.Correctness, MistakeCategory.ErrorHandling],
+            records.Strengths.OrderBy(s => s.AssignmentId).Select(s => s.Category));
+        Assert.Equal((StudentRecordSource.InReview, StudentRecordSource.Approved, StudentRecordSource.Draft),
+            (records.SourceOf("a1"), records.SourceOf("a2"), records.SourceOf("a3")));
+        Assert.Equal((double?)70, records.Assignments["a3"].Score!.AiScore);
+    }
+
+    [Fact]
+    public async Task OverviewAnalysis_SendsScoresMistakesAndStrengths_WithExactNumbers_NeverTheName()
+    {
+        _fakes.Assignment("a1", "Assignment 1", Now.AddDays(-20));
+        _fakes.Assignment("a2", "Assignment 2", Now.AddDays(-10));
+        _fakes.Approve("a1", grade: 70, mistakes: [MistakeCategory.ErrorHandling, MistakeCategory.Naming], strengths: [MistakeCategory.Design]);
+        _fakes.Grade("a2", grade: 90, mistakes: [MistakeCategory.Naming], strengths: [MistakeCategory.ErrorHandling], report: false);
+        _fakes.Reply = """{ "summary": " Getting better. ", "nextSteps": "Keep naming in check." }""";
+
+        await Service().AnalyzeAsync("course", "student", StudentAnalysisKind.Overview, TestContext.Current.CancellationToken);
+
+        var prompt = _fakes.Prompt!;
+        Assert.DoesNotContain("Ana Beridze", prompt);
+        Assert.Contains("score=\"70 / 100\" checked=\"teacher's report\"", prompt);
+        Assert.Contains("score=\"90 / 100\" checked=\"AI draft, not reviewed\"", prompt);
+        Assert.Contains("- mistake · Minor · Naming · -2 pts · repeated (first in Assignment 1)", prompt);
+        Assert.Contains("- strength · ErrorHandling · improved (was a mistake in Assignment 1)", prompt);
+        Assert.Contains("2 graded assignments, average score 80%, first 70%, latest 90%", prompt);
+        Assert.Contains("3 mistakes (1 repeated), 6 points lost", prompt);
+        Assert.Contains("ErrorHandling: 1 / 1 / 2", prompt);
+
+        var latest = (await Service().GetLatestAsync("course", "student", StudentAnalysisKind.Overview, TestContext.Current.CancellationToken))!;
+        Assert.Equal((StudentAnalysisKind.Overview, "Getting better.", "Keep naming in check.", 2, 5, false),
+            (latest.Kind, latest.Summary, latest.NextSteps, latest.Assignments, latest.Records, latest.Outdated));
+    }
+
+    [Fact]
+    public async Task Overview_CountsScoresFromTheReportOrElseTheDraft_PerAssignmentInDueOrder()
+    {
+        _fakes.Assignment("a1", "Assignment 1", Now.AddDays(-20));
+        _fakes.Assignment("a2", "Assignment 2", Now.AddDays(-10));
+        _fakes.Grade("a2", grade: 90, mistakes: [MistakeCategory.Naming], strengths: [], report: false);
+        _fakes.Approve("a1", grade: 60, mistakes: [MistakeCategory.Naming, MistakeCategory.Design], strengths: [MistakeCategory.Readability]);
+
+        var overview = await new StudentOverviewService(new StudentRecordCollector(_fakes, _fakes, _fakes, _fakes, _fakes), _fakes)
+            .GetAsync("course", "student", TestContext.Current.CancellationToken);
+
+        Assert.Equal(["a1", "a2"], overview.Assignments.Select(a => a.AssignmentId));
+        Assert.Equal(((double?)60, StudentRecordSource.Approved, 2), (overview.Assignments[0].Percent, overview.Assignments[0].Source, overview.Assignments[0].Mistakes));
+        Assert.Equal(((double?)90, StudentRecordSource.Draft, 1), (overview.Assignments[1].Percent, overview.Assignments[1].Source, overview.Assignments[1].Repeated));
+        Assert.Equal(((double?)75, (double?)60, (double?)90), (overview.AveragePercent, overview.FirstPercent, overview.LatestPercent));
+        Assert.Equal((3, 1, 6.0, 1), (overview.Mistakes, overview.RepeatedMistakes, overview.PointsLost, overview.Strengths));
+        Assert.Equal(MistakeCategory.Naming, overview.TopMistakes[0].Category);
+    }
+
+    [Fact]
     public async Task Analyze_WithoutRecordsOfThatKind_IsRejected_AndNothingIsAsked()
     {
         _fakes.Approve("a1", grade: 70, mistakes: [MistakeCategory.Naming], strengths: []);
@@ -178,6 +248,16 @@ public class StudentAnalysisServiceTests
             }
         }
 
+        public void GradeAgain(string assignmentId, double grade, MistakeCategory[] mistakes, MistakeCategory[] strengths)
+        {
+            var at = Now.AddMinutes(++_approvals);
+            var submission = _submissions.Single(s => s.AssignmentId == assignmentId);
+            var grading = new AiGrading(submission.LatestVersion!.Id, "model", "review", grade, 100, null, 1, [], [], "{}",
+                mistakes.Select(c => new GradingMistake("A.java", 1, 1, MistakeSeverity.Minor, c, $"{c} slip", 2)), at,
+                strengths.Select(c => new GradingStrength(null, null, null, c, $"{c} done well")));
+            _gradings.Add(grading);
+        }
+
         public void Resubmit(string assignmentId)
         {
             var at = Now.AddMinutes(++_approvals);
@@ -208,7 +288,8 @@ public class StudentAnalysisServiceTests
                     var submission = _submissions.Single(s => s.Versions.Any(v => v.Id == g.VersionId));
                     var number = submission.Versions.Single(v => v.Id == g.VersionId).Number;
                     return new GradingSummary(g.Id, g.VersionId, number, submission.AssignmentId, submission.ExternalSubmissionId,
-                        submission.StudentId, submission.StudentName, g.Status, g.Score, g.MaxScore, g.Bonus, 0, 0, 0, g.Model, g.CreatedAt, null);
+                        submission.StudentId, submission.StudentName, g.Status, g.Score, g.MaxScore, g.Bonus, 0, 0, 0, g.Model, g.CreatedAt,
+                        _reports.FirstOrDefault(r => r.GradingId == g.Id)?.Status);
                 })
                 .ToList());
 

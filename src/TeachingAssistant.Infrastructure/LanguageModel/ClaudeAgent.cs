@@ -11,6 +11,8 @@ namespace TeachingAssistant.Infrastructure.LanguageModel;
 
 internal static class ClaudeAgent
 {
+    private const string MissingResult = "No result was stored for this tool call; treat it as not run.";
+
     public static IChatClient ChatClient(AnthropicClient client, string model, int maxTokens)
     {
         return client.AsIChatClient(model, maxTokens);
@@ -20,26 +22,70 @@ internal static class ClaudeAgent
         IChatClient chatClient, string model, string systemPrompt, IReadOnlyList<AgentEntry> history, IReadOnlyList<object> tools,
         AgentRunHooks? hooks, CancellationToken cancellationToken)
     {
+        var messages = ToMessages(history, out var answered);
         var agent = new ChatClientAgent(
-            hooks is null ? chatClient : new StepObserver(chatClient, hooks),
+            hooks is null ? chatClient : new StepObserver(chatClient, hooks, answered),
             instructions: systemPrompt,
             name: "teaching-assistant",
-            tools: tools.SelectMany(t => ToFunctions(t, hooks)).ToList());
+            tools: tools.SelectMany(t => ToFunctions(t, hooks, answered)).ToList());
 
-        var response = await agent.RunAsync(history.Select(ToMessage).ToList(), cancellationToken: cancellationToken);
+        var response = await agent.RunAsync(messages, cancellationToken: cancellationToken);
         return new AgentReply(model, ToEntries(response.Messages), ToUsage(response.Usage));
     }
 
-    private static IEnumerable<AITool> ToFunctions(object tools, AgentRunHooks? hooks)
+    private static IEnumerable<AITool> ToFunctions(object tools, AgentRunHooks? hooks, HashSet<string> answered)
     {
         foreach (var method in tools.GetType().GetMethods(BindingFlags.Public | BindingFlags.Instance))
         {
             if (method.GetCustomAttribute<AgentToolAttribute>() is { } tool)
             {
                 var function = AIFunctionFactory.Create(method, tools, tool.Name);
-                yield return hooks is null ? function : new ObservedFunction(function, hooks);
+                yield return hooks is null ? function : new ObservedFunction(function, hooks, answered);
             }
         }
+    }
+
+    /// <summary>
+    /// Turns the stored conversation into the model's messages. The model requires every tool call to be followed by its
+    /// result; a call whose result was never stored (an older run lost it) gets a placeholder result, so one lost step never
+    /// breaks the rest of the conversation. <paramref name="answered"/> collects every call id that already has a result.
+    /// </summary>
+    private static List<ChatMessage> ToMessages(IReadOnlyList<AgentEntry> history, out HashSet<string> answered)
+    {
+        answered = history.Where(e => e is { Role: AgentMessageRole.Tool, ToolCallId: not null }).Select(e => e.ToolCallId!).ToHashSet();
+        var messages = new List<ChatMessage>();
+        var open = new List<string>();
+        foreach (var entry in history)
+        {
+            if (entry.Role != AgentMessageRole.Tool)
+            {
+                CloseOpenCalls(messages, open, answered);
+            }
+
+            messages.Add(ToMessage(entry));
+            if (entry.ToolCalls is { Count: > 0 } calls)
+            {
+                open.AddRange(calls.Select(c => c.Id));
+            }
+            else if (entry.ToolCallId is { } callId)
+            {
+                open.Remove(callId);
+            }
+        }
+
+        CloseOpenCalls(messages, open, answered);
+        return messages;
+    }
+
+    private static void CloseOpenCalls(List<ChatMessage> messages, List<string> open, HashSet<string> answered)
+    {
+        foreach (var callId in open)
+        {
+            messages.Add(new ChatMessage(ChatRole.Tool, [new FunctionResultContent(callId, MissingResult)]));
+            answered.Add(callId);
+        }
+
+        open.Clear();
     }
 
     private static ChatMessage ToMessage(AgentEntry entry)
@@ -131,12 +177,14 @@ internal static class ClaudeAgent
             : new LanguageModelUsage(usage.InputTokenCount ?? 0, usage.OutputTokenCount ?? 0, usage.CachedInputTokenCount ?? 0, 0);
     }
 
-    private sealed class StepObserver(IChatClient inner, AgentRunHooks hooks) : DelegatingChatClient(inner)
+    private sealed class StepObserver(IChatClient inner, AgentRunHooks hooks, HashSet<string> answered) : DelegatingChatClient(inner)
     {
         public override async Task<ChatResponse> GetResponseAsync(
             IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
         {
-            var response = await base.GetResponseAsync(messages, options, cancellationToken);
+            var sent = messages.ToList();
+            await ReportUnstoredResultsAsync(sent);
+            var response = await base.GetResponseAsync(sent, options, cancellationToken);
             foreach (var message in response.Messages)
             {
                 if (ToAssistantEntry(message) is { } entry)
@@ -147,18 +195,69 @@ internal static class ClaudeAgent
 
             return response;
         }
+
+        /// <summary>
+        /// Stores the tool results the model is about to read that no tool reported, before the model's next step: those the
+        /// framework wrote itself when a call could not run (arguments it could not read or bind). Without them the stored
+        /// conversation would hold a call without a result, which the model refuses on the next turn.
+        /// </summary>
+        private async Task ReportUnstoredResultsAsync(List<ChatMessage> messages)
+        {
+            var names = messages.SelectMany(m => m.Contents.OfType<FunctionCallContent>())
+                .GroupBy(c => c.CallId)
+                .ToDictionary(g => g.Key, g => g.Last().Name);
+            foreach (var result in messages.Where(m => m.Role == ChatRole.Tool).SelectMany(m => m.Contents.OfType<FunctionResultContent>()))
+            {
+                if (!answered.Add(result.CallId))
+                {
+                    continue;
+                }
+
+                var text = ResultText(result.Result);
+                if (text.Length == 0 && result.Exception is { } exception)
+                {
+                    text = $"Failed: {exception.Message}";
+                }
+
+                await hooks.OnStep(new AgentEntry(AgentMessageRole.Tool, text, ToolCallId: result.CallId,
+                    ToolName: names.GetValueOrDefault(result.CallId, "unknown")));
+            }
+        }
     }
 
-    private sealed class ObservedFunction(AIFunction inner, AgentRunHooks hooks) : DelegatingAIFunction(inner)
+    private sealed class ObservedFunction(AIFunction inner, AgentRunHooks hooks, HashSet<string> answered) : DelegatingAIFunction(inner)
     {
         private const string Stopped = "Not run: this turn is ending, so no more tools are called.";
 
         protected override async ValueTask<object?> InvokeCoreAsync(AIFunctionArguments arguments, CancellationToken cancellationToken)
         {
             var context = FunctionInvokingChatClient.CurrentContext;
-            var result = hooks.ShouldStop() ? Stopped : await base.InvokeCoreAsync(arguments, cancellationToken);
+            object? result;
+            if (hooks.ShouldStop())
+            {
+                result = Stopped;
+            }
+            else
+            {
+                try
+                {
+                    result = await base.InvokeCoreAsync(arguments, cancellationToken);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    // A call the tool could not run, for example with a missing or malformed argument: the model reads why and
+                    // can call again, and the result is stored like any other.
+                    result = $"Failed: the tool could not run: {ex.Message}";
+                }
+            }
 
-            await hooks.OnStep(new AgentEntry(AgentMessageRole.Tool, ResultText(result), ToolCallId: context?.CallContent.CallId, ToolName: Name));
+            var callId = context?.CallContent.CallId;
+            if (callId is not null)
+            {
+                answered.Add(callId);
+            }
+
+            await hooks.OnStep(new AgentEntry(AgentMessageRole.Tool, ResultText(result), ToolCallId: callId, ToolName: Name));
             if (hooks.ShouldStop() && context is not null)
             {
                 context.Terminate = true;

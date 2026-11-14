@@ -32,10 +32,11 @@ public class AgentConversation
     }
 
     public AgentMessage AddToolResult(
-        Guid runId, string toolCallId, string toolName, string text, Guid? jobId, DateTimeOffset at, string? links = null)
+        Guid runId, string toolCallId, string toolName, string text, Guid? jobId, DateTimeOffset at, string? links = null,
+        string[]? replies = null)
     {
         return Add(new AgentMessage(Id, runId, MessageCount, AgentMessageRole.Tool, text, at, toolCallId: toolCallId, toolName: toolName,
-            jobId: jobId, links: links));
+            jobId: jobId, links: links, replies: replies));
     }
 
     public AgentMessage AddNotice(Guid runId, string text, Guid? jobId, DateTimeOffset at, string? links = null)

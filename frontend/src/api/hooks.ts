@@ -60,6 +60,12 @@ export const useStudentStrengths = (courseId: string, userId: string, filter: St
     placeholderData: (previous) => previous,
   });
 
+export const useStudentOverview = (courseId: string, userId: string) =>
+  useQuery({
+    queryKey: ["courses", courseId, "students", userId, "overview", "gradings"],
+    queryFn: () => unwrap(api.GET("/courses/{courseId}/students/{userId}/overview", { params: { path: { courseId, userId } } })),
+  });
+
 export const useStudentAnalysis = (courseId: string, userId: string, kind: StudentAnalysisKind) =>
   useQuery({
     queryKey: ["courses", courseId, "students", userId, "analysis", kind, "gradings"],

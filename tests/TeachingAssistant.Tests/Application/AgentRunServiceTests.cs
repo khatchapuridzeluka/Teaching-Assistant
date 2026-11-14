@@ -21,9 +21,10 @@ public class AgentRunServiceTests
 
     private AgentRunService Service()
     {
-        var agentTools = new AgentTools(_jobs, new JobReporter(_jobs, _jobs, _jobs), _runContext);
+        var agentTools = new AgentTools(_jobs, new JobReporter(_jobs, _jobs, _jobs, _jobs), _runContext);
         var gradingTools = new GradingTools(null!, null!, null!, _runContext, TimeProvider.System);
-        return new AgentRunService(_chats, _jobs, _jobs, _model, _tools, _studentTools, agentTools, gradingTools, _runContext,
+        var analysisTools = new StudentAnalysisTools(null!, null!, _runContext, TimeProvider.System);
+        return new AgentRunService(_chats, _jobs, _jobs, _model, _tools, _studentTools, agentTools, gradingTools, analysisTools, _runContext,
             new ModelCallContext(), TimeProvider.System);
     }
 
@@ -95,9 +96,50 @@ public class AgentRunServiceTests
 
         Assert.Equal("what courses do I have?", Assert.Single(_model.History!).Text);
         Assert.Contains("(course id course-1, assignment id assignment-4)", _model.System);
-        Assert.Equal(4, _model.Tools!.Count);
+        Assert.Equal(5, _model.Tools!.Count);
         Assert.Same(_tools, _model.Tools[0]);
         Assert.Same(_studentTools, _model.Tools[1]);
+    }
+
+    [Fact]
+    public async Task SuggestedReplies_AreSavedWithTheirToolStep_TrimmedDistinctAndAtMostThree()
+    {
+        var started = await StartAsync("make a pdf of Sandro's assignment 2");
+        var tools = new AgentTools(_jobs, new JobReporter(_jobs, _jobs, _jobs, _jobs), _runContext);
+        string? answer = null;
+        _model.OnTool = entry =>
+        {
+            if (entry.ToolName == "suggest_replies")
+            {
+                answer = tools.SuggestReplies([" Yes, grade it ", "yes, grade it", "", new string('x', 61), "No, leave it", "Grade all his work", "Later"]);
+            }
+        };
+        _model.Reply = new AgentReply("fake-model",
+        [
+            new AgentEntry(AgentMessageRole.Assistant, "He has no grading yet. Should I grade it first?",
+                [new AgentToolCall("call-1", "suggest_replies", "{}")]),
+            new AgentEntry(AgentMessageRole.Tool, "3 buttons are shown", ToolCallId: "call-1", ToolName: "suggest_replies"),
+            new AgentEntry(AgentMessageRole.Assistant, ""),
+        ]);
+
+        await Service().ExecuteAsync(started.Id, TestContext.Current.CancellationToken);
+
+        var run = (await Service().GetAsync(started.Id, TestContext.Current.CancellationToken))!;
+        Assert.Equal((AgentRunStatus.Succeeded, "He has no grading yet. Should I grade it first?"), (run.Status, run.Reply));
+        Assert.Equal(["Yes, grade it", "No, leave it", "Grade all his work"], run.Messages[2].Replies);
+        Assert.Empty(run.Messages[3].Replies);
+        Assert.StartsWith("3 buttons are shown under your question.", answer);
+    }
+
+    [Fact]
+    public void SuggestReplies_WithNoUsableAnswer_ShowsNothing()
+    {
+        var tools = new AgentTools(_jobs, new JobReporter(_jobs, _jobs, _jobs, _jobs), _runContext);
+
+        var answer = tools.SuggestReplies(["  ", new string('x', 61)]);
+
+        Assert.StartsWith("No buttons shown", answer);
+        Assert.Empty(_runContext.TakeReplies());
     }
 
     [Fact]

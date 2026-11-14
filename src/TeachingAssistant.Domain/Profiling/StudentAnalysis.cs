@@ -5,6 +5,8 @@ public enum StudentAnalysisKind
     Mistakes,
 
     Strengths,
+
+    Overview,
 }
 
 public class StudentAnalysis

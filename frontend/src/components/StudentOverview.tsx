@@ -28,6 +28,15 @@ const texts: Record<StudentAnalysisKind, { title: string; empty: string; confirm
     job: "strengths analysis",
     records: "strengths",
   },
+  Overview: {
+    title: "AI overview",
+    empty:
+      "Not analyzed yet. The AI gets each graded assignment's score with its mistakes and strengths (your report where you reviewed it, otherwise the AI draft), plus the numbers counted in code, and writes the overall picture and what to work on next.",
+    confirm:
+      "The AI reads every graded assignment's score, mistakes and strengths (your report where you reviewed it, otherwise the AI draft) and writes an overall picture of at most 250 words and what to work on next. The name is never sent.",
+    job: "overview",
+    records: "mistakes and strengths",
+  },
 };
 
 export function StudentOverviewCard({
@@ -124,7 +133,7 @@ export function StudentOverviewCard({
 
       {confirming && (
         <ConfirmDialog
-          title={`Analyze ${studentName}'s ${text.records} with AI?`}
+          title={kind === "Overview" ? `Write an AI overview of ${studentName}?` : `Analyze ${studentName}'s ${text.records} with AI?`}
           confirmLabel="Analyze"
           onConfirm={start}
           onCancel={() => setConfirming(false)}

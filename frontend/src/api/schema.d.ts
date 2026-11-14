@@ -994,6 +994,55 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/gradings/{gradingId}/export/pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Downloads one grading as a PDF report for the student: score, the review, mistakes and strengths, taken from the teacher's report when one exists and otherwise from the AI draft, with a banner saying whether it is approved; generated on request, never stored or sent anywhere. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    gradingId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The PDF file */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/pdf": string;
+                        "application/json": string;
+                    };
+                };
+                /** @description No grading with this ID, or its submission is no longer stored */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/pdf": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/gradings/{gradingId}/discard": {
         parameters: {
             query?: never;
@@ -1962,7 +2011,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Returns a student's mistakes in the course (from each graded assignment's current draft: your report when you saved one, otherwise the AI draft, and the approved records when the latest version has no current draft; each item and assignment says which (Draft, InReview, Approved)), newest assignment first, each labelled new or repeated (same category in an earlier assignment; labels always come from the full history), with breakdowns by category, severity, label and assignment; filterable by assignment, category, severity and label. */
+        /** Returns a student's mistakes in the course (per graded assignment: your newest report when you saved one, even if a newer AI draft exists, otherwise the newest AI draft; each item and assignment says which (Draft, InReview, Approved)), newest assignment first, each labelled new or repeated (same category in an earlier assignment; labels always come from the full history), with breakdowns by category, severity, label and assignment; filterable by assignment, category, severity and label. */
         get: {
             parameters: {
                 query?: {
@@ -2006,7 +2055,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Returns a student's strengths in the course (from each graded assignment's current draft: your report when you saved one, otherwise the AI draft, and the approved records when the latest version has no current draft; each item and assignment says which (Draft, InReview, Approved)), newest assignment first, each labelled new, consistent (same category was a strength in an earlier assignment) or improved (same category was a mistake in an earlier assignment), with breakdowns by category and label and strengths vs. mistakes per assignment; filterable by assignment, category and label. */
+        /** Returns a student's strengths in the course (per graded assignment: your newest report when you saved one, even if a newer AI draft exists, otherwise the newest AI draft; each item and assignment says which (Draft, InReview, Approved)), newest assignment first, each labelled new, consistent (same category was a strength in an earlier assignment) or improved (same category was a mistake in an earlier assignment), with breakdowns by category and label and strengths vs. mistakes per assignment; filterable by assignment, category and label. */
         get: {
             parameters: {
                 query?: {
@@ -2042,6 +2091,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/courses/{courseId}/students/{userId}/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Returns the full overview of a student, counted in code from the same records as the mistakes and strengths pages: a score per graded assignment (your report's where you reviewed it, otherwise the AI draft's), mistakes and strengths per assignment and per category, and the top mistake and strength categories. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    courseId: string;
+                    userId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Overview retrieved successfully; empty lists when nothing is graded yet */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StudentOverviewResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/courses/{courseId}/students/{userId}/analysis": {
         parameters: {
             query?: never;
@@ -2049,7 +2137,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Returns the latest AI analysis of the student's mistakes (feedback of at most 200 words and what to work on next) or strengths (the strengths grouped into skills and an overview), with what it was based on and whether reports changed since. */
+        /** Returns the latest AI analysis of the student's mistakes (feedback of at most 200 words and what to work on next) strengths (the strengths grouped into skills and an overview) or the full overview (an overall picture of at most 250 words and what to work on next), with what it was based on and whether reports changed since. */
         get: {
             parameters: {
                 query?: {
@@ -2083,7 +2171,7 @@ export interface paths {
             };
         };
         put?: never;
-        /** Queues an AI analysis of the student from each graded assignment's current draft (your report when you saved one, otherwise the AI draft; the approved records when the latest version has no current draft): Mistakes sends only the kept mistakes with their points and labels, Strengths sends only the kept strengths to be grouped into skills; trends are counted in code and the student is never named. */
+        /** Queues an AI analysis of the student from each graded assignment (your newest report when you saved one, otherwise the newest AI draft): Mistakes sends only the kept mistakes with their points and labels, Strengths sends only the kept strengths to be grouped into skills, Overview sends the scores with both mistakes and strengths for an overall picture; trends are counted in code and the student is never named. */
         post: {
             parameters: {
                 query?: {
@@ -2492,7 +2580,7 @@ export interface components {
             readonly key: string;
         };
         /** @enum {string} */
-        AgentLinkKind: "CommonMistakes" | "Submission" | "Assignment" | "Student" | "GradingPdf";
+        AgentLinkKind: "CommonMistakes" | "Submission" | "Assignment" | "Student" | "GradingPdf" | "StudentOverview" | "StudentMistakes" | "StudentStrengths";
         AgentMessageResponse: {
             /** Format: uuid */
             id: string;
@@ -2507,6 +2595,7 @@ export interface components {
             /** Format: uuid */
             jobId?: string | null;
             links: components["schemas"]["AgentLink"][];
+            replies: string[];
             /** Format: date-time */
             createdAt: string;
         };
@@ -3186,6 +3275,44 @@ export interface components {
             /** Format: int64 */
             averageDurationMs: number;
         };
+        OverviewAssignmentResponse: {
+            assignmentId: string;
+            title?: string | null;
+            /** Format: date-time */
+            dueAt?: string | null;
+            source: components["schemas"]["StudentRecordSource"];
+            /** Format: double */
+            score?: number | null;
+            /** Format: double */
+            bonus?: number | null;
+            /** Format: double */
+            maxPoints?: number | null;
+            /** Format: double */
+            percent?: number | null;
+            /** Format: double */
+            aiScore?: number | null;
+            /** Format: int32 */
+            mistakes: number;
+            /** Format: int32 */
+            major: number;
+            /** Format: int32 */
+            repeated: number;
+            /** Format: double */
+            pointsLost: number;
+            /** Format: int32 */
+            strengths: number;
+            /** Format: int32 */
+            improved: number;
+        };
+        OverviewCategoryResponse: {
+            category: components["schemas"]["MistakeCategory"];
+            /** Format: int32 */
+            strengths: number;
+            /** Format: int32 */
+            mistakes: number;
+            /** Format: double */
+            pointsLost: number;
+        };
         ProblemDetails: {
             type?: string | null;
             title?: string | null;
@@ -3391,9 +3518,7 @@ export interface components {
             percent: number;
         };
         /** @enum {string} */
-        StudentAnalysisKind: "Mistakes" | "Strengths";
-        /** @enum {string} */
-        StudentRecordSource: "Draft" | "InReview" | "Approved";
+        StudentAnalysisKind: "Mistakes" | "Strengths" | "Overview";
         StudentAnalysisResponse: {
             /** Format: uuid */
             id: string;
@@ -3478,6 +3603,34 @@ export interface components {
             assignments: components["schemas"]["MistakeAssignmentResponse"][];
             assignmentOptions: components["schemas"]["MistakeAssignmentOption"][];
         };
+        StudentOverviewResponse: {
+            /** Format: int32 */
+            gradedAssignments: number;
+            /** Format: double */
+            averagePercent?: number | null;
+            /** Format: double */
+            firstPercent?: number | null;
+            /** Format: double */
+            latestPercent?: number | null;
+            /** Format: int32 */
+            mistakes: number;
+            /** Format: int32 */
+            repeatedMistakes: number;
+            /** Format: double */
+            pointsLost: number;
+            /** Format: int32 */
+            strengths: number;
+            /** Format: int32 */
+            consistentStrengths: number;
+            /** Format: int32 */
+            improvedStrengths: number;
+            assignments: components["schemas"]["OverviewAssignmentResponse"][];
+            topMistakes: components["schemas"]["MistakeCategoryResponse"][];
+            topStrengths: components["schemas"]["StrengthCategoryResponse"][];
+            categories: components["schemas"]["OverviewCategoryResponse"][];
+        };
+        /** @enum {string} */
+        StudentRecordSource: "Draft" | "InReview" | "Approved";
         StudentStrengthResponse: {
             /** Format: uuid */
             id: string;

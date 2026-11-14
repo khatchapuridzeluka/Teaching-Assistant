@@ -1,13 +1,14 @@
 import type { ReactNode } from "react";
-import { Link, useParams, useSearchParams } from "react-router";
+import { useParams, useSearchParams } from "react-router";
 import { Bar, BarChart, CartesianGrid, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { MistakeCategory, MistakeLabel, MistakeSeverity, StudentMistakeFilter } from "../api/client";
 import { useCourseStudents, useStudentMistakes } from "../api/hooks";
 import { FilterChips } from "../components/FilterChips";
 import { CourseName } from "../components/Layout";
+import { StudentPageNav } from "../components/StudentPageNav";
 import { StudentOverviewCard } from "../components/StudentOverview";
 import { categoryLabels, MistakeRow, SourceChip } from "../components/StudentMistakes";
-import { Avatar, Button, Card, CardHeader, EmptyState, ErrorPanel, PageHeader, Spinner, Stat, StatStrip } from "../components/ui";
+import { Avatar, Card, CardHeader, EmptyState, ErrorPanel, PageHeader, Spinner, Stat, StatStrip } from "../components/ui";
 import { formatDay, initials } from "../format";
 
 const severityShades: Record<MistakeSeverity, string> = {
@@ -69,16 +70,7 @@ export function StudentMistakesPage() {
             <CourseName courseId={courseId} /> · from AI drafts and your reports · labels compare with assignments due earlier
           </>
         }
-        actions={
-          <span className="flex flex-wrap gap-2">
-            <Link to={`/courses/${courseId}/students/${userId}/strengths`}>
-              <Button>Strengths →</Button>
-            </Link>
-            <Link to={`/courses/${courseId}/students${student ? `?student=${student.id}` : ""}`}>
-              <Button>← Profile</Button>
-            </Link>
-          </span>
-        }
+        actions={<StudentPageNav courseId={courseId} userId={userId} studentId={student?.id} active="mistakes" />}
       />
 
       {mistakes.isError && <ErrorPanel error={mistakes.error} />}

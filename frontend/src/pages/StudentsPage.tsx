@@ -10,7 +10,7 @@ import { StrengthsCard } from "../components/StudentStrengths";
 import { StudentOverviewCard } from "../components/StudentOverview";
 import { stateChip } from "../components/SubmissionDetail";
 import { Avatar, Button, buttonClass, Card, Chip, CountTabs, EmptyState, ErrorPanel, Meter, Modal, Notice, PageHeader, SearchField, Spinner, Stat, StatStrip } from "../components/ui";
-import { ArrowLeft, ArrowRight, Award, CalendarX, CircleAlert, Clock, GraduationCap, RefreshCw, Send, Sparkles, Table2, TrendingUp, Users } from "lucide-react";
+import { ArrowLeft, ArrowRight, Award, CalendarX, CircleAlert, Clock, GraduationCap, LayoutDashboard, RefreshCw, Send, Sparkles, Table2, TrendingUp, Users } from "lucide-react";
 import { formatDate, formatDay, initials } from "../format";
 
 export function StudentsPage() {
@@ -380,6 +380,13 @@ function StudentProfile({
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
+            <Link
+              to={`/courses/${courseId}/students/${student.externalUserId}/overview`}
+              className={buttonClass("outline", true)}
+              title="The whole picture: scores, mistakes and strengths together, with its own AI analysis"
+            >
+              <LayoutDashboard className="h-3.5 w-3.5" /> Overview
+            </Link>
             <Link
               to={`/courses/${courseId}/students/${student.externalUserId}/mistakes`}
               className={buttonClass("outline", true)}

@@ -36,6 +36,30 @@ public class StudentAnalysisService : IStudentAnalysisService
         Write in English.
         """;
 
+    private const string OverviewPrompt =
+        """
+        You help a university programming teacher (Advanced Java, C++ basics) see the whole picture of one student across
+        the course: how well they do, where they are heading, what they are good at and what holds them back. The student
+        is called "the student" and is never named. You get every graded assignment of this student, in due-date order:
+        the teacher's report where they reviewed it, otherwise the AI draft that the teacher has not checked yet (each says
+        which). For each you get the score out of its maximum, its mistakes (severity, category, the points they cost,
+        new or repeated) and its strengths (category, new, consistent or improved from an earlier mistake). The numbers at
+        the end are counted in code and are exact; use them instead of counting yourself.
+
+        First write "summary": an overall picture for the teacher, at most 250 words. Cover the student's level (the
+        scores), the direction over the assignments (improving, steady or slipping, and how sure that is with this many
+        assignments), the skills they show again and again, the problems that keep coming back or cost the most, and how
+        the two connect (a former weakness that became a strength, or a strength in one area next to a gap in another).
+        Mention that an assignment is still an unchecked AI draft only if it changes the picture. With one or two
+        assignments say that the picture is early. Plain prose, no lists, no names, and do not invent details of the code.
+
+        Then write "nextSteps": the one to three things that would help this student most now, at most 100 words, each
+        with a short reason and a concrete way to practise, and one strength to keep building on. Written for the
+        teacher to pass on, no names.
+
+        Write in English.
+        """;
+
     private const string MistakesSchema =
         """
         {
@@ -125,7 +149,8 @@ public class StudentAnalysisService : IStudentAnalysisService
     public async Task<Guid> AnalyzeAsync(
         string courseId, string studentId, StudentAnalysisKind kind, CancellationToken cancellationToken = default)
     {
-        var (mistakes, strengths, _) = await _records.CollectAsync(courseId, studentId, cancellationToken);
+        var records = await _records.CollectAsync(courseId, studentId, cancellationToken);
+        var (mistakes, strengths) = (records.Mistakes, records.Strengths);
         var assignments = (await _assignments.GetByCourseAsync(SubmissionSource.GoogleClassroom, courseId, cancellationToken))
             .ToDictionary(a => a.ExternalAssignmentId);
 
@@ -163,7 +188,7 @@ public class StudentAnalysisService : IStudentAnalysisService
             analysis = new StudentAnalysis(courseId, studentId, kind, reply.Model, answer.Summary ?? "", answer.NextSteps ?? "",
                 mistakes.Select(m => m.AssignmentId).Distinct().Count(), mistakes.Count, Latest(mistakes.Select(m => m.ApprovedAt)), now);
         }
-        else
+        else if (kind == StudentAnalysisKind.Strengths)
         {
             if (strengths.Count == 0)
             {
@@ -178,6 +203,20 @@ public class StudentAnalysisService : IStudentAnalysisService
             analysis = new StudentAnalysis(courseId, studentId, kind, reply.Model, answer.Overview ?? "", "",
                 strengths.Select(s => s.AssignmentId).Distinct().Count(), strengths.Count, Latest(strengths.Select(s => s.ApprovedAt)), now,
                 Group(ordered, answer.Groups ?? []));
+        }
+        else
+        {
+            if (records.Assignments.Count == 0)
+            {
+                throw new InvalidRequestException(
+                    "This student has no graded assignment yet: there is no current AI draft or report. Grade an assignment first.");
+            }
+
+            var reply = await _languageModel.AnalyzeAsync(OverviewPrompt,
+                [new TextPart(OverviewPromptText(records, assignments))], MistakesSchema, cancellationToken);
+            var answer = Read<MistakesReply>(reply.Text);
+            analysis = new StudentAnalysis(courseId, studentId, kind, reply.Model, answer.Summary ?? "", answer.NextSteps ?? "",
+                records.Assignments.Count, mistakes.Count + strengths.Count, LatestOf(mistakes, strengths), now);
         }
 
         _analyses.Add(analysis);
@@ -195,9 +234,12 @@ public class StudentAnalysisService : IStudentAnalysisService
         }
 
         var (mistakes, strengths, _) = await _records.CollectAsync(courseId, studentId, cancellationToken);
-        var outdated = kind == StudentAnalysisKind.Mistakes
-            ? analysis.IsOutdated(mistakes.Count, Latest(mistakes.Select(m => m.ApprovedAt)))
-            : analysis.IsOutdated(strengths.Count, Latest(strengths.Select(s => s.ApprovedAt)));
+        var outdated = kind switch
+        {
+            StudentAnalysisKind.Mistakes => analysis.IsOutdated(mistakes.Count, Latest(mistakes.Select(m => m.ApprovedAt))),
+            StudentAnalysisKind.Strengths => analysis.IsOutdated(strengths.Count, Latest(strengths.Select(s => s.ApprovedAt))),
+            _ => analysis.IsOutdated(mistakes.Count + strengths.Count, LatestOf(mistakes, strengths)),
+        };
 
         var groups = new List<StrengthGroupResponse>();
         if (analysis.Groups.Count > 0)
@@ -302,6 +344,99 @@ public class StudentAnalysisService : IStudentAnalysisService
 
         prompt.AppendLine("</counts>").Append("Group these strengths into skills and write the overview.");
         return prompt.ToString();
+    }
+
+    internal static string OverviewPromptText(StudentRecords records, IReadOnlyDictionary<string, CourseAssignment> assignments)
+    {
+        DateTimeOffset? DueAt(string id)
+        {
+            return assignments.GetValueOrDefault(id)?.DueAt;
+        }
+
+        string Title(string? id)
+        {
+            return (id is null ? null : assignments.GetValueOrDefault(id)?.Title) ?? "Assignment";
+        }
+
+        var overview = StudentOverviewService.Build(records, assignments);
+        var mistakeLabels = MistakeHistory.Label(records.Mistakes, DueAt).ToDictionary(l => l.Mistake.Id);
+        var strengthLabels = StrengthHistory.Label(records.Strengths, records.Mistakes, DueAt).ToDictionary(l => l.Strength.Id);
+
+        var prompt = new StringBuilder("<assignments>\n");
+        foreach (var row in overview.Assignments)
+        {
+            prompt.Append("<assignment title=\"").Append(Title(row.AssignmentId)).Append('"');
+            if (row.DueAt is { } due)
+            {
+                prompt.Append(" due=\"").Append(due.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)).Append('"');
+            }
+
+            prompt.Append(" score=\"").Append(row.Score is { } score ? Number(score) : "unknown");
+            if (row.MaxPoints is { } max)
+            {
+                prompt.Append(" / ").Append(Number(max));
+            }
+
+            prompt.Append('"');
+            if (row.Bonus is > 0)
+            {
+                prompt.Append(" bonus=\"").Append(Number(row.Bonus.Value)).Append('"');
+            }
+
+            prompt.Append(" checked=\"").Append(row.Source == StudentRecordSource.Draft ? "AI draft, not reviewed" : "teacher's report")
+                .AppendLine("\">");
+            foreach (var mistake in records.Mistakes.Where(m => m.AssignmentId == row.AssignmentId))
+            {
+                var label = mistakeLabels[mistake.Id];
+                prompt.Append("- mistake · ").Append(mistake.Severity).Append(" · ").Append(mistake.Category)
+                    .Append(" · -").Append(Number(mistake.Points ?? 0)).Append(" pts · ")
+                    .Append(label.Label == MistakeLabel.Repeated ? $"repeated (first in {Title(label.FirstAssignmentId)})" : "new")
+                    .Append(" · ").AppendLine(mistake.Message.ReplaceLineEndings(" "));
+            }
+
+            foreach (var strength in records.Strengths.Where(s => s.AssignmentId == row.AssignmentId))
+            {
+                var label = strengthLabels[strength.Id];
+                prompt.Append("- strength · ").Append(strength.Category).Append(" · ").Append(label.Label switch
+                    {
+                        StrengthLabel.Consistent => $"consistent (also in {Title(label.SinceAssignmentId)})",
+                        StrengthLabel.Improved => $"improved (was a mistake in {Title(label.SinceAssignmentId)})",
+                        _ => "new",
+                    })
+                    .Append(" · ").AppendLine(strength.Message.ReplaceLineEndings(" "));
+            }
+
+            prompt.AppendLine("</assignment>");
+        }
+
+        prompt.AppendLine("</assignments>").AppendLine("<numbers>")
+            .Append(overview.GradedAssignments).Append(overview.GradedAssignments == 1 ? " graded assignment" : " graded assignments");
+        if (overview.AveragePercent is { } average)
+        {
+            prompt.Append(", average score ").Append(Number(average)).Append('%')
+                .Append(", first ").Append(Number(overview.FirstPercent!.Value)).Append("%, latest ")
+                .Append(Number(overview.LatestPercent!.Value)).Append('%');
+        }
+
+        prompt.AppendLine()
+            .Append(overview.Mistakes).Append(" mistakes (").Append(overview.RepeatedMistakes).Append(" repeated), ")
+            .Append(Number(overview.PointsLost)).AppendLine(" points lost")
+            .Append(overview.Strengths).Append(" strengths (").Append(overview.ConsistentStrengths).Append(" consistent, ")
+            .Append(overview.ImprovedStrengths).AppendLine(" improved from an earlier mistake)")
+            .AppendLine("Per category (strengths / mistakes / points lost):");
+        foreach (var category in overview.Categories)
+        {
+            prompt.Append(category.Category).Append(": ").Append(category.Strengths).Append(" / ").Append(category.Mistakes)
+                .Append(" / ").AppendLine(Number(category.PointsLost));
+        }
+
+        prompt.AppendLine("</numbers>").Append("Write the overall picture of this student.");
+        return prompt.ToString();
+    }
+
+    private static DateTimeOffset? LatestOf(IReadOnlyList<StudentMistake> mistakes, IReadOnlyList<StudentStrength> strengths)
+    {
+        return Latest(mistakes.Select(m => m.ApprovedAt).Concat(strengths.Select(s => s.ApprovedAt)));
     }
 
     internal static IReadOnlyList<StrengthGroup> Group(IReadOnlyList<StudentStrength> ordered, IReadOnlyList<ReplyGroup> groups)

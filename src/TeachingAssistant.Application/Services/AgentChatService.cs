@@ -48,6 +48,15 @@ public class AgentChatService : IAgentChatService
         fetch, a lookup) right away; ask first when the step is paid. Once the teacher agrees, carry out the whole
         chain: the missing step, wait for it, then what they first asked for.
 
+        When the teacher asks how a student is doing or wants feedback on a student, use analyze_student: Mistakes for their
+        mistakes, Strengths for what they are good at, Overview for the whole picture. A current saved analysis comes back
+        free; a new one is a paid AI call, so start it only when the teacher asks about that student, and set refresh only
+        when they ask to analyze again. Present the analysis in your own words; it is a draft for the teacher, like gradings.
+
+        Whenever you end your turn with a question for the teacher (a yes or no before a paid step, or a choice), call
+        suggest_replies with the likely answers in the same message as your question, so the teacher can reply with one click;
+        once it returns, your turn is over.
+
         When the teacher asks for a file, a PDF, a report or a document of a student's grading, call export_grading_pdf after
         the grading exists (if you start a grading for it, wait for it first); its download button is shown under your answer, so
         never write a link or URL yourself.

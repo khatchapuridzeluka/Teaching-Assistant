@@ -80,7 +80,7 @@ Previously graded homework exists (Claude-drafted, teacher-corrected). Use it as
 - Postgres + pgvector (grades, mistake records, profiles)
 - Docker sandboxes (multiple JDK images); Polly for retries; OpenTelemetry logging
 - Deploy: Cloud Run (web + API) + Vertex AI. Cloud Run can't run Docker inside itself → sandboxes run as Cloud Run Jobs or on a small Compute Engine VM. Keep the sandbox runner a separate component from day one.
-- Course teaches Python LangChain/LangGraph — translate concepts: tools→SK plugins, LangGraph→SK orchestration/Process Framework, retrievers→SK vector store
+- Course teaches Python LangChain/LangGraph — translate concepts: tools→`[AgentTool]` methods, LangGraph→the background agent run (`AgentRun` jobs with `wait_for_jobs`, see README), retrievers→pgvector behind a port
 
 ## Architecture
 
@@ -142,6 +142,16 @@ Generated code (EF Core migrations, `schema.d.ts`) is left as generated. For C# 
 ## README
 
 When a change affects anything `README.md` describes (features and their status, stack, project structure, setup steps, configuration, API endpoints, security notes), update `README.md` in the same change.
+
+## Working conventions
+
+- **Tests:** build with `dotnet build tests/TeachingAssistant.Tests`, then run `dotnet tests/TeachingAssistant.Tests/bin/Debug/net10.0/TeachingAssistant.Tests.dll` — `dotnet test` reports zero tests on this setup.
+- **The API runs in Rider** and locks its DLLs, so `dotnet build` of the WebAPI fails to copy while it runs; build the test project instead (or the WebAPI with `-o` to a temp folder). After backend changes, ask the teacher to restart the API in Rider.
+- **API types:** after changing contracts, regenerate `frontend/src/api/schema.d.ts` with `npm run gen:api` (needs the API running at :5288). Never hand-write types; a hand edit is only a stopgap until the regeneration.
+- **No Prettier or other formatters on the frontend** — the project does not use one, and running it rewraps whole files.
+- **Paid AI calls:** never trigger gradings, analyses or agent runs while verifying a change unless the teacher agrees; test with fakes and free endpoints.
+- **Comments:** none in `src/` or the frontend except the controller XML docs.
+- **Commits:** only when the teacher asks; the teacher often commits themselves.
 
 ## Prompting conventions
 

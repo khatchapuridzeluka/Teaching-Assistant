@@ -71,6 +71,10 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
                         .HasColumnType("jsonb")
                         .HasColumnName("links");
 
+                    b.PrimitiveCollection<string[]>("Replies")
+                        .HasColumnType("text[]")
+                        .HasColumnName("replies");
+
                     b.Property<string>("Role")
                         .IsRequired()
                         .HasColumnType("text")

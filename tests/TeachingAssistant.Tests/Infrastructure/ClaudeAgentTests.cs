@@ -93,6 +93,88 @@ public class ClaudeAgentTests
         Assert.Equal(AgentMessageRole.Tool, reply.Entries[^1].Role);
     }
 
+    [Fact]
+    public async Task ACallWithAMissingArgument_IsAnsweredWithTheReason_AndStoredBeforeTheNextStep()
+    {
+        var model = new ScriptedModel(
+            new ChatMessage(ChatRole.Assistant, [new FunctionCallContent("call-1", "echo", new Dictionary<string, object?> { ["wrd"] = "hi" })]),
+            new ChatMessage(ChatRole.Assistant, [new FunctionCallContent("call-2", "echo", new Dictionary<string, object?> { ["word"] = "hi" })]),
+            new ChatMessage(ChatRole.Assistant, "Done."));
+        var steps = new List<AgentEntry>();
+        var hooks = new AgentRunHooks(entry =>
+        {
+            steps.Add(entry);
+            return Task.CompletedTask;
+        }, () => false);
+
+        await ClaudeAgent.RunAsync(
+            model, "fake-model", "You are a test.", [new AgentEntry(AgentMessageRole.User, "say hi")], [new EchoTools()], hooks,
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(
+            [AgentMessageRole.Assistant, AgentMessageRole.Tool, AgentMessageRole.Assistant, AgentMessageRole.Tool, AgentMessageRole.Assistant],
+            steps.Select(s => s.Role));
+        Assert.Equal(("call-1", "echo"), (steps[1].ToolCallId, steps[1].ToolName));
+        Assert.StartsWith("Failed: the tool could not run:", steps[1].Text);
+        Assert.Equal("echoed hi", steps[3].Text);
+    }
+
+    [Fact]
+    public async Task ACallWhoseArgumentsCouldNotBeRead_IsStoredWithTheFrameworksAnswer_BeforeTheNextStep()
+    {
+        var broken = new FunctionCallContent("call-1", "echo", new Dictionary<string, object?>())
+        {
+            Exception = new System.Text.Json.JsonException("'<' is an invalid start of a value."),
+        };
+        var model = new ScriptedModel(
+            new ChatMessage(ChatRole.Assistant, [broken]),
+            new ChatMessage(ChatRole.Assistant, "Done."));
+        var tools = new EchoTools();
+        var steps = new List<AgentEntry>();
+        var hooks = new AgentRunHooks(entry =>
+        {
+            steps.Add(entry);
+            return Task.CompletedTask;
+        }, () => false);
+
+        await ClaudeAgent.RunAsync(
+            model, "fake-model", "You are a test.", [new AgentEntry(AgentMessageRole.User, "say hi")], [tools], hooks,
+            TestContext.Current.CancellationToken);
+
+        Assert.Empty(tools.Words);
+        Assert.Equal([AgentMessageRole.Assistant, AgentMessageRole.Tool, AgentMessageRole.Assistant], steps.Select(s => s.Role));
+        Assert.Equal(("call-1", "echo"), (steps[1].ToolCallId, steps[1].ToolName));
+        Assert.NotEqual("", steps[1].Text);
+    }
+
+    [Fact]
+    public async Task AStoredCallWithoutItsResult_GetsAPlaceholderResult_SoTheModelAcceptsTheHistory()
+    {
+        var model = new ScriptedModel(new ChatMessage(ChatRole.Assistant, "Done."));
+        var steps = new List<AgentEntry>();
+        var hooks = new AgentRunHooks(entry =>
+        {
+            steps.Add(entry);
+            return Task.CompletedTask;
+        }, () => false);
+        AgentEntry[] history =
+        [
+            new(AgentMessageRole.User, "grade it"),
+            new(AgentMessageRole.Assistant, "", [new AgentToolCall("lost", "echo", """{"word":"x"}""")]),
+            new(AgentMessageRole.Assistant, "Again.", [new AgentToolCall("call-2", "echo", """{"word":"hi"}""")]),
+            new(AgentMessageRole.Tool, "echoed hi", ToolCallId: "call-2", ToolName: "echo"),
+            new(AgentMessageRole.Notice, "The grading finished."),
+        ];
+
+        await ClaudeAgent.RunAsync(model, "fake-model", "You are a test.", history, [new EchoTools()], hooks,
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal([ChatRole.User, ChatRole.Assistant, ChatRole.Tool, ChatRole.Assistant, ChatRole.Tool, ChatRole.User],
+            model.LastRequest.Select(m => m.Role));
+        Assert.Equal("lost", Assert.Single(model.LastRequest[2].Contents.OfType<FunctionResultContent>()).CallId);
+        Assert.Equal([AgentMessageRole.Assistant], steps.Select(s => s.Role)); // the placeholder and the old result are not stored again
+    }
+
     private sealed class EchoTools
     {
         public List<string> Words { get; } = [];

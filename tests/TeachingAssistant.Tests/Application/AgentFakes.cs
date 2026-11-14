@@ -1,3 +1,6 @@
+using TeachingAssistant.Application.Contracts;
+using TeachingAssistant.Domain.Profiling;
+using TeachingAssistant.Application.Interfaces.Services;
 using TeachingAssistant.Application.Interfaces;
 using TeachingAssistant.Application.Models;
 using TeachingAssistant.Domain.Agents;
@@ -51,8 +54,19 @@ internal sealed class FakeAgentChats : IAgentChatStore
     }
 }
 
-internal sealed class FakeAgentJobs : IJobStore, IJobSignal, IGradingStore, IMistakeAnalysisStore
+internal sealed class FakeAgentJobs : IJobStore, IJobSignal, IGradingStore, IMistakeAnalysisStore, IStudentAnalysisService
 {
+    public List<StudentAnalysisResponse> StudentAnalyses { get; } = [];
+
+    public Task<StudentAnalysisResponse?> GetLatestAsync(
+        string courseId, string studentId, StudentAnalysisKind kind, CancellationToken cancellationToken = default) =>
+        Task.FromResult(StudentAnalyses.LastOrDefault(a => a.Kind == kind));
+
+    Task<Guid> IStudentAnalysisService.AnalyzeAsync(
+        string courseId, string studentId, StudentAnalysisKind kind, CancellationToken cancellationToken) =>
+        throw new NotSupportedException();
+
+
     public List<MistakeAnalysis> Analyses { get; } = [];
 
     public Task<MistakeAnalysis?> GetLatestAsync(string courseId, string assignmentId, CancellationToken cancellationToken = default) =>

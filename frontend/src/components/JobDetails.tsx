@@ -30,7 +30,7 @@ export const jobTypeInfo: Record<JobType, { label: string; description: string }
   AnalyzeStudent: {
     label: "Student analysis",
     description:
-      "An AI analysis of one student from each graded assignment's current draft (your report where you reviewed it, otherwise the AI draft; the approved records when the latest version has no current draft), never the name. Mistakes: every kept mistake with its points and new / repeated label, plus trends counted in code; the model writes feedback of at most 200 words and what to work on next. Strengths: every kept strength; the model groups similar ones into skills and writes an overview. Shown on the student's profile and on their mistakes or strengths page.",
+      "An AI analysis of one student from each graded assignment (your newest report where you reviewed it, otherwise the newest AI draft), never the name. Mistakes: every kept mistake with its points and new / repeated label, plus trends counted in code; the model writes feedback of at most 200 words and what to work on next. Strengths: every kept strength; the model groups similar ones into skills and writes an overview. Overview: each assignment's score with its mistakes and strengths; the model writes the overall picture and what to work on next. Shown on the student's profile and on their mistakes, strengths or overview page.",
   },
   AgentRun: {
     label: "Agent",

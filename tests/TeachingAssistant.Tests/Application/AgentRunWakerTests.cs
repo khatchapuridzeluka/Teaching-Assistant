@@ -19,7 +19,7 @@ public class AgentRunWakerTests
 
     private AgentRunWaker Waker()
     {
-        return new AgentRunWaker(_chats, _jobs, _jobs, new JobReporter(_jobs, _jobs, _jobs), _clock);
+        return new AgentRunWaker(_chats, _jobs, _jobs, new JobReporter(_jobs, _jobs, _jobs, _jobs), _clock);
     }
 
     private AgentRun WaitingRun(params Job[] jobs)
@@ -220,7 +220,7 @@ public class AgentRunWakerTests
         var grading = Grading("Nino", 78);
         var context = new AgentRunContext();
         context.Begin(Guid.NewGuid());
-        var tools = new AgentTools(_jobs, new JobReporter(_jobs, _jobs, _jobs), context);
+        var tools = new AgentTools(_jobs, new JobReporter(_jobs, _jobs, _jobs, _jobs), context);
 
         var result = await tools.WaitForJobsAsync([grading.Id.ToString()], TestContext.Current.CancellationToken);
 
@@ -236,7 +236,7 @@ public class AgentRunWakerTests
         var running = Grading("Giorgi", null);
         var context = new AgentRunContext();
         context.Begin(Guid.NewGuid());
-        var tools = new AgentTools(_jobs, new JobReporter(_jobs, _jobs, _jobs), context);
+        var tools = new AgentTools(_jobs, new JobReporter(_jobs, _jobs, _jobs, _jobs), context);
 
         var result = await tools.WaitForJobsAsync([done.Id.ToString(), running.Id.ToString()], TestContext.Current.CancellationToken);
 
@@ -249,7 +249,7 @@ public class AgentRunWakerTests
     public async Task WaitTool_RejectsAnUnknownId_AndWorksOnlyInsideARun()
     {
         var context = new AgentRunContext();
-        var tools = new AgentTools(_jobs, new JobReporter(_jobs, _jobs, _jobs), context);
+        var tools = new AgentTools(_jobs, new JobReporter(_jobs, _jobs, _jobs, _jobs), context);
 
         Assert.StartsWith("Waiting is not possible here", await tools.WaitForJobsAsync(["x"], TestContext.Current.CancellationToken));
 

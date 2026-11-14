@@ -1,7 +1,9 @@
 using System.Globalization;
 using TeachingAssistant.Application.Contracts;
 using TeachingAssistant.Application.Interfaces;
+using TeachingAssistant.Application.Interfaces.Services;
 using TeachingAssistant.Application.Jobs;
+using TeachingAssistant.Application.Tools;
 using TeachingAssistant.Domain.Jobs;
 
 namespace TeachingAssistant.Application.Services;
@@ -11,12 +13,14 @@ public class JobReporter
     private readonly IJobStore _jobs;
     private readonly IGradingStore _gradings;
     private readonly IMistakeAnalysisStore _analyses;
+    private readonly IStudentAnalysisService _studentAnalyses;
 
-    public JobReporter(IJobStore jobs, IGradingStore gradings, IMistakeAnalysisStore analyses)
+    public JobReporter(IJobStore jobs, IGradingStore gradings, IMistakeAnalysisStore analyses, IStudentAnalysisService studentAnalyses)
     {
         _jobs = jobs;
         _gradings = gradings;
         _analyses = analyses;
+        _studentAnalyses = studentAnalyses;
     }
 
     public async Task<string> DescribeAsync(IReadOnlyList<Job> jobs, CancellationToken cancellationToken = default)
@@ -67,6 +71,12 @@ public class JobReporter
             {
                 links.Add(new AgentLink(AgentLinkKind.CommonMistakes, "Common mistakes", mistakesCourse, mistakesAssignment));
             }
+            else if (job.Type == JobType.AnalyzeStudent)
+            {
+                var analyzed = JobPayloads.Read<AnalyzeStudentPayload>(job.Payload);
+                var owner = analyzed.StudentName is { } name ? $"{name}'s" : "The student's";
+                links.Add(StudentAnalysisTools.Link(analyzed.Kind, owner, analyzed.CourseId, analyzed.StudentId));
+            }
         }
 
         return links;
@@ -107,6 +117,11 @@ public class JobReporter
             return await DescribeAnalysisAsync(job, cancellationToken);
         }
 
+        if (job.Type == JobType.AnalyzeStudent)
+        {
+            return await DescribeStudentAnalysisAsync(job, cancellationToken);
+        }
+
         var error = job.Status == JobStatus.Failed ? $": {job.Error ?? "unknown error"}" : "";
         var name = job.Type == JobType.AnalyzeMistakes ? "Common mistakes analysis" : $"{job.Type} job";
         return $"{name} {job.Status.ToString().ToLowerInvariant()}{error}";
@@ -133,6 +148,26 @@ public class JobReporter
         var rest = ungrouped > 0 ? $"\n  ({ungrouped} mistakes not grouped)" : "";
         return $"Common mistakes analysis ready: {analysis.Mistakes} mistakes from {analysis.Students} students.\n"
             + $"  Overview: {analysis.Summary}\n  Groups:\n{string.Join("\n", groups)}{rest}\n  For the next lecture: {analysis.NextLecture}";
+    }
+
+    private async Task<string> DescribeStudentAnalysisAsync(Job job, CancellationToken cancellationToken)
+    {
+        var analyzed = JobPayloads.Read<AnalyzeStudentPayload>(job.Payload);
+        var name = $"{StudentAnalysisTools.Name(analyzed.Kind)} of {analyzed.StudentName ?? "the student"}";
+        if (job.Status != JobStatus.Succeeded)
+        {
+            var error = job.Status == JobStatus.Failed ? $": {job.Error ?? "unknown error"}" : "";
+            return $"The {name} {job.Status.ToString().ToLowerInvariant()}{error}";
+        }
+
+        var analysisId = job.Result is null ? (Guid?)null : JobPayloads.Read<AnalyzeStudentResult>(job.Result).AnalysisId;
+        var analysis = await _studentAnalyses.GetLatestAsync(analyzed.CourseId, analyzed.StudentId, analyzed.Kind, cancellationToken);
+        if (analysis is null || analysis.Id != analysisId)
+        {
+            return $"The {name} finished; open the student's page for the result";
+        }
+
+        return $"The {name} is ready.\n  {StudentAnalysisTools.Describe(analysis).Replace("\n", "\n  ")}";
     }
 
     private static string Count(int count, string noun)

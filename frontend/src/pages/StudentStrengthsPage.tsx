@@ -1,16 +1,17 @@
 import type { ReactNode } from "react";
-import { Link, useParams, useSearchParams } from "react-router";
+import { useParams, useSearchParams } from "react-router";
 import { Bar, BarChart, CartesianGrid, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { MistakeCategory, StrengthLabel, StudentStrengthFilter, StudentStrengthInfo } from "../api/client";
 import { useCourseStudents, useStudentStrengths } from "../api/hooks";
 import { strengthColor } from "../components/CodeBrowser";
 import { FilterChips } from "../components/FilterChips";
 import { CourseName } from "../components/Layout";
+import { StudentPageNav } from "../components/StudentPageNav";
 import { StudentOverviewCard } from "../components/StudentOverview";
 import { categoryLabels } from "../components/StudentMistakes";
 import { SourceChip } from "../components/StudentMistakes";
 import { StrengthRow, summarize } from "../components/StudentStrengths";
-import { Avatar, Button, Card, CardHeader, EmptyState, ErrorPanel, PageHeader, Spinner, Stat, StatStrip } from "../components/ui";
+import { Avatar, Card, CardHeader, EmptyState, ErrorPanel, PageHeader, Spinner, Stat, StatStrip } from "../components/ui";
 import { formatDay, initials } from "../format";
 
 const mistakeColor = "#9a3412";
@@ -65,16 +66,7 @@ export function StudentStrengthsPage() {
             <CourseName courseId={courseId} /> · from AI drafts and your reports · labels compare with assignments due earlier
           </>
         }
-        actions={
-          <span className="flex flex-wrap gap-2">
-            <Link to={`/courses/${courseId}/students/${userId}/mistakes`}>
-              <Button>Mistakes →</Button>
-            </Link>
-            <Link to={`/courses/${courseId}/students${student ? `?student=${student.id}` : ""}`}>
-              <Button>← Profile</Button>
-            </Link>
-          </span>
-        }
+        actions={<StudentPageNav courseId={courseId} userId={userId} studentId={student?.id} active="strengths" />}
       />
 
       {strengths.isError && <ErrorPanel error={strengths.error} />}
