@@ -32,7 +32,7 @@ public class GradingToolsTests
             .OfType<string>()
             .Order();
 
-        Assert.Equal(["analyze_common_mistakes", "grade_all_students"], names);
+        Assert.Equal(["analyze_common_mistakes", "export_grading_pdf", "grade_all_students"], names);
     }
 
     [Fact]
@@ -90,6 +90,30 @@ public class GradingToolsTests
         Assert.StartsWith($"Common mistakes analysis queued (job id {_fakes.AnalysisJob!.Id}).", result);
         Assert.Equal(_fakes.AnalysisJob.Id, _context.TakeQueuedJob());
         Assert.Equal([new AgentLink(AgentLinkKind.CommonMistakes, "Common mistakes", "course-1", "a-4")], _context.TakeLinks());
+    }
+
+    [Fact]
+    public async Task ExportGradingPdf_AttachesADownloadLinkForTheCurrentDraft()
+    {
+        var result = await Tools().ExportGradingPdfAsync("course-1", "a-4", "s-1", TestContext.Current.CancellationToken);
+
+        Assert.StartsWith("The PDF report of Nino's grading (version 1, score 80 / 100) is ready", result);
+        var link = Assert.Single(_context.TakeLinks());
+        Assert.Equal((AgentLinkKind.GradingPdf, "PDF · Nino", "s-1"), (link.Kind, link.Label, link.StudentId));
+        Assert.NotNull(link.GradingId);
+        Assert.Null(_context.TakeQueuedJob());
+    }
+
+    [Fact]
+    public async Task ExportGradingPdf_SaysToGradeFirst_WhenThereIsNoCurrentDraft()
+    {
+        _fakes.Drafts.Clear();
+        _fakes.Drafts.Add(GradingStatus.Discarded);
+
+        var result = await Tools().ExportGradingPdfAsync("course-1", "a-4", "s-1", TestContext.Current.CancellationToken);
+
+        Assert.StartsWith("No PDF: this student has no current AI draft", result);
+        Assert.Empty(_context.TakeLinks());
     }
 
     [Fact]
