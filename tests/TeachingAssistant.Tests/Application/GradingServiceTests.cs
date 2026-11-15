@@ -20,11 +20,39 @@ public class GradingServiceTests
     private readonly RecordingModel _model = new();
     private readonly FakeWordReader _wordReader = new();
     private readonly FakeGradingStore _gradings = new();
+    private readonly FakeGradingPrinciples _principles = new();
+    private readonly FakeCourseGuidance _courseGuidance = new();
 
     private readonly ModelCallContext _callContext = new();
 
     private GradingService Service() =>
-        new(_store, _instructions, _storage, _wordReader, _model, _gradings, _callContext, TimeProvider.System);
+        new(_store, _instructions, _storage, _wordReader, _model, _gradings, _principles, _courseGuidance, _callContext, TimeProvider.System);
+
+    [Fact]
+    public void TheSystemPrompt_PutsTheCourseGuidanceBetweenThePrinciplesAndTheRules()
+    {
+        _principles.Add(1, "First", "Follow the points in the instructions.");
+
+        var system = GradingService.SystemPromptFor(_principles.GetActiveAsync().Result, "  Second-year students; be firm about names.  ");
+        var without = GradingService.SystemPromptFor(_principles.GetActiveAsync().Result);
+
+        Assert.Contains("- Follow the points in the instructions.\n\nCourse guidance (", system);
+        Assert.Contains("):\nSecond-year students; be firm about names.\n\nGrading policy", system);
+        Assert.DoesNotContain("Course guidance", without);
+    }
+
+    [Fact]
+    public void TheSystemPrompt_ListsTheActivePrinciplesInOrder_ThenTheRules()
+    {
+        _principles.Add(2, "Second", "Judge by reading the code.");
+        _principles.Add(1, "First", "Follow the points in the instructions.");
+        _principles.Add(3, "Gone", "A deleted principle.").Delete(DateTimeOffset.UtcNow);
+
+        var system = GradingService.SystemPromptFor(_principles.GetActiveAsync().Result);
+
+        Assert.Contains("How to grade:\n- Follow the points in the instructions.\n- Judge by reading the code.\n\nGrading policy", system);
+        Assert.DoesNotContain("A deleted principle.", system);
+    }
 
     [Fact]
     public async Task PlanGradeAll_SkipsVersionsWithADraftThatIsNotDiscarded_AndKeepsTheRest()

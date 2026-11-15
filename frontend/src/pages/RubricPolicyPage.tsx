@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { Link, useParams } from "react-router";
 import {
   ArrowDown,
@@ -12,14 +12,25 @@ import {
   type LucideIcon,
   NotebookPen,
   Paperclip,
+  Pencil,
+  Plus,
   ScrollText,
   Sparkles,
+  Trash2,
 } from "lucide-react";
-import type { Assignment, GradingGuidance, PolicyRule } from "../api/client";
-import { useAssignments, useGradingGuidance } from "../api/hooks";
+import type { Assignment, GradingGuidance, GradingPrinciple, PolicyRule } from "../api/client";
+import {
+  useAddPrinciple,
+  useAssignments,
+  useDeletePrinciple,
+  useGradingGuidance,
+  useSetCourseGuidance,
+  useUpdatePrinciple,
+} from "../api/hooks";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { CourseName } from "../components/Layout";
-import { buttonClass, Card, CardHeader, Chip, ErrorPanel, PageHeader, Spinner, Stat, StatStrip } from "../components/ui";
-import { formatDay, formatPoints } from "../format";
+import { Button, buttonClass, Card, CardHeader, Chip, ErrorPanel, Modal, PageHeader, Spinner, Stat, StatStrip } from "../components/ui";
+import { formatDate, formatDay, formatPoints } from "../format";
 
 type LayerKey = "approach" | "guidance" | "rules" | "instructions" | "notes";
 
@@ -76,7 +87,7 @@ export function RubricPolicyPage() {
             <CourseName courseId={courseId} /> · everything the grader is told before it reads a student's work, in the order it gets it
           </>
         }
-        actions={<Chip tone="outline">Read-only for now · editing comes next</Chip>}
+        actions={<Chip tone="outline">Rules and notes: editing comes next</Chip>}
       />
 
       {guidance.isError && <ErrorPanel error={guidance.error} />}
@@ -214,74 +225,309 @@ function LayerPage({
 // ---------- 1. Built-in approach ----------
 
 export function RubricApproachPage() {
+  // null: closed; "new": adding; a principle: editing it.
+  const [editing, setEditing] = useState<GradingPrinciple | "new" | null>(null);
+  const [deleting, setDeleting] = useState<GradingPrinciple | null>(null);
+  const remove = useDeletePrinciple();
+
   return (
-    <LayerPage layerKey="approach" actions={<Chip tone="outline">Part of the tool · same for every course</Chip>}>
+    <LayerPage layerKey="approach" actions={<Chip tone="outline">Same for every course</Chip>}>
       {(data) => (
         <>
           <Explainer>
             The grader always starts from these principles, in every course. They describe how it grades in general; your course
-            guidance, rules and assignment notes come after them and win where they disagree.
+            guidance, rules and assignment notes come after them and win where they disagree. A change here applies to the next
+            grading in every course.
           </Explainer>
-          <ol className="grid gap-3 lg:grid-cols-2">
-            {data.approach.map((principle, i) => (
-              <li key={principle.title}>
-                <Card className="h-full px-[18px] py-3.5">
-                  <div className="flex items-start gap-3">
-                    <Step n={i + 1} />
-                    <div className="min-w-0">
-                      <h3 className="text-[14px] font-semibold">{principle.title}</h3>
-                      <p className="mt-1 text-[13px] leading-relaxed text-ink-soft">{principle.detail}</p>
+          {remove.isError && <ErrorPanel error={remove.error} />}
+          {data.approach.length === 0 ? (
+            <div className="flex flex-col gap-3">
+              <Card className="px-[18px] py-4 text-[13px] text-ink-muted">
+                Every principle is deleted, so the grader starts directly from your rules and the instructions.
+              </Card>
+              <AddPrincipleCard onClick={() => setEditing("new")} />
+            </div>
+          ) : (
+            <ol className="grid gap-3 lg:grid-cols-2">
+              {data.approach.map((principle, i) => (
+                <li key={principle.id}>
+                  <Card className="h-full px-[18px] py-3.5">
+                    <div className="flex items-start gap-3">
+                      <Step n={i + 1} />
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-[14px] font-semibold">{principle.title}</h3>
+                        <p className="mt-1 text-[13px] leading-relaxed text-ink-soft">{principle.detail}</p>
+                      </div>
+                      <span className="-mr-1.5 -mt-1 flex shrink-0 gap-0.5">
+                        <IconButton label={`Edit "${principle.title}"`} onClick={() => setEditing(principle)}>
+                          <Pencil className="h-3.5 w-3.5" />
+                        </IconButton>
+                        <IconButton label={`Delete "${principle.title}"`} danger onClick={() => setDeleting(principle)}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </IconButton>
+                      </span>
                     </div>
-                  </div>
-                </Card>
+                  </Card>
+                </li>
+              ))}
+              <li>
+                <AddPrincipleCard onClick={() => setEditing("new")} />
               </li>
-            ))}
-          </ol>
+            </ol>
+          )}
+
+          {editing && (
+            <PrincipleModal
+              principle={editing === "new" ? null : editing}
+              position={data.approach.length + 1}
+              onClose={() => setEditing(null)}
+            />
+          )}
+          {deleting && (
+            <ConfirmDialog
+              title={`Delete "${deleting.title}"?`}
+              confirmLabel="Delete principle"
+              danger
+              onCancel={() => setDeleting(null)}
+              onConfirm={() => {
+                remove.mutate(deleting.id);
+                setDeleting(null);
+              }}
+            >
+              <p>
+                The grader stops using it from the next grading, in every course. Earlier drafts are not changed, and it stays in
+                the database marked as deleted.
+              </p>
+            </ConfirmDialog>
+          )}
         </>
       )}
     </LayerPage>
   );
 }
 
+function AddPrincipleCard({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex h-full min-h-[92px] w-full items-center justify-center gap-2 rounded-[10px] border border-dashed border-ink-faint px-[18px] py-3.5 text-[13px] font-semibold text-ink-muted transition-colors hover:border-accent hover:text-accent"
+    >
+      <Plus className="h-4 w-4" /> Add principle
+    </button>
+  );
+}
+
+// Adds a principle when principle is null, otherwise edits it.
+function PrincipleModal({ principle, position, onClose }: { principle: GradingPrinciple | null; position: number; onClose: () => void }) {
+  const [title, setTitle] = useState(principle?.title ?? "");
+  const [detail, setDetail] = useState(principle?.detail ?? "");
+  const [tried, setTried] = useState(false);
+  const add = useAddPrinciple();
+  const update = useUpdatePrinciple();
+  const saving = add.isPending || update.isPending;
+  const failed = add.isError ? add.error : update.isError ? update.error : null;
+  const missing = title.trim().length === 0 || detail.trim().length === 0;
+
+  function save() {
+    setTried(true);
+    if (missing) {
+      return;
+    }
+    const body = { title: title.trim(), detail: detail.trim() };
+    if (principle) {
+      update.mutate({ id: principle.id, ...body }, { onSuccess: onClose });
+    } else {
+      add.mutate(body, { onSuccess: onClose });
+    }
+  }
+
+  return (
+    <Modal
+      title={principle ? "Edit principle" : `Add principle ${position}`}
+      subtitle={principle ? "Applies to the next grading in every course" : "Added at the end; applies to the next grading in every course"}
+      onClose={onClose}
+      busy={saving}
+      size="max-w-xl"
+      footer={
+        <>
+          <Button onClick={onClose} disabled={saving}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={save} disabled={saving}>
+            {saving ? "Saving…" : principle ? "Save" : "Add principle"}
+          </Button>
+        </>
+      }
+    >
+      <form
+        className="flex shrink-0 flex-col gap-3.5 px-5 py-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          save();
+        }}
+      >
+        <label className="flex flex-col gap-1.5">
+          <span className="eyebrow">Title</span>
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            maxLength={120}
+            className="field"
+            placeholder="Check the printed output"
+            autoFocus
+          />
+          <span className="text-[11px] text-ink-muted">Short, for you; the grader does not see it</span>
+        </label>
+        <label className="flex flex-col gap-1.5">
+          <span className="eyebrow">What the grader is told</span>
+          <textarea
+            value={detail}
+            onChange={(e) => setDetail(e.target.value)}
+            placeholder="When the instructions show an example run, compare the student's output with it line by line."
+            maxLength={2000}
+            rows={7}
+            className="field min-h-[170px] resize-y py-2 leading-relaxed"
+          />
+          <span className="text-[11px] text-ink-muted">{detail.trim().length} / 2000 characters</span>
+        </label>
+        {tried && missing && <p className="text-xs text-danger">Enter a title and a text.</p>}
+        {failed && <ErrorPanel error={failed} />}
+      </form>
+    </Modal>
+  );
+}
+
+function IconButton({ label, danger, onClick, children }: { label: string; danger?: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className={`flex h-7 w-7 items-center justify-center rounded-md text-ink-muted transition-colors hover:bg-paper-dark ${
+        danger ? "hover:text-danger" : "hover:text-ink"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
 // ---------- 2. Course guidance ----------
 
 export function RubricGuidancePage() {
+  const { courseId = "" } = useParams();
+  const [editing, setEditing] = useState(false);
+
   return (
-    <LayerPage layerKey="guidance">
-      {(data) =>
-        data.courseGuidance ? (
-          <Card className="px-[18px] py-4">
-            <p className="whitespace-pre-line leading-relaxed">{data.courseGuidance}</p>
-          </Card>
-        ) : (
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
-            <Card>
-              <CardHeader icon={<NotebookPen />} title="Not written yet" subtitle="This course is graded with the built-in approach and your rules only" />
-              <div className="flex flex-col gap-3 px-[18px] py-4">
-                <div className="rounded-lg border border-dashed border-ink-faint bg-paper/60 px-3.5 py-3 text-[13px] leading-relaxed text-ink-muted">
-                  <div className="eyebrow mb-1">For example</div>
-                  “These are second-year students. Judge mainly whether the program works and the classes are designed sensibly.
-                  Don’t be strict about formatting; mention it as a suggestion. Be encouraging in the feedback.”
+    <LayerPage layerKey="guidance" actions={<Chip tone="outline">This course only</Chip>}>
+      {(data) => (
+        <>
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+            {data.courseGuidance ? (
+              <Card>
+                <CardHeader
+                  icon={<NotebookPen />}
+                  title="How to grade this course"
+                  subtitle={`In use from the next grading · saved ${formatDate(data.courseGuidanceUpdatedAt)}`}
+                  actions={
+                    <Button small icon={<Pencil />} onClick={() => setEditing(true)}>
+                      Edit
+                    </Button>
+                  }
+                />
+                <p className="whitespace-pre-line px-[18px] py-4 text-[13.5px] leading-relaxed">{data.courseGuidance}</p>
+              </Card>
+            ) : (
+              <Card>
+                <CardHeader
+                  icon={<NotebookPen />}
+                  title="Not written yet"
+                  subtitle="This course is graded with the built-in approach and your rules only"
+                  actions={
+                    <Button small variant="primary" icon={<Pencil />} onClick={() => setEditing(true)}>
+                      Write guidance
+                    </Button>
+                  }
+                />
+                <div className="flex flex-col gap-3 px-[18px] py-4">
+                  <div className="rounded-lg border border-dashed border-ink-faint bg-paper/60 px-3.5 py-3 text-[13px] leading-relaxed text-ink-muted">
+                    <div className="eyebrow mb-1">For example</div>
+                    “These are second-year students. Judge mainly whether the program works and the classes are designed sensibly.
+                    Don’t be strict about formatting; mention it as a suggestion. Be encouraging in the feedback.”
+                  </div>
+                  <p className="text-xs text-ink-muted">
+                    One paragraph is enough. It sets the tone for this group, for example more lenient for C++ basics than for
+                    Advanced Java.
+                  </p>
                 </div>
-                <p className="text-xs text-ink-muted">
-                  One paragraph is enough. It sets the tone for this group, for example more lenient for C++ basics than for
-                  Advanced Java.
-                </p>
-              </div>
-            </Card>
+              </Card>
+            )}
             <Card>
               <CardHeader title="What to write here" subtitle="Anything true for every assignment of this course" />
               <ul className="flex flex-col gap-2.5 px-[18px] py-4 text-[13px]">
-                <Bullet title="Level of the group">beginners, second-year, mixed experience</Bullet>
+                <Bullet title="Level of the group">what they already know, their age or year</Bullet>
                 <Bullet title="How strict to be">what costs points and what is only a suggestion</Bullet>
-                <Bullet title="What matters most">working code, class design, the pattern of the week</Bullet>
-                <Bullet title="Feedback tone">encouraging, short, concrete next steps</Bullet>
+                <Bullet title="What matters most">working code, class design, best practices</Bullet>
+                <Bullet title="Feedback tone">how to speak to this group</Bullet>
               </ul>
+              <p className="border-t border-line px-[18px] py-3 text-[11px] text-ink-muted">
+                The grader reads it after the built-in approach and before your rules; your rules still decide the points.
+              </p>
             </Card>
           </div>
-        )
-      }
+          {editing && <GuidanceModal courseId={courseId} text={data.courseGuidance ?? ""} onClose={() => setEditing(false)} />}
+        </>
+      )}
     </LayerPage>
+  );
+}
+
+function GuidanceModal({ courseId, text, onClose }: { courseId: string; text: string; onClose: () => void }) {
+  const [value, setValue] = useState(text);
+  const save = useSetCourseGuidance(courseId);
+  const removing = value.trim().length === 0 && text.length > 0;
+
+  return (
+    <Modal
+      title={text ? "Edit course guidance" : "Write course guidance"}
+      subtitle={<CourseName courseId={courseId} />}
+      onClose={onClose}
+      busy={save.isPending}
+      size="max-w-2xl"
+      footer={
+        <>
+          <Button onClick={onClose} disabled={save.isPending}>
+            Cancel
+          </Button>
+          <Button variant={removing ? "danger" : "primary"} onClick={() => save.mutate(value.trim(), { onSuccess: onClose })} disabled={save.isPending}>
+            {save.isPending ? "Saving…" : removing ? "Remove guidance" : "Save"}
+          </Button>
+        </>
+      }
+    >
+      <div className="flex shrink-0 flex-col gap-1.5 px-5 py-4">
+        <label htmlFor="course-guidance" className="eyebrow">
+          How to grade this course
+        </label>
+        <textarea
+          id="course-guidance"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          maxLength={4000}
+          rows={14}
+          autoFocus
+          placeholder="These are second-year students. Judge mainly whether the program works and the classes are designed sensibly…"
+          className="field min-h-[300px] resize-y py-2 leading-relaxed"
+        />
+        <span className="text-[11px] text-ink-muted">
+          {value.trim().length} / 4000 characters · applies to the next grading in this course
+          {removing ? " · empty removes the guidance" : ""}
+        </span>
+        {save.isError && <ErrorPanel error={save.error} />}
+      </div>
+    </Modal>
   );
 }
 

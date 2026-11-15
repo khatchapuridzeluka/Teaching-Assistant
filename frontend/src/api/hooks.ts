@@ -66,6 +66,51 @@ export const useGradingGuidance = (courseId: string) =>
     queryFn: () => unwrap(api.GET("/courses/{courseId}/grading-guidance", { params: { path: { courseId } } })),
   });
 
+const isGradingGuidance = (query: { queryKey: readonly unknown[] }) => query.queryKey.includes("grading-guidance");
+
+export const useSetCourseGuidance = (courseId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (text: string) =>
+      unwrap(api.PUT("/courses/{courseId}/grading-guidance/course-guidance", { params: { path: { courseId } }, body: { text } })),
+    onSuccess: (guidance) => {
+      queryClient.setQueryData(["courses", courseId, "grading-guidance"], guidance);
+    },
+  });
+};
+
+export const useAddPrinciple = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ title, detail }: { title: string; detail: string }) =>
+      unwrap(api.POST("/grading-principles", { body: { title, detail } })),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ predicate: isGradingGuidance });
+    },
+  });
+};
+
+export const useUpdatePrinciple = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, title, detail }: { id: string; title: string; detail: string }) =>
+      unwrap(api.PUT("/grading-principles/{id}", { params: { path: { id } }, body: { title, detail } })),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ predicate: isGradingGuidance });
+    },
+  });
+};
+
+export const useDeletePrinciple = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => unwrap(api.DELETE("/grading-principles/{id}", { params: { path: { id } } })),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ predicate: isGradingGuidance });
+    },
+  });
+};
+
 export const useStudentOverview = (courseId: string, userId: string) =>
   useQuery({
     queryKey: ["courses", courseId, "students", userId, "overview", "gradings"],

@@ -14,6 +14,3 @@ public enum PolicyEffect
 /// scope are for people; Detail is the exact instruction the grader gets.
 /// </summary>
 public sealed record PolicyRule(string Title, PolicyEffect Effect, double? Points, string? PointsPer, string Covers, string Detail);
-
-/// <summary>A principle of how the grader works, the same for every course: a short title and the exact instruction.</summary>
-public sealed record GradingPrinciple(string Title, string Detail);

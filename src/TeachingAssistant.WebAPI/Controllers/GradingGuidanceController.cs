@@ -17,12 +17,24 @@ public class GradingGuidanceController : ControllerBase
     }
 
     /// <summary>
-    /// Returns what the course is graded with: the course's own guidance (none yet), the grader's built-in approach and the grading rules, each with the exact text the grader receives.
+    /// Returns what the course is graded with: the course's own guidance, the grader's built-in approach and the grading rules, each with the exact text the grader receives.
     /// </summary>
     /// <response code="200">Guidance retrieved successfully</response>
     [HttpGet]
     public async Task<ActionResult<GradingGuidanceResponse>> GetAsync(string courseId, CancellationToken cancellationToken)
     {
         return Ok(await _guidanceService.GetAsync(courseId, cancellationToken));
+    }
+
+    /// <summary>
+    /// Sets the course's own grading guidance (an empty text removes it) and returns the course's guidance; the course's next grading uses it.
+    /// </summary>
+    /// <response code="200">Guidance saved</response>
+    /// <response code="400">The text is too long</response>
+    [HttpPut("course-guidance")]
+    public async Task<ActionResult<GradingGuidanceResponse>> SetCourseGuidanceAsync(
+        string courseId, CourseGuidanceRequest request, CancellationToken cancellationToken)
+    {
+        return Ok(await _guidanceService.SetCourseGuidanceAsync(courseId, request, cancellationToken));
     }
 }

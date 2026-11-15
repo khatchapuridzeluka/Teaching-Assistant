@@ -60,6 +60,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IStudentAnalysisStore, StudentAnalysisStore>();
         services.AddScoped<IModelCallStore, ModelCallStore>();
         services.AddScoped<IMistakeAnalysisStore, MistakeAnalysisStore>();
+        services.AddScoped<IGradingPrincipleStore, GradingPrincipleStore>();
+        services.AddScoped<ICourseGuidanceStore, CourseGuidanceStore>();
 
         services.Configure<StorageOptions>(configuration.GetSection(StorageOptions.SectionName));
         services.AddSingleton<ISnapshotStorage, FileSystemSnapshotStorage>();

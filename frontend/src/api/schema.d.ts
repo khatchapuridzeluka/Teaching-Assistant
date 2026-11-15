@@ -1095,7 +1095,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Returns what the course is graded with: the course's own guidance (none yet), the grader's built-in approach and the grading rules, each with the exact text the grader receives. */
+        /** Returns what the course is graded with: the course's own guidance, the grader's built-in approach and the grading rules, each with the exact text the grader receives. */
         get: {
             parameters: {
                 query?: never;
@@ -1121,6 +1121,193 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/courses/{courseId}/grading-guidance/course-guidance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Sets the course's own grading guidance (an empty text removes it) and returns the course's guidance; the course's next grading uses it. */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    courseId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["CourseGuidanceRequest"];
+                    "text/json": components["schemas"]["CourseGuidanceRequest"];
+                    "application/*+json": components["schemas"]["CourseGuidanceRequest"];
+                };
+            };
+            responses: {
+                /** @description Guidance saved */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GradingGuidanceResponse"];
+                    };
+                };
+                /** @description The text is too long */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/grading-principles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Adds a built-in grading principle after the existing ones; every course's next grading uses it. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["GradingPrincipleRequest"];
+                    "text/json": components["schemas"]["GradingPrincipleRequest"];
+                    "application/*+json": components["schemas"]["GradingPrincipleRequest"];
+                };
+            };
+            responses: {
+                /** @description Principle added */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GradingPrincipleResponse"];
+                    };
+                };
+                /** @description Title or text is empty or too long */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/grading-principles/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Changes a built-in grading principle's title and text; every course's next grading uses the new text. */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["GradingPrincipleRequest"];
+                    "text/json": components["schemas"]["GradingPrincipleRequest"];
+                    "application/*+json": components["schemas"]["GradingPrincipleRequest"];
+                };
+            };
+            responses: {
+                /** @description Principle updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GradingPrincipleResponse"];
+                    };
+                };
+                /** @description Title or text is empty or too long */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No principle with this ID, or it is deleted */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        /** Deletes a built-in grading principle (it is only marked deleted); every course's next grading leaves it out. */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Principle deleted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No principle with this ID, or it is already deleted */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
         options?: never;
         head?: never;
         patch?: never;
@@ -2804,6 +2991,9 @@ export interface components {
         ContentOrigin: "Drive" | "GitHub" | "Link" | "Upload";
         /** @enum {string} */
         ContentStatus: "Stored" | "Extracted" | "Unsupported" | "TooLarge";
+        CourseGuidanceRequest: {
+            text?: string | null;
+        };
         CourseResponse: {
             id: string;
             name: string;
@@ -2954,12 +3144,22 @@ export interface components {
         };
         GradingGuidanceResponse: {
             courseGuidance?: string | null;
+            /** Format: date-time */
+            courseGuidanceUpdatedAt?: string | null;
             approach: components["schemas"]["GradingPrincipleResponse"][];
             rules: components["schemas"]["PolicyRuleResponse"][];
         };
-        GradingPrincipleResponse: {
+        GradingPrincipleRequest: {
             title: string;
             detail: string;
+        };
+        GradingPrincipleResponse: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            detail: string;
+            /** Format: date-time */
+            updatedAt: string;
         };
         GradingReportResponse: {
             /** Format: uuid */
