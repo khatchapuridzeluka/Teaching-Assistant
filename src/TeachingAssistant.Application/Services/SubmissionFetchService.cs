@@ -21,6 +21,7 @@ public class SubmissionFetchService : ISubmissionFetchService
 
     private readonly ISubmissionSource _submissionSource;
     private readonly IRemoteFileSource _fileSource;
+    private readonly IRepositorySource _repositorySource;
     private readonly ISnapshotStorage _storage;
     private readonly ISubmissionStore _store;
     private readonly IInstructionsFetchService _instructionsFetch;
@@ -30,6 +31,7 @@ public class SubmissionFetchService : ISubmissionFetchService
     public SubmissionFetchService(
         ISubmissionSource submissionSource,
         IRemoteFileSource fileSource,
+        IRepositorySource repositorySource,
         ISnapshotStorage storage,
         ISubmissionStore store,
         IInstructionsFetchService instructionsFetch,
@@ -37,6 +39,7 @@ public class SubmissionFetchService : ISubmissionFetchService
     {
         _submissionSource = submissionSource;
         _fileSource = fileSource;
+        _repositorySource = repositorySource;
         _storage = storage;
         _store = store;
         _instructionsFetch = instructionsFetch;
@@ -217,19 +220,22 @@ public class SubmissionFetchService : ISubmissionFetchService
         {
             foreach (var content in missing)
             {
-                var file = current.FirstOrDefault(c => c.Fingerprint.ExternalId == content.ExternalId)?.File;
-                if (file is null)
+                var source = current.FirstOrDefault(c => c.Fingerprint.ExternalId == content.ExternalId);
+                if (source?.File is { } file)
                 {
-                    continue;
+                    await _storage.RestoreOriginalAsync(version.StoragePath, content.StoredName!,
+                        stream => LimitedAsync(async () =>
+                        {
+                            await _fileSource.DownloadAsync(file, stream, cancellationToken);
+                            return true;
+                        }, cancellationToken),
+                        cancellationToken);
                 }
-
-                await _storage.RestoreOriginalAsync(version.StoragePath, content.StoredName!,
-                    stream => LimitedAsync(async () =>
-                    {
-                        await _fileSource.DownloadAsync(file, stream, cancellationToken);
-                        return true;
-                    }, cancellationToken),
-                    cancellationToken);
+                else if (source?.Repository is { } repository)
+                {
+                    await _storage.RestoreOriginalAsync(version.StoragePath, content.StoredName!,
+                        stream => DownloadRepositoryAsync(repository, stream, cancellationToken), cancellationToken);
+                }
             }
         }
         catch (Exception ex) when (ex is SubmissionSourceNotFoundException or SubmissionSourceUnavailableException)
@@ -283,10 +289,29 @@ public class SubmissionFetchService : ISubmissionFetchService
                         $"Could not read '{attachment.Title}': {ex.Message} Skipped; retried on the next fetch."), Failed: true);
                 }
 
+            case { Kind: AttachmentKind.Link, Url: { } url } when IsGitHub(url):
+                try
+                {
+                    var repository = await LimitedAsync(() => _repositorySource.ResolveAsync(url, cancellationToken), cancellationToken);
+                    return new DescribedAttachment(new CurrentContent(
+                        new ContentFingerprint(ContentOrigin.GitHub, url, repository.CommitSha), null, attachment.Title, repository), null);
+                }
+                catch (SubmissionSourceNotFoundException ex)
+                {
+                    // Private, renamed or deleted: recorded with the reason, so the teacher sees it; a later fetch picks the
+                    // code up once the student makes the repository public.
+                    return new DescribedAttachment(new CurrentContent(
+                        new ContentFingerprint(ContentOrigin.GitHub, url, url), null, attachment.Title, NotFoundReason: ex.Message), null);
+                }
+                catch (SubmissionSourceUnavailableException ex)
+                {
+                    return new DescribedAttachment(null, new FetchProblem(item.StudentName,
+                        $"Could not read '{attachment.Title}': {ex.Message} Skipped; retried on the next fetch."), Failed: true);
+                }
+
             case { Kind: AttachmentKind.Link, Url: { } url }:
-                var origin = IsGitHub(url) ? ContentOrigin.GitHub : ContentOrigin.Link;
                 return new DescribedAttachment(
-                    new CurrentContent(new ContentFingerprint(origin, url, url), null, attachment.Title), null);
+                    new CurrentContent(new ContentFingerprint(ContentOrigin.Link, url, url), null, attachment.Title), null);
 
             default:
                 return new DescribedAttachment(null,
@@ -304,9 +329,12 @@ public class SubmissionFetchService : ISubmissionFetchService
 
         try
         {
-            results = await Task.WhenAll(current.Select(content => content.File is { } file
-                ? StoreFileAsync(writer, file, cancellationToken)
-                : Task.FromResult(LinkContent(content))));
+            results = await Task.WhenAll(current.Select(content => content switch
+            {
+                { File: { } file } => StoreFileAsync(writer, file, cancellationToken),
+                { Repository: { } repository } => StoreRepositoryAsync(writer, content, repository, cancellationToken),
+                _ => Task.FromResult(LinkContent(content)),
+            }));
 
             extraction = await writer.ExtractCodeAsync(results
                 .Where(r => r.Content.StoredName is not null)
@@ -371,6 +399,26 @@ public class SubmissionFetchService : ISubmissionFetchService
         return new StoredContent(content, notStoredReason);
     }
 
+    private async Task<StoredContent> StoreRepositoryAsync(
+        ISnapshotWriter writer, CurrentContent content, RepositorySnapshot repository, CancellationToken cancellationToken)
+    {
+        var storedName = await writer.AddOriginalAsync(repository.DownloadName,
+            stream => DownloadRepositoryAsync(repository, stream, cancellationToken), cancellationToken);
+        var url = content.Fingerprint.ExternalId;
+        var versionContent = new VersionContent(ContentOrigin.GitHub, ContentKind.Repository, url, content.Title ?? repository.FullName,
+            "application/zip", repository.CommitSha, repository.Ref, null, storedName, null, ContentStatus.Stored);
+        return new StoredContent(versionContent, null);
+    }
+
+    private Task<bool> DownloadRepositoryAsync(RepositorySnapshot repository, Stream stream, CancellationToken cancellationToken)
+    {
+        return LimitedAsync(async () =>
+        {
+            await _repositorySource.DownloadAsync(repository, stream, cancellationToken);
+            return true;
+        }, cancellationToken);
+    }
+
     private static StoredContent LinkContent(CurrentContent content)
     {
         var url = content.Fingerprint.ExternalId;
@@ -379,7 +427,7 @@ public class SubmissionFetchService : ISubmissionFetchService
         var versionContent = new VersionContent(content.Fingerprint.Origin, isRepository ? ContentKind.Repository : ContentKind.Other,
             url, content.Title ?? url, null, content.Fingerprint.Fingerprint, null, null, null, null, ContentStatus.Unsupported);
         return new StoredContent(versionContent,
-            isRepository ? $"GitHub repository {url} is not fetched yet." : $"Link {url} cannot be downloaded.");
+            isRepository ? content.NotFoundReason ?? $"GitHub repository {url} could not be fetched." : $"Link {url} cannot be downloaded.");
     }
 
     internal static string? ExtractionDetail(CodeExtraction extraction) =>
@@ -405,7 +453,9 @@ public class SubmissionFetchService : ISubmissionFetchService
 
     private sealed record FolderNames(string CourseName, string AssignmentTitle);
 
-    private sealed record CurrentContent(ContentFingerprint Fingerprint, RemoteFile? File, string? Title = null);
+    private sealed record CurrentContent(
+        ContentFingerprint Fingerprint, RemoteFile? File, string? Title = null, RepositorySnapshot? Repository = null,
+        string? NotFoundReason = null);
 
     private sealed record DescribedAttachment(CurrentContent? Content, FetchProblem? Problem, bool Failed = false);
 

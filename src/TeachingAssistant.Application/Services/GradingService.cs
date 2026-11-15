@@ -465,7 +465,7 @@ public class GradingService : IGradingService
     {
         foreach (var content in version.Contents)
         {
-            if (content.Kind is ContentKind.CodeArchive or ContentKind.SourceFile)
+            if (ContentClassifier.IsCode(content.Kind))
             {
                 continue;
             }

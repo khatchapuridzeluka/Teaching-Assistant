@@ -14,11 +14,12 @@ public class SubmissionFetchServiceTests
 {
     private readonly FakeSubmissionSource _source = new();
     private readonly FakeFileSource _files = new();
+    private readonly FakeRepositories _repositories = new();
     private readonly FakeStorage _storage = new();
     private readonly FakeStore _store = new();
     private readonly FakeInstructionsFetch _instructions = new();
 
-    private SubmissionFetchService Service() => new(_source, _files, _storage, _store, _instructions, TimeProvider.System);
+    private SubmissionFetchService Service() => new(_source, _files, _repositories, _storage, _store, _instructions, TimeProvider.System);
 
     private Task<FetchSummary> FetchAsync() => Service().FetchAsync("course-1", "assignment-1", TestContext.Current.CancellationToken);
 
@@ -168,21 +169,84 @@ public class SubmissionFetchServiceTests
     }
 
     [Fact]
-    public async Task GitHubLink_IsRecordedAsUnsupportedNextToStoredFiles()
+    public async Task GitHubLink_IsDownloadedAtItsCommit_AndExtractedLikeAnArchive()
     {
         _files.Add("file-1", "report.docx", "md5-a");
-        _source.Add("sub-1", "Ana K.", "TURNED_IN", DriveAttachment("file-1"),
-            new SubmissionAttachment(AttachmentKind.Link, "library", "https://github.com/ana/library", null));
+        _repositories.Commits["https://github.com/ana/library"] = "1111111aaaa";
+        _source.Add("sub-1", "Ana K.", "TURNED_IN", DriveAttachment("file-1"), GitHubAttachment("https://github.com/ana/library"));
 
         var summary = await FetchAsync();
 
         var version = Assert.Single(Assert.Single(_store.Submissions).Versions);
-        Assert.Equal(VersionStatus.PartiallySupported, version.Status);
+        Assert.Equal(VersionStatus.Ready, version.Status);
         var repository = version.Contents.Single(c => c.Origin == ContentOrigin.GitHub);
-        Assert.Equal(ContentKind.Repository, repository.Kind);
-        Assert.Equal(ContentStatus.Unsupported, repository.Status);
-        Assert.Null(repository.StoredName);
-        Assert.Contains(summary.Problems, p => p.Detail.Contains("not fetched yet"));
+        Assert.Equal((ContentKind.Repository, ContentStatus.Extracted, "1111111aaaa", "main", "library-1111111.zip"),
+            (repository.Kind, repository.Status, repository.Fingerprint, repository.Ref, repository.StoredName));
+        Assert.Equal("https://github.com/ana/library", repository.ExternalId);
+        Assert.Equal(1, _repositories.Downloads);
+        Assert.Empty(summary.Problems);
+    }
+
+    [Fact]
+    public async Task ANewPushToTheSameRepository_BecomesANewVersion_AndAnUnchangedOneDownloadsNothing()
+    {
+        _repositories.Commits["https://github.com/ana/library"] = "1111111aaaa";
+        _source.Add("sub-1", "Ana K.", "TURNED_IN", GitHubAttachment("https://github.com/ana/library"));
+        await FetchAsync();
+
+        var unchanged = await FetchAsync();
+        _repositories.Commits["https://github.com/ana/library"] = "2222222bbbb";
+        var pushed = await FetchAsync();
+
+        Assert.Equal((1, 0), (unchanged.Unchanged, unchanged.NewVersions));
+        Assert.Equal(1, pushed.NewVersions);
+        Assert.Equal(["1111111aaaa", "2222222bbbb"],
+            Assert.Single(_store.Submissions).Versions.Select(v => v.Contents.Single().Fingerprint));
+        Assert.Equal(2, _repositories.Downloads);
+    }
+
+    [Fact]
+    public async Task APrivateRepository_IsRecordedWithTheReason_AndPickedUpOnceItIsPublic()
+    {
+        _source.Add("sub-1", "Ana K.", "TURNED_IN", GitHubAttachment("https://github.com/ana/secret"));
+
+        var hidden = await FetchAsync();
+        _repositories.Commits["https://github.com/ana/secret"] = "3333333cccc";
+        var visible = await FetchAsync();
+
+        var versions = Assert.Single(_store.Submissions).Versions;
+        Assert.Equal((VersionStatus.Failed, ContentStatus.Unsupported), (versions[0].Status, versions[0].Contents.Single().Status));
+        Assert.Contains(hidden.Problems, p => p.Detail.Contains("make it public"));
+        Assert.Equal(1, visible.NewVersions);
+        Assert.Equal(VersionStatus.Ready, versions[1].Status);
+    }
+
+    [Fact]
+    public async Task GitHubBeingUnavailable_SkipsTheStudent_UntilTheNextFetch()
+    {
+        _repositories.Unavailable = true;
+        _source.Add("sub-1", "Ana K.", "TURNED_IN", GitHubAttachment("https://github.com/ana/library"));
+
+        var summary = await FetchAsync();
+
+        Assert.Empty(Assert.Single(_store.Submissions).Versions);
+        Assert.Contains(summary.Problems, p => p.Detail.Contains("retried on the next fetch"));
+    }
+
+    [Fact]
+    public async Task AMissingRepositoryDownload_IsRestoredFromItsStoredCommit()
+    {
+        _repositories.Commits["https://github.com/ana/library"] = "1111111aaaa";
+        _source.Add("sub-1", "Ana K.", "TURNED_IN", GitHubAttachment("https://github.com/ana/library"));
+        await FetchAsync();
+        var path = Assert.Single(Assert.Single(_store.Submissions).Versions).StoragePath;
+        _storage.LostOriginals[$"{path}/library-1111111.zip"] = true;
+
+        var summary = await FetchAsync();
+
+        Assert.Equal([$"{path}/library-1111111.zip"], _storage.Restored);
+        Assert.Equal(["1111111aaaa", "1111111aaaa"], _repositories.Downloaded);
+        Assert.Contains(summary.Problems, p => p.Detail.Contains("downloaded again"));
     }
 
     [Fact]
@@ -278,6 +342,46 @@ public class SubmissionFetchServiceTests
 
     private static SubmissionAttachment DriveAttachment(string fileId) =>
         new(AttachmentKind.DriveFile, fileId, null, fileId);
+
+    private static SubmissionAttachment GitHubAttachment(string url) =>
+        new(AttachmentKind.Link, "library", url, null);
+
+    private sealed class FakeRepositories : IRepositorySource
+    {
+        private int _downloads;
+
+        // Public repositories by link, with their current commit; any other link is private or missing.
+        public ConcurrentDictionary<string, string> Commits { get; } = [];
+
+        public ConcurrentQueue<string> Downloaded { get; } = [];
+
+        public bool Unavailable { get; set; }
+
+        public int Downloads => _downloads;
+
+        public Task<RepositorySnapshot> ResolveAsync(string url, CancellationToken cancellationToken = default)
+        {
+            if (Unavailable)
+            {
+                throw new SubmissionSourceUnavailableException("GitHub's request limit is used up.");
+            }
+
+            if (!Commits.TryGetValue(url, out var sha))
+            {
+                throw new SubmissionSourceNotFoundException($"GitHub repository {url} was not found; ask the student to make it public.");
+            }
+
+            var name = url.Split('/')[^1];
+            return Task.FromResult(new RepositorySnapshot("ana", name, sha, "main"));
+        }
+
+        public async Task DownloadAsync(RepositorySnapshot snapshot, Stream destination, CancellationToken cancellationToken = default)
+        {
+            Interlocked.Increment(ref _downloads);
+            Downloaded.Enqueue(snapshot.CommitSha);
+            await destination.WriteAsync("PK"u8.ToArray(), cancellationToken);
+        }
+    }
 
     private sealed class FakeSubmissionSource : ISubmissionSource
     {
@@ -384,7 +488,7 @@ public class SubmissionFetchServiceTests
         {
             LostCode.TryRemove(versionPath, out _);
             ReExtracted.Add(versionPath);
-            var code = files.Where(f => f.Kind is ContentKind.CodeArchive or ContentKind.SourceFile).Select(f => f.StoredName).ToList();
+            var code = files.Where(f => ContentClassifier.IsCode(f.Kind)).Select(f => f.StoredName).ToList();
             return Task.FromResult(new CodeExtraction(code.Count > 0 ? "code-hash" : null, code.Count, code, []));
         }
 
@@ -406,7 +510,7 @@ public class SubmissionFetchServiceTests
             // Pretends every archive and source file extracts cleanly.
             public Task<CodeExtraction> ExtractCodeAsync(IReadOnlyList<ExtractableFile> files, CancellationToken cancellationToken = default)
             {
-                var code = files.Where(f => f.Kind is ContentKind.CodeArchive or ContentKind.SourceFile).Select(f => f.StoredName).ToList();
+                var code = files.Where(f => ContentClassifier.IsCode(f.Kind)).Select(f => f.StoredName).ToList();
                 return Task.FromResult(new CodeExtraction(code.Count > 0 ? "code-hash" : null, code.Count, code, []));
             }
 

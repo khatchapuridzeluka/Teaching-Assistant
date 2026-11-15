@@ -35,8 +35,8 @@ public static class CodeExtractor
         var extracted = new List<string>();
         var problems = new List<string>();
 
-        var codeFiles = files.Where(f => f.Kind is ContentKind.CodeArchive or ContentKind.SourceFile).ToList();
-        var archiveCount = codeFiles.Count(f => f.Kind == ContentKind.CodeArchive);
+        var codeFiles = files.Where(f => ContentClassifier.IsCode(f.Kind)).ToList();
+        var archiveCount = codeFiles.Count(f => ContentClassifier.IsArchive(f.Kind));
 
         foreach (var file in codeFiles)
         {

@@ -11,6 +11,7 @@ using TeachingAssistant.Application.Models;
 using TeachingAssistant.Application.Services;
 using TeachingAssistant.Application.Tools;
 using TeachingAssistant.Infrastructure.Documents;
+using TeachingAssistant.Infrastructure.GitHub;
 using TeachingAssistant.Infrastructure.Google;
 using TeachingAssistant.Infrastructure.Jobs;
 using TeachingAssistant.Infrastructure.LanguageModel;
@@ -33,6 +34,7 @@ public static class ServiceCollectionExtensions
         services.AddApplicationServices();
         services.AddLanguageModel(configuration);
         services.AddGoogle(configuration);
+        services.AddGitHub(configuration);
         services.AddPersistence(configuration);
         services.AddJobs(configuration);
 
@@ -176,6 +178,14 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<IModelCallStore>(),
             sp.GetRequiredService<ModelCallContext>(),
             sp.GetRequiredService<TimeProvider>()));
+
+        return services;
+    }
+
+    public static IServiceCollection AddGitHub(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.Configure<GitHubOptions>(configuration.GetSection(GitHubOptions.SectionName));
+        services.AddHttpClient<IRepositorySource, GitHubRepositorySource>(client => client.Timeout = TimeSpan.FromMinutes(5));
 
         return services;
     }

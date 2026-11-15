@@ -25,6 +25,12 @@ public static class ContentClassifier
             "application/x-rar-compressed", "application/x-7z-compressed", "application/x-tar", "application/gzip",
         }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>Kinds whose code is extracted into the version's code folder: archives, repositories and single source files.</summary>
+    public static bool IsCode(ContentKind kind) => kind is ContentKind.CodeArchive or ContentKind.Repository or ContentKind.SourceFile;
+
+    /// <summary>Kinds stored as an archive to unpack: an uploaded archive or a downloaded repository.</summary>
+    public static bool IsArchive(ContentKind kind) => kind is ContentKind.CodeArchive or ContentKind.Repository;
+
     public static ContentKind Classify(string fileName, string? mimeType)
     {
         var extension = Path.GetExtension(fileName);

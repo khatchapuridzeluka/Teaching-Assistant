@@ -33,6 +33,17 @@ public sealed class CodeExtractorTests : IDisposable
     }
 
     [Fact]
+    public void Extract_UnpacksADownloadedRepositoryLikeAnArchive()
+    {
+        Zip("library-1111111.zip", ("ana-library-1111111/src/Main.java", "class Main {}"), ("ana-library-1111111/.git/config", "x"));
+
+        var result = Extract(new ExtractableFile("library-1111111.zip", ContentKind.Repository));
+
+        Assert.Equal(["ana-library-1111111/src/Main.java"], Files());
+        Assert.Equal(["library-1111111.zip"], result.ExtractedStoredNames);
+    }
+
+    [Fact]
     public void Extract_NeverWritesOutsideTheCodeFolder()
     {
         Zip("evil.zip", ("../../escaped.txt", "x"), ("ok/Main.java", "class Main {}"));
