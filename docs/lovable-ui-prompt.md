@@ -2,7 +2,7 @@
 
 ## What the app is
 
-A desktop web app for one teacher who grades programming homework (Advanced Java, C++ basics) from Google Classroom.
+A desktop web app for one teacher who grades programming homework (Advanced Java) from Google Classroom.
 An AI agent drafts grades in the background; the teacher reviews, edits and approves. The UI is the teacher's
 workspace: calm, dense, professional — closer to Linear / GitHub PR review than to a colorful dashboard.
 

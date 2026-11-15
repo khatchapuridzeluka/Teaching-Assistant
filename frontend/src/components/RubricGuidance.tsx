@@ -59,7 +59,7 @@ export function RubricGuidance({ courseId, data }: { courseId: string; data: Gra
                   strict about formatting; mention it as a suggestion. Be encouraging in the feedback.”
                 </div>
                 <p className="text-xs text-ink-muted">
-                  One paragraph is enough. It sets the tone for this group, for example more lenient for C++ basics than for Advanced Java.
+                  One paragraph is enough. It sets the tone for this group, for example more lenient for a younger group than for an advanced one.
                 </p>
               </div>
             </Card>

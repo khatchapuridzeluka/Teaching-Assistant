@@ -5,15 +5,13 @@ Demo Day: **Nov 28** — 5 min demo + 10 min Q&A, jury grades on predefined crit
 
 ## The problem
 
-The author teaches two groups:
-- **Advanced Java — 15 students.** Advanced OOP, class design, design patterns, console I/O now; SQL, Maven/Gradle, Spring Boot, multithreading coming soon.
-- **C++ basics — 15 students.** Nested loops, sorting, simple console programs.
+The author teaches **Advanced Java**, up to 8 students per course: advanced OOP, class design, design patterns, console I/O now; SQL, Maven/Gradle, Spring Boot, multithreading coming soon.
 
 Today grading means: download each submission from Google Classroom, send it to Claude with the grading plan, then correct the result by hand. Plus writing a personal overview for every student. It takes hours.
 
 ## Scope order
 
-**Java first** (hardest case — if it handles Java, C++ basics is easy), starting with class design and design patterns, then SQL/Maven/Gradle/Spring Boot. C++ later.
+Java only, starting with class design and design patterns, then SQL/Maven/Gradle/Spring Boot.
 
 ## The product (priority order)
 
@@ -72,7 +70,7 @@ Previously graded homework exists (Claude-drafted, teacher-corrected). Use it as
 ## Tech stack
 
 - **Web app**, run locally first (single user, no auth yet), deployed to GCP later.
-- **Backend:** C# / ASP.NET Core API (the tool is .NET even though graded code is Java/C++). Written and reviewed carefully by the teacher — all grading logic, agents and data live here.
+- **Backend:** C# / ASP.NET Core API (the tool is .NET even though graded code is Java). Written and reviewed carefully by the teacher — all grading logic, agents and data live here.
 - **Frontend:** React + Vite + TypeScript, Tailwind + shadcn/ui, `@monaco-editor/react` (code viewer, inline comments, diff), Recharts, TanStack Query. **Mostly AI-generated ("vibe-coded")** — so it must stay a thin client: no grading/business logic in the frontend, it only displays and edits what the API returns.
 - **API contract first:** endpoints and DTOs defined in the backend, exposed via **Swashbuckle** (Swagger UI at `/swagger`, spec at `/swagger/v1/swagger.json`; not Microsoft.AspNetCore.OpenApi); TypeScript types are generated from it, never hand-written.
 - **Microsoft Agent Framework** (`Microsoft.Agents.AI`) for agents with tools, over the Anthropic SDK's `IChatClient` — Semantic Kernel is in maintenance mode since Agent Framework 1.0 (April 2026). A tool is a method marked `[AgentTool("name")]` with a `[Description]`, in a class under `Application/Tools/`: a small adapter that calls an existing service and returns only what the model needs, with failures returned as text. Infrastructure registers every marked method; only Infrastructure references the framework
