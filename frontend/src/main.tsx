@@ -16,16 +16,7 @@ import { DraftsPage } from "./pages/DraftsPage";
 import { GradebookPage } from "./pages/GradebookPage";
 import { InstructionsPage } from "./pages/InstructionsPage";
 import { ReviewQueuePage } from "./pages/ReviewQueuePage";
-import {
-  RubricApproachPage,
-  RubricAssignmentNotesPage,
-  RubricGuidancePage,
-  RubricInstructionsPage,
-  rubricLayers,
-  RubricNotesPage,
-  RubricPolicyPage,
-  RubricRulesPage,
-} from "./pages/RubricPolicyPage";
+import { RubricLegacyRedirect, RubricPolicyPage } from "./pages/RubricPolicyPage";
 import { SystemPage } from "./pages/SystemPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { StudentMistakesPage } from "./pages/StudentMistakesPage";
@@ -118,45 +109,10 @@ const router = createBrowserRouter([
           },
           {
             path: "rubric",
-            handle: {
-              crumbs: ({ courseId }) => [{ label: "Rubric & policy", to: `/courses/${courseId}/rubric` }],
-            } satisfies CrumbHandle,
-            children: [
-              { index: true, element: <RubricPolicyPage /> },
-              ...(
-                [
-                  ["approach", <RubricApproachPage />],
-                  ["guidance", <RubricGuidancePage />],
-                  ["rules", <RubricRulesPage />],
-                  ["instructions", <RubricInstructionsPage />],
-                ] as const
-              ).map(([path, element]) => ({
-                path,
-                element,
-                handle: {
-                  crumbs: () => [{ label: rubricLayers.find((l) => l.key === path)!.label }],
-                } satisfies CrumbHandle,
-              })),
-              {
-                path: "notes",
-                handle: {
-                  crumbs: ({ courseId }) => [{ label: "Assignment notes", to: `/courses/${courseId}/rubric/notes` }],
-                } satisfies CrumbHandle,
-                children: [
-                  { index: true, element: <RubricNotesPage /> },
-                  {
-                    path: ":assignmentId",
-                    element: <RubricAssignmentNotesPage />,
-                    handle: {
-                      crumbs: ({ courseId, assignmentId }) => [
-                        { label: <AssignmentTitle courseId={courseId!} assignmentId={assignmentId!} /> },
-                      ],
-                    } satisfies CrumbHandle,
-                  },
-                ],
-              },
-            ],
+            element: <RubricPolicyPage />,
+            handle: { crumbs: () => [{ label: "Rubric & policy" }] } satisfies CrumbHandle,
           },
+          { path: "rubric/*", element: <RubricLegacyRedirect /> },
           {
             path: "gradebook",
             element: <GradebookPage />,
