@@ -18,18 +18,25 @@ import {
   Sparkles,
   Trash2,
 } from "lucide-react";
-import type { Assignment, GradingGuidance, GradingPrinciple, PolicyRule } from "../api/client";
+import type { Assignment, AssignmentNote, GradingGuidance, GradingPrinciple, PolicyEffect, PolicyRule } from "../api/client";
 import {
+  useAddNote,
   useAddPrinciple,
+  useAddRule,
+  useAssignmentNotes,
   useAssignments,
+  useDeleteNote,
   useDeletePrinciple,
+  useDeleteRule,
   useGradingGuidance,
   useSetCourseGuidance,
+  useUpdateNote,
   useUpdatePrinciple,
+  useUpdateRule,
 } from "../api/hooks";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { CourseName } from "../components/Layout";
-import { Button, buttonClass, Card, CardHeader, Chip, ErrorPanel, Modal, PageHeader, Spinner, Stat, StatStrip } from "../components/ui";
+import { Button, buttonClass, Card, CardHeader, Chip, ErrorPanel, Modal, PageHeader, Segmented, Spinner, Stat, StatStrip } from "../components/ui";
 import { formatDate, formatDay, formatPoints } from "../format";
 
 type LayerKey = "approach" | "guidance" | "rules" | "instructions" | "notes";
@@ -74,7 +81,7 @@ export function RubricPolicyPage() {
         : "From Classroom, per assignment",
       empty: false,
     },
-    notes: { text: "None yet: extra criteria or a rule that differs for one assignment", empty: true },
+    notes: noteSummary(data?.notes ?? []),
   };
 
   return (
@@ -87,7 +94,7 @@ export function RubricPolicyPage() {
             <CourseName courseId={courseId} /> · everything the grader is told before it reads a student's work, in the order it gets it
           </>
         }
-        actions={<Chip tone="outline">Rules and notes: editing comes next</Chip>}
+        actions={<Chip tone="outline">Edit any layer from its page</Chip>}
       />
 
       {guidance.isError && <ErrorPanel error={guidance.error} />}
@@ -151,10 +158,14 @@ function LayerPage({
   layerKey,
   children,
   actions,
+  heading,
+  purpose,
 }: {
   layerKey: LayerKey;
   children: (data: GradingGuidance, assignments: Assignment[]) => ReactNode;
   actions?: ReactNode;
+  heading?: ReactNode;
+  purpose?: ReactNode;
 }) {
   const { courseId = "" } = useParams();
   const guidance = useGradingGuidance(courseId);
@@ -169,10 +180,10 @@ function LayerPage({
     <>
       <PageHeader
         lead={<Lead icon={layer.icon} />}
-        title={layer.label}
+        title={heading ?? layer.label}
         subtitle={
           <>
-            <CourseName courseId={courseId} /> · layer {index + 1} of {rubricLayers.length} · {layer.purpose}
+            <CourseName courseId={courseId} /> · layer {index + 1} of {rubricLayers.length} · {purpose ?? layer.purpose}
           </>
         }
         actions={actions ?? <Chip tone="outline">Read-only for now</Chip>}
@@ -320,13 +331,56 @@ function AddPrincipleCard({ onClick }: { onClick: () => void }) {
 
 // Adds a principle when principle is null, otherwise edits it.
 function PrincipleModal({ principle, position, onClose }: { principle: GradingPrinciple | null; position: number; onClose: () => void }) {
-  const [title, setTitle] = useState(principle?.title ?? "");
-  const [detail, setDetail] = useState(principle?.detail ?? "");
-  const [tried, setTried] = useState(false);
   const add = useAddPrinciple();
   const update = useUpdatePrinciple();
-  const saving = add.isPending || update.isPending;
-  const failed = add.isError ? add.error : update.isError ? update.error : null;
+  return (
+    <TitleTextModal
+      heading={principle ? "Edit principle" : `Add principle ${position}`}
+      subtitle={principle ? "Applies to the next grading in every course" : "Added at the end; applies to the next grading in every course"}
+      submitLabel={principle ? "Save" : "Add principle"}
+      initialTitle={principle?.title ?? ""}
+      initialDetail={principle?.detail ?? ""}
+      titlePlaceholder="Check the printed output"
+      detailPlaceholder="When the instructions show an example run, compare the student's output with it line by line."
+      saving={add.isPending || update.isPending}
+      error={add.isError ? add.error : update.isError ? update.error : null}
+      onSave={(body) =>
+        principle ? update.mutate({ id: principle.id, ...body }, { onSuccess: onClose }) : add.mutate(body, { onSuccess: onClose })
+      }
+      onClose={onClose}
+    />
+  );
+}
+
+// A small modal with a short title (for the teacher) and the text the grader gets; used for principles and notes.
+function TitleTextModal({
+  heading,
+  subtitle,
+  submitLabel,
+  initialTitle,
+  initialDetail,
+  titlePlaceholder,
+  detailPlaceholder,
+  saving,
+  error,
+  onSave,
+  onClose,
+}: {
+  heading: string;
+  subtitle: ReactNode;
+  submitLabel: string;
+  initialTitle: string;
+  initialDetail: string;
+  titlePlaceholder: string;
+  detailPlaceholder: string;
+  saving: boolean;
+  error: unknown;
+  onSave: (body: { title: string; detail: string }) => void;
+  onClose: () => void;
+}) {
+  const [title, setTitle] = useState(initialTitle);
+  const [detail, setDetail] = useState(initialDetail);
+  const [tried, setTried] = useState(false);
   const missing = title.trim().length === 0 || detail.trim().length === 0;
 
   function save() {
@@ -334,18 +388,13 @@ function PrincipleModal({ principle, position, onClose }: { principle: GradingPr
     if (missing) {
       return;
     }
-    const body = { title: title.trim(), detail: detail.trim() };
-    if (principle) {
-      update.mutate({ id: principle.id, ...body }, { onSuccess: onClose });
-    } else {
-      add.mutate(body, { onSuccess: onClose });
-    }
+    onSave({ title: title.trim(), detail: detail.trim() });
   }
 
   return (
     <Modal
-      title={principle ? "Edit principle" : `Add principle ${position}`}
-      subtitle={principle ? "Applies to the next grading in every course" : "Added at the end; applies to the next grading in every course"}
+      title={heading}
+      subtitle={subtitle}
       onClose={onClose}
       busy={saving}
       size="max-w-xl"
@@ -355,7 +404,7 @@ function PrincipleModal({ principle, position, onClose }: { principle: GradingPr
             Cancel
           </Button>
           <Button variant="primary" onClick={save} disabled={saving}>
-            {saving ? "Saving…" : principle ? "Save" : "Add principle"}
+            {saving ? "Saving…" : submitLabel}
           </Button>
         </>
       }
@@ -374,7 +423,7 @@ function PrincipleModal({ principle, position, onClose }: { principle: GradingPr
             onChange={(e) => setTitle(e.target.value)}
             maxLength={120}
             className="field"
-            placeholder="Check the printed output"
+            placeholder={titlePlaceholder}
             autoFocus
           />
           <span className="text-[11px] text-ink-muted">Short, for you; the grader does not see it</span>
@@ -384,7 +433,7 @@ function PrincipleModal({ principle, position, onClose }: { principle: GradingPr
           <textarea
             value={detail}
             onChange={(e) => setDetail(e.target.value)}
-            placeholder="When the instructions show an example run, compare the student's output with it line by line."
+            placeholder={detailPlaceholder}
             maxLength={2000}
             rows={7}
             className="field min-h-[170px] resize-y py-2 leading-relaxed"
@@ -392,7 +441,7 @@ function PrincipleModal({ principle, position, onClose }: { principle: GradingPr
           <span className="text-[11px] text-ink-muted">{detail.trim().length} / 2000 characters</span>
         </label>
         {tried && missing && <p className="text-xs text-danger">Enter a title and a text.</p>}
-        {failed && <ErrorPanel error={failed} />}
+        {error != null && <ErrorPanel error={error} />}
       </form>
     </Modal>
   );
@@ -534,26 +583,61 @@ function GuidanceModal({ courseId, text, onClose }: { courseId: string; text: st
 // ---------- 3. Your rules ----------
 
 export function RubricRulesPage() {
+  // null: closed; "new": adding; a rule: editing it.
+  const [editing, setEditing] = useState<PolicyRule | "new" | null>(null);
+  const [deleting, setDeleting] = useState<PolicyRule | null>(null);
+  const remove = useDeleteRule();
+
   return (
-    <LayerPage layerKey="rules">
+    <LayerPage layerKey="rules" actions={<Chip tone="outline">Same for every course</Chip>}>
       {(data) => {
         const free = data.rules.filter((r) => r.effect === "NoDeduction").length;
         return (
           <>
             <StatStrip columns={3}>
-              <Stat label="Rules" value={data.rules.length} note="for this course" />
+              <Stat label="Rules" value={data.rules.length} note="same for every course" />
               <Stat label="No deduction" value={free} note="listed as suggestions" tone={free > 0 ? "good" : undefined} />
               <Stat label="Deduction" value={data.rules.length - free} note="fixed points each time" />
             </StatStrip>
             <Explainer>
               A rule is a judgement call the grader must make the same way for every student. Rules override the built-in
-              approach; an assignment note can still change a rule for one assignment.
+              approach and the course guidance; an assignment note can still change a rule for one assignment. A change here
+              applies to the next grading in every course.
             </Explainer>
+            {remove.isError && <ErrorPanel error={remove.error} />}
             <div className="flex flex-col gap-3">
               {data.rules.map((rule, i) => (
-                <RuleCard key={rule.title} n={i + 1} rule={rule} />
+                <RuleCard key={rule.id} n={i + 1} rule={rule} onEdit={() => setEditing(rule)} onDelete={() => setDeleting(rule)} />
               ))}
+              <button
+                type="button"
+                onClick={() => setEditing("new")}
+                className="flex min-h-[64px] w-full items-center justify-center gap-2 rounded-[10px] border border-dashed border-ink-faint px-[18px] py-3 text-[13px] font-semibold text-ink-muted transition-colors hover:border-accent hover:text-accent"
+              >
+                <Plus className="h-4 w-4" /> Add rule
+              </button>
             </div>
+
+            {editing && (
+              <RuleModal rule={editing === "new" ? null : editing} position={data.rules.length + 1} onClose={() => setEditing(null)} />
+            )}
+            {deleting && (
+              <ConfirmDialog
+                title={`Delete "${deleting.title}"?`}
+                confirmLabel="Delete rule"
+                danger
+                onCancel={() => setDeleting(null)}
+                onConfirm={() => {
+                  remove.mutate(deleting.id);
+                  setDeleting(null);
+                }}
+              >
+                <p>
+                  The grader stops applying it from the next grading, in every course. Earlier drafts are not changed, and it stays
+                  in the database marked as deleted.
+                </p>
+              </ConfirmDialog>
+            )}
           </>
         );
       }}
@@ -561,7 +645,7 @@ export function RubricRulesPage() {
   );
 }
 
-function RuleCard({ n, rule }: { n: number; rule: PolicyRule }) {
+function RuleCard({ n, rule, onEdit, onDelete }: { n: number; rule: PolicyRule; onEdit: () => void; onDelete: () => void }) {
   const deducts = rule.effect === "Deduction";
   return (
     <Card>
@@ -581,12 +665,167 @@ function RuleCard({ n, rule }: { n: number; rule: PolicyRule }) {
             {deducts ? `points ${rule.pointsPer ?? ""}`.trim() : "no deduction"}
           </span>
         </span>
+        <span className="-mr-1.5 flex shrink-0 gap-0.5">
+          <IconButton label={`Edit "${rule.title}"`} onClick={onEdit}>
+            <Pencil className="h-3.5 w-3.5" />
+          </IconButton>
+          <IconButton label={`Delete "${rule.title}"`} danger onClick={onDelete}>
+            <Trash2 className="h-3.5 w-3.5" />
+          </IconButton>
+        </span>
       </div>
       <div className="border-t border-line px-[18px] py-3">
         <div className="eyebrow mb-1">Exact text the grader gets</div>
         <p className="text-[13px] leading-relaxed text-ink-soft">{rule.detail}</p>
       </div>
     </Card>
+  );
+}
+
+// Adds a rule when rule is null, otherwise edits it.
+function RuleModal({ rule, position, onClose }: { rule: PolicyRule | null; position: number; onClose: () => void }) {
+  const [title, setTitle] = useState(rule?.title ?? "");
+  const [covers, setCovers] = useState(rule?.covers ?? "");
+  const [effect, setEffect] = useState<PolicyEffect>(rule?.effect ?? "NoDeduction");
+  const [points, setPoints] = useState(rule?.points != null ? String(rule.points) : "");
+  const [pointsPer, setPointsPer] = useState(rule?.pointsPer ?? "");
+  const [detail, setDetail] = useState(rule?.detail ?? "");
+  const [tried, setTried] = useState(false);
+  const add = useAddRule();
+  const update = useUpdateRule();
+  const saving = add.isPending || update.isPending;
+  const failed = add.isError ? add.error : update.isError ? update.error : null;
+
+  const deducts = effect === "Deduction";
+  const value = Number(points);
+  const pointsInvalid = deducts && !(points.trim() !== "" && Number.isFinite(value) && value > 0 && value <= 100);
+  const missing = !title.trim() || !covers.trim() || !detail.trim();
+
+  function save() {
+    setTried(true);
+    if (missing || pointsInvalid) {
+      return;
+    }
+    const body = {
+      title: title.trim(),
+      effect,
+      points: deducts ? value : null,
+      pointsPer: deducts && pointsPer.trim() ? pointsPer.trim() : null,
+      covers: covers.trim(),
+      detail: detail.trim(),
+    };
+    if (rule) {
+      update.mutate({ id: rule.id, ...body }, { onSuccess: onClose });
+    } else {
+      add.mutate(body, { onSuccess: onClose });
+    }
+  }
+
+  return (
+    <Modal
+      title={rule ? "Edit rule" : `Add rule ${position}`}
+      subtitle={rule ? "Applies to the next grading in every course" : "Added at the end; applies to the next grading in every course"}
+      onClose={onClose}
+      busy={saving}
+      size="max-w-xl"
+      footer={
+        <>
+          <Button onClick={onClose} disabled={saving}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={save} disabled={saving}>
+            {saving ? "Saving…" : rule ? "Save" : "Add rule"}
+          </Button>
+        </>
+      }
+    >
+      <form
+        className="flex shrink-0 flex-col gap-3.5 px-5 py-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          save();
+        }}
+      >
+        <label className="flex flex-col gap-1.5">
+          <span className="eyebrow">Title</span>
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            maxLength={120}
+            className="field"
+            placeholder="Changing a name the instructions fix"
+            autoFocus
+          />
+        </label>
+        <label className="flex flex-col gap-1.5">
+          <span className="eyebrow">What it covers</span>
+          <input
+            value={covers}
+            onChange={(e) => setCovers(e.target.value)}
+            maxLength={300}
+            className="field"
+            placeholder="A class, method or variable whose exact name the instructions give"
+          />
+          <span className="text-[11px] text-ink-muted">Short, for you; the grader does not see it</span>
+        </label>
+        <div className="flex flex-col gap-1.5">
+          <span className="eyebrow">Effect</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <Segmented
+              label="Effect"
+              value={effect}
+              onChange={setEffect}
+              options={[
+                { value: "NoDeduction", label: "No deduction" },
+                { value: "Deduction", label: "Deduct points" },
+              ]}
+            />
+            {deducts && (
+              <>
+                <span className="text-xs text-ink-muted">−</span>
+                <input
+                  value={points}
+                  onChange={(e) => setPoints(e.target.value)}
+                  inputMode="decimal"
+                  aria-label="Points"
+                  className="field w-20"
+                  placeholder="3"
+                />
+                <span className="text-xs text-ink-muted">points</span>
+                <input
+                  value={pointsPer}
+                  onChange={(e) => setPointsPer(e.target.value)}
+                  maxLength={40}
+                  aria-label="Counted per"
+                  className="field w-36"
+                  placeholder="per name"
+                />
+              </>
+            )}
+          </div>
+          <span className="text-[11px] text-ink-muted">
+            {deducts
+              ? "Shown on the card; the text below is what tells the grader how many points to take"
+              : "Listed as a suggestion with severity Style; costs no points"}
+          </span>
+        </div>
+        <label className="flex flex-col gap-1.5">
+          <span className="eyebrow">What the grader is told</span>
+          <textarea
+            value={detail}
+            onChange={(e) => setDetail(e.target.value)}
+            maxLength={2000}
+            rows={6}
+            placeholder="When the instructions give the exact name of a class, method or variable and the student used another one, deduct 3 points for each such name and say so in the mistake."
+            className="field min-h-[150px] resize-y py-2 leading-relaxed"
+          />
+          <span className="text-[11px] text-ink-muted">{detail.trim().length} / 2000 characters</span>
+        </label>
+        {tried && missing && <p className="text-xs text-danger">Enter a title, what it covers and the text the grader gets.</p>}
+        {tried && !missing && pointsInvalid && <p className="text-xs text-danger">Enter points between 0 and 100.</p>}
+        {failed && <ErrorPanel error={failed} />}
+      </form>
+    </Modal>
   );
 }
 
@@ -656,45 +895,216 @@ function InstructionsCard({ courseId, assignment }: { courseId: string; assignme
 
 // ---------- 5. Assignment notes ----------
 
+function noteSummary(counts: { assignmentId: string; count: number }[]): { text: string; empty: boolean } {
+  const total = counts.reduce((sum, c) => sum + c.count, 0);
+  if (total === 0) {
+    return { text: "None yet: extra criteria or a rule that differs for one assignment", empty: true };
+  }
+  return {
+    text: `${total} ${total === 1 ? "note" : "notes"} on ${counts.length} ${counts.length === 1 ? "assignment" : "assignments"}`,
+    empty: false,
+  };
+}
+
 export function RubricNotesPage() {
   const { courseId = "" } = useParams();
   return (
-    <LayerPage layerKey="notes">
-      {(_, assignments) => (
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
-          <Card className="overflow-hidden">
-            <CardHeader title="Per assignment" subtitle="Most assignments need none: course guidance and rules cover them" />
-            <ul className="divide-y divide-paper-dark">
-              {assignments.map((assignment) => (
-                <li key={assignment.id}>
-                  <Link
-                    to={`/courses/${courseId}/assignments/${assignment.id}/instructions`}
-                    className="flex items-center gap-3 px-[18px] py-3 hover:bg-paper"
-                  >
-                    <span className="min-w-0 flex-1">
-                      <b className="block truncate text-[13px]">{assignment.title}</b>
-                      <span className="text-[11px] text-ink-muted">
-                        {assignment.dueAt ? `due ${formatDay(assignment.dueAt)}` : "no due date"}
-                      </span>
-                    </span>
-                    <Chip tone="dashed">No notes</Chip>
-                    <ChevronRight className="h-4 w-4 text-ink-faint" />
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </Card>
-          <Card>
-            <CardHeader title="When a note helps" subtitle="Only what differs for this one assignment" />
-            <ul className="flex flex-col gap-2.5 px-[18px] py-4 text-[13px]">
-              <Bullet title="The point of the task">“The Strategy pattern is what this task tests; deduct if it is missing.”</Bullet>
-              <Bullet title="A different rule">“Printed output must match exactly here: −2 points.” Replaces the course rule for this assignment.</Bullet>
-              <Bullet title="Something to ignore">“Input validation is not part of this task.”</Bullet>
-            </ul>
-          </Card>
-        </div>
-      )}
+    <LayerPage layerKey="notes" actions={<Chip tone="outline">Per assignment</Chip>}>
+      {(data, assignments) => {
+        const counts = new Map(data.notes.map((n) => [n.assignmentId, n.count]));
+        return (
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+            <Card className="overflow-hidden">
+              <CardHeader title="Per assignment" subtitle="Open an assignment to add, edit or delete its notes" />
+              <ul className="divide-y divide-paper-dark">
+                {assignments.map((assignment) => {
+                  const count = counts.get(assignment.id) ?? 0;
+                  return (
+                    <li key={assignment.id}>
+                      <Link
+                        to={`/courses/${courseId}/rubric/notes/${assignment.id}`}
+                        className="flex items-center gap-3 px-[18px] py-3 hover:bg-paper"
+                      >
+                        <span className="min-w-0 flex-1">
+                          <b className="block truncate text-[13px]">{assignment.title}</b>
+                          <span className="text-[11px] text-ink-muted">
+                            {assignment.dueAt ? `due ${formatDay(assignment.dueAt)}` : "no due date"}
+                          </span>
+                        </span>
+                        {count > 0 ? (
+                          <Chip tone="info">
+                            {count} {count === 1 ? "note" : "notes"}
+                          </Chip>
+                        ) : (
+                          <Chip tone="dashed">No notes</Chip>
+                        )}
+                        <ChevronRight className="h-4 w-4 text-ink-faint" />
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </Card>
+            <NoteExamples />
+          </div>
+        );
+      }}
     </LayerPage>
+  );
+}
+
+function NoteExamples() {
+  return (
+    <Card>
+      <CardHeader title="When a note helps" subtitle="Only what differs for this one assignment" />
+      <ul className="flex flex-col gap-2.5 px-[18px] py-4 text-[13px]">
+        <Bullet title="The point of the task">“The Strategy pattern is what this task tests; deduct if it is missing.”</Bullet>
+        <Bullet title="A different rule">“Printed output must match exactly here: −2 points.” Wins over the course rule for this assignment.</Bullet>
+        <Bullet title="Something to ignore">“Input validation is not part of this task.”</Bullet>
+      </ul>
+    </Card>
+  );
+}
+
+// ---------- 5a. One assignment's notes ----------
+
+export function RubricAssignmentNotesPage() {
+  const { courseId = "", assignmentId = "" } = useParams();
+  const notes = useAssignmentNotes(courseId, assignmentId);
+  const remove = useDeleteNote();
+  // null: closed; "new": adding; a note: editing it.
+  const [editing, setEditing] = useState<AssignmentNote | "new" | null>(null);
+  const [deleting, setDeleting] = useState<AssignmentNote | null>(null);
+
+  return (
+    <LayerPage
+      layerKey="notes"
+      heading={<AssignmentHeading courseId={courseId} assignmentId={assignmentId} />}
+      purpose="notes for this assignment only"
+      actions={
+        <Link to={`/courses/${courseId}/rubric/notes`} className={buttonClass("outline", true)}>
+          <ArrowLeft className="h-3.5 w-3.5" /> All assignments
+        </Link>
+      }
+    >
+      {(_, assignments) => {
+        const assignment = assignments.find((a) => a.id === assignmentId);
+        const list = notes.data ?? [];
+        return (
+          <>
+            <Explainer>
+              The grader reads these only when it grades {assignment ? <b>{assignment.title}</b> : "this assignment"}, after
+              everything else: where a note differs from the built-in approach, the course guidance or your rules, the note wins
+              for this assignment.
+            </Explainer>
+            {notes.isError && <ErrorPanel error={notes.error} />}
+            {remove.isError && <ErrorPanel error={remove.error} />}
+            {notes.isLoading && <Spinner />}
+            {notes.data && (
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+                <ol className="flex flex-col gap-3">
+                  {list.map((note, i) => (
+                    <li key={note.id}>
+                      <Card className="px-[18px] py-3.5">
+                        <div className="flex items-start gap-3">
+                          <Step n={i + 1} />
+                          <div className="min-w-0 flex-1">
+                            <h3 className="text-[14px] font-semibold">{note.title}</h3>
+                            <p className="mt-1 text-[13px] leading-relaxed text-ink-soft">{note.detail}</p>
+                          </div>
+                          <span className="-mr-1.5 -mt-1 flex shrink-0 gap-0.5">
+                            <IconButton label={`Edit "${note.title}"`} onClick={() => setEditing(note)}>
+                              <Pencil className="h-3.5 w-3.5" />
+                            </IconButton>
+                            <IconButton label={`Delete "${note.title}"`} danger onClick={() => setDeleting(note)}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </IconButton>
+                          </span>
+                        </div>
+                      </Card>
+                    </li>
+                  ))}
+                  <li>
+                    <button
+                      type="button"
+                      onClick={() => setEditing("new")}
+                      className="flex min-h-[72px] w-full items-center justify-center gap-2 rounded-[10px] border border-dashed border-ink-faint px-[18px] py-3 text-[13px] font-semibold text-ink-muted transition-colors hover:border-accent hover:text-accent"
+                    >
+                      <Plus className="h-4 w-4" /> {list.length === 0 ? "Add the first note" : "Add note"}
+                    </button>
+                  </li>
+                </ol>
+                <NoteExamples />
+              </div>
+            )}
+
+            {editing && (
+              <NoteModal
+                courseId={courseId}
+                assignmentId={assignmentId}
+                note={editing === "new" ? null : editing}
+                position={list.length + 1}
+                onClose={() => setEditing(null)}
+              />
+            )}
+            {deleting && (
+              <ConfirmDialog
+                title={`Delete "${deleting.title}"?`}
+                confirmLabel="Delete note"
+                danger
+                onCancel={() => setDeleting(null)}
+                onConfirm={() => {
+                  remove.mutate(deleting.id);
+                  setDeleting(null);
+                }}
+              >
+                <p>
+                  The grader stops using it from this assignment's next grading. Earlier drafts are not changed, and it stays in the
+                  database marked as deleted.
+                </p>
+              </ConfirmDialog>
+            )}
+          </>
+        );
+      }}
+    </LayerPage>
+  );
+}
+
+function AssignmentHeading({ courseId, assignmentId }: { courseId: string; assignmentId: string }) {
+  const title = useAssignments(courseId).data?.find((a) => a.id === assignmentId)?.title;
+  return <>{title ? `Notes · ${title}` : "Assignment notes"}</>;
+}
+
+function NoteModal({
+  courseId,
+  assignmentId,
+  note,
+  position,
+  onClose,
+}: {
+  courseId: string;
+  assignmentId: string;
+  note: AssignmentNote | null;
+  position: number;
+  onClose: () => void;
+}) {
+  const add = useAddNote(courseId, assignmentId);
+  const update = useUpdateNote();
+  return (
+    <TitleTextModal
+      heading={note ? "Edit note" : `Add note ${position}`}
+      subtitle={note ? "Applies to this assignment's next grading" : "Added at the end; applies to this assignment's next grading"}
+      submitLabel={note ? "Save" : "Add note"}
+      initialTitle={note?.title ?? ""}
+      initialDetail={note?.detail ?? ""}
+      titlePlaceholder="The Strategy pattern is the point"
+      detailPlaceholder="This task tests the Strategy pattern: the algorithms must be behind one interface and chosen at runtime. Deduct the design points of task 2 if they are not."
+      saving={add.isPending || update.isPending}
+      error={add.isError ? add.error : update.isError ? update.error : null}
+      onSave={(body) => (note ? update.mutate({ id: note.id, ...body }, { onSuccess: onClose }) : add.mutate(body, { onSuccess: onClose }))}
+      onClose={onClose}
+    />
   );
 }
 

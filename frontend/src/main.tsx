@@ -18,6 +18,7 @@ import { InstructionsPage } from "./pages/InstructionsPage";
 import { ReviewQueuePage } from "./pages/ReviewQueuePage";
 import {
   RubricApproachPage,
+  RubricAssignmentNotesPage,
   RubricGuidancePage,
   RubricInstructionsPage,
   rubricLayers,
@@ -128,7 +129,6 @@ const router = createBrowserRouter([
                   ["guidance", <RubricGuidancePage />],
                   ["rules", <RubricRulesPage />],
                   ["instructions", <RubricInstructionsPage />],
-                  ["notes", <RubricNotesPage />],
                 ] as const
               ).map(([path, element]) => ({
                 path,
@@ -137,6 +137,24 @@ const router = createBrowserRouter([
                   crumbs: () => [{ label: rubricLayers.find((l) => l.key === path)!.label }],
                 } satisfies CrumbHandle,
               })),
+              {
+                path: "notes",
+                handle: {
+                  crumbs: ({ courseId }) => [{ label: "Assignment notes", to: `/courses/${courseId}/rubric/notes` }],
+                } satisfies CrumbHandle,
+                children: [
+                  { index: true, element: <RubricNotesPage /> },
+                  {
+                    path: ":assignmentId",
+                    element: <RubricAssignmentNotesPage />,
+                    handle: {
+                      crumbs: ({ courseId, assignmentId }) => [
+                        { label: <AssignmentTitle courseId={courseId!} assignmentId={assignmentId!} /> },
+                      ],
+                    } satisfies CrumbHandle,
+                  },
+                ],
+              },
             ],
           },
           {

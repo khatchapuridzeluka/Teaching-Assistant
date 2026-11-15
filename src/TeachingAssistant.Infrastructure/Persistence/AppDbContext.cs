@@ -33,6 +33,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<MistakeAnalysis> MistakeAnalyses => Set<MistakeAnalysis>();
     public DbSet<GradingPrinciple> GradingPrinciples => Set<GradingPrinciple>();
     public DbSet<CourseGuidance> CourseGuidance => Set<CourseGuidance>();
+    public DbSet<PolicyRule> PolicyRules => Set<PolicyRule>();
+    public DbSet<AssignmentNote> AssignmentNotes => Set<AssignmentNote>();
     public DbSet<Job> Jobs => Set<Job>();
     public DbSet<AgentConversation> AgentConversations => Set<AgentConversation>();
     public DbSet<AgentRun> AgentRuns => Set<AgentRun>();

@@ -89,9 +89,11 @@ public class GradingService : IGradingService
         Keep it concise; the teacher reviews a whole class.
         """;
 
-    internal static string SystemPromptFor(IReadOnlyList<GradingPrinciple> principles, string? courseGuidance = null)
+    internal static string SystemPromptFor(
+        IReadOnlyList<GradingPrinciple> principles, string? courseGuidance, IReadOnlyList<PolicyRule> rules,
+        IReadOnlyList<AssignmentNote>? notes = null)
     {
-        return PromptIntro + "\n\n" + BuiltInGradingGuidance.PromptSections(principles, courseGuidance) + "\n\n" + PromptOutput;
+        return PromptIntro + "\n\n" + GradingPromptSections.Build(principles, courseGuidance, rules, notes) + "\n\n" + PromptOutput;
     }
 
     private readonly ISubmissionStore _store;
@@ -102,6 +104,8 @@ public class GradingService : IGradingService
     private readonly IGradingStore _gradings;
     private readonly IGradingPrincipleStore _principles;
     private readonly ICourseGuidanceStore _courseGuidance;
+    private readonly IPolicyRuleStore _rules;
+    private readonly IAssignmentNoteStore _notes;
     private readonly ModelCallContext _callContext;
     private readonly TimeProvider _timeProvider;
 
@@ -114,6 +118,8 @@ public class GradingService : IGradingService
         IGradingStore gradings,
         IGradingPrincipleStore principles,
         ICourseGuidanceStore courseGuidance,
+        IPolicyRuleStore rules,
+        IAssignmentNoteStore notes,
         ModelCallContext callContext,
         TimeProvider timeProvider)
     {
@@ -125,6 +131,8 @@ public class GradingService : IGradingService
         _gradings = gradings;
         _principles = principles;
         _courseGuidance = courseGuidance;
+        _rules = rules;
+        _notes = notes;
         _callContext = callContext;
         _timeProvider = timeProvider;
     }
@@ -262,8 +270,10 @@ public class GradingService : IGradingService
         _callContext.Describe(submission.CourseId, submission.AssignmentId, versionId);
         var principles = await _principles.GetActiveAsync(cancellationToken);
         var guidance = await _courseGuidance.FindAsync(submission.CourseId, cancellationToken);
+        var rules = await _rules.GetActiveAsync(cancellationToken);
+        var notes = await _notes.GetActiveAsync(submission.AssignmentId, cancellationToken);
         var reply = await _languageModel.GradeAsync(
-            SystemPromptFor(principles, guidance?.Text), prompt.Parts, GradingOutput.Schema, cancellationToken);
+            SystemPromptFor(principles, guidance?.Text, rules, notes), prompt.Parts, GradingOutput.Schema, cancellationToken);
         var read = GradingOutput.Read(reply.Text, prompt.CodeLines);
 
         var grading = new AiGrading(versionId, reply.Model, read.Review, read.Score, read.MaxScore, read.Bonus,

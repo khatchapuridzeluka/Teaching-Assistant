@@ -19,4 +19,13 @@ public interface IGradingGuidanceService
 
     /// <summary>Marks a principle deleted; false when it does not exist or is already deleted.</summary>
     Task<bool> DeletePrincipleAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>Adds a rule after the existing ones.</summary>
+    Task<PolicyRuleResponse> AddRuleAsync(PolicyRuleRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>Changes a rule; null when it does not exist or is deleted.</summary>
+    Task<PolicyRuleResponse?> UpdateRuleAsync(Guid id, PolicyRuleRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>Marks a rule deleted; false when it does not exist or is already deleted.</summary>
+    Task<bool> DeleteRuleAsync(Guid id, CancellationToken cancellationToken = default);
 }

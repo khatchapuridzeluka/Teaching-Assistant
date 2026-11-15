@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, type JobStatus, type JobType, type ModelCallPurpose, type SaveReportRequest, type StudentMistakeFilter,
+import { api, type JobStatus, type PolicyRuleRequest, type JobType, type ModelCallPurpose, type SaveReportRequest, type StudentMistakeFilter,
   type StudentStrengthFilter, type StudentAnalysisKind, unwrap } from "./client";
 import { forgetMissingPhotos } from "../components/ui";
 
@@ -75,6 +75,79 @@ export const useSetCourseGuidance = (courseId: string) => {
       unwrap(api.PUT("/courses/{courseId}/grading-guidance/course-guidance", { params: { path: { courseId } }, body: { text } })),
     onSuccess: (guidance) => {
       queryClient.setQueryData(["courses", courseId, "grading-guidance"], guidance);
+    },
+  });
+};
+
+const isAssignmentNotes = (query: { queryKey: readonly unknown[] }) =>
+  query.queryKey.includes("notes") || query.queryKey.includes("grading-guidance");
+
+export const useAssignmentNotes = (courseId: string, assignmentId: string) =>
+  useQuery({
+    queryKey: ["courses", courseId, "assignments", assignmentId, "notes"],
+    queryFn: () =>
+      unwrap(api.GET("/courses/{courseId}/assignments/{assignmentId}/notes", { params: { path: { courseId, assignmentId } } })),
+  });
+
+export const useAddNote = (courseId: string, assignmentId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { title: string; detail: string }) =>
+      unwrap(api.POST("/courses/{courseId}/assignments/{assignmentId}/notes", { params: { path: { courseId, assignmentId } }, body })),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ predicate: isAssignmentNotes });
+    },
+  });
+};
+
+export const useUpdateNote = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, title, detail }: { id: string; title: string; detail: string }) =>
+      unwrap(api.PUT("/assignment-notes/{id}", { params: { path: { id } }, body: { title, detail } })),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ predicate: isAssignmentNotes });
+    },
+  });
+};
+
+export const useDeleteNote = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => unwrap(api.DELETE("/assignment-notes/{id}", { params: { path: { id } } })),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ predicate: isAssignmentNotes });
+    },
+  });
+};
+
+export const useAddRule = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: PolicyRuleRequest) => unwrap(api.POST("/policy-rules", { body })),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ predicate: isGradingGuidance });
+    },
+  });
+};
+
+export const useUpdateRule = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...body }: PolicyRuleRequest & { id: string }) =>
+      unwrap(api.PUT("/policy-rules/{id}", { params: { path: { id } }, body })),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ predicate: isGradingGuidance });
+    },
+  });
+};
+
+export const useDeleteRule = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => unwrap(api.DELETE("/policy-rules/{id}", { params: { path: { id } } })),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ predicate: isGradingGuidance });
     },
   });
 };

@@ -255,6 +255,168 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/courses/{courseId}/assignments/{assignmentId}/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Returns the teacher's notes for one assignment, in order; the grader reads them only when it grades this assignment. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    courseId: string;
+                    assignmentId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Notes retrieved successfully; empty when the assignment has none */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AssignmentNoteResponse"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Adds a note to the assignment after its existing ones; the assignment's next grading uses it. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    courseId: string;
+                    assignmentId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["AssignmentNoteRequest"];
+                    "text/json": components["schemas"]["AssignmentNoteRequest"];
+                    "application/*+json": components["schemas"]["AssignmentNoteRequest"];
+                };
+            };
+            responses: {
+                /** @description Note added */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AssignmentNoteResponse"];
+                    };
+                };
+                /** @description Title or text is empty or too long */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/assignment-notes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Changes an assignment note's title and text; the assignment's next grading uses the new text. */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["AssignmentNoteRequest"];
+                    "text/json": components["schemas"]["AssignmentNoteRequest"];
+                    "application/*+json": components["schemas"]["AssignmentNoteRequest"];
+                };
+            };
+            responses: {
+                /** @description Note updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AssignmentNoteResponse"];
+                    };
+                };
+                /** @description Title or text is empty or too long */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No note with this ID, or it is deleted */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        /** Deletes an assignment note (it is only marked deleted); the assignment's next grading leaves it out. */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Note deleted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No note with this ID, or it is already deleted */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/courses/{courseId}/assignments": {
         parameters: {
             query?: never;
@@ -2106,6 +2268,142 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/policy-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Adds a grading rule after the existing ones; every course's next grading uses it. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["PolicyRuleRequest"];
+                    "text/json": components["schemas"]["PolicyRuleRequest"];
+                    "application/*+json": components["schemas"]["PolicyRuleRequest"];
+                };
+            };
+            responses: {
+                /** @description Rule added */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PolicyRuleResponse"];
+                    };
+                };
+                /** @description A field is empty or too long, or a deduction has no valid points */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/policy-rules/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Changes a grading rule; every course's next grading uses the new version. */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["PolicyRuleRequest"];
+                    "text/json": components["schemas"]["PolicyRuleRequest"];
+                    "application/*+json": components["schemas"]["PolicyRuleRequest"];
+                };
+            };
+            responses: {
+                /** @description Rule updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PolicyRuleResponse"];
+                    };
+                };
+                /** @description A field is empty or too long, or a deduction has no valid points */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No rule with this ID, or it is deleted */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        /** Deletes a grading rule (it is only marked deleted); every course's next grading leaves it out. */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Rule deleted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No rule with this ID, or it is already deleted */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/review-queue": {
         parameters: {
             query?: never;
@@ -2882,6 +3180,24 @@ export interface components {
             createdAt: string;
             reportStatus?: components["schemas"]["ReportStatus"];
         };
+        AssignmentNoteCount: {
+            assignmentId: string;
+            /** Format: int32 */
+            count: number;
+        };
+        AssignmentNoteRequest: {
+            title: string;
+            detail: string;
+        };
+        AssignmentNoteResponse: {
+            /** Format: uuid */
+            id: string;
+            assignmentId: string;
+            title: string;
+            detail: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
         AssignmentResponse: {
             id: string;
             courseId: string;
@@ -3148,6 +3464,7 @@ export interface components {
             courseGuidanceUpdatedAt?: string | null;
             approach: components["schemas"]["GradingPrincipleResponse"][];
             rules: components["schemas"]["PolicyRuleResponse"][];
+            notes: components["schemas"]["AssignmentNoteCount"][];
         };
         GradingPrincipleRequest: {
             title: string;
@@ -3562,7 +3879,7 @@ export interface components {
         };
         /** @enum {string} */
         PolicyEffect: "NoDeduction" | "Deduction";
-        PolicyRuleResponse: {
+        PolicyRuleRequest: {
             title: string;
             effect: components["schemas"]["PolicyEffect"];
             /** Format: double */
@@ -3570,6 +3887,19 @@ export interface components {
             pointsPer?: string | null;
             covers: string;
             detail: string;
+        };
+        PolicyRuleResponse: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            effect: components["schemas"]["PolicyEffect"];
+            /** Format: double */
+            points?: number | null;
+            pointsPer?: string | null;
+            covers: string;
+            detail: string;
+            /** Format: date-time */
+            updatedAt: string;
         };
         ProblemDetails: {
             type?: string | null;

@@ -12,8 +12,10 @@ public class GradingGuidanceServiceTests
 
     private readonly FakeGradingPrinciples _principles = new();
     private readonly FakeCourseGuidance _courseGuidance = new();
+    private readonly FakePolicyRules _rules = new();
+    private readonly FakeAssignmentNotes _notes = new();
 
-    private GradingGuidanceService Service() => new(_principles, _courseGuidance, new FixedClock(Now));
+    private GradingGuidanceService Service() => new(_principles, _courseGuidance, _rules, _notes, new FixedClock(Now));
 
     [Fact]
     public async Task Get_ListsTheActivePrinciplesInOrder_AsOneParagraphEach()
@@ -27,7 +29,8 @@ public class GradingGuidanceServiceTests
         Assert.Equal(["First", "Second"], guidance.Approach.Select(p => p.Title));
         Assert.Equal("Line one line two", guidance.Approach[1].Detail);
         Assert.Equal(first.Id, guidance.Approach[1].Id);
-        Assert.Equal(2, guidance.Rules.Count);
+        Assert.Empty(guidance.Rules);
+        Assert.Empty(guidance.Notes);
     }
 
     [Fact]
@@ -76,6 +79,66 @@ public class GradingGuidanceServiceTests
     {
         await Assert.ThrowsAsync<InvalidRequestException>(() => Service().SetCourseGuidanceAsync("course-1",
             new CourseGuidanceRequest(new string('x', CourseGuidance.MaxTextLength + 1)), TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task AddRule_PutsItLast_Trimmed_AndANoDeductionRuleKeepsNoPoints()
+    {
+        _rules.Add(3, "Old", "Removed.").Delete(Now);
+
+        var added = await Service().AddRuleAsync(
+            new PolicyRuleRequest(" Missing output ", PolicyEffect.NoDeduction, 5, "per line", " Printed text ", " No points for printing. "),
+            TestContext.Current.CancellationToken);
+
+        var stored = Assert.Single(_rules.All, r => r.Id == added.Id);
+        Assert.Equal((4, "Missing output", PolicyEffect.NoDeduction, (double?)null, (string?)null, "Printed text", "No points for printing."),
+            (stored.Position, stored.Title, stored.Effect, stored.Points, stored.PointsPer, stored.Covers, stored.Detail));
+        var guidance = await Service().GetAsync("course-1", TestContext.Current.CancellationToken);
+        Assert.Equal(["Missing output"], guidance.Rules.Select(r => r.Title));
+    }
+
+    [Theory]
+    [InlineData(PolicyEffect.Deduction, null)]
+    [InlineData(PolicyEffect.Deduction, 0.0)]
+    [InlineData(PolicyEffect.Deduction, 101.0)]
+    public async Task ADeductionWithoutValidPoints_IsRefused(PolicyEffect effect, double? points)
+    {
+        await Assert.ThrowsAsync<InvalidRequestException>(() => Service().AddRuleAsync(
+            new PolicyRuleRequest("Names", effect, points, null, "Names", "Deduct."), TestContext.Current.CancellationToken));
+
+        Assert.Empty(_rules.All);
+    }
+
+    [Fact]
+    public async Task UpdateRule_ChangesEverything_AndSavingTheSameRuleAgainChangesNothing()
+    {
+        var rule = _rules.Add(1, "Names", "Line one\n  line two");
+
+        var updated = await Service().UpdateRuleAsync(rule.Id,
+            new PolicyRuleRequest("Names", PolicyEffect.Deduction, 2, "per name", "Class and method names", "Deduct 2 points per name."),
+            TestContext.Current.CancellationToken);
+        var saves = _rules.Saves;
+        await Service().UpdateRuleAsync(rule.Id,
+            new PolicyRuleRequest("Names", PolicyEffect.Deduction, 2, "per name", "Class and method names", "Deduct 2 points per name."),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal((PolicyEffect.Deduction, (double?)2, "per name", "Class and method names", Now),
+            (updated!.Effect, updated.Points, updated.PointsPer, updated.Covers, updated.UpdatedAt));
+        Assert.Equal(saves, _rules.Saves);
+    }
+
+    [Fact]
+    public async Task DeleteRule_OnlyMarksItDeleted_AndADeletedRuleCannotBeEditedOrDeletedAgain()
+    {
+        var rule = _rules.Add(1, "Names", "Deduct.");
+
+        Assert.True(await Service().DeleteRuleAsync(rule.Id, TestContext.Current.CancellationToken));
+
+        Assert.True(rule.IsDeleted);
+        Assert.Contains(rule, _rules.All);
+        Assert.False(await Service().DeleteRuleAsync(rule.Id, TestContext.Current.CancellationToken));
+        Assert.Null(await Service().UpdateRuleAsync(rule.Id,
+            new PolicyRuleRequest("A", PolicyEffect.NoDeduction, null, null, "B", "C"), TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -179,4 +242,36 @@ internal sealed class FakeCourseGuidance : ICourseGuidanceStore
     public void Remove(CourseGuidance guidance) => All.Remove(guidance);
 
     public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+}
+
+internal sealed class FakePolicyRules : IPolicyRuleStore
+{
+    public List<PolicyRule> All { get; } = [];
+
+    public int Saves { get; private set; }
+
+    public PolicyRule Add(int position, string title, string detail)
+    {
+        var rule = new PolicyRule(Guid.NewGuid(), position, title, PolicyEffect.NoDeduction, null, null, title, detail,
+            new DateTimeOffset(2026, 11, 1, 0, 0, 0, TimeSpan.Zero));
+        All.Add(rule);
+        return rule;
+    }
+
+    public Task<IReadOnlyList<PolicyRule>> GetActiveAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<PolicyRule>>(All.Where(r => !r.IsDeleted).OrderBy(r => r.Position).ToList());
+
+    public Task<PolicyRule?> FindAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(All.FirstOrDefault(r => r.Id == id));
+
+    public Task<int> GetLastPositionAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(All.Count == 0 ? 0 : All.Max(r => r.Position));
+
+    void IPolicyRuleStore.Add(PolicyRule rule) => All.Add(rule);
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        Saves++;
+        return Task.CompletedTask;
+    }
 }

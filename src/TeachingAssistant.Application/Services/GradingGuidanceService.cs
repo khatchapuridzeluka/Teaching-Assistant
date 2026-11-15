@@ -14,24 +14,33 @@ namespace TeachingAssistant.Application.Services;
 public partial class GradingGuidanceService : IGradingGuidanceService
 {
     private readonly IGradingPrincipleStore _principles;
+    private const double MaxRulePoints = 100;
+
     private readonly ICourseGuidanceStore _courseGuidance;
+    private readonly IPolicyRuleStore _rules;
+    private readonly IAssignmentNoteStore _notes;
     private readonly TimeProvider _timeProvider;
 
-    public GradingGuidanceService(IGradingPrincipleStore principles, ICourseGuidanceStore courseGuidance, TimeProvider timeProvider)
+    public GradingGuidanceService(
+        IGradingPrincipleStore principles, ICourseGuidanceStore courseGuidance, IPolicyRuleStore rules, IAssignmentNoteStore notes,
+        TimeProvider timeProvider)
     {
         _principles = principles;
         _courseGuidance = courseGuidance;
+        _rules = rules;
+        _notes = notes;
         _timeProvider = timeProvider;
     }
 
     public async Task<GradingGuidanceResponse> GetAsync(string courseId, CancellationToken cancellationToken = default)
     {
         var approach = (await _principles.GetActiveAsync(cancellationToken)).Select(ToResponse).ToList();
-        var rules = BuiltInGradingGuidance.Rules
-            .Select(r => new PolicyRuleResponse(r.Title, r.Effect, r.Points, r.PointsPer, r.Covers, OneLine(r.Detail)))
-            .ToList();
+        var rules = (await _rules.GetActiveAsync(cancellationToken)).Select(ToResponse).ToList();
         var guidance = await _courseGuidance.FindAsync(courseId, cancellationToken);
-        return new GradingGuidanceResponse(guidance?.Text, guidance?.UpdatedAt, approach, rules);
+        var notes = (await _notes.CountByAssignmentAsync(courseId, cancellationToken))
+            .Select(n => new AssignmentNoteCount(n.Key, n.Value))
+            .ToList();
+        return new GradingGuidanceResponse(guidance?.Text, guidance?.UpdatedAt, approach, rules, notes);
     }
 
     public async Task<GradingGuidanceResponse> SetCourseGuidanceAsync(
@@ -107,6 +116,90 @@ public partial class GradingGuidanceService : IGradingGuidanceService
         principle.Delete(_timeProvider.GetUtcNow());
         await _principles.SaveChangesAsync(cancellationToken);
         return true;
+    }
+
+    public async Task<PolicyRuleResponse> AddRuleAsync(PolicyRuleRequest request, CancellationToken cancellationToken = default)
+    {
+        var rule = Validate(request);
+        var position = await _rules.GetLastPositionAsync(cancellationToken) + 1;
+        var added = new PolicyRule(Guid.CreateVersion7(), position, rule.Title, rule.Effect, rule.Points, rule.PointsPer, rule.Covers,
+            rule.Detail, _timeProvider.GetUtcNow());
+        _rules.Add(added);
+        await _rules.SaveChangesAsync(cancellationToken);
+        return ToResponse(added);
+    }
+
+    public async Task<PolicyRuleResponse?> UpdateRuleAsync(Guid id, PolicyRuleRequest request, CancellationToken cancellationToken = default)
+    {
+        var rule = Validate(request);
+        var existing = await _rules.FindAsync(id, cancellationToken);
+        if (existing is null || existing.IsDeleted)
+        {
+            return null;
+        }
+
+        // The stored text keeps its line breaks for the grader; saving the same rule again changes nothing.
+        var changed = rule.Title != existing.Title || rule.Effect != existing.Effect || rule.Points != existing.Points
+            || rule.PointsPer != existing.PointsPer || rule.Covers != existing.Covers || OneLine(rule.Detail) != OneLine(existing.Detail);
+        if (changed)
+        {
+            existing.Edit(rule.Title, rule.Effect, rule.Points, rule.PointsPer, rule.Covers, rule.Detail, _timeProvider.GetUtcNow());
+            await _rules.SaveChangesAsync(cancellationToken);
+        }
+
+        return ToResponse(existing);
+    }
+
+    public async Task<bool> DeleteRuleAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var rule = await _rules.FindAsync(id, cancellationToken);
+        if (rule is null || rule.IsDeleted)
+        {
+            return false;
+        }
+
+        rule.Delete(_timeProvider.GetUtcNow());
+        await _rules.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    private static PolicyRuleRequest Validate(PolicyRuleRequest request)
+    {
+        var title = (request.Title ?? "").Trim();
+        var covers = (request.Covers ?? "").Trim();
+        var detail = (request.Detail ?? "").Trim();
+        if (title.Length == 0 || covers.Length == 0 || detail.Length == 0)
+        {
+            throw new InvalidRequestException("A rule needs a title, what it covers and the text the grader gets.");
+        }
+
+        if (title.Length > PolicyRule.MaxTitleLength || covers.Length > PolicyRule.MaxCoversLength
+            || detail.Length > PolicyRule.MaxDetailLength || (request.PointsPer?.Trim().Length ?? 0) > PolicyRule.MaxPointsPerLength)
+        {
+            throw new InvalidRequestException(
+                $"Too long: the title can have at most {PolicyRule.MaxTitleLength} characters, what it covers {PolicyRule.MaxCoversLength}, "
+                + $"\"per\" {PolicyRule.MaxPointsPerLength} and the text {PolicyRule.MaxDetailLength}.");
+        }
+
+        if (!Enum.IsDefined(request.Effect))
+        {
+            throw new InvalidRequestException("Unknown effect.");
+        }
+
+        if (request.Effect == PolicyEffect.Deduction && request.Points is not (> 0 and <= MaxRulePoints))
+        {
+            throw new InvalidRequestException($"A deduction needs points between 0 and {MaxRulePoints}.");
+        }
+
+        var deduction = request.Effect == PolicyEffect.Deduction;
+        var per = deduction && !string.IsNullOrWhiteSpace(request.PointsPer) ? request.PointsPer.Trim() : null;
+        return new PolicyRuleRequest(title, request.Effect, deduction ? request.Points : null, per, covers, detail);
+    }
+
+    private static PolicyRuleResponse ToResponse(PolicyRule rule)
+    {
+        return new PolicyRuleResponse(rule.Id, rule.Title, rule.Effect, rule.Points, rule.PointsPer, rule.Covers, OneLine(rule.Detail),
+            rule.UpdatedAt);
     }
 
     private static (string Title, string Detail) Validate(GradingPrincipleRequest request)

@@ -285,6 +285,62 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
                     b.ToTable("gradings", (string)null);
                 });
 
+            modelBuilder.Entity("TeachingAssistant.Domain.Grading.AssignmentNote", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AssignmentId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("assignment_id");
+
+                    b.Property<string>("CourseId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("course_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Detail")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("detail");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("title");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_assignment_notes");
+
+                    b.HasIndex("CourseId", "IsDeleted")
+                        .HasDatabaseName("ix_assignment_notes_course_id_is_deleted");
+
+                    b.HasIndex("AssignmentId", "IsDeleted", "Position")
+                        .HasDatabaseName("ix_assignment_notes_assignment_id_is_deleted_position");
+
+                    b.ToTable("assignment_notes", (string)null);
+                });
+
             modelBuilder.Entity("TeachingAssistant.Domain.Grading.ClusterMember", b =>
                 {
                     b.Property<Guid>("Id")
@@ -737,6 +793,70 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_mistake_clusters_analysis_id");
 
                     b.ToTable("mistake_clusters", (string)null);
+                });
+
+            modelBuilder.Entity("TeachingAssistant.Domain.Grading.PolicyRule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Covers")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("covers");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Detail")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("detail");
+
+                    b.Property<string>("Effect")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("effect");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<double?>("Points")
+                        .HasColumnType("double precision")
+                        .HasColumnName("points");
+
+                    b.Property<string>("PointsPer")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("points_per");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("title");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_policy_rules");
+
+                    b.HasIndex("IsDeleted", "Position")
+                        .HasDatabaseName("ix_policy_rules_is_deleted_position");
+
+                    b.ToTable("policy_rules", (string)null);
                 });
 
             modelBuilder.Entity("TeachingAssistant.Domain.Grading.ReportMistake", b =>

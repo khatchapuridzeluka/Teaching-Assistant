@@ -22,19 +22,39 @@ public class GradingServiceTests
     private readonly FakeGradingStore _gradings = new();
     private readonly FakeGradingPrinciples _principles = new();
     private readonly FakeCourseGuidance _courseGuidance = new();
+    private readonly FakePolicyRules _rules = new();
+    private readonly FakeAssignmentNotes _notes = new();
 
     private readonly ModelCallContext _callContext = new();
 
     private GradingService Service() =>
-        new(_store, _instructions, _storage, _wordReader, _model, _gradings, _principles, _courseGuidance, _callContext, TimeProvider.System);
+        new(_store, _instructions, _storage, _wordReader, _model, _gradings, _principles, _courseGuidance, _rules, _notes, _callContext, TimeProvider.System);
+
+    [Fact]
+    public void TheSystemPrompt_EndsWithTheAssignmentsActiveNotes_AfterTheRules()
+    {
+        _principles.Add(1, "First", "Follow the points in the instructions.");
+        _rules.Add(1, "Names", "Names fixed by the instructions cost 3 points.");
+        _notes.Add("a-1", 1, "Pattern", "The Strategy pattern is the point of this task.");
+        _notes.Add("a-1", 2, "Gone", "A deleted note.").Delete(DateTimeOffset.UtcNow);
+
+        var system = GradingService.SystemPromptFor(_principles.GetActiveAsync().Result, null, _rules.GetActiveAsync().Result,
+            _notes.GetActiveAsync("a-1").Result);
+
+        Assert.Contains("cost 3 points.\n\nAssignment notes (", system);
+        Assert.Contains("):\n- The Strategy pattern is the point of this task.\n\nYour answer", system);
+        Assert.DoesNotContain("A deleted note.", system);
+    }
 
     [Fact]
     public void TheSystemPrompt_PutsTheCourseGuidanceBetweenThePrinciplesAndTheRules()
     {
         _principles.Add(1, "First", "Follow the points in the instructions.");
 
-        var system = GradingService.SystemPromptFor(_principles.GetActiveAsync().Result, "  Second-year students; be firm about names.  ");
-        var without = GradingService.SystemPromptFor(_principles.GetActiveAsync().Result);
+        _rules.Add(1, "Names", "Names fixed by the instructions cost 3 points.");
+        var system = GradingService.SystemPromptFor(_principles.GetActiveAsync().Result, "  Second-year students; be firm about names.  ",
+            _rules.GetActiveAsync().Result);
+        var without = GradingService.SystemPromptFor(_principles.GetActiveAsync().Result, null, _rules.GetActiveAsync().Result);
 
         Assert.Contains("- Follow the points in the instructions.\n\nCourse guidance (", system);
         Assert.Contains("):\nSecond-year students; be firm about names.\n\nGrading policy", system);
@@ -48,10 +68,18 @@ public class GradingServiceTests
         _principles.Add(1, "First", "Follow the points in the instructions.");
         _principles.Add(3, "Gone", "A deleted principle.").Delete(DateTimeOffset.UtcNow);
 
-        var system = GradingService.SystemPromptFor(_principles.GetActiveAsync().Result);
+        _rules.Add(2, "Second rule", "Comments cost nothing.");
+        _rules.Add(1, "First rule", "Names fixed by the instructions cost 3 points.");
+        _rules.Add(3, "Gone rule", "A deleted rule.").Delete(DateTimeOffset.UtcNow);
+
+        var system = GradingService.SystemPromptFor(_principles.GetActiveAsync().Result, null, _rules.GetActiveAsync().Result);
+        var noRules = GradingService.SystemPromptFor(_principles.GetActiveAsync().Result, null, []);
 
         Assert.Contains("How to grade:\n- Follow the points in the instructions.\n- Judge by reading the code.\n\nGrading policy", system);
+        Assert.Contains("):\n- Names fixed by the instructions cost 3 points.\n- Comments cost nothing.\n\nYour answer", system);
         Assert.DoesNotContain("A deleted principle.", system);
+        Assert.DoesNotContain("A deleted rule.", system);
+        Assert.DoesNotContain("Grading policy", noRules);
     }
 
     [Fact]
