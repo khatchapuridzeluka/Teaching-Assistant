@@ -6,6 +6,7 @@ using TeachingAssistant.Application.Exceptions;
 using TeachingAssistant.Application.Interfaces;
 using TeachingAssistant.Application.Interfaces.Services;
 using TeachingAssistant.Application.Models;
+using TeachingAssistant.Application.Prompts;
 using TeachingAssistant.Domain.Ingestion;
 using TeachingAssistant.Domain.Profiling;
 
@@ -13,53 +14,6 @@ namespace TeachingAssistant.Application.Services;
 
 public class StudentAnalysisService : IStudentAnalysisService
 {
-    private const string MistakesPrompt =
-        """
-        You help a university programming teacher (Advanced Java, C++ basics) give one student feedback on the mistakes
-        they make across the course. The student is called "the student" and is never named. You get every graded
-        assignment of this student, in due-date order: the teacher's report where they reviewed it, otherwise the AI
-        draft that the teacher has not checked yet. For each you get the points it was out of, the points its mistakes
-        cost, and each mistake: its severity, category, the points it cost, whether
-        it is new or repeated (the same category in an earlier assignment), and a short description. The trends at the
-        end are counted in code and are exact.
-
-        First write "summary": feedback on the student's mistakes for the teacher, at most 200 words. Which problems
-        keep coming back and which were one-off slips, careless blunders in otherwise sound work as opposed to real
-        misunderstandings, where most of the points were lost, and whether the mistakes are shrinking or growing over
-        the assignments. Base it only on what you are given and say so when it covers only one or two assignments. Plain
-        prose, no lists, no names, and do not invent details of the code.
-
-        Then write "nextSteps": what the student should work on next, at most 100 words. Pick one to three things that
-        matter most, recurring and costly problems first, each with a short reason and a concrete way to practise.
-        Written for the teacher to pass on, no names.
-
-        Write in English.
-        """;
-
-    private const string OverviewPrompt =
-        """
-        You help a university programming teacher (Advanced Java, C++ basics) see the whole picture of one student across
-        the course: how well they do, where they are heading, what they are good at and what holds them back. The student
-        is called "the student" and is never named. You get every graded assignment of this student, in due-date order:
-        the teacher's report where they reviewed it, otherwise the AI draft that the teacher has not checked yet (each says
-        which). For each you get the score out of its maximum, its mistakes (severity, category, the points they cost,
-        new or repeated) and its strengths (category, new, consistent or improved from an earlier mistake). The numbers at
-        the end are counted in code and are exact; use them instead of counting yourself.
-
-        First write "summary": an overall picture for the teacher, at most 250 words. Cover the student's level (the
-        scores), the direction over the assignments (improving, steady or slipping, and how sure that is with this many
-        assignments), the skills they show again and again, the problems that keep coming back or cost the most, and how
-        the two connect (a former weakness that became a strength, or a strength in one area next to a gap in another).
-        Mention that an assignment is still an unchecked AI draft only if it changes the picture. With one or two
-        assignments say that the picture is early. Plain prose, no lists, no names, and do not invent details of the code.
-
-        Then write "nextSteps": the one to three things that would help this student most now, at most 100 words, each
-        with a short reason and a concrete way to practise, and one strength to keep building on. Written for the
-        teacher to pass on, no names.
-
-        Write in English.
-        """;
-
     private const string MistakesSchema =
         """
         {
@@ -71,33 +25,6 @@ public class StudentAnalysisService : IStudentAnalysisService
           },
           "required": ["summary", "nextSteps"]
         }
-        """;
-
-    private const string StrengthsPrompt =
-        """
-        You help a university programming teacher (Advanced Java, C++ basics) see what one student is good at across the
-        course. The student is called "the student" and is never named. You get every strength from the student's graded
-        assignments (the teacher's report where they reviewed it, otherwise the AI draft that the teacher has not checked
-        yet), numbered, in due-date order of their assignments: the assignment, its category,
-        whether it is new, consistent (the same category was a strength in an earlier assignment) or improved (the same
-        category was a mistake in an earlier assignment), and a short description of what the code showed. The counts at
-        the end are exact.
-
-        First group the strengths into skills. Strengths that show the same skill belong together even when they are
-        worded differently or come from different assignments, for example "bounds checked in get" and "index validated
-        before access". The teacher reads each group as one skill the student has shown, so a good group is one skill
-        that fits every strength in it; keep different skills apart even when they share a category. A strength that
-        matches no other one is its own group. For each group write:
-        - title: at most eight words naming the skill, for example "Validates indices before accessing lists".
-        - explanation: one or two sentences on what the student does and how consistently, without counts.
-        - strengthIds: the numbers of the strengths in the group.
-        Put every strength in exactly one group and use only the numbers you were given.
-
-        Then write "overview": what this student is good at, at most 150 words, for the teacher. Which skills the student
-        shows again and again, which appeared once, and where a former weakness became a strength. With few assignments
-        there is little to compare; say so instead of drawing conclusions. Plain prose, no lists, no names.
-
-        Write in English.
         """;
 
     private const string StrengthsSchema =
@@ -182,7 +109,7 @@ public class StudentAnalysisService : IStudentAnalysisService
                     "This student has no mistakes in any graded assignment yet: no current AI draft or report lists one. Grade an assignment first.");
             }
 
-            var reply = await _languageModel.AnalyzeAsync(MistakesPrompt,
+            var reply = await _languageModel.AnalyzeAsync(PromptLibrary.StudentMistakes,
                 [new TextPart(MistakesPromptText(mistakes, DueAt, Title, MaxPoints))], MistakesSchema, cancellationToken);
             var answer = Read<MistakesReply>(reply.Text);
             analysis = new StudentAnalysis(courseId, studentId, kind, reply.Model, answer.Summary ?? "", answer.NextSteps ?? "",
@@ -197,7 +124,7 @@ public class StudentAnalysisService : IStudentAnalysisService
             }
 
             var ordered = Ordered(strengths, DueAt);
-            var reply = await _languageModel.AnalyzeAsync(StrengthsPrompt,
+            var reply = await _languageModel.AnalyzeAsync(PromptLibrary.StudentStrengths,
                 [new TextPart(StrengthsPromptText(ordered, mistakes, DueAt, Title))], StrengthsSchema, cancellationToken);
             var answer = Read<StrengthsReply>(reply.Text);
             analysis = new StudentAnalysis(courseId, studentId, kind, reply.Model, answer.Overview ?? "", "",
@@ -212,7 +139,7 @@ public class StudentAnalysisService : IStudentAnalysisService
                     "This student has no graded assignment yet: there is no current AI draft or report. Grade an assignment first.");
             }
 
-            var reply = await _languageModel.AnalyzeAsync(OverviewPrompt,
+            var reply = await _languageModel.AnalyzeAsync(PromptLibrary.StudentOverview,
                 [new TextPart(OverviewPromptText(records, assignments))], MistakesSchema, cancellationToken);
             var answer = Read<MistakesReply>(reply.Text);
             analysis = new StudentAnalysis(courseId, studentId, kind, reply.Model, answer.Summary ?? "", answer.NextSteps ?? "",

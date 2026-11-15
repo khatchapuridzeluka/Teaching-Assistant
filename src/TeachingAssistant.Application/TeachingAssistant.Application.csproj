@@ -8,6 +8,11 @@
       <InternalsVisibleTo Include="TeachingAssistant.Tests" />
     </ItemGroup>
 
+    <ItemGroup>
+      <!-- The model's fixed instructions, read by Prompts/PromptLibrary.cs -->
+      <EmbeddedResource Include="Prompts\*.md" LogicalName="TeachingAssistant.Application.Prompts.%(Filename)%(Extension)" />
+    </ItemGroup>
+
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
