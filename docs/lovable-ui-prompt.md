@@ -61,7 +61,7 @@ Full-height, three columns, nothing scrolls except the main area:
    - Logo: green rounded square "TA" + "Teaching Assistant" / "Grading agent".
    - "WORKSPACE" label, then **Courses** (link to all courses, with a ▾/▸ toggle that folds the course list).
    - Nested course list (thin left border). The current course expands to its sections:
-     Overview, Assignments (working), Students, Gradebook, Common mistakes, Rubric & policy, Participation
+     Overview, Assignments (working), Students, Gradebook, Common mistakes, Rubric & policy
      (planned — marked with a small outlined "SOON" pill).
    - Workspace sections: Review queue, Evaluation (both "SOON"), Settings.
    - Bottom: **Google Classroom card** with a status dot (filled green = connected): "Connected · read-only" /

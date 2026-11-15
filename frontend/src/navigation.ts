@@ -3,7 +3,6 @@ import {
   ChartColumn,
   ClipboardList,
   FlaskConical,
-  Hand,
   Inbox,
   LayoutDashboard,
   type LucideIcon,
@@ -76,14 +75,6 @@ export const courseSections: Section[] = [
       "Your judgement calls as rules, e.g. \"typo in printed text: not a mistake\"",
       "Rules suggested from the corrections you make while reviewing",
     ],
-  },
-  {
-    path: "participation",
-    label: "Participation",
-    icon: Hand,
-    ready: false,
-    description: "Lecture participation alongside homework results (later).",
-    plans: ["Attendance and in-class activity next to each student's homework progress"],
   },
 ];
 

@@ -23,7 +23,6 @@ Java only, starting with class design and design patterns, then SQL/Maven/Gradle
    - Batch features (all students solve the same task): calibration pass for consistent scores, class-wide clustering of common mistakes, review one explanation per cluster, similarity flags (flag only, never accuse).
    - **Human in the loop:** the agent only drafts; the teacher approves/edits in a review dashboard.
 2. **Student profiler — thin layer on top of grading.** Every mistake stored as a structured record; new submissions labeled new / repeated / similar / previously fixed (to track growth, not to lower grades). GitHub commit history feeds it. Trends computed in code; LLM writes the narrative.
-3. **Lecture participation — stretch goal only.**
 
 ## Java submissions
 
