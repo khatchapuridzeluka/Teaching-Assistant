@@ -16,6 +16,15 @@ import { DraftsPage } from "./pages/DraftsPage";
 import { GradebookPage } from "./pages/GradebookPage";
 import { InstructionsPage } from "./pages/InstructionsPage";
 import { ReviewQueuePage } from "./pages/ReviewQueuePage";
+import {
+  RubricApproachPage,
+  RubricGuidancePage,
+  RubricInstructionsPage,
+  rubricLayers,
+  RubricNotesPage,
+  RubricPolicyPage,
+  RubricRulesPage,
+} from "./pages/RubricPolicyPage";
 import { SystemPage } from "./pages/SystemPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { StudentMistakesPage } from "./pages/StudentMistakesPage";
@@ -105,6 +114,30 @@ const router = createBrowserRouter([
             path: "mistakes",
             element: <CommonMistakesPage />,
             handle: { crumbs: () => [{ label: "Common mistakes" }] } satisfies CrumbHandle,
+          },
+          {
+            path: "rubric",
+            handle: {
+              crumbs: ({ courseId }) => [{ label: "Rubric & policy", to: `/courses/${courseId}/rubric` }],
+            } satisfies CrumbHandle,
+            children: [
+              { index: true, element: <RubricPolicyPage /> },
+              ...(
+                [
+                  ["approach", <RubricApproachPage />],
+                  ["guidance", <RubricGuidancePage />],
+                  ["rules", <RubricRulesPage />],
+                  ["instructions", <RubricInstructionsPage />],
+                  ["notes", <RubricNotesPage />],
+                ] as const
+              ).map(([path, element]) => ({
+                path,
+                element,
+                handle: {
+                  crumbs: () => [{ label: rubricLayers.find((l) => l.key === path)!.label }],
+                } satisfies CrumbHandle,
+              })),
+            ],
           },
           {
             path: "gradebook",

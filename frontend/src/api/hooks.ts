@@ -60,6 +60,12 @@ export const useStudentStrengths = (courseId: string, userId: string, filter: St
     placeholderData: (previous) => previous,
   });
 
+export const useGradingGuidance = (courseId: string) =>
+  useQuery({
+    queryKey: ["courses", courseId, "grading-guidance"],
+    queryFn: () => unwrap(api.GET("/courses/{courseId}/grading-guidance", { params: { path: { courseId } } })),
+  });
+
 export const useStudentOverview = (courseId: string, userId: string) =>
   useQuery({
     queryKey: ["courses", courseId, "students", userId, "overview", "gradings"],

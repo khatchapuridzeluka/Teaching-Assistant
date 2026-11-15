@@ -69,7 +69,7 @@ export const courseSections: Section[] = [
     path: "rubric",
     label: "Rubric & policy",
     icon: ScrollText,
-    ready: false,
+    ready: true,
     description: "The rubric and your grading rules, applied to every grading in this course.",
     plans: [
       "Base rubric shared by all assignments, with per-assignment additions",

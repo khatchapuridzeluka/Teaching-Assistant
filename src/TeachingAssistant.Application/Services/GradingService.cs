@@ -29,41 +29,15 @@ public class GradingService : IGradingService
         [".webp"] = "image/webp",
     };
 
-    private const string SystemPrompt =
+    private const string PromptIntro =
         """
         You grade programming homework for a university course (Advanced Java, and C++ basics) as the teacher's
         assistant. Your review is a draft: the teacher reads it, corrects it and decides the final grade. So be precise,
         give short reasons, and say when you are unsure instead of sounding certain.
+        """;
 
-        How to grade:
-        - The assignment's instructions (the attached instruction files and the task statement) define the tasks and how
-          many points each is worth. Follow that breakdown exactly. If the instructions give no points, split the
-          assignment's maximum points across the tasks sensibly and say that you did.
-        - You only see the source code; it has not been compiled or run. Judge behaviour by reading the code carefully.
-          When the instructions give an expected output, trace the code to check whether it would produce the same
-          values and behaviour, and say "likely" when you cannot be sure. Small differences in the printed text itself
-          do not count (see the grading policy below).
-        - Deduct points only for real problems measured against the instructions: missing or wrong functionality, rules
-          the instructions state (for example that fields must be private), and clear design mistakes for this course
-          level. Do not deduct for style choices the instructions do not mention, and do not invent requirements.
-        - A requirement met in a different but valid way (other variable names, extra helper methods) earns full points,
-          unless the instructions fix the exact form.
-        - Award a bonus only when its task is actually done, and show it separately from the base total.
-        - Some submitted files may be listed as not included; do not deduct points for content you could not see, but
-          mention it.
-
-        Grading policy (the teacher's own rules; they override the general rules above):
-        - Trivial issues never cost points. The teacher wants students judged on whether their program works and is
-          designed well, not punished for polish. Trivial means: the wording, spacing, punctuation, capitalization or
-          labels of printed text (as long as the printed values are right); comments (missing, too few, or with typos);
-          unused imports; and unused or unnecessary variables. Still list each one in "mistakes" with severity Style, so
-          the student sees it as a suggestion, and say in the message that no points were deducted.
-        - Names fixed by the instructions: when the instructions specify the exact name of a variable or method and the
-          student used a different one, deduct 3 points for each such name (a misspelling or different capitalization
-          counts as different). The teacher relies on these names, for example to test the code. List each one with
-          severity Minor and say in the message that it cost 3 points and in which task. Names the instructions do not
-          fix are the student's choice: a poor name there is a Style suggestion that costs nothing.
-
+    private const string PromptOutput =
+        """
         Your answer is in English and has these parts.
 
         "review" is Markdown with exactly these sections:
@@ -114,6 +88,9 @@ public class GradingService : IGradingService
 
         Keep it concise; the teacher reviews a whole class.
         """;
+
+    private static readonly string SystemPrompt =
+        PromptIntro + "\n\n" + BuiltInGradingGuidance.PromptSections() + "\n\n" + PromptOutput;
 
     private readonly ISubmissionStore _store;
     private readonly IInstructionsStore _instructionsStore;

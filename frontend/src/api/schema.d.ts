@@ -1088,6 +1088,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/courses/{courseId}/grading-guidance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Returns what the course is graded with: the course's own guidance (none yet), the grader's built-in approach and the grading rules, each with the exact text the grader receives. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    courseId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Guidance retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GradingGuidanceResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/gradings/{gradingId}/report": {
         parameters: {
             query?: never;
@@ -2914,6 +2952,15 @@ export interface components {
             /** Format: double */
             classAveragePercent?: number | null;
         };
+        GradingGuidanceResponse: {
+            courseGuidance?: string | null;
+            approach: components["schemas"]["GradingPrincipleResponse"][];
+            rules: components["schemas"]["PolicyRuleResponse"][];
+        };
+        GradingPrincipleResponse: {
+            title: string;
+            detail: string;
+        };
         GradingReportResponse: {
             /** Format: uuid */
             id: string;
@@ -3312,6 +3359,17 @@ export interface components {
             mistakes: number;
             /** Format: double */
             pointsLost: number;
+        };
+        /** @enum {string} */
+        PolicyEffect: "NoDeduction" | "Deduction";
+        PolicyRuleResponse: {
+            title: string;
+            effect: components["schemas"]["PolicyEffect"];
+            /** Format: double */
+            points?: number | null;
+            pointsPer?: string | null;
+            covers: string;
+            detail: string;
         };
         ProblemDetails: {
             type?: string | null;
