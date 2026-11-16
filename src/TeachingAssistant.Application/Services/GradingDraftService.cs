@@ -81,5 +81,6 @@ public class GradingDraftService : IGradingDraftService
             .Select(m => new CodeMistake(m.File, m.StartLine, m.EndLine, m.Severity, m.Category, m.Message, m.Id, m.Points)).ToList(),
         g.InstructionsVersion, g.SentFiles, g.SkippedFiles, g.CreatedAt,
         g.Strengths.OrderBy(s => s.Position)
-            .Select(s => new CodeStrength(s.File, s.StartLine, s.EndLine, s.Category, s.Message, s.Id)).ToList());
+            .Select(s => new CodeStrength(s.File, s.StartLine, s.EndLine, s.Category, s.Message, s.Id)).ToList(),
+        g.BuildStatus, g.BuildOutput);
 }

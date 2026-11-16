@@ -169,7 +169,9 @@ public static class CodeExtractor
 
     private static string? SafeRelativePath(string entryName)
     {
-        var segments = entryName.Split('/', '\\', StringSplitOptions.RemoveEmptyEntries)
+        // Archives made on Windows (RAR, some zips) separate folders with a backslash. The array matters: with two plain
+        // chars, Split(char, int, options) is chosen and the backslash silently becomes a count of 92.
+        var segments = entryName.Split(['/', '\\'], StringSplitOptions.RemoveEmptyEntries)
             .Where(s => s != ".")
             .ToList();
         if (segments.Count == 0 || segments.Contains(".."))

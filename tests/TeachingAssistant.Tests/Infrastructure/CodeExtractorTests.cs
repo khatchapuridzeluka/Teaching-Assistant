@@ -33,6 +33,17 @@ public sealed class CodeExtractorTests : IDisposable
     }
 
     [Fact]
+    public void Extract_KeepsFoldersOfAWindowsArchive_ThatSeparatesThemWithBackslashes()
+    {
+        Zip("hw.zip", (@"3D Figures\src\Main.java", "class Main {}"), (@"3D Figures\.idea\misc.xml", "x"),
+            (@"3D Figures\out\production\Main.class", "x"), (@"MysticCreatures\src\Main.java", "class Main {}"));
+
+        Extract(Archive("hw.zip"));
+
+        Assert.Equal(["3D Figures/src/Main.java", "MysticCreatures/src/Main.java"], Files());
+    }
+
+    [Fact]
     public void Extract_UnpacksADownloadedRepositoryLikeAnArchive()
     {
         Zip("library-1111111.zip", ("ana-library-1111111/src/Main.java", "class Main {}"), ("ana-library-1111111/.git/config", "x"));

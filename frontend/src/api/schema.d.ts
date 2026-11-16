@@ -3215,6 +3215,8 @@ export interface components {
         };
         /** @enum {string} */
         AttachmentKind: "DriveFile" | "Link" | "Other";
+        /** @enum {string} */
+        BuildStatus: "Compiled" | "CompileFailed" | "TimedOut" | "Skipped" | "Unavailable";
         ChatMessage: {
             role: components["schemas"]["ChatRole"];
             text: string;
@@ -3527,6 +3529,8 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
             strengths: components["schemas"]["CodeStrength"][];
+            buildStatus?: components["schemas"]["BuildStatus"];
+            buildOutput?: string | null;
         };
         /** @enum {string} */
         GradingStatus: "Draft" | "Discarded";

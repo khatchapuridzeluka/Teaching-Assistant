@@ -24,11 +24,13 @@ public class GradingServiceTests
     private readonly FakeCourseGuidance _courseGuidance = new();
     private readonly FakePolicyRules _rules = new();
     private readonly FakeAssignmentNotes _notes = new();
+    private readonly FakeSandbox _sandbox = new() { Unavailable = "Docker is not running." };
 
     private readonly ModelCallContext _callContext = new();
 
     private GradingService Service() =>
-        new(_store, _instructions, _storage, _wordReader, _model, _gradings, _principles, _courseGuidance, _rules, _notes, _callContext, TimeProvider.System);
+        new(_store, _instructions, _storage, _wordReader, _model, _gradings, _principles, _courseGuidance, _rules, _notes,
+            new JavaBuildCheck(_sandbox, _storage), _callContext, TimeProvider.System);
 
     [Fact]
     public void TheSystemPrompt_EndsWithTheAssignmentsActiveNotes_AfterTheRules()
@@ -207,6 +209,41 @@ public class GradingServiceTests
         Assert.Equal(saved.Id, result!.Id);
         Assert.Equal(86, result.Score);
         Assert.Equal(2, result.Mistakes.Count);
+    }
+
+    [Fact]
+    public async Task Grade_GivesTheGraderTheCompileResult_BeforeTheLastLine_AndKeepsItWithTheDraft()
+    {
+        _instructions.Store("Write a zoo.");
+        var versionId = _store.AddVersion(Content(ContentKind.CodeArchive, "zoo.zip", "application/zip"));
+        _storage.Code["Zoo.java"] = "class Zoo { int n = \"x\"; }";
+        _sandbox.Unavailable = null;
+        _sandbox.Result = new SandboxResult(
+            [new SandboxStepResult("compile", SandboxStepOutcome.Failed, 1, "", "Zoo.java:1: error: incompatible types\n1 error\n", false, TimeSpan.Zero)],
+            TimeSpan.Zero);
+
+        await Service().GradeVersionAsync(versionId, TestContext.Current.CancellationToken);
+
+        var texts = _model.Parts!.OfType<TextPart>().Select(p => p.Text).ToList();
+        Assert.StartsWith("<build_and_test_results>", texts[^2]);
+        Assert.Contains("Result: it did NOT compile.", texts[^2]);
+        Assert.Equal("Grade this submission against the instructions.", texts[^1]);
+        var saved = Assert.Single(_gradings.Saved);
+        Assert.Equal((BuildStatus.CompileFailed, "Zoo.java:1: error: incompatible types\n1 error"), (saved.BuildStatus, saved.BuildOutput));
+    }
+
+    [Fact]
+    public async Task Grade_WithoutTheSandbox_StillGrades_AndRecordsWhy()
+    {
+        _instructions.Store("Write a zoo.");
+        var versionId = _store.AddVersion(Content(ContentKind.CodeArchive, "zoo.zip", "application/zip"));
+        _storage.Code["Zoo.java"] = "class Zoo {}";
+
+        await Service().GradeVersionAsync(versionId, TestContext.Current.CancellationToken);
+
+        Assert.DoesNotContain(_model.Parts!.OfType<TextPart>(), p => p.Text.Contains("<build_and_test_results>"));
+        var saved = Assert.Single(_gradings.Saved);
+        Assert.Equal((BuildStatus.Unavailable, "Docker is not running."), (saved.BuildStatus, saved.BuildOutput));
     }
 
     [Fact]

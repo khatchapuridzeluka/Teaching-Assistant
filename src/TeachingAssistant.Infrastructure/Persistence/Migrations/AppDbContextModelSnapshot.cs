@@ -219,6 +219,14 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
                         .HasColumnType("double precision")
                         .HasColumnName("bonus");
 
+                    b.Property<string>("BuildOutput")
+                        .HasColumnType("text")
+                        .HasColumnName("build_output");
+
+                    b.Property<string>("BuildStatus")
+                        .HasColumnType("text")
+                        .HasColumnName("build_status");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");

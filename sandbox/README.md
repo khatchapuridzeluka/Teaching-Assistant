@@ -1,6 +1,7 @@
 # Sandbox images
 
-Student code never runs on the host. It runs in these images, started by the API's sandbox runner (planned) with no
+Student code never runs on the host. It runs in these images, started by the API's sandbox runner
+(`src/TeachingAssistant.Infrastructure/Sandbox/DockerSandboxRunner.cs`) with no
 network, a read-only file system, memory, CPU and process limits, and an unprivileged user.
 
 ## ta-java

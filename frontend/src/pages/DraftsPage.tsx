@@ -7,6 +7,7 @@ import { useAssignments, useCourseGradings, useGradingReport, useVersionGradings
 import { CodeBrowser, type CodeFocus } from "../components/CodeBrowser";
 import { DiscardDraftButton } from "../components/DiscardDraftButton";
 import { ExportPdfLink } from "../components/ExportPdfLink";
+import { BuildCheck } from "../components/BuildCheck";
 import { CourseName } from "../components/Layout";
 import { keptMistakes, keptStrengths, ReportChip, ReportEditor } from "../components/ReportEditor";
 import { MistakeList, StrengthList } from "../components/SubmissionDetail";
@@ -587,6 +588,7 @@ function DraftDetail({
                   setTab("code");
                 }}
               />
+              <BuildCheck status={grading.buildStatus} output={grading.buildOutput} />
               <details className="text-xs">
                 <summary className="cursor-pointer font-semibold text-ink-muted hover:text-ink">
                   Files sent to the model · {grading.sentFiles.length}
@@ -604,8 +606,7 @@ function DraftDetail({
                 </ul>
               </details>
               <p className="text-[11px] text-ink-muted">
-                Instructions v{grading.instructionsVersion} · read from the code only, nothing was compiled or run · never sent to
-                Classroom
+                Instructions v{grading.instructionsVersion} · never sent to Classroom
               </p>
             </div>
           </div>

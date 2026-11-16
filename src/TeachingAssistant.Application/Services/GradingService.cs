@@ -47,6 +47,7 @@ public class GradingService : IGradingService
     private readonly ICourseGuidanceStore _courseGuidance;
     private readonly IPolicyRuleStore _rules;
     private readonly IAssignmentNoteStore _notes;
+    private readonly JavaBuildCheck _buildCheck;
     private readonly ModelCallContext _callContext;
     private readonly TimeProvider _timeProvider;
 
@@ -61,6 +62,7 @@ public class GradingService : IGradingService
         ICourseGuidanceStore courseGuidance,
         IPolicyRuleStore rules,
         IAssignmentNoteStore notes,
+        JavaBuildCheck buildCheck,
         ModelCallContext callContext,
         TimeProvider timeProvider)
     {
@@ -74,6 +76,7 @@ public class GradingService : IGradingService
         _courseGuidance = courseGuidance;
         _rules = rules;
         _notes = notes;
+        _buildCheck = buildCheck;
         _callContext = callContext;
         _timeProvider = timeProvider;
     }
@@ -208,6 +211,16 @@ public class GradingService : IGradingService
         }
 
         var (submission, instructions, prompt) = prepared;
+
+        // Compile first, so the grader gets "it compiles" or the compiler's errors as facts. The facts go just before the
+        // closing "Grade this submission" line; when there is nothing to say (no Java files, sandbox not available) the
+        // prompt stays as it was.
+        var build = await _buildCheck.CheckAsync(submission.Versions.Single(v => v.Id == versionId), cancellationToken);
+        if (JavaBuildCheck.PromptSection(build) is { } facts)
+        {
+            prompt.Parts.Insert(prompt.Parts.Count - 1, new TextPart(facts));
+        }
+
         _callContext.Describe(submission.CourseId, submission.AssignmentId, versionId);
         var principles = await _principles.GetActiveAsync(cancellationToken);
         var guidance = await _courseGuidance.FindAsync(submission.CourseId, cancellationToken);
@@ -222,6 +235,7 @@ public class GradingService : IGradingService
             read.Mistakes.Select(m => new GradingMistake(m.File, m.StartLine, m.EndLine, m.Severity, m.Category, m.Message, m.Points)),
             _timeProvider.GetUtcNow(),
             read.Strengths.Select(s => new GradingStrength(s.File, s.StartLine, s.EndLine, s.Category, s.Message)));
+        grading.RecordBuild(build.Status, build.Output);
         _gradings.Add(grading);
         await _gradings.SaveChangesAsync(cancellationToken);
         return GradingDraftService.ToResponse(grading);

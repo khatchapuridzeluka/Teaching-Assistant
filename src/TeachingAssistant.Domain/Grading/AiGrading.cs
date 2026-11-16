@@ -85,9 +85,21 @@ public class AiGrading
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset? DiscardedAt { get; private set; }
 
+    /// <summary>What compiling the code before grading found; null for gradings made before the check existed.</summary>
+    public BuildStatus? BuildStatus { get; private set; }
+
+    /// <summary>The compiler's messages, or why the check did not run.</summary>
+    public string? BuildOutput { get; private set; }
+
     public IReadOnlyList<GradingMistake> Mistakes => _mistakes;
 
     public IReadOnlyList<GradingStrength> Strengths => _strengths;
+
+    public void RecordBuild(BuildStatus status, string output)
+    {
+        BuildStatus = status;
+        BuildOutput = output;
+    }
 
     public void Discard(DateTimeOffset at)
     {

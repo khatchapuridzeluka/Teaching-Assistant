@@ -5,6 +5,7 @@ import type { CodeMistake, CodeStrength, JobInfo, StoredFile, StoredSubmission, 
 import { useGradingReport, useReview, useVersionGradings } from "../api/hooks";
 import { formatDate, formatDay, initials } from "../format";
 import { CodeBrowser, type CodeFocus, severityColor, strengthColor } from "./CodeBrowser";
+import { BuildCheck } from "./BuildCheck";
 import { DiscardDraftButton } from "./DiscardDraftButton";
 import { ExportPdfLink } from "./ExportPdfLink";
 import { keptMistakes, keptStrengths, ReportEditor } from "./ReportEditor";
@@ -306,8 +307,11 @@ export function SubmissionDetail({
                     <div className="markdown px-5 py-4">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>{showReport ? report.review : review.review}</ReactMarkdown>
                     </div>
+                    <div className="border-t border-paper-dark px-5 py-2.5">
+                      <BuildCheck status={review.buildStatus} output={review.buildOutput} />
+                    </div>
                     <div className="border-t border-paper-dark px-5 py-2 font-mono text-[10.5px] text-ink-faint">
-                      {review.model} · instructions v{review.instructionsVersion} · read from the code only, nothing was compiled or run
+                      {review.model} · instructions v{review.instructionsVersion}
                     </div>
                   </div>
                   <MistakeList mistakes={shownMistakes ?? []} onShow={showMistake} />

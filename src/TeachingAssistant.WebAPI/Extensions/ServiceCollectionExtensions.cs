@@ -12,6 +12,7 @@ using TeachingAssistant.Application.Services;
 using TeachingAssistant.Application.Tools;
 using TeachingAssistant.Infrastructure.Documents;
 using TeachingAssistant.Infrastructure.GitHub;
+using TeachingAssistant.Infrastructure.Sandbox;
 using TeachingAssistant.Infrastructure.Google;
 using TeachingAssistant.Infrastructure.Jobs;
 using TeachingAssistant.Infrastructure.LanguageModel;
@@ -35,6 +36,7 @@ public static class ServiceCollectionExtensions
         services.AddLanguageModel(configuration);
         services.AddGoogle(configuration);
         services.AddGitHub(configuration);
+        services.AddSandbox(configuration);
         services.AddPersistence(configuration);
         services.AddJobs(configuration);
 
@@ -150,6 +152,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IStudentAnalysisService, StudentAnalysisService>();
         services.AddScoped<IStudentOverviewService, StudentOverviewService>();
         services.AddScoped<IGradingGuidanceService, GradingGuidanceService>();
+        services.AddScoped<JavaBuildCheck>();
         services.AddScoped<IAssignmentNoteService, AssignmentNoteService>();
         services.AddScoped<IModelUsageService, ModelUsageService>();
         services.AddScoped<IMistakeAnalysisService, MistakeAnalysisService>();
@@ -192,6 +195,14 @@ public static class ServiceCollectionExtensions
     {
         services.Configure<GitHubOptions>(configuration.GetSection(GitHubOptions.SectionName));
         services.AddHttpClient<IRepositorySource, GitHubRepositorySource>(client => client.Timeout = TimeSpan.FromMinutes(5));
+
+        return services;
+    }
+
+    public static IServiceCollection AddSandbox(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.Configure<SandboxOptions>(configuration.GetSection(SandboxOptions.SectionName));
+        services.AddSingleton<ISandboxRunner, DockerSandboxRunner>();
 
         return services;
     }

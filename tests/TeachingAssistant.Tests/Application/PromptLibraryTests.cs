@@ -38,7 +38,8 @@ public class PromptLibraryTests
         var prompt = PromptLibrary.Grading("How to grade:\n- Be fair.");
 
         Assert.StartsWith("You grade programming homework", prompt);
-        Assert.Contains("say when you are unsure instead of sounding certain.\n\nHow to grade:\n- Be fair.\n\nYour answer is in English",
+        Assert.Contains("say when you are unsure instead of sounding certain.\n\nWhen the message has a <build_and_test_results> section", prompt);
+        Assert.Contains("Without that section, judge from the code.\n\nHow to grade:\n- Be fair.\n\nYour answer is in English",
             prompt);
         Assert.EndsWith("the teacher reviews a whole class.", prompt);
     }

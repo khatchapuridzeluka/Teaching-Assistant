@@ -16,7 +16,9 @@ public record GradingResponse(
     IReadOnlyList<string> SentFiles,
     IReadOnlyList<string> SkippedFiles,
     DateTimeOffset CreatedAt,
-    IReadOnlyList<CodeStrength> Strengths);
+    IReadOnlyList<CodeStrength> Strengths,
+    BuildStatus? BuildStatus = null,
+    string? BuildOutput = null);
 
 public record CodeMistake(
     string? File,
