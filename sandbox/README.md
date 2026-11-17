@@ -26,8 +26,8 @@ Inside the image:
 |---|---|
 | `/work` | Working directory, owned by the `sandbox` user (uid 10001); the runner copies the student's files here |
 | `javac`, `java` | The JDK of the image's tag |
-| `checkstyle` | `java -jar /opt/checkstyle/checkstyle.jar`, e.g. `checkstyle -c /google_checks.xml src` |
-| `pmd` | PMD 7, e.g. `pmd check -d src -R rulesets/java/quickstart.xml -f text` |
+| `checkstyle` | `java -jar /opt/checkstyle/checkstyle.jar`; grading runs `checkstyle -c __ta_checkstyle.xml .` with the short list from `src/TeachingAssistant.Application/Checks/checkstyle.xml` |
+| `pmd` | PMD 7; grading runs `pmd check --no-progress --no-cache -d . -R __ta_pmd.xml -f text --aux-classpath /tmp/classes-1:…` with the short list from `src/TeachingAssistant.Application/Checks/pmd.xml` |
 | `spotbugs` | SpotBugs, e.g. `spotbugs -textui out` on compiled classes |
 
 The container's default command is `sleep infinity`: the runner starts it, copies files in, runs each step with

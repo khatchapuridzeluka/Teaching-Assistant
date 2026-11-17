@@ -235,7 +235,7 @@ public class GradingService : IGradingService
             read.Mistakes.Select(m => new GradingMistake(m.File, m.StartLine, m.EndLine, m.Severity, m.Category, m.Message, m.Points)),
             _timeProvider.GetUtcNow(),
             read.Strengths.Select(s => new GradingStrength(s.File, s.StartLine, s.EndLine, s.Category, s.Message)));
-        grading.RecordBuild(build.Status, build.Output);
+        grading.RecordBuild(build.Status, build.Output, build.StyleFindings, build.StyleOutput, build.PmdFindings, build.PmdOutput);
         _gradings.Add(grading);
         await _gradings.SaveChangesAsync(cancellationToken);
         return GradingDraftService.ToResponse(grading);

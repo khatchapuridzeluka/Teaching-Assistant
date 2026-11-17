@@ -10,8 +10,10 @@ namespace TeachingAssistant.Tests.Infrastructure;
 
 /// <summary>
 /// Runs against the real Docker and the ta-java:27 image (sandbox/README.md). Skipped when Docker is not running or the
-/// image is not built, so the suite still passes on a machine without them.
+/// image is not built, so the suite still passes on a machine without them. The Docker tests run one class at a time, so
+/// "no container is left" is not confused by another test's container.
 /// </summary>
+[Collection(DockerCollection.Name)]
 public class DockerSandboxRunnerTests
 {
     private const string Image = "ta-java:27";

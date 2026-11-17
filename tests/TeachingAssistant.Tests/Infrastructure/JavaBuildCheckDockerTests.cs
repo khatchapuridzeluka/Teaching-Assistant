@@ -11,6 +11,7 @@ using TeachingAssistant.Tests.Application;
 namespace TeachingAssistant.Tests.Infrastructure;
 
 /// <summary>The compile check end to end against the real Docker sandbox; skipped without Docker or the ta-java:27 image.</summary>
+[Collection(DockerCollection.Name)]
 public class JavaBuildCheckDockerTests
 {
     private readonly FakeCodeStorage _storage = new();
@@ -97,6 +98,75 @@ public class JavaBuildCheckDockerTests
         Assert.True(missing.Count == 0, $"missing {string.Join(", ", missing)} in:\n{outcome.Output}");
 
         Assert.True(outcome.Warnings >= 9, $"{outcome.Warnings} warnings:\n{outcome.Output}");
+    }
+
+    [Fact]
+    public async Task Checkstyle_ReportsTheShortListsFindings_WithTheSubmissionsPaths()
+    {
+        SkipWithoutDocker();
+        _storage.Files["src/shop/Main.java"] = Encoding.UTF8.GetBytes("""
+            package shop;
+
+            import java.util.List;
+
+            public class Main {
+                public int Count;
+
+                public static void main(String[] args) {
+                    String name = args.length > 0 ? args[0] : "";
+                    if (name == "admin") System.out.println("hi");
+                }
+            }
+            """);
+
+        var outcome = await Check().CheckAsync(Version(), TestContext.Current.CancellationToken);
+
+        Assert.Equal(BuildStatus.Compiled, outcome.Status);
+        Assert.Equal(5, outcome.StyleFindings);
+        foreach (var rule in new[] { "[UnusedImports]", "[VisibilityModifier]", "[MemberName]", "[NeedBraces]", "[StringLiteralEquality]" })
+        {
+            Assert.Contains(rule, outcome.StyleOutput);
+        }
+
+        Assert.StartsWith("src/shop/Main.java:", outcome.StyleOutput);
+    }
+
+    [Fact]
+    public async Task Pmd_ReportsTheShortListsFindings_WithTheSubmissionsPaths()
+    {
+        SkipWithoutDocker();
+        _storage.Files["src/shop/Main.java"] = Encoding.UTF8.GetBytes("""
+            package shop;
+
+            import java.util.Scanner;
+
+            public class Main {
+                public static void main(String[] args) {
+                    Scanner in = new Scanner(System.in);
+                    Integer a = in.nextInt();
+                    Integer b = in.nextInt();
+                    if (a == b) {
+                        System.out.println("same");
+                    }
+                    String text = "";
+                    for (int i = 0; i < 3; i++) {
+                        text += i;
+                    }
+                    System.out.println(text);
+                }
+            }
+            """);
+
+        var outcome = await Check().CheckAsync(Version(), TestContext.Current.CancellationToken);
+
+        Assert.Equal(BuildStatus.Compiled, outcome.Status);
+        foreach (var rule in new[] { "[CloseResource]", "[CompareObjectsWithEquals]", "[UseStringBufferForStringAppends]" })
+        {
+            Assert.Contains(rule, outcome.PmdOutput);
+        }
+
+        Assert.Equal(3, outcome.PmdFindings);
+        Assert.StartsWith("src/shop/Main.java:", outcome.PmdOutput);
     }
 
     private static void SkipWithoutDocker()

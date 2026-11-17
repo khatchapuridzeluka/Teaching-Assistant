@@ -588,7 +588,14 @@ function DraftDetail({
                   setTab("code");
                 }}
               />
-              <BuildCheck status={grading.buildStatus} output={grading.buildOutput} />
+              <BuildCheck
+                status={grading.buildStatus}
+                output={grading.buildOutput}
+                styleFindings={grading.styleFindings}
+                styleOutput={grading.styleOutput}
+                pmdFindings={grading.pmdFindings}
+                pmdOutput={grading.pmdOutput}
+              />
               <details className="text-xs">
                 <summary className="cursor-pointer font-semibold text-ink-muted hover:text-ink">
                   Files sent to the model · {grading.sentFiles.length}

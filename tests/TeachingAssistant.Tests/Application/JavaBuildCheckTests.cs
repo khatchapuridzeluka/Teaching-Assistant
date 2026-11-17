@@ -45,7 +45,12 @@ public class JavaBuildCheckTests
 
         var request = _sandbox.Request!;
         Assert.Equal(JavaBuildCheck.Image, request.Image);
-        Assert.Equal(["compile task1/", "compile task2/"], request.Steps.Select(s => s.Name));
+        Assert.Equal(["compile task1/", "compile task2/", "checkstyle", "pmd"], request.Steps.Select(s => s.Name));
+        Assert.Equal(["pmd", "check", "--no-progress", "--no-cache", "-d", ".", "-R", "__ta_pmd.xml", "-f", "text",
+            "--aux-classpath", "/tmp/classes-1:/tmp/classes-2"], request.Steps[3].Command);
+        Assert.Contains("category/java/errorprone.xml/CloseResource", Text(request, "__ta_pmd.xml"));
+        Assert.Equal(["checkstyle", "-c", "__ta_checkstyle.xml", "."], request.Steps[2].Command);
+        Assert.Contains("<module name=" + '"' + "TypeName" + '"' + "/>", Text(request, "__ta_checkstyle.xml"));
         Assert.Equal(["javac", "-encoding", "UTF-8", JavaBuildCheck.Warnings, "-Xmaxerrs", "50", "-Xmaxwarns", "50", "-d", "/tmp/classes-1",
                 "@__ta_sources_1.txt"],
             request.Steps[0].Command);
@@ -98,6 +103,65 @@ public class JavaBuildCheckTests
 
         Assert.Equal((BuildStatus.Unavailable, "Docker is not running. Start Docker Desktop and try again."), (outcome.Status, outcome.Output));
         Assert.Null(JavaBuildCheck.PromptSection(outcome));
+    }
+
+    [Fact]
+    public void ReadCheckstyle_KeepsTheFindingsWithTheSubmissionsPaths_AndCountsUnreadableFiles()
+    {
+        var step = new SandboxStepResult("checkstyle", SandboxStepOutcome.Failed, 1,
+            "Starting audit...\n[WARN] /work/./src/Zoo.java:3:16: Name 'Count' must match pattern. [MemberName]\n[WARN] /work/./src/Zoo.java:9:9: 'if' construct must use '{}'s. [NeedBraces]\n[ERROR] /work/./broken/Broken.java:1: Got an exception - parse error\nAudit done.\n", "", false, TimeSpan.Zero);
+
+        var (findings, output) = JavaBuildCheck.ReadCheckstyle(step);
+
+        Assert.Equal(2, findings);
+        Assert.Equal("src/Zoo.java:3:16: Name 'Count' must match pattern. [MemberName]\nsrc/Zoo.java:9:9: 'if' construct must use '{}'s. [NeedBraces]\n(1 file could not be read by Checkstyle, usually because of a syntax error)", output);
+    }
+
+    [Fact]
+    public void ReadCheckstyle_ThatDidNotFinish_HasNoCount()
+    {
+        Assert.Null(JavaBuildCheck.ReadCheckstyle(null).Findings);
+        Assert.Equal((null, "it took too long and was stopped"), JavaBuildCheck.ReadCheckstyle(
+            new SandboxStepResult("checkstyle", SandboxStepOutcome.TimedOut, null, "", "", false, TimeSpan.Zero)));
+        Assert.Null(JavaBuildCheck.ReadCheckstyle(
+            new SandboxStepResult("checkstyle", SandboxStepOutcome.Failed, 254, "", "Exception in thread main", false, TimeSpan.Zero)).Findings);
+    }
+
+    [Fact]
+    public void ReadPmd_KeepsTheFindingsWithTheSubmissionsPaths_AndCountsUnparsableFiles()
+    {
+        var step = new SandboxStepResult("pmd", SandboxStepOutcome.Failed, 5,
+            "./src/Main.java:10:\tCloseResource:\tEnsure that resources like this Scanner object are closed after use\n./src/Main.java:13:\tCompareObjectsWithEquals:\tUse equals() to compare object references.\n./broken/Broken.java\t-\tParseException: Parse exception in file\nWas expecting:\n    \")\" ...\n",
+            "[INFO] An error occurred while executing PMD.", false, TimeSpan.Zero);
+
+        var (findings, output) = JavaBuildCheck.ReadPmd(step);
+
+        Assert.Equal(2, findings);
+        Assert.Equal("src/Main.java:10: Ensure that resources like this Scanner object are closed after use [CloseResource]\nsrc/Main.java:13: Use equals() to compare object references. [CompareObjectsWithEquals]\n(1 file could not be read by PMD, usually because of a syntax error)", output);
+    }
+
+    [Fact]
+    public void ReadPmd_WithNothingFound_OrAnUnexpectedExit()
+    {
+        Assert.Equal((0, ""), JavaBuildCheck.ReadPmd(new SandboxStepResult("pmd", SandboxStepOutcome.Succeeded, 0, "", "", false, TimeSpan.Zero)));
+        Assert.Equal((null, "[ERROR] Cannot load ruleset __ta_pmd.xml"), JavaBuildCheck.ReadPmd(new SandboxStepResult("pmd",
+            SandboxStepOutcome.Failed, 1, "", "[WARN] x\n[ERROR] Cannot load ruleset __ta_pmd.xml\n", false, TimeSpan.Zero)));
+    }
+
+    [Fact]
+    public void ThePromptSection_ListsTheCheckstyleFindings_AfterTheCompileResult()
+    {
+        var section = JavaBuildCheck.PromptSection(new BuildCheckOutcome(BuildStatus.Compiled, "", 1, 0, 1,
+            "src/Zoo.java:3:16: Name 'Count' must match pattern. [MemberName]"))!;
+
+        Assert.Contains("Result: it compiled without errors.\nCheckstyle (a style checker with the teacher's short list: naming conventions,",
+            section);
+        Assert.Contains("found 1 issue (file:line:column: message [rule]):\nsrc/Zoo.java:3:16: Name 'Count'", section);
+        Assert.Contains("found nothing.", JavaBuildCheck.PromptSection(new BuildCheckOutcome(BuildStatus.Compiled, "", 1, 0, 0, "")));
+        Assert.Contains("PMD (a code checker with the teacher's short list: resources such as a Scanner", section);
+        Assert.Contains("PMD (a code checker", section[section.IndexOf("Checkstyle", StringComparison.Ordinal)..]);
+        Assert.Contains("found 1 issue (file:line: message [rule]):\nsrc/A.java:2: Use equals()", JavaBuildCheck.PromptSection(
+            new BuildCheckOutcome(BuildStatus.Compiled, "", 1, 0, 0, "", 1, "src/A.java:2: Use equals() [CompareObjectsWithEquals]")));
     }
 
     private static SandboxResult Steps(params SandboxStepResult[] steps) => new(steps, TimeSpan.FromSeconds(2));

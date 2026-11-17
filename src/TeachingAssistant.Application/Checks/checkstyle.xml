@@ -1,0 +1,48 @@
+<?xml version="1.0"?>
+<!DOCTYPE module PUBLIC
+    "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+    "https://checkstyle.org/dtds/configuration_1_3.dtd">
+
+<!--
+    The teacher's short Checkstyle list for student code: only what the course guidance cares about (names, best practices
+    that beginners miss), not formatting or Javadoc. Every finding goes to the grader as a fact; the grading rules decide
+    whether it costs points. Sent into the sandbox with each check by JavaBuildCheck.
+-->
+<module name="Checker">
+    <property name="charset" value="UTF-8"/>
+    <property name="severity" value="warning"/>
+    <property name="fileExtensions" value="java"/>
+    <!-- A file Checkstyle cannot parse (a syntax error) is reported and skipped instead of stopping the whole run. -->
+    <property name="haltOnException" value="false"/>
+
+    <module name="TreeWalker">
+        <!-- Naming conventions -->
+        <module name="TypeName"/>
+        <module name="MethodName"/>
+        <module name="MemberName"/>
+        <module name="ParameterName"/>
+        <module name="LocalVariableName"/>
+        <module name="LocalFinalVariableName"/>
+        <module name="StaticVariableName"/>
+        <module name="ConstantName"/>
+        <module name="ClassTypeParameterName"/>
+        <module name="MethodTypeParameterName"/>
+
+        <!-- Encapsulation: fields should be private (protected is fine for inheritance) -->
+        <module name="VisibilityModifier">
+            <property name="protectedAllowed" value="true"/>
+        </module>
+
+        <!-- Imports -->
+        <module name="UnusedImports"/>
+        <module name="RedundantImport"/>
+
+        <!-- Beginner mistakes that compile -->
+        <module name="StringLiteralEquality"/>
+        <module name="EmptyCatchBlock"/>
+        <module name="MissingSwitchDefault"/>
+        <module name="SimplifyBooleanExpression"/>
+        <module name="SimplifyBooleanReturn"/>
+        <module name="NeedBraces"/>
+    </module>
+</module>

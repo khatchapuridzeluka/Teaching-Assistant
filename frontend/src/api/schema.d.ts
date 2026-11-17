@@ -3531,6 +3531,12 @@ export interface components {
             strengths: components["schemas"]["CodeStrength"][];
             buildStatus?: components["schemas"]["BuildStatus"];
             buildOutput?: string | null;
+            /** Format: int32 */
+            styleFindings?: number | null;
+            styleOutput?: string | null;
+            /** Format: int32 */
+            pmdFindings?: number | null;
+            pmdOutput?: string | null;
         };
         /** @enum {string} */
         GradingStatus: "Draft" | "Discarded";

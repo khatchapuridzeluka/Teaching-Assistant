@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<ruleset name="Teaching Assistant"
+    xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+
+    <description>
+        The teacher's short PMD list for student code: mistakes that compile and often even work, but show a gap in good
+        practice. What javac's warnings and the Checkstyle list already catch (switch fall-through, equals without hashCode,
+        == on strings, empty catch blocks, braces, names) is left out. Every finding goes to the grader as a fact; the grading
+        rules decide whether it costs points. Sent into the sandbox with each check by JavaBuildCheck.
+    </description>
+
+    <!-- Resources and comparisons -->
+    <rule ref="category/java/errorprone.xml/CloseResource"/>
+    <rule ref="category/java/errorprone.xml/CompareObjectsWithEquals"/>
+
+    <!-- Dead code -->
+    <rule ref="category/java/bestpractices.xml/UnusedLocalVariable"/>
+    <rule ref="category/java/bestpractices.xml/UnusedPrivateField"/>
+    <rule ref="category/java/bestpractices.xml/UnusedPrivateMethod"/>
+
+    <!-- Design: code that is hard to follow, and fields that should be local variables -->
+    <rule ref="category/java/design.xml/CognitiveComplexity"/>
+    <rule ref="category/java/design.xml/AvoidDeeplyNestedIfStmts"/>
+    <rule ref="category/java/design.xml/SingularField"/>
+
+    <!-- Building a string with += in a loop -->
+    <rule ref="category/java/performance.xml/UseStringBufferForStringAppends"/>
+</ruleset>

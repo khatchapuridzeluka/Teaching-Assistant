@@ -91,14 +91,32 @@ public class AiGrading
     /// <summary>The compiler's messages, or why the check did not run.</summary>
     public string? BuildOutput { get; private set; }
 
+    /// <summary>How many Checkstyle findings the check found; null when Checkstyle did not run.</summary>
+    public int? StyleFindings { get; private set; }
+
+    /// <summary>Checkstyle's findings, one per line, or why it did not finish.</summary>
+    public string? StyleOutput { get; private set; }
+
+    /// <summary>How many PMD findings the check found; null when PMD did not run.</summary>
+    public int? PmdFindings { get; private set; }
+
+    /// <summary>PMD's findings, one per line, or why it did not finish.</summary>
+    public string? PmdOutput { get; private set; }
+
     public IReadOnlyList<GradingMistake> Mistakes => _mistakes;
 
     public IReadOnlyList<GradingStrength> Strengths => _strengths;
 
-    public void RecordBuild(BuildStatus status, string output)
+    public void RecordBuild(
+        BuildStatus status, string output, int? styleFindings = null, string? styleOutput = null, int? pmdFindings = null,
+        string? pmdOutput = null)
     {
         BuildStatus = status;
         BuildOutput = output;
+        StyleFindings = styleFindings;
+        StyleOutput = string.IsNullOrEmpty(styleOutput) ? null : styleOutput;
+        PmdFindings = pmdFindings;
+        PmdOutput = string.IsNullOrEmpty(pmdOutput) ? null : pmdOutput;
     }
 
     public void Discard(DateTimeOffset at)

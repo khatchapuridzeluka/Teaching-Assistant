@@ -248,6 +248,14 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("model");
 
+                    b.Property<int?>("PmdFindings")
+                        .HasColumnType("integer")
+                        .HasColumnName("pmd_findings");
+
+                    b.Property<string>("PmdOutput")
+                        .HasColumnType("text")
+                        .HasColumnName("pmd_output");
+
                     b.Property<string>("RawOutput")
                         .IsRequired()
                         .HasColumnType("text")
@@ -276,6 +284,14 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("status");
+
+                    b.Property<int?>("StyleFindings")
+                        .HasColumnType("integer")
+                        .HasColumnName("style_findings");
+
+                    b.Property<string>("StyleOutput")
+                        .HasColumnType("text")
+                        .HasColumnName("style_output");
 
                     b.Property<Guid>("VersionId")
                         .HasColumnType("uuid")

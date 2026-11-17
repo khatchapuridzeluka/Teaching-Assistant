@@ -17,6 +17,8 @@ public class AiGradingConfiguration : IEntityTypeConfiguration<AiGrading>
         builder.Property(g => g.RawOutput).HasColumnType("text");
         builder.Property(g => g.BuildStatus).HasConversion<string>();
         builder.Property(g => g.BuildOutput).HasColumnType("text");
+        builder.Property(g => g.StyleOutput).HasColumnType("text");
+        builder.Property(g => g.PmdOutput).HasColumnType("text");
 
         builder.HasOne<SubmissionVersion>()
             .WithMany()

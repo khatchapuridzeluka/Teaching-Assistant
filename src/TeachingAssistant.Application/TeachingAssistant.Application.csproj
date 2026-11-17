@@ -11,6 +11,9 @@
     <ItemGroup>
       <!-- The model's fixed instructions, read by Prompts/PromptLibrary.cs -->
       <EmbeddedResource Include="Prompts\*.md" LogicalName="TeachingAssistant.Application.Prompts.%(Filename)%(Extension)" />
+      <!-- The teacher's short Checkstyle rule list, sent into the sandbox by Services/JavaBuildCheck.cs -->
+      <EmbeddedResource Include="Checks\checkstyle.xml" LogicalName="TeachingAssistant.Application.Checks.checkstyle.xml" />
+      <EmbeddedResource Include="Checks\pmd.xml" LogicalName="TeachingAssistant.Application.Checks.pmd.xml" />
     </ItemGroup>
 
     <PropertyGroup>

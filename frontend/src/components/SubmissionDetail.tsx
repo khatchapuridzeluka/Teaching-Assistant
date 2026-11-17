@@ -308,7 +308,14 @@ export function SubmissionDetail({
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>{showReport ? report.review : review.review}</ReactMarkdown>
                     </div>
                     <div className="border-t border-paper-dark px-5 py-2.5">
-                      <BuildCheck status={review.buildStatus} output={review.buildOutput} />
+                      <BuildCheck
+                        status={review.buildStatus}
+                        output={review.buildOutput}
+                        styleFindings={review.styleFindings}
+                        styleOutput={review.styleOutput}
+                        pmdFindings={review.pmdFindings}
+                        pmdOutput={review.pmdOutput}
+                      />
                     </div>
                     <div className="border-t border-paper-dark px-5 py-2 font-mono text-[10.5px] text-ink-faint">
                       {review.model} · instructions v{review.instructionsVersion}

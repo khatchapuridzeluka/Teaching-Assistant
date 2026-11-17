@@ -18,7 +18,11 @@ public record GradingResponse(
     DateTimeOffset CreatedAt,
     IReadOnlyList<CodeStrength> Strengths,
     BuildStatus? BuildStatus = null,
-    string? BuildOutput = null);
+    string? BuildOutput = null,
+    int? StyleFindings = null,
+    string? StyleOutput = null,
+    int? PmdFindings = null,
+    string? PmdOutput = null);
 
 public record CodeMistake(
     string? File,
