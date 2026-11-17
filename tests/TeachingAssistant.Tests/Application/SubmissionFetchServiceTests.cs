@@ -146,10 +146,10 @@ public class SubmissionFetchServiceTests
         await FetchAsync();
 
         var graded = _store.Submissions.Single(s => s.ExternalSubmissionId == "sub-2");
-        Assert.Equal((70.0, 90.0), (graded.InitialGrade!.Value, graded.FinalGrade!.Value));
+        Assert.Equal(90, graded.Grade);
         Assert.Equal("RETURNED", graded.State);
         var ungraded = _store.Submissions.Single(s => s.ExternalSubmissionId == "sub-1");
-        Assert.Null(ungraded.FinalGrade);
+        Assert.Null(ungraded.Grade);
         Assert.Single(ungraded.Versions);
     }
 

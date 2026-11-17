@@ -17,7 +17,6 @@ public record CourseStudentResponse(
     int TurnedIn,
     int Missing,
     int Late,
-    int Improved,
     double? OverallPercent,
     double Earned,
     double Possible,
@@ -31,8 +30,4 @@ public record StudentAssignmentResult(
     bool Late,
     bool Missing,
     GradeStatus GradeStatus,
-    double? InitialGrade,
-    double? FinalGrade,
-    IReadOnlyList<GradeReturn> Returns);
-
-public record GradeReturn(double? Points, DateTimeOffset At);
+    double? Grade);

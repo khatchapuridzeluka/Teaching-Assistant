@@ -52,9 +52,9 @@ public class StudentMistakeServiceTests
         var result = await Service().GetAsync("course", "student", null, TestContext.Current.CancellationToken);
 
         var a2 = result.Assignments.Single(a => a.AssignmentId == "a2");
-        Assert.Equal(((double?)100, (double?)90, (double?)88, (double?)82), (a2.MaxPoints, a2.ClassroomFinal, a2.ReportScore, a2.AiScore));
+        Assert.Equal(((double?)100, (double?)90, (double?)88, (double?)82), (a2.MaxPoints, a2.ClassroomGrade, a2.ReportScore, a2.AiScore));
         var a1 = result.Assignments.Single(a => a.AssignmentId == "a1");
-        Assert.Null(a1.ClassroomFinal);
+        Assert.Null(a1.ClassroomGrade);
         Assert.Equal(((double?)10, 1), (result.ClassroomPointsLost, result.ClassroomGraded));
         Assert.Equal(13.0, result.PointsLost);
     }

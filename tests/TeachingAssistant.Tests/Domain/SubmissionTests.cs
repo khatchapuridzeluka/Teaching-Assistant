@@ -81,8 +81,7 @@ public class SubmissionTests
         Assert.Equal(("RETURNED", true, 95.0), (submission.State, submission.Late, submission.AssignedGrade));
         Assert.Equal([70.0, 95.0], submission.GradeEvents.Select(e => e.PointsEarned!.Value));
         Assert.All(submission.GradeEvents, e => Assert.Equal(submission.Id, e.SubmissionId));
-        Assert.Equal(70, submission.InitialGrade);
-        Assert.Equal(95, submission.FinalGrade);
+        Assert.Equal(95, submission.Grade);
     }
 
     [Fact]
@@ -107,7 +106,7 @@ public class SubmissionTests
         submission.RecordStatus("RETURNED", false, 90, [Assigned(70, Now), Assigned(90, Now.AddDays(2))], Now.AddDays(2));
 
         Assert.Equal(2, submission.GradeEvents.Count);
-        Assert.Equal(90, submission.FinalGrade);
+        Assert.Equal(90, submission.Grade);
     }
 
     private static GradeEvent Assigned(double points, DateTimeOffset at) => new(GradeEventKind.AssignedGrade, points, 100, at);

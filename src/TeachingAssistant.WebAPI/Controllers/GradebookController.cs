@@ -17,7 +17,7 @@ public class GradebookController : ControllerBase
     }
 
     /// <summary>
-    /// Returns the course gradebook: enrolled students × assignments with each cell's state, initial and final grade, per-assignment summaries and overall scores, from the grades synced from Classroom.
+    /// Returns the course gradebook: enrolled students × assignments with each cell's state and grade, per-assignment summaries and overall scores, from the grades synced from Classroom.
     /// </summary>
     /// <response code="200">Gradebook retrieved successfully; empty lists before the first sync</response>
     [HttpGet]
@@ -27,7 +27,7 @@ public class GradebookController : ControllerBase
     }
 
     /// <summary>
-    /// Downloads the gradebook as a CSV file (initial and final grade per assignment, overall %), for the teacher's own records; nothing is written to Classroom.
+    /// Downloads the gradebook as a CSV file (the grade per assignment, overall %), for the teacher's own records; nothing is written to Classroom.
     /// </summary>
     /// <response code="200">The CSV file</response>
     [HttpGet("export")]

@@ -315,8 +315,7 @@ function ScoresCard({ assignments }: { assignments: AssignmentScores[] }) {
 function ScoreRow({ scores }: { scores: AssignmentScores }) {
   const max = scores.maxPoints != null ? ` / ${round(scores.maxPoints)}` : "";
   const reportTotal = scores.reportScore != null ? scores.reportScore + (scores.reportBonus ?? 0) : null;
-  const difference = reportTotal != null && scores.classroomFinal != null ? scores.classroomFinal - reportTotal : null;
-  const improved = scores.classroomInitial != null && scores.classroomFinal != null && scores.classroomInitial !== scores.classroomFinal;
+  const difference = reportTotal != null && scores.classroomGrade != null ? scores.classroomGrade - reportTotal : null;
 
   return (
     <tr className="border-b border-line last:border-b-0">
@@ -327,12 +326,11 @@ function ScoreRow({ scores }: { scores: AssignmentScores }) {
         </span>
       </td>
       <td className="px-3 py-2">
-        {scores.classroomFinal == null ? (
+        {scores.classroomGrade == null ? (
           <span className="text-ink-muted">not returned</span>
         ) : (
           <>
-            {improved && <span className="text-ink-muted">{round(scores.classroomInitial!)} → </span>}
-            <b className="text-[13px]">{round(scores.classroomFinal)}</b>
+            <b className="text-[13px]">{round(scores.classroomGrade)}</b>
             <span className="text-ink-muted">{max}</span>
           </>
         )}

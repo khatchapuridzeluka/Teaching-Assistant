@@ -63,9 +63,8 @@ public class Submission
 
     public IReadOnlyList<GradeEvent> GradeEvents => _gradeEvents;
 
-    public double? InitialGrade => Grades.Initial(_gradeEvents);
-
-    public double? FinalGrade => Grades.Final(_gradeEvents, AssignedGrade);
+    /// <summary>The latest grade returned in Classroom; null when none was returned.</summary>
+    public double? Grade => Grades.Latest(_gradeEvents, AssignedGrade);
 
     public void UpdateStudentName(string studentName) => StudentName = studentName;
 

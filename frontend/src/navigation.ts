@@ -41,7 +41,7 @@ export const courseSections: Section[] = [
     label: "Students",
     icon: Users,
     ready: true,
-    description: "Every student's grades per assignment, initial and final, and their overall score.",
+    description: "Every student's grade per assignment and their overall score.",
   },
   {
     path: "drafts",
@@ -55,7 +55,7 @@ export const courseSections: Section[] = [
     label: "Gradebook",
     icon: Table2,
     ready: true,
-    description: "Initial and final grades for every student and assignment, with class averages and a CSV export.",
+    description: "The grade for every student and assignment, with class averages and a CSV export.",
   },
   {
     path: "mistakes",

@@ -73,22 +73,16 @@ public class StudentService : IStudentService
         foreach (var assignment in assignments)
         {
             var submission = byAssignment.GetValueOrDefault(assignment.ExternalAssignmentId);
-            var result = new AssignmentResult(assignment.MaxPoints, assignment.DueAt, submission?.FinalGrade, submission?.IsTurnedIn ?? false);
+            var result = new AssignmentResult(assignment.MaxPoints, assignment.DueAt, submission?.Grade, submission?.IsTurnedIn ?? false);
             scored.Add(result);
-            var returns = (submission?.GradeEvents ?? [])
-                .Where(e => e.Kind == GradeEventKind.AssignedGrade)
-                .OrderBy(e => e.GradedAt)
-                .Select(e => new GradeReturn(e.PointsEarned, e.GradedAt))
-                .ToList();
             results.Add(new StudentAssignmentResult(assignment.ExternalAssignmentId, submission?.ExternalSubmissionId,
                 submission?.State, result.TurnedIn, submission?.Late ?? false, result.IsMissing(now), result.GradeStatusAt(now),
-                submission?.InitialGrade, submission?.FinalGrade, returns));
+                submission?.Grade));
         }
 
         var overall = OverallScore.Compute(scored, now);
         return new CourseStudentResponse(student.Id, student.ExternalUserId, student.Name, student.IsEnrolledIn(courseId),
             results.Count(r => r.TurnedIn), results.Count(r => r.Missing), results.Count(r => r.TurnedIn && r.Late),
-            results.Count(r => r.InitialGrade is { } first && r.FinalGrade is { } last && last > first),
             overall.Percent, overall.Earned, overall.Possible, results);
     }
 }

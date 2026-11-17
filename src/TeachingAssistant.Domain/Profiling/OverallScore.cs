@@ -1,13 +1,13 @@
 namespace TeachingAssistant.Domain.Profiling;
 
-public sealed record AssignmentResult(double? MaxPoints, DateTimeOffset? DueAt, double? FinalGrade, bool TurnedIn)
+public sealed record AssignmentResult(double? MaxPoints, DateTimeOffset? DueAt, double? Grade, bool TurnedIn)
 {
     public bool IsMissing(DateTimeOffset now) =>
-        MaxPoints is > 0 && FinalGrade is null && !TurnedIn && DueAt is { } due && due <= now;
+        MaxPoints is > 0 && Grade is null && !TurnedIn && DueAt is { } due && due <= now;
 
     public GradeStatus GradeStatusAt(DateTimeOffset now)
     {
-        if (FinalGrade is not null)
+        if (Grade is not null)
         {
             return GradeStatus.Graded;
         }
@@ -47,7 +47,7 @@ public sealed record OverallScore(double Earned, double Possible, int Counted)
                 continue;
             }
 
-            if (assignment.FinalGrade is { } grade)
+            if (assignment.Grade is { } grade)
             {
                 earned += grade;
             }

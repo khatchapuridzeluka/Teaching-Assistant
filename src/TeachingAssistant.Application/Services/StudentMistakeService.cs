@@ -92,8 +92,7 @@ public class StudentMistakeService : IStudentMistakeService
                     g.Count(l => l.Label == MistakeLabel.Repeated),
                     g.Sum(l => l.Mistake.Points ?? 0),
                     maxPoints,
-                    submission?.InitialGrade,
-                    submission?.FinalGrade,
+                    submission?.Grade,
                     score?.Score,
                     score?.Bonus,
                     score?.AiScore,
@@ -102,10 +101,10 @@ public class StudentMistakeService : IStudentMistakeService
             })
             .ToList();
 
-        var classroomGraded = byAssignment.Where(a => a is { ClassroomFinal: not null, MaxPoints: > 0 }).ToList();
+        var classroomGraded = byAssignment.Where(a => a is { ClassroomGrade: not null, MaxPoints: > 0 }).ToList();
         double? classroomLost = classroomGraded.Count == 0
             ? null
-            : classroomGraded.Sum(a => Math.Max(0, a.MaxPoints!.Value - a.ClassroomFinal!.Value));
+            : classroomGraded.Sum(a => Math.Max(0, a.MaxPoints!.Value - a.ClassroomGrade!.Value));
 
         return new StudentMistakesResponse(total, mistakes.Count, selected.Sum(l => l.Mistake.Points ?? 0), classroomLost,
             classroomGraded.Count, history, categories, severities, labels, byAssignment, options);

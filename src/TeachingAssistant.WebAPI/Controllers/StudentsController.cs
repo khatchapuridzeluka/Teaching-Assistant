@@ -32,7 +32,7 @@ public class StudentsController : ControllerBase
     }
 
     /// <summary>
-    /// Returns the course's students with their state, initial and final grade per assignment and overall score, from the database (filled by POST /courses/{courseId}/sync).
+    /// Returns the course's students with their state and grade per assignment and overall score, from the database (filled by POST /courses/{courseId}/sync).
     /// </summary>
     /// <response code="200">Students retrieved successfully; empty lists before the first sync</response>
     [HttpGet]

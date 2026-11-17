@@ -203,7 +203,7 @@ public class StudentTools
         };
         var grade = result?.GradeStatus switch
         {
-            GradeStatus.Graded => $"graded in Classroom: {Points(result.FinalGrade ?? result.InitialGrade)} of {Points(assignment.MaxPoints)}",
+            GradeStatus.Graded => $"graded in Classroom: {Points(result.Grade)} of {Points(assignment.MaxPoints)}",
             GradeStatus.AwaitingGrade => "waiting for a grade",
             GradeStatus.NotDue => "not due yet",
             _ => "no grade",

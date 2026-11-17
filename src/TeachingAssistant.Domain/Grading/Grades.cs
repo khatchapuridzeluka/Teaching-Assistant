@@ -1,11 +1,12 @@
 namespace TeachingAssistant.Domain.Grading;
 
+/// <summary>
+/// The Classroom grade of a submission: the latest grade the teacher returned, or the current assigned grade when there is no
+/// history. Draft grades never count.
+/// </summary>
 public static class Grades
 {
-    public static double? Initial(IEnumerable<GradeEvent> history) =>
-        Assigned(history).FirstOrDefault(e => e.PointsEarned is not null)?.PointsEarned;
-
-    public static double? Final(IEnumerable<GradeEvent> history, double? currentGrade)
+    public static double? Latest(IEnumerable<GradeEvent> history, double? currentGrade)
     {
         var assigned = Assigned(history).ToList();
         return assigned.Count > 0 ? assigned[^1].PointsEarned : currentGrade;

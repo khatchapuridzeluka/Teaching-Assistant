@@ -42,14 +42,9 @@ Rules are defined together with the teacher (old Claude chats had no hard rules)
 
 ## Scores
 
-Two scores per student per assignment:
-- **Initial score** — first submission.
-- **Final score** — after the student fixes mistakes and resubmits/recommits.
+One score per grading. **Dropped for Demo Day:** separate initial and final scores, diff-aware regrading (previous mistakes + diff → fixed / remaining / new) and the teacher choosing a final version. Grading a version again is enough: the latest draft is current, earlier drafts stay in the history to compare.
 
-**Resubmissions have no fixed form:** usually new commits, but possibly a new zip or just a new/changed file in Classroom. No fixed deadline. So:
-- Every fetch stores a **snapshot** (files + content hash, commit SHA for GitHub). A changed hash/SHA vs. the graded snapshot = new version detected, shown in the UI.
-- Regrading a new version gets the previous grading's mistakes + the **diff**, and reports which mistakes were fixed, which remain, and any new ones.
-- The **teacher decides** which version counts as final — never inferred automatically.
+**Resubmissions have no fixed form:** usually new commits, but possibly a new zip or just a new/changed file in Classroom. No fixed deadline. Every fetch stores a **snapshot** (files + content hash, commit SHA for GitHub); a changed hash/SHA vs. the graded snapshot = new version detected, shown in the UI, and the teacher grades it again.
 
 Stored **only in the tool** (DB + UI, exportable to the teacher's own file). **The agent must never upload or write grades anywhere** — enforced technically by using read-only Google OAuth scopes and read-only GitHub access, not only by instructions.
 
@@ -57,7 +52,7 @@ Stored **only in the tool** (DB + UI, exportable to the teacher's own file). **T
 
 Agents work in the background; the UI is where the teacher reviews and decides. Screens:
 1. **Home** — courses → assignments with status counts (new, drafted, approved, new version).
-2. **Assignment** — student table (status, initial/final score, flags), "Grade all", class-wide mistake clusters with approve-per-cluster.
+2. **Assignment** — student table (status, score, flags), "Grade all", class-wide mistake clusters with approve-per-cluster.
 3. **Submission review** — code viewer with mistakes as **inline line comments** (like a PR review) + rubric scores, mistakes, feedback; edit/approve; version diff; "ask why" chat with the agent.
 4. **Student profile** — score trend, mistake categories, repeated vs. fixed, narrative overview.
 5. **Settings** — base rubric, policy rules, Classroom/GitHub connections.
@@ -166,8 +161,8 @@ The program owners approved real student data for the MVP and Demo Day (sensitiv
 
 ## Timeline
 
-- **By Nov 8:** Classroom fetch (zip + GitHub link) → sandbox compile → rubric + policy grading of a Java class-design task → review screen with initial score.
-- **By Nov 15:** resubmission → final score, mistake DB + new/repeated labels, orchestrator, batch calibration + mistake clustering.
+- **By Nov 8:** Classroom fetch (zip + GitHub link) → sandbox compile → rubric + policy grading of a Java class-design task → review screen with the score.
+- **By Nov 15:** mistake DB + new/repeated labels, orchestrator, batch calibration + mistake clustering.
 - **By Nov 22:** student profile page with charts, accuracy eval vs. past grades, GCP deploy.
 - **Nov 23–28:** demo polish only — no new features.
 

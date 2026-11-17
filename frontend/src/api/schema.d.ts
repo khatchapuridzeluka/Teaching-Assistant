@@ -859,7 +859,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Returns the course gradebook: enrolled students × assignments with each cell's state, initial and final grade, per-assignment summaries and overall scores, from the grades synced from Classroom. */
+        /** Returns the course gradebook: enrolled students × assignments with each cell's state and grade, per-assignment summaries and overall scores, from the grades synced from Classroom. */
         get: {
             parameters: {
                 query?: never;
@@ -897,7 +897,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Downloads the gradebook as a CSV file (initial and final grade per assignment, overall %), for the teacher's own records; nothing is written to Classroom. */
+        /** Downloads the gradebook as a CSV file (the grade per assignment, overall %), for the teacher's own records; nothing is written to Classroom. */
         get: {
             parameters: {
                 query?: never;
@@ -2496,7 +2496,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Returns the course's students with their state, initial and final grade per assignment and overall score, from the database (filled by POST /courses/{courseId}/sync). */
+        /** Returns the course's students with their state and grade per assignment and overall score, from the database (filled by POST /courses/{courseId}/sync). */
         get: {
             parameters: {
                 query?: never;
@@ -3331,8 +3331,6 @@ export interface components {
             missing: number;
             /** Format: int32 */
             late: number;
-            /** Format: int32 */
-            improved: number;
             /** Format: double */
             overallPercent?: number | null;
             /** Format: double */
@@ -3428,12 +3426,6 @@ export interface components {
         };
         /** @enum {string} */
         GradeEventKind: "DraftGrade" | "AssignedGrade" | "MaxPoints" | "Other";
-        GradeReturn: {
-            /** Format: double */
-            points?: number | null;
-            /** Format: date-time */
-            at: string;
-        };
         /** @enum {string} */
         GradeStatus: "Graded" | "AwaitingGrade" | "Missing" | "NotDue" | "NotSubmitted";
         GradebookColumn: {
@@ -3666,9 +3658,7 @@ export interface components {
             /** Format: double */
             maxPoints?: number | null;
             /** Format: double */
-            classroomInitial?: number | null;
-            /** Format: double */
-            classroomFinal?: number | null;
+            classroomGrade?: number | null;
             /** Format: double */
             reportScore?: number | null;
             /** Format: double */
@@ -4150,10 +4140,7 @@ export interface components {
             missing: boolean;
             gradeStatus: components["schemas"]["GradeStatus"];
             /** Format: double */
-            initialGrade?: number | null;
-            /** Format: double */
-            finalGrade?: number | null;
-            returns: components["schemas"]["GradeReturn"][];
+            grade?: number | null;
         };
         StudentMistakeResponse: {
             /** Format: uuid */

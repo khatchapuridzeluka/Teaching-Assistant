@@ -78,7 +78,7 @@ public class CourseSyncService : ICourseSyncService
             }
 
             SubmissionStatus.Record(submission, item, now);
-            if (submission.FinalGrade is not null)
+            if (submission.Grade is not null)
             {
                 graded++;
             }

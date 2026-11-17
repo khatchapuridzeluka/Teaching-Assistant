@@ -34,8 +34,7 @@ public class GradebookService : IGradebookService
         foreach (var assignment in gradebook.Assignments)
         {
             var max = assignment.MaxPoints is { } points ? $" (/{Number(points)})" : "";
-            header.Add($"{assignment.Title}{max} initial");
-            header.Add($"{assignment.Title}{max} final");
+            header.Add($"{assignment.Title}{max}");
         }
 
         header.Add("Overall %");
@@ -46,8 +45,7 @@ public class GradebookService : IGradebookService
             var row = new List<string> { student.Name };
             foreach (var result in student.Results)
             {
-                row.Add(result.InitialGrade is { } initial ? Number(initial) : "");
-                row.Add(FinalCell(result));
+                row.Add(Cell(result));
             }
 
             row.Add(student.OverallPercent is { } percent ? Number(Math.Round(percent, 1)) : "");
@@ -62,18 +60,18 @@ public class GradebookService : IGradebookService
         var cells = students.Select(s => s.Results.Single(r => r.AssignmentId == assignment.Id)).ToList();
         var graded = cells.Where(c => c.GradeStatus == GradeStatus.Graded).ToList();
         double? average = assignment.MaxPoints is > 0 && graded.Count > 0
-            ? graded.Average(c => c.FinalGrade!.Value / assignment.MaxPoints.Value * 100)
+            ? graded.Average(c => c.Grade!.Value / assignment.MaxPoints.Value * 100)
             : null;
 
         return new GradebookColumn(assignment.Id, assignment.Title, assignment.MaxPoints, assignment.DueAt, graded.Count,
             cells.Count(c => c.GradeStatus == GradeStatus.AwaitingGrade), cells.Count(c => c.GradeStatus == GradeStatus.Missing), average);
     }
 
-    private static string FinalCell(StudentAssignmentResult result)
+    private static string Cell(StudentAssignmentResult result)
     {
         return result.GradeStatus switch
         {
-            GradeStatus.Graded => Number(result.FinalGrade!.Value),
+            GradeStatus.Graded => Number(result.Grade!.Value),
             GradeStatus.AwaitingGrade => "not graded",
             GradeStatus.Missing => "missing",
             _ => "",

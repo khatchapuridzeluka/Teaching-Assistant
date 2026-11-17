@@ -10,7 +10,7 @@ import { StrengthsCard } from "../components/StudentStrengths";
 import { StudentOverviewCard } from "../components/StudentOverview";
 import { stateChip } from "../components/SubmissionDetail";
 import { Avatar, Button, buttonClass, Card, Chip, CountTabs, EmptyState, ErrorPanel, Meter, Modal, Notice, PageHeader, SearchField, Spinner, Stat, StatStrip } from "../components/ui";
-import { ArrowLeft, ArrowRight, Award, CalendarX, CircleAlert, Clock, GraduationCap, LayoutDashboard, RefreshCw, Send, Sparkles, Table2, TrendingUp, Users } from "lucide-react";
+import { ArrowLeft, ArrowRight, Award, CalendarX, CircleAlert, Clock, GraduationCap, LayoutDashboard, RefreshCw, Send, Sparkles, Table2, Users } from "lucide-react";
 import { formatDate, formatDay, initials } from "../format";
 
 export function StudentsPage() {
@@ -34,7 +34,6 @@ export function StudentsPage() {
   const counts: Record<Filter, number> = {
     all: all.length,
     missing: all.filter(filters.missing.matches).length,
-    improved: all.filter(filters.improved.matches).length,
     left: all.filter(filters.left.matches).length,
   };
   const search = query.trim().toLowerCase();
@@ -116,9 +115,8 @@ export function StudentsPage() {
               value={active.length}
               note={all.length > active.length ? `${all.length - active.length} left the course` : "on the roster"}
             />
-            <Stat compact icon={<GraduationCap />} label="Class average" value={average == null ? "–" : `${Math.round(average)}%`} note="overall, final grades" />
+            <Stat compact icon={<GraduationCap />} label="Class average" value={average == null ? "–" : `${Math.round(average)}%`} note="overall, Classroom grades" />
             <Stat compact icon={<CalendarX />} label="Missing work" value={active.reduce((sum, s) => sum + s.missing, 0)} note="past due, counts as 0" />
-            <Stat compact icon={<TrendingUp />} label="Improved" value={active.reduce((sum, s) => sum + s.improved, 0)} note="grades raised after a fix" />
           </StatStrip>
 
           <Card className="@container/workspace flex h-[calc(100dvh-96px)] min-h-[460px] shrink-0 overflow-hidden lg:h-auto lg:min-h-[420px] lg:flex-1 lg:shrink">
@@ -177,12 +175,11 @@ const sortLabels: Record<SortOption, string> = {
   missing: "Most missing",
 };
 
-type Filter = "all" | "missing" | "improved" | "left";
+type Filter = "all" | "missing" | "left";
 
 const filters: Record<Filter, { label: string; matches: (s: CourseStudent) => boolean }> = {
   all: { label: "All", matches: () => true },
   missing: { label: "Missing work", matches: (s) => s.active && s.missing > 0 },
-  improved: { label: "Improved", matches: (s) => s.improved > 0 },
   left: { label: "Left course", matches: (s) => !s.active },
 };
 
@@ -304,7 +301,6 @@ function StudentList({
                     <span className="block truncate text-[11px] text-ink-muted">
                       {student.active ? `${student.turnedIn} turned in` : "Left the course"}
                       {student.missing > 0 && ` · ${student.missing} missing`}
-                      {student.improved > 0 && ` · ${student.improved} improved`}
                     </span>
                   </span>
                   <span className="flex w-14 shrink-0 flex-col items-end gap-1">
@@ -481,7 +477,6 @@ function StudentProfile({
             <Stat compact icon={<Send />} label="Turned in" value={`${student.turnedIn} / ${assignments.length}`} note="handed in" />
             <Stat compact icon={<CalendarX />} label="Missing" value={student.missing} note="count as 0" tone={student.missing > 0 ? "bad" : undefined} />
             <Stat compact icon={<Clock />} label="Late" value={student.late} note="after deadline" />
-            <Stat compact icon={<TrendingUp />} label="Improved" value={student.improved} note="after a fix" tone={student.improved > 0 ? "good" : undefined} />
           </StatStrip>
 
           <div className="grid gap-4 @3xl:grid-cols-2">
@@ -552,45 +547,31 @@ function ScoreChart({ assignments, results }: { assignments: StudentAssignmentCo
     value != null && max ? (value / max) * 100 : null;
   const bars = assignments.map((a) => {
     const result = results.get(a.id);
-    return { a, result, final: share(result?.finalGrade, a.maxPoints), initial: share(result?.initialGrade, a.maxPoints) };
+    return { a, result, grade: share(result?.grade, a.maxPoints) };
   });
-  const top = Math.max(100, ...bars.map((b) => b.final ?? 0), ...bars.map((b) => b.initial ?? 0));
+  const top = Math.max(100, ...bars.map((b) => b.grade ?? 0));
 
   return (
     <div className="surface">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-2.5">
         <h3 className="eyebrow">Score by assignment</h3>
-        <span className="flex items-center gap-3 text-[11px] text-ink-muted">
-          <span className="flex items-center gap-1">
-            <span className="h-2 w-2 rounded-sm bg-accent-tint ring-1 ring-accent/30" /> first returned
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="h-2 w-2 rounded-sm bg-accent" /> final
-          </span>
+        <span className="flex items-center gap-1 text-[11px] text-ink-muted">
+          <span className="h-2 w-2 rounded-sm bg-accent" /> grade returned in Classroom
         </span>
       </div>
       <div className="flex h-[170px] items-end gap-2 px-4 pb-2 pt-4">
-        {bars.map(({ a, result, final, initial }) => (
+        {bars.map(({ a, result, grade }) => (
           <div key={a.id} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1">
             <span className="text-[11px] font-semibold tabular-nums">
-              {final != null ? `${Math.round(final)}%` : result?.missing ? "0" : ""}
+              {grade != null ? `${Math.round(grade)}%` : result?.missing ? "0" : ""}
             </span>
             <div className="relative flex w-full max-w-[56px] flex-1 items-end justify-center gap-1">
-              {final != null ? (
-                <>
-                  {initial != null && initial !== final && (
-                    <span
-                      className="w-1/3 origin-bottom animate-[grow-y_700ms_cubic-bezier(0.22,1,0.36,1)_both] rounded-t bg-accent-tint ring-1 ring-accent/30"
-                      style={{ height: `${(initial / top) * 100}%` }}
-                      title={`First returned: ${points(result!.initialGrade!)}`}
-                    />
-                  )}
-                  <span
-                    className="w-1/2 origin-bottom animate-[grow-y_700ms_cubic-bezier(0.22,1,0.36,1)_both] rounded-t bg-accent"
-                    style={{ height: `${(final / top) * 100}%` }}
-                    title={`Final: ${points(result!.finalGrade!)} of ${a.maxPoints}`}
-                  />
-                </>
+              {grade != null ? (
+                <span
+                  className="w-1/2 origin-bottom animate-[grow-y_700ms_cubic-bezier(0.22,1,0.36,1)_both] rounded-t bg-accent"
+                  style={{ height: `${(grade / top) * 100}%` }}
+                  title={`${points(result!.grade!)} of ${a.maxPoints}`}
+                />
               ) : (
                 <span
                   className={`w-1/2 rounded-t border border-dashed ${result?.missing ? "h-1 border-ink" : "h-full border-line"}`}
@@ -644,12 +625,10 @@ function AssignmentRow({
 }
 
 function Grade({ result, maxPoints }: { result: StudentAssignmentResult | undefined; maxPoints: number | null | undefined }) {
-  if (result?.finalGrade != null) {
-    const changed = result.initialGrade != null && result.initialGrade !== result.finalGrade;
+  if (result?.grade != null) {
     return (
       <span className="whitespace-nowrap font-mono text-[12px]">
-        {changed && <span className="text-ink-muted">{points(result.initialGrade!)} → </span>}
-        <b>{points(result.finalGrade)}</b>
+        <b>{points(result.grade)}</b>
         <span className="text-ink-muted"> / {maxPoints ?? "–"}</span>
       </span>
     );
@@ -725,25 +704,12 @@ function AssignmentModal({
         </div>
 
         <div>
-          <h3 className="eyebrow mb-2">Grade history</h3>
-          {result && result.returns.length > 0 ? (
-            <ol className="relative flex flex-col gap-3 border-l-2 border-line pl-4">
-              {result.returns.map((r, i) => (
-                <li key={i} className="relative">
-                  <span
-                    className={`absolute -left-[22px] top-1 h-2.5 w-2.5 rounded-full border-2 border-white ${i === result.returns.length - 1 ? "bg-success" : "bg-accent"}`}
-                  />
-                  <div className="flex items-baseline justify-between gap-3">
-                    <b>
-                      {i === 0 ? "Returned" : "Returned again"} with {r.points == null ? "no grade" : points(r.points)}
-                    </b>
-                    <span className="text-[11px] text-ink-muted">{formatDate(r.at)}</span>
-                  </div>
-                  {i === 0 && result.returns.length > 1 && <div className="text-[11px] text-ink-muted">Initial score</div>}
-                  {i === result.returns.length - 1 && <div className="text-[11px] text-ink-muted">Final score</div>}
-                </li>
-              ))}
-            </ol>
+          <h3 className="eyebrow mb-2">Grade</h3>
+          {result?.grade != null ? (
+            <p className="text-xs text-ink-muted">
+              Returned in Classroom with <b className="text-ink">{points(result.grade)}</b>
+              {assignment.maxPoints != null ? ` of ${assignment.maxPoints}` : ""}; the latest grade you returned counts.
+            </p>
           ) : (
             <p className="text-xs text-ink-muted">
               {result?.missing
@@ -775,7 +741,7 @@ function GradeTableModal({
   return (
     <Modal
       title="Grade table"
-      subtitle={'Final grades; "70 → 95" when a fix raised it. Click a name to open the profile.'}
+      subtitle="Grades returned in Classroom. Click a name to open the profile."
       size="max-w-[1200px]"
       height="max-h-[94dvh]"
       onClose={onClose}

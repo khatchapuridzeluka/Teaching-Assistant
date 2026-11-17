@@ -41,7 +41,7 @@ export function GradebookPage() {
         subtitle={
           <>
             <CourseName courseId={courseId} /> · {synced ? `synced ${formatDate(data!.syncedAt)}` : "not synced yet"} · grades you
-            returned in Classroom, initial → final
+            returned in Classroom
           </>
         }
         actions={
@@ -211,11 +211,9 @@ function Cell({ result, column, courseId }: { result: StudentAssignmentResult; c
 function cellContent(result: StudentAssignmentResult): ReactNode {
   switch (result.gradeStatus) {
     case "Graded": {
-      const improved = result.initialGrade != null && result.finalGrade != null && result.initialGrade !== result.finalGrade;
       return (
         <span className="whitespace-nowrap">
-          {improved && <span className="text-ink-muted">{round(result.initialGrade!)} → </span>}
-          <b className="font-mono text-[12.5px] font-semibold">{round(result.finalGrade!)}</b>
+          <b className="font-mono text-[12.5px] font-semibold">{round(result.grade!)}</b>
           {result.late && <span className="ml-1 text-[10px] font-semibold uppercase text-ink-muted">late</span>}
         </span>
       );
@@ -235,8 +233,7 @@ function Legend() {
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-ink-muted">
       <span>
-        <span>80 → </span>
-        <b className="text-ink">95</b> initial → final
+        <b className="text-ink">95</b> grade returned in Classroom
       </span>
       <span className="rounded-full bg-accent-tint px-2 py-0.5 font-semibold text-accent">turned in</span>
       <span>waiting for your grade</span>

@@ -28,29 +28,29 @@ public class GradebookServiceTests
     }
 
     [Fact]
-    public async Task Csv_HasInitialAndFinalColumns_AndQuotesNamesWithCommas()
+    public async Task Csv_HasOneGradeColumnPerAssignment_AndQuotesNamesWithCommas()
     {
-        _students.Add("Khachapuridze, Luka", active: true, Result(GradeStatus.Graded, 95, initial: 80), overall: 95);
+        _students.Add("Khachapuridze, Luka", active: true, Result(GradeStatus.Graded, 95), overall: 95);
         _students.Add("Nini", active: true, Result(GradeStatus.AwaitingGrade, null), overall: null);
 
         var bytes = await new GradebookService(_students).ExportCsvAsync("course", TestContext.Current.CancellationToken);
         var lines = Encoding.UTF8.GetString(bytes).TrimStart('﻿').Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
 
-        Assert.Equal("Student,Task 1 (/100) initial,Task 1 (/100) final,Overall %", lines[0]);
-        Assert.Equal("\"Khachapuridze, Luka\",80,95,95", lines[1]);
-        Assert.Equal("Nini,,not graded,", lines[2]);
+        Assert.Equal("Student,Task 1 (/100),Overall %", lines[0]);
+        Assert.Equal("\"Khachapuridze, Luka\",95,95", lines[1]);
+        Assert.Equal("Nini,not graded,", lines[2]);
     }
 
-    private static StudentAssignmentResult Result(GradeStatus state, double? final, double? initial = null) =>
+    private static StudentAssignmentResult Result(GradeStatus state, double? grade) =>
         new("a1", "sub", null, state is GradeStatus.Graded or GradeStatus.AwaitingGrade, false,
-            state == GradeStatus.Missing, state, initial ?? final, final, []);
+            state == GradeStatus.Missing, state, grade);
 
     private sealed class FakeStudents : IStudentService
     {
         private readonly List<CourseStudentResponse> _rows = [];
 
         public void Add(string name, bool active, StudentAssignmentResult result, double? overall) =>
-            _rows.Add(new CourseStudentResponse(Guid.NewGuid(), name, name, active, 1, 0, 0, 0, overall, 0, 0, [result]));
+            _rows.Add(new CourseStudentResponse(Guid.NewGuid(), name, name, active, 1, 0, 0, overall, 0, 0, [result]));
 
         public Task<CourseStudentsResponse> GetCourseStudentsAsync(string courseId, CancellationToken cancellationToken = default) =>
             Task.FromResult(new CourseStudentsResponse(null, [new StudentAssignmentColumn("a1", "Task 1", 100, null)], _rows));

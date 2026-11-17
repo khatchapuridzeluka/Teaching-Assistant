@@ -220,8 +220,8 @@ public class StudentToolsTests
             ];
             StudentAssignmentResult[] results =
             [
-                new("a-4", "sub-4", "TURNED_IN", true, true, false, GradeStatus.Graded, 70, 80, []),
-                new("a-5", null, null, false, false, true, GradeStatus.Missing, null, null, []),
+                new("a-4", "sub-4", "TURNED_IN", true, true, false, GradeStatus.Graded, 80),
+                new("a-5", null, null, false, false, true, GradeStatus.Missing, null),
             ];
             CourseStudentResponse[] students =
             [
@@ -234,7 +234,7 @@ public class StudentToolsTests
 
         private static CourseStudentResponse Student(string id, string name, bool active, IReadOnlyList<StudentAssignmentResult> results)
         {
-            return new CourseStudentResponse(Guid.NewGuid(), id, name, active, 1, 1, 1, 0, null, 0, 0, results);
+            return new CourseStudentResponse(Guid.NewGuid(), id, name, active, 1, 1, 1, null, 0, 0, results);
         }
 
         public Task<StudentPhoto?> OpenPhotoAsync(string externalUserId, CancellationToken cancellationToken = default) =>

@@ -109,7 +109,7 @@ public class CourseSyncServiceTests
         Assert.Equal([100.0, 50.0], _assignments.Assignments.Select(a => a.MaxPoints!.Value));
 
         var graded = _submissions.Submissions.Single(s => s.ExternalSubmissionId == "s1");
-        Assert.Equal((70.0, 90.0), (graded.InitialGrade!.Value, graded.FinalGrade!.Value));
+        Assert.Equal(90, graded.Grade);
         Assert.Empty(graded.Versions); // no files are downloaded by a sync
         Assert.Equal("submissions/Java II/Assignment 1/Ana K. (u1)", graded.StorageFolder);
         Assert.Equal("CREATED", _submissions.Submissions.Single(s => s.ExternalSubmissionId == "s2").State);
@@ -134,7 +134,7 @@ public class CourseSyncServiceTests
         Assert.Equal("Ana Kapanadze", Assert.Single(_students.Students).Name);
         Assert.Equal("Assignment 1 (Lists)", Assert.Single(_assignments.Assignments).Title);
         var submission = Assert.Single(_submissions.Submissions);
-        Assert.Equal((70.0, 95.0), (submission.InitialGrade!.Value, submission.FinalGrade!.Value));
+        Assert.Equal(95, submission.Grade);
     }
 
     [Fact]
@@ -184,7 +184,7 @@ public class CourseSyncServiceTests
         var submission = Assert.Single(_submissions.Submissions);
         Assert.Equal("submissions/old-folder", submission.StorageFolder);
         Assert.Single(submission.Versions);
-        Assert.Equal(88, submission.FinalGrade);
+        Assert.Equal(88, submission.Grade);
     }
 
     [Fact]
@@ -208,10 +208,8 @@ public class CourseSyncServiceTests
         Assert.Equal((1, 1, 90.0, 200.0), (ana.TurnedIn, ana.Missing, ana.Earned, ana.Possible));
         Assert.Equal(45, ana.OverallPercent);
         var first = ana.Results[0];
-        Assert.Equal((70.0, 90.0), (first.InitialGrade!.Value, first.FinalGrade!.Value));
-        Assert.Equal([70.0, 90.0], first.Returns.Select(r => r.Points!.Value));
+        Assert.Equal(90, first.Grade);
         Assert.Equal("s1", first.SubmissionId);
-        Assert.Equal(1, ana.Improved);
         Assert.Equal("u1", ana.ExternalUserId);
         Assert.True(ana.Results[1].Missing);
         Assert.False(ana.Results[2].Missing);

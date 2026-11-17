@@ -34,8 +34,7 @@ public class SubmissionConfiguration : IEntityTypeConfiguration<Submission>
 
         builder.Ignore(s => s.LatestVersion);
         builder.Ignore(s => s.NextVersionNumber);
-        builder.Ignore(s => s.InitialGrade);
-        builder.Ignore(s => s.FinalGrade);
+        builder.Ignore(s => s.Grade);
         builder.Ignore(s => s.IsTurnedIn);
     }
 }
