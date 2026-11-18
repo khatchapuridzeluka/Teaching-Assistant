@@ -732,6 +732,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/evaluation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Returns how the AI drafts compare with the approved reports made from them (scores, mistakes, strengths, per model), in all courses or one. */
+        get: {
+            parameters: {
+                query?: {
+                    courseId?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Comparison computed; zero counts before any report is approved */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["EvaluationResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/google/status": {
         parameters: {
             query?: never;
@@ -3217,6 +3255,15 @@ export interface components {
         AttachmentKind: "DriveFile" | "Link" | "Other";
         /** @enum {string} */
         BuildStatus: "Compiled" | "CompileFailed" | "TimedOut" | "Skipped" | "Unavailable";
+        CategoryDecisions: {
+            category: components["schemas"]["MistakeCategory"];
+            /** Format: int32 */
+            kept: number;
+            /** Format: int32 */
+            edited: number;
+            /** Format: int32 */
+            rejected: number;
+        };
         ChatMessage: {
             role: components["schemas"]["ChatRole"];
             text: string;
@@ -3364,6 +3411,201 @@ export interface components {
             photosUpdated: number;
             /** Format: int32 */
             photosFailed: number;
+        };
+        /** @description Differences from From up to but not including To; the outer buckets are open-ended. */
+        DifferenceBucket: {
+            /** Format: int32 */
+            from: number;
+            /** Format: int32 */
+            to: number;
+            /** Format: int32 */
+            count: number;
+        };
+        EvaluationClassroom: {
+            /**
+             * Format: int32
+             * @description Reports whose submission has a grade returned in Classroom.
+             */
+            compared: number;
+            /**
+             * Format: int32
+             * @description How many AI totals are within the tolerance of that grade.
+             */
+            aiWithinTolerance: number;
+            /**
+             * Format: double
+             * @description Average size of the AI's difference from it, in percent of the maximum.
+             */
+            aiMeanAbsoluteDifference?: number | null;
+            /**
+             * Format: int32
+             * @description How many of the teacher's report totals are within the tolerance of it.
+             */
+            teacherWithinTolerance: number;
+        };
+        EvaluationMistakes: {
+            /**
+             * Format: int32
+             * @description The AI's mistakes in the compared reports.
+             */
+            total: number;
+            /**
+             * Format: int32
+             * @description Kept as the AI wrote them.
+             */
+            kept: number;
+            /**
+             * Format: int32
+             * @description Kept but changed (message, severity, category or points).
+             */
+            edited: number;
+            /**
+             * Format: int32
+             * @description Rejected: not a real mistake according to the teacher.
+             */
+            rejected: number;
+            /**
+             * Format: int32
+             * @description Kept mistakes whose points the teacher changed.
+             */
+            pointsChanged: number;
+            /**
+             * Format: double
+             * @description Average size of those point changes.
+             */
+            meanPointsChange?: number | null;
+            /** @description The decisions per category the AI chose. */
+            byCategory: components["schemas"]["CategoryDecisions"][];
+            /** @description The decisions per severity the AI chose. */
+            bySeverity: components["schemas"]["SeverityDecisions"][];
+        };
+        EvaluationModel: {
+            model: string;
+            /** Format: int32 */
+            reports: number;
+            /** Format: int32 */
+            scoresCompared: number;
+            /** Format: int32 */
+            withinTolerance: number;
+            /** Format: double */
+            meanAbsoluteDifference?: number | null;
+            /** Format: int32 */
+            mistakes: number;
+            /** Format: int32 */
+            mistakesRejected: number;
+        };
+        /**
+         * @description How the AI's drafts compare with the teacher's approved reports made from them. Scores are compared as a share of the
+         *     assignment's maximum, so assignments out of 50 and 100 count alike. Only approved reports count: they are the teacher's
+         *     final word, and discarded or unreviewed drafts say nothing about whether the AI was right.
+         */
+        EvaluationResponse: {
+            /**
+             * Format: int32
+             * @description How many approved reports were compared.
+             */
+            reports: number;
+            scores: components["schemas"]["EvaluationScores"];
+            mistakes: components["schemas"]["EvaluationMistakes"];
+            strengths: components["schemas"]["EvaluationStrengths"];
+            classroom: components["schemas"]["EvaluationClassroom"];
+            /** @description The same numbers per model that wrote the drafts. */
+            models: components["schemas"]["EvaluationModel"][];
+            /** @description One row per compared report, largest disagreement first. */
+            rows: components["schemas"]["EvaluationRow"][];
+        };
+        /**
+         * @description One compared report. Scores are totals (score plus bonus); AiPercent and TeacherPercent are those totals in percent of the
+         *     maximum, and Difference is the AI's minus the teacher's in percent of the maximum (positive: the AI was more lenient), null
+         *     when either total is missing. ClassroomGrade is the grade returned in Classroom for the same submission, if any.
+         */
+        EvaluationRow: {
+            /** Format: uuid */
+            reportId: string;
+            /** Format: uuid */
+            gradingId: string;
+            courseId: string;
+            assignmentId: string;
+            assignmentTitle?: string | null;
+            studentId: string;
+            studentName?: string | null;
+            model: string;
+            /** Format: double */
+            aiScore?: number | null;
+            /** Format: double */
+            teacherScore?: number | null;
+            /** Format: double */
+            maxScore?: number | null;
+            /** Format: double */
+            aiPercent?: number | null;
+            /** Format: double */
+            teacherPercent?: number | null;
+            /** Format: double */
+            difference?: number | null;
+            /** Format: int32 */
+            mistakes: number;
+            /** Format: int32 */
+            mistakesEdited: number;
+            /** Format: int32 */
+            mistakesRejected: number;
+            /** Format: double */
+            classroomGrade?: number | null;
+            /** Format: date-time */
+            approvedAt?: string | null;
+        };
+        EvaluationScores: {
+            /**
+             * Format: int32
+             * @description Reports where both totals and the maximum are known.
+             */
+            compared: number;
+            /**
+             * Format: double
+             * @description How close counts as agreeing, in percent of the maximum (5 = 5 points out of 100).
+             */
+            tolerancePercent: number;
+            /**
+             * Format: int32
+             * @description How many of them agree within the tolerance.
+             */
+            withinTolerance: number;
+            /**
+             * Format: int32
+             * @description How many have the very same total.
+             */
+            exact: number;
+            /**
+             * Format: double
+             * @description Average size of the difference, in percent of the maximum.
+             */
+            meanAbsoluteDifference?: number | null;
+            /**
+             * Format: double
+             * @description Average signed difference, in percent of the maximum: positive means the AI is more lenient.
+             */
+            meanDifference?: number | null;
+            /**
+             * Format: int32
+             * @description How many times the AI gave more than the teacher.
+             */
+            aiHigher: number;
+            /**
+             * Format: int32
+             * @description How many times the AI gave less than the teacher.
+             */
+            aiLower: number;
+            /** @description How the differences spread, in 5-point steps of percent of the maximum. */
+            buckets: components["schemas"]["DifferenceBucket"][];
+        };
+        EvaluationStrengths: {
+            /** Format: int32 */
+            total: number;
+            /** Format: int32 */
+            kept: number;
+            /** Format: int32 */
+            edited: number;
+            /** Format: int32 */
+            rejected: number;
         };
         ExtractionSummary: {
             /** Format: int32 */
@@ -4003,6 +4245,15 @@ export interface components {
             review: string;
             mistakes: components["schemas"]["ReportMistakeInput"][];
             strengths?: components["schemas"]["ReportStrengthInput"][] | null;
+        };
+        SeverityDecisions: {
+            severity: components["schemas"]["MistakeSeverity"];
+            /** Format: int32 */
+            kept: number;
+            /** Format: int32 */
+            edited: number;
+            /** Format: int32 */
+            rejected: number;
         };
         StartAgentRunRequest: {
             text: string;

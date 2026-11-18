@@ -65,6 +65,9 @@ public class GradingExportServiceTests
 
     private sealed class Fakes : IGradingStore, IGradingReportStore, ISubmissionStore, ICourseAssignmentStore, IGradingDocumentRenderer
     {
+        public Task<IReadOnlyList<TeachingAssistant.Application.Models.ApprovedReport>> GetApprovedAsync(string? courseId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         private readonly List<AiGrading> _gradings = [];
         private readonly List<GradingReport> _reports = [];
         private readonly List<Submission> _submissions = [];

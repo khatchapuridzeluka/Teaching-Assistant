@@ -29,6 +29,33 @@ public class GradingReportStore(AppDbContext db) : IGradingReportStore
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<ApprovedReport>> GetApprovedAsync(string? courseId, CancellationToken cancellationToken = default)
+    {
+        var reports = await db.GradingReports
+            .Include(r => r.Mistakes)
+            .Include(r => r.Strengths)
+            .AsSplitQuery()
+            .Where(r => r.Status == ReportStatus.Approved && (courseId == null || r.CourseId == courseId))
+            .ToListAsync(cancellationToken);
+        if (reports.Count == 0)
+        {
+            return [];
+        }
+
+        var gradingIds = reports.Select(r => r.GradingId).ToList();
+        var drafts = await db.Gradings
+            .Include(g => g.Mistakes)
+            .Include(g => g.Strengths)
+            .AsSplitQuery()
+            .Where(g => gradingIds.Contains(g.Id))
+            .ToDictionaryAsync(g => g.Id, cancellationToken);
+
+        return reports
+            .Where(r => drafts.ContainsKey(r.GradingId))
+            .Select(r => new ApprovedReport(r, drafts[r.GradingId]))
+            .ToList();
+    }
+
     public void Add(GradingReport report) => db.GradingReports.Add(report);
 
     public Task SaveChangesAsync(CancellationToken cancellationToken = default) => db.SaveChangesAsync(cancellationToken);

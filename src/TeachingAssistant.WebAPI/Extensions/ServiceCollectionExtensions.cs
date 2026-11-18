@@ -152,6 +152,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IStudentAnalysisService, StudentAnalysisService>();
         services.AddScoped<IStudentOverviewService, StudentOverviewService>();
         services.AddScoped<IGradingGuidanceService, GradingGuidanceService>();
+        services.AddScoped<IEvaluationService, EvaluationService>();
         services.AddScoped<JavaBuildCheck>();
         services.AddScoped<IAssignmentNoteService, AssignmentNoteService>();
         services.AddScoped<IModelUsageService, ModelUsageService>();

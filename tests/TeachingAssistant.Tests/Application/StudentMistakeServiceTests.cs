@@ -76,6 +76,9 @@ public class StudentMistakeServiceTests
 
     private sealed class FakeMistakes : IStudentMistakeStore, IGradingReportStore
     {
+        public Task<IReadOnlyList<TeachingAssistant.Application.Models.ApprovedReport>> GetApprovedAsync(string? courseId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         private readonly List<StudentMistake> _mistakes = [];
         private readonly List<ReportScore> _scores = [];
 

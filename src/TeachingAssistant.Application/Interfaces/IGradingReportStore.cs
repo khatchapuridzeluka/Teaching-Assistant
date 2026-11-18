@@ -9,6 +9,9 @@ public interface IGradingReportStore
 
     Task<IReadOnlyList<ReportScore>> GetScoresAsync(IReadOnlyCollection<Guid> reportIds, CancellationToken cancellationToken = default);
 
+    /// <summary>Every approved report with its AI draft, in one course or in all of them (courseId null).</summary>
+    Task<IReadOnlyList<ApprovedReport>> GetApprovedAsync(string? courseId, CancellationToken cancellationToken = default);
+
     void Add(GradingReport report);
 
     Task SaveChangesAsync(CancellationToken cancellationToken = default);

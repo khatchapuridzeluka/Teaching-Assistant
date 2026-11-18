@@ -534,6 +534,13 @@ export const useCourseGradings = (
       ),
   });
 
+export const useEvaluation = (courseId?: string) =>
+  useQuery({
+    queryKey: ["evaluation", courseId ?? "all"],
+    queryFn: () => unwrap(api.GET("/evaluation", { params: { query: { courseId } } })),
+    staleTime: 0,
+  });
+
 export const useReviewQueue = () =>
   useQuery({
     queryKey: ["gradings", "review-queue"],

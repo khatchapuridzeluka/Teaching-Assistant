@@ -212,6 +212,9 @@ public class GradingReportServiceTests
 
     private sealed class FakeReports : IGradingReportStore
     {
+        public Task<IReadOnlyList<TeachingAssistant.Application.Models.ApprovedReport>> GetApprovedAsync(string? courseId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public List<GradingReport> Reports { get; } = [];
 
         public Task<GradingReport?> FindByGradingAsync(Guid gradingId, CancellationToken cancellationToken = default) =>

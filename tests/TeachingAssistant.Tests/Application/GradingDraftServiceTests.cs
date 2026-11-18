@@ -112,6 +112,9 @@ public class GradingDraftServiceTests
 
     private sealed class NoReports : IGradingReportStore
     {
+        public Task<IReadOnlyList<TeachingAssistant.Application.Models.ApprovedReport>> GetApprovedAsync(string? courseId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public Task<GradingReport?> FindByGradingAsync(Guid gradingId, CancellationToken cancellationToken = default) =>
             Task.FromResult<GradingReport?>(null);
 

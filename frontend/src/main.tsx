@@ -17,6 +17,7 @@ import { GradebookPage } from "./pages/GradebookPage";
 import { InstructionsPage } from "./pages/InstructionsPage";
 import { ReviewQueuePage } from "./pages/ReviewQueuePage";
 import { RubricLegacyRedirect, RubricPolicyPage } from "./pages/RubricPolicyPage";
+import { EvaluationPage } from "./pages/EvaluationPage";
 import { SystemPage } from "./pages/SystemPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { StudentMistakesPage } from "./pages/StudentMistakesPage";
@@ -131,6 +132,11 @@ const router = createBrowserRouter([
         path: "/system",
         element: <SystemPage />,
         handle: { crumbs: () => [{ label: "System" }] } satisfies CrumbHandle,
+      },
+      {
+        path: "/evaluation",
+        element: <EvaluationPage />,
+        handle: { crumbs: () => [{ label: "Evaluation" }] } satisfies CrumbHandle,
       },
       {
         path: "/review",

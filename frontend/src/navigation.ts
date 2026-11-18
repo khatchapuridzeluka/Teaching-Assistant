@@ -90,13 +90,8 @@ export const workspaceSections: Section[] = [
     path: "evaluation",
     label: "Evaluation",
     icon: FlaskConical,
-    ready: false,
-    description: "How often the agent agrees with your final grades, measured on past homework.",
-    plans: [
-      "Agreement rate between AI drafts and your final grades",
-      "Where the agent tends to be too strict or too lenient",
-      "Tracked over time as the rubric and rules improve",
-    ],
+    ready: true,
+    description: "How often the AI's drafts agree with the reports you approved: scores, mistakes, strengths and per model.",
   },
   {
     path: "system",
