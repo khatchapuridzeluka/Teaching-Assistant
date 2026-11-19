@@ -102,7 +102,7 @@ public class GradingReportService : IGradingReportService
 
         foreach (var other in others)
         {
-            other.Discard(now);
+            other.Discard(now, DiscardReason.Superseded);
             if (await _reports.FindByGradingAsync(other.Id, cancellationToken) is { } otherReport)
             {
                 await RemoveRecordsAsync(otherReport.Id, cancellationToken);

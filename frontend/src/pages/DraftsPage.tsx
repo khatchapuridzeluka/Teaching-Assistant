@@ -5,7 +5,7 @@ import { Link, useParams, useSearchParams } from "react-router";
 import type { AssignmentGrading } from "../api/client";
 import { useAssignments, useCourseGradings, useGradingReport, useVersionGradings } from "../api/hooks";
 import { CodeBrowser, type CodeFocus } from "../components/CodeBrowser";
-import { DiscardDraftButton } from "../components/DiscardDraftButton";
+import { DiscardDraftButton, discardReasonLabel } from "../components/DiscardDraftButton";
 import { ExportPdfLink } from "../components/ExportPdfLink";
 import { BuildCheck } from "../components/BuildCheck";
 import { CourseName } from "../components/Layout";
@@ -23,7 +23,7 @@ export function DraftsPage() {
   const studentId = searchParams.get("student") ?? undefined;
   const viewAll = searchParams.get("view") === "all";
   const overview = !assignmentId && !studentId && !viewAll;
-  const [showAll, setShowAll] = useState(false);
+  const [showAll, setShowAll] = useState(searchParams.get("earlier") === "1");
   const [showDraft, setShowDraft] = useState(false);
 
   const assignments = useAssignments(courseId);
@@ -488,7 +488,9 @@ function DraftDetail({
             <div className="flex flex-wrap items-center gap-2">
               <b className="truncate font-display text-[19px] font-semibold leading-tight">{draft.studentName}</b>
               {draft.status === "Discarded" ? (
-                <Chip tone="muted">Discarded</Chip>
+                <Chip tone="muted">
+                  Discarded{grading?.discardReason ? ` · ${discardReasonLabel[grading.discardReason]}` : ""}
+                </Chip>
               ) : draft.current ? (
                 <Chip tone="info">Current draft</Chip>
               ) : (
@@ -496,6 +498,11 @@ function DraftDetail({
               )}
               {report && draft.status !== "Discarded" && <ReportChip report={report} />}
             </div>
+            {draft.status === "Discarded" && grading?.discardNote && (
+              <div className="truncate text-xs text-ink-muted" title={grading.discardNote}>
+                Why: {grading.discardNote}
+              </div>
+            )}
             <div className="truncate text-xs text-ink-muted">
               {assignmentTitle} · <span className="font-mono text-[11px]">v{draft.versionNumber}</span> · saved {formatDate(draft.createdAt)} ·{" "}
               <span className="font-mono text-[11px]">{draft.model}</span>

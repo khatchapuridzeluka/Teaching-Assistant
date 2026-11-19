@@ -1252,7 +1252,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Discards a draft; it stays in the version's history and is no longer its current draft. */
+        /** Discards a draft with why (optional body: reason and note); it stays in the version's history and is no longer its current draft. */
         post: {
             parameters: {
                 query?: never;
@@ -1262,7 +1262,13 @@ export interface paths {
                 };
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["DiscardGradingRequest"];
+                    "text/json": components["schemas"]["DiscardGradingRequest"];
+                    "application/*+json": components["schemas"]["DiscardGradingRequest"];
+                };
+            };
             responses: {
                 /** @description The discarded grading */
                 200: {
@@ -1272,6 +1278,13 @@ export interface paths {
                     content: {
                         "application/json": components["schemas"]["GradingResponse"];
                     };
+                };
+                /** @description The reason is Superseded or the note is too long */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
                 };
                 /** @description No grading with this ID */
                 404: {
@@ -3421,6 +3434,50 @@ export interface components {
             /** Format: int32 */
             count: number;
         };
+        /** @description Why the teacher discards a draft; the Evaluation page counts PoorGrading as the AI getting it wrong. */
+        DiscardGradingRequest: {
+            reason: components["schemas"]["DiscardReason"];
+            /** @description Optional, in the teacher's words, at most 500 characters. */
+            note?: string | null;
+        };
+        /** @enum {string} */
+        DiscardReason: "PoorGrading" | "WrongSubmission" | "NotNeeded" | "Superseded" | "Other";
+        DiscardReasonCount: {
+            reason?: components["schemas"]["DiscardReason"];
+            /** Format: int32 */
+            count: number;
+        };
+        /**
+         * @description One discarded draft: whose and which assignment, the model, the AI's total (score plus bonus) and mistakes per severity,
+         *     why it was discarded and the teacher's note, and the status its report had, if one was made.
+         */
+        DiscardedRow: {
+            /** Format: uuid */
+            gradingId: string;
+            courseId: string;
+            assignmentId: string;
+            assignmentTitle?: string | null;
+            studentId: string;
+            studentName: string;
+            model: string;
+            /** Format: double */
+            aiScore?: number | null;
+            /** Format: double */
+            maxScore?: number | null;
+            /** Format: int32 */
+            major: number;
+            /** Format: int32 */
+            minor: number;
+            /** Format: int32 */
+            style: number;
+            reason?: components["schemas"]["DiscardReason"];
+            note?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            discardedAt?: string | null;
+            reportStatus?: components["schemas"]["ReportStatus"];
+        };
         EvaluationClassroom: {
             /**
              * Format: int32
@@ -3442,6 +3499,22 @@ export interface components {
              * @description How many of the teacher's report totals are within the tolerance of it.
              */
             teacherWithinTolerance: number;
+        };
+        EvaluationDiscards: {
+            /**
+             * Format: int32
+             * @description Every discarded draft.
+             */
+            total: number;
+            /**
+             * Format: int32
+             * @description Discarded because the grading was wrong or poor: the AI's clearest failures.
+             */
+            poorGrading: number;
+            /** @description How many per reason; a null reason means discarded before reasons were recorded. */
+            byReason: components["schemas"]["DiscardReasonCount"][];
+            /** @description Every discarded draft, newest discard first. */
+            rows: components["schemas"]["DiscardedRow"][];
         };
         EvaluationMistakes: {
             /**
@@ -3479,12 +3552,15 @@ export interface components {
             /** @description The decisions per severity the AI chose. */
             bySeverity: components["schemas"]["SeverityDecisions"][];
         };
+        /** @description The evaluation numbers for the drafts one model wrote, with how many of its drafts were discarded as poor grading. */
         EvaluationModel: {
             model: string;
             /** Format: int32 */
             reports: number;
             /** Format: int32 */
             scoresCompared: number;
+            /** Format: double */
+            accuracy?: number | null;
             /** Format: int32 */
             withinTolerance: number;
             /** Format: double */
@@ -3493,11 +3569,14 @@ export interface components {
             mistakes: number;
             /** Format: int32 */
             mistakesRejected: number;
+            /** Format: int32 */
+            discardedPoorGrading: number;
         };
         /**
          * @description How the AI's drafts compare with the teacher's approved reports made from them. Scores are compared as a share of the
-         *     assignment's maximum, so assignments out of 50 and 100 count alike. Only approved reports count: they are the teacher's
-         *     final word, and discarded or unreviewed drafts say nothing about whether the AI was right.
+         *     assignment's maximum, so assignments out of 50 and 100 count alike. Only approved reports of drafts that were not
+         *     discarded count: they are the teacher's final word. Discarded drafts are listed apart with why they were discarded,
+         *     since a draft thrown away as poor grading is the clearest failure of all.
          */
         EvaluationResponse: {
             /**
@@ -3511,6 +3590,7 @@ export interface components {
             classroom: components["schemas"]["EvaluationClassroom"];
             /** @description The same numbers per model that wrote the drafts. */
             models: components["schemas"]["EvaluationModel"][];
+            discards: components["schemas"]["EvaluationDiscards"];
             /** @description One row per compared report, largest disagreement first. */
             rows: components["schemas"]["EvaluationRow"][];
         };
@@ -3559,6 +3639,11 @@ export interface components {
              * @description Reports where both totals and the maximum are known.
              */
             compared: number;
+            /**
+             * Format: double
+             * @description 100 minus the average gap, in percent: 97.8 when the AI is off by 2.2 points per 100 on average.
+             */
+            accuracy?: number | null;
             /**
              * Format: double
              * @description How close counts as agreeing, in percent of the maximum (5 = 5 points out of 100).
@@ -3771,6 +3856,8 @@ export interface components {
             /** Format: int32 */
             pmdFindings?: number | null;
             pmdOutput?: string | null;
+            discardReason?: components["schemas"]["DiscardReason"];
+            discardNote?: string | null;
         };
         /** @enum {string} */
         GradingStatus: "Draft" | "Discarded";

@@ -596,6 +596,9 @@ public class GradingServiceTests
 
     private sealed class FakeGradingStore : IGradingStore
     {
+        public Task<IReadOnlyList<TeachingAssistant.Application.Models.DiscardedDraft>> GetDiscardedAsync(string? courseId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public List<AiGrading> Saved { get; } = [];
 
         public void Add(AiGrading grading) => Saved.Add(grading);

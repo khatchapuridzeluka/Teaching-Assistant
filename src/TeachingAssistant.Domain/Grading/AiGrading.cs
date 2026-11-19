@@ -9,6 +9,8 @@ public enum GradingStatus
 
 public class AiGrading
 {
+    public const int MaxDiscardNoteLength = 500;
+
     private readonly List<GradingMistake> _mistakes = [];
     private readonly List<GradingStrength> _strengths = [];
 
@@ -85,6 +87,12 @@ public class AiGrading
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset? DiscardedAt { get; private set; }
 
+    /// <summary>Why it was discarded; null for drafts discarded before reasons were recorded.</summary>
+    public DiscardReason? DiscardReason { get; private set; }
+
+    /// <summary>The teacher's own words on why, when given.</summary>
+    public string? DiscardNote { get; private set; }
+
     /// <summary>What compiling the code before grading found; null for gradings made before the check existed.</summary>
     public BuildStatus? BuildStatus { get; private set; }
 
@@ -119,7 +127,7 @@ public class AiGrading
         PmdOutput = string.IsNullOrEmpty(pmdOutput) ? null : pmdOutput;
     }
 
-    public void Discard(DateTimeOffset at)
+    public void Discard(DateTimeOffset at, DiscardReason? reason = null, string? note = null)
     {
         if (Status == GradingStatus.Discarded)
         {
@@ -128,6 +136,8 @@ public class AiGrading
 
         Status = GradingStatus.Discarded;
         DiscardedAt = at.ToUniversalTime();
+        DiscardReason = reason;
+        DiscardNote = string.IsNullOrWhiteSpace(note) ? null : note.Trim();
     }
 }
 

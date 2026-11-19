@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, type JobStatus, type PolicyRuleRequest, type JobType, type ModelCallPurpose, type SaveReportRequest, type StudentMistakeFilter,
+import { api, type DiscardReason, type JobStatus, type PolicyRuleRequest, type JobType, type ModelCallPurpose, type SaveReportRequest, type StudentMistakeFilter,
   type StudentStrengthFilter, type StudentAnalysisKind, unwrap } from "./client";
 import { forgetMissingPhotos } from "../components/ui";
 
@@ -551,11 +551,12 @@ export const useReviewQueue = () =>
 export const useDiscardGrading = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (gradingId: string) =>
-      unwrap(api.POST("/gradings/{gradingId}/discard", { params: { path: { gradingId } } })),
+    mutationFn: ({ gradingId, reason, note }: { gradingId: string; reason: DiscardReason; note?: string }) =>
+      unwrap(api.POST("/gradings/{gradingId}/discard", { params: { path: { gradingId } }, body: { reason, note } })),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["reviews"] });
       void queryClient.invalidateQueries({ predicate: (query) => query.queryKey.includes("gradings") });
+      void queryClient.invalidateQueries({ queryKey: ["evaluation"] });
     },
   });
 };

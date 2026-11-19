@@ -1,3 +1,5 @@
+using TeachingAssistant.Application.Contracts;
+using TeachingAssistant.Application.Exceptions;
 using TeachingAssistant.Application.Interfaces;
 using TeachingAssistant.Application.Models;
 using TeachingAssistant.Application.Services;
@@ -23,7 +25,8 @@ public class GradingDraftServiceTests
         var second = Grade(versionId, 86, Start.AddMinutes(5));
         var third = Grade(versionId, 40, Start.AddMinutes(9));
 
-        await Service().DiscardAsync(third.Id, TestContext.Current.CancellationToken);
+        await Service().DiscardAsync(third.Id, new DiscardGradingRequest(DiscardReason.PoorGrading, "  Missed the task 2 rules.  "),
+            TestContext.Current.CancellationToken);
         var current = await Service().GetCurrentAsync(versionId, TestContext.Current.CancellationToken);
 
         Assert.Equal(second.Id, current!.Id);
@@ -31,6 +34,20 @@ public class GradingDraftServiceTests
         var history = await Service().GetHistoryAsync(versionId, TestContext.Current.CancellationToken);
         Assert.Equal([third.Id, second.Id, first.Id], history.Select(h => h.Id));
         Assert.Equal(GradingStatus.Discarded, history[0].Status);
+        Assert.Equal((DiscardReason.PoorGrading, "Missed the task 2 rules."), (history[0].DiscardReason!.Value, history[0].DiscardNote));
+    }
+
+    [Fact]
+    public async Task Discard_RefusesSupersededAsAReason_AndATooLongNote()
+    {
+        var grading = Grade(Guid.NewGuid(), 70, Start);
+
+        await Assert.ThrowsAsync<InvalidRequestException>(() => Service().DiscardAsync(grading.Id,
+            new DiscardGradingRequest(DiscardReason.Superseded), TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<InvalidRequestException>(() => Service().DiscardAsync(grading.Id,
+            new DiscardGradingRequest(DiscardReason.Other, new string('x', AiGrading.MaxDiscardNoteLength + 1)),
+            TestContext.Current.CancellationToken));
+        Assert.Equal(GradingStatus.Draft, grading.Status);
     }
 
     [Fact]
@@ -42,7 +59,7 @@ public class GradingDraftServiceTests
     [Fact]
     public async Task Discard_UnknownGrading_ReturnsNull()
     {
-        Assert.Null(await Service().DiscardAsync(Guid.NewGuid(), TestContext.Current.CancellationToken));
+        Assert.Null(await Service().DiscardAsync(Guid.NewGuid(), null, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -159,6 +176,9 @@ public class GradingDraftServiceTests
     // Stands in for the database: gradings plus the version → submission facts the real store joins to.
     private sealed class FakeGradingStore : IGradingStore
     {
+        public Task<IReadOnlyList<TeachingAssistant.Application.Models.DiscardedDraft>> GetDiscardedAsync(string? courseId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         private readonly Dictionary<Guid, (string AssignmentId, string SubmissionId, string StudentName, int Number)> _versions = [];
 
         public List<AiGrading> Gradings { get; } = [];

@@ -9,8 +9,9 @@ namespace TeachingAssistant.Application.Services;
 
 /// <summary>
 /// Compares every approved report with the AI draft it was made from and adds the comparisons up: how close the scores are,
-/// which of the AI's mistakes and strengths the teacher kept, edited or rejected, and the same per model. Everything is
-/// counted in code from stored data; no model is called.
+/// which of the AI's mistakes and strengths the teacher kept, edited or rejected, and the same per model. A report whose draft
+/// was later discarded (for example because another draft of the submission was approved) no longer counts; discarded
+/// drafts are counted and listed apart, with why. Everything is counted in code from stored data; no model is called.
 /// </summary>
 public class EvaluationService : IEvaluationService
 {
@@ -21,14 +22,17 @@ public class EvaluationService : IEvaluationService
     private const int BucketLimit = 25;
 
     private readonly IGradingReportStore _reports;
+    private readonly IGradingStore _gradings;
     private readonly ISubmissionStore _submissions;
     private readonly IStudentStore _students;
     private readonly ICourseAssignmentStore _assignments;
 
     public EvaluationService(
-        IGradingReportStore reports, ISubmissionStore submissions, IStudentStore students, ICourseAssignmentStore assignments)
+        IGradingReportStore reports, IGradingStore gradings, ISubmissionStore submissions, IStudentStore students,
+        ICourseAssignmentStore assignments)
     {
         _reports = reports;
+        _gradings = gradings;
         _submissions = submissions;
         _students = students;
         _assignments = assignments;
@@ -37,11 +41,15 @@ public class EvaluationService : IEvaluationService
     public async Task<EvaluationResponse> GetAsync(string? courseId = null, CancellationToken cancellationToken = default)
     {
         var approved = await _reports.GetApprovedAsync(courseId, cancellationToken);
-        var compared = approved.Select(a => (a.Report, a.Draft, Comparison: DraftComparison.Of(a.Draft, a.Report))).ToList();
+        var compared = approved
+            .Where(a => a.Draft.Status != GradingStatus.Discarded)
+            .Select(a => (a.Report, a.Draft, Comparison: DraftComparison.Of(a.Draft, a.Report)))
+            .ToList();
+        var discarded = await _gradings.GetDiscardedAsync(courseId, cancellationToken);
 
         var titles = new Dictionary<(string Course, string Assignment), string>();
         var grades = new Dictionary<(string Assignment, string Student), double?>();
-        foreach (var course in compared.Select(c => c.Report.CourseId).Distinct())
+        foreach (var course in compared.Select(c => c.Report.CourseId).Concat(discarded.Select(d => d.CourseId)).Distinct())
         {
             foreach (var assignment in await _assignments.GetByCourseAsync(SubmissionSource.GoogleClassroom, course, cancellationToken))
             {
@@ -71,10 +79,15 @@ public class EvaluationService : IEvaluationService
             Mistakes(comparisons),
             Strengths(comparisons),
             Classroom(compared.Select(c => (c.Comparison, grades.GetValueOrDefault((c.Report.AssignmentId, c.Report.StudentId)))).ToList()),
-            compared.GroupBy(c => c.Draft.Model)
-                .Select(g => Model(g.Key, g.Select(c => c.Comparison).ToList()))
+            compared.Select(c => c.Draft.Model)
+                .Concat(discarded.Select(d => d.Model))
+                .Distinct()
+                .Select(model => Model(model,
+                    compared.Where(c => c.Draft.Model == model).Select(c => c.Comparison).ToList(),
+                    discarded.Count(d => d.Model == model && d.Reason == DiscardReason.PoorGrading)))
                 .OrderByDescending(m => m.Reports)
                 .ToList(),
+            Discards(discarded, titles),
             rows);
     }
 
@@ -94,8 +107,10 @@ public class EvaluationService : IEvaluationService
             .Select((count, i) => new DifferenceBucket(-BucketLimit + i * BucketSize, -BucketLimit + (i + 1) * BucketSize, count))
             .ToList();
 
+        double? meanGap = differences.Count == 0 ? null : differences.Average(Math.Abs);
         return new EvaluationScores(
             differences.Count,
+            meanGap is { } gap ? Math.Max(0, 100 - gap) : null,
             TolerancePercent,
             differences.Count(d => Math.Abs(d) <= TolerancePercent + 1e-9),
             differences.Count(d => Math.Abs(d) < 1e-9),
@@ -158,12 +173,29 @@ public class EvaluationService : IEvaluationService
             teacherDifferences.Count(d => Math.Abs(d) <= TolerancePercent + 1e-9));
     }
 
-    private static EvaluationModel Model(string model, IReadOnlyList<DraftComparison> comparisons)
+    private static EvaluationModel Model(string model, IReadOnlyList<DraftComparison> comparisons, int discardedPoorGrading)
     {
         var scores = Scores(comparisons);
         var mistakes = comparisons.SelectMany(c => c.Mistakes).ToList();
-        return new EvaluationModel(model, comparisons.Count, scores.Compared, scores.WithinTolerance, scores.MeanAbsoluteDifference,
-            mistakes.Count, mistakes.Count(m => m.Decision == MistakeDecision.Rejected));
+        return new EvaluationModel(model, comparisons.Count, scores.Compared, scores.Accuracy, scores.WithinTolerance, scores.MeanAbsoluteDifference,
+            mistakes.Count, mistakes.Count(m => m.Decision == MistakeDecision.Rejected), discardedPoorGrading);
+    }
+
+    internal static EvaluationDiscards Discards(
+        IReadOnlyList<DiscardedDraft> discarded, IReadOnlyDictionary<(string Course, string Assignment), string> titles)
+    {
+        var byReason = discarded
+            .GroupBy(d => d.Reason)
+            .Select(g => new DiscardReasonCount(g.Key, g.Count()))
+            .OrderByDescending(c => c.Reason == DiscardReason.PoorGrading)
+            .ThenByDescending(c => c.Count)
+            .ToList();
+        var rows = discarded
+            .Select(d => new DiscardedRow(d.GradingId, d.CourseId, d.AssignmentId, titles.GetValueOrDefault((d.CourseId, d.AssignmentId)),
+                d.StudentId, d.StudentName, d.Model, d.Score is { } score ? score + (d.Bonus ?? 0) : null, d.MaxScore,
+                d.Major, d.Minor, d.Style, d.Reason, d.Note, d.CreatedAt, d.DiscardedAt, d.ReportStatus))
+            .ToList();
+        return new EvaluationDiscards(discarded.Count, discarded.Count(d => d.Reason == DiscardReason.PoorGrading), byReason, rows);
     }
 
     private static EvaluationRow Row(

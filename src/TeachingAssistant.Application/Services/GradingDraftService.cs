@@ -1,4 +1,5 @@
 using TeachingAssistant.Application.Contracts;
+using TeachingAssistant.Application.Exceptions;
 using TeachingAssistant.Application.Interfaces;
 using TeachingAssistant.Application.Interfaces.Services;
 using TeachingAssistant.Domain.Grading;
@@ -56,15 +57,26 @@ public class GradingDraftService : IGradingDraftService
             .ToList();
     }
 
-    public async Task<GradingResponse?> DiscardAsync(Guid gradingId, CancellationToken cancellationToken = default)
+    public async Task<GradingResponse?> DiscardAsync(
+        Guid gradingId, DiscardGradingRequest? request = null, CancellationToken cancellationToken = default)
     {
+        if (request?.Reason == DiscardReason.Superseded)
+        {
+            throw new InvalidRequestException("Superseded is set automatically when another draft is approved; choose another reason.");
+        }
+
+        if (request?.Note is { Length: > AiGrading.MaxDiscardNoteLength })
+        {
+            throw new InvalidRequestException($"The note can have at most {AiGrading.MaxDiscardNoteLength} characters.");
+        }
+
         var grading = await _gradings.FindAsync(gradingId, cancellationToken);
         if (grading is null)
         {
             return null;
         }
 
-        grading.Discard(_timeProvider.GetUtcNow());
+        grading.Discard(_timeProvider.GetUtcNow(), request?.Reason, request?.Note);
         if (await _reports.FindByGradingAsync(gradingId, cancellationToken) is { } report)
         {
             _studentMistakes.RemoveRange(await _studentMistakes.GetByReportAsync(report.Id, cancellationToken));
@@ -82,5 +94,5 @@ public class GradingDraftService : IGradingDraftService
         g.InstructionsVersion, g.SentFiles, g.SkippedFiles, g.CreatedAt,
         g.Strengths.OrderBy(s => s.Position)
             .Select(s => new CodeStrength(s.File, s.StartLine, s.EndLine, s.Category, s.Message, s.Id)).ToList(),
-        g.BuildStatus, g.BuildOutput, g.StyleFindings, g.StyleOutput, g.PmdFindings, g.PmdOutput);
+        g.BuildStatus, g.BuildOutput, g.StyleFindings, g.StyleOutput, g.PmdFindings, g.PmdOutput, g.DiscardReason, g.DiscardNote);
 }

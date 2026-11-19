@@ -116,14 +116,16 @@ public class GradingController : ControllerBase
     }
 
     /// <summary>
-    /// Discards a draft; it stays in the version's history and is no longer its current draft.
+    /// Discards a draft with why (optional body: reason and note); it stays in the version's history and is no longer its current draft.
     /// </summary>
     /// <response code="200">The discarded grading</response>
+    /// <response code="400">The reason is Superseded or the note is too long</response>
     /// <response code="404">No grading with this ID</response>
     [HttpPost("gradings/{gradingId:guid}/discard")]
-    public async Task<ActionResult<GradingResponse>> DiscardAsync(Guid gradingId, CancellationToken cancellationToken)
+    public async Task<ActionResult<GradingResponse>> DiscardAsync(
+        Guid gradingId, [FromBody] DiscardGradingRequest? request, CancellationToken cancellationToken)
     {
-        var grading = await _draftService.DiscardAsync(gradingId, cancellationToken);
+        var grading = await _draftService.DiscardAsync(gradingId, request, cancellationToken);
         if (grading is null)
         {
             return NotFound();

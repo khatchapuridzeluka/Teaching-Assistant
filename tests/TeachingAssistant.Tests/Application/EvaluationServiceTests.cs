@@ -1,3 +1,4 @@
+using TeachingAssistant.Application.Models;
 using TeachingAssistant.Application.Services;
 using TeachingAssistant.Domain.Grading;
 
@@ -22,6 +23,7 @@ public class EvaluationServiceTests
 
         Assert.Equal((4, 2, 1, 2, 1), (scores.Compared, scores.WithinTolerance, scores.Exact, scores.AiHigher, scores.AiLower));
         Assert.Equal(5.5, scores.MeanAbsoluteDifference!.Value, 6);
+        Assert.Equal(94.5, scores.Accuracy!.Value, 6);
         Assert.Equal(4.5, scores.MeanDifference!.Value, 6);
         Assert.Equal(5, scores.TolerancePercent);
     }
@@ -61,12 +63,31 @@ public class EvaluationServiceTests
     }
 
     [Fact]
+    public void Discards_CountPoorGradingFirst_AndKeepEachDraftsContext()
+    {
+        var at = new DateTimeOffset(2026, 11, 18, 9, 0, 0, TimeSpan.Zero);
+        DiscardedDraft Draft(DiscardReason? reason, string? note = null) =>
+            new(Guid.NewGuid(), "c-1", "a-1", "s-1", "Nini", "claude-opus-5-5", 70, 5, 100, 1, 2, 3, reason, note, at, at.AddHours(1), null);
+
+        var discards = EvaluationService.Discards(
+            [Draft(DiscardReason.Superseded), Draft(DiscardReason.Superseded), Draft(DiscardReason.PoorGrading, "Ignored the rules."), Draft(null)],
+            new Dictionary<(string Course, string Assignment), string> { [("c-1", "a-1")] = "Assignment 3" });
+
+        Assert.Equal((4, 1), (discards.Total, discards.PoorGrading));
+        Assert.Equal([DiscardReason.PoorGrading, DiscardReason.Superseded, null], discards.ByReason.Select(r => r.Reason));
+        Assert.Equal([1, 2, 1], discards.ByReason.Select(r => r.Count));
+        var poor = discards.Rows.Single(r => r.Reason == DiscardReason.PoorGrading);
+        Assert.Equal(("Assignment 3", "Nini", 75.0, "Ignored the rules.", 6), (poor.AssignmentTitle, poor.StudentName, poor.AiScore!.Value, poor.Note,
+            poor.Major + poor.Minor + poor.Style));
+    }
+
+    [Fact]
     public void NoReports_GiveZeroCountsAndNoAverages()
     {
         var scores = EvaluationService.Scores([]);
         var mistakes = EvaluationService.Mistakes([]);
 
-        Assert.Equal((0, 0, (double?)null), (scores.Compared, scores.WithinTolerance, scores.MeanAbsoluteDifference));
+        Assert.Equal((0, 0, (double?)null, (double?)null), (scores.Compared, scores.WithinTolerance, scores.MeanAbsoluteDifference, scores.Accuracy));
         Assert.All(scores.Buckets, b => Assert.Equal(0, b.Count));
         Assert.Equal((0, (double?)null), (mistakes.Total, mistakes.MeanPointsChange));
     }

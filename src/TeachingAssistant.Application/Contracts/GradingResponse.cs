@@ -22,7 +22,9 @@ public record GradingResponse(
     int? StyleFindings = null,
     string? StyleOutput = null,
     int? PmdFindings = null,
-    string? PmdOutput = null);
+    string? PmdOutput = null,
+    DiscardReason? DiscardReason = null,
+    string? DiscardNote = null);
 
 public record CodeMistake(
     string? File,

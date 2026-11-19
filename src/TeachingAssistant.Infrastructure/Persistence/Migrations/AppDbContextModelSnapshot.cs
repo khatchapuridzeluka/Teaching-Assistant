@@ -231,6 +231,15 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<string>("DiscardNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("discard_note");
+
+                    b.Property<string>("DiscardReason")
+                        .HasColumnType("text")
+                        .HasColumnName("discard_reason");
+
                     b.Property<DateTimeOffset?>("DiscardedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("discarded_at");

@@ -118,6 +118,9 @@ public class StudentMistakeServiceTests
 
     private sealed class NoDrafts : IGradingStore, IStudentStrengthStore
     {
+        public Task<IReadOnlyList<TeachingAssistant.Application.Models.DiscardedDraft>> GetDiscardedAsync(string? courseId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public Task<IReadOnlyList<GradingSummary>> GetSummariesAsync(
             SubmissionSource source, string courseId, string? assignmentId, string? studentId, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<GradingSummary>>([]);

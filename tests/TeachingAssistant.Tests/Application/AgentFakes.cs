@@ -56,6 +56,9 @@ internal sealed class FakeAgentChats : IAgentChatStore
 
 internal sealed class FakeAgentJobs : IJobStore, IJobSignal, IGradingStore, IMistakeAnalysisStore, IStudentAnalysisService
 {
+    public Task<IReadOnlyList<TeachingAssistant.Application.Models.DiscardedDraft>> GetDiscardedAsync(string? courseId, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
+
     public List<StudentAnalysisResponse> StudentAnalyses { get; } = [];
 
     public Task<StudentAnalysisResponse?> GetLatestAsync(

@@ -185,6 +185,9 @@ public class StudentToolsTests
 
     private sealed class Fakes : IStudentService, ISubmissionFetchService, ISubmissionStore, IGradingStore, IJobService
     {
+        public Task<IReadOnlyList<TeachingAssistant.Application.Models.DiscardedDraft>> GetDiscardedAsync(string? courseId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public List<(string CourseId, string AssignmentId)> Fetches { get; } = [];
 
         public List<Submission> Submissions { get; } = [];

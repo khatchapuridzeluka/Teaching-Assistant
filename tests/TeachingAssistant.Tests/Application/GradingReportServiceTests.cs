@@ -110,6 +110,7 @@ public class GradingReportServiceTests
         await Service().ApproveAsync(latest.Id, Request(latest, 95), TestContext.Current.CancellationToken);
 
         Assert.Equal([GradingStatus.Discarded, GradingStatus.Discarded, GradingStatus.Draft], new[] { first, regrade, latest }.Select(g => g.Status));
+        Assert.All(new[] { first, regrade }, g => Assert.Equal(DiscardReason.Superseded, g.DiscardReason));
         Assert.Equal(["Latest mistake"], _studentMistakes.Mistakes.Select(m => m.Message));
         Assert.Equal(["Latest strength"], _studentStrengths.Strengths.Select(s => s.Message));
         Assert.Equal(2, _reports.Reports.Count);
@@ -122,7 +123,7 @@ public class GradingReportServiceTests
         await Service().ApproveAsync(grading.Id, Request(grading, 80), TestContext.Current.CancellationToken);
 
         await new GradingDraftService(_gradings, _reports, _studentMistakes, _studentStrengths, TimeProvider.System)
-            .DiscardAsync(grading.Id, TestContext.Current.CancellationToken);
+            .DiscardAsync(grading.Id, null, TestContext.Current.CancellationToken);
 
         Assert.Equal(GradingStatus.Discarded, grading.Status);
         Assert.Empty(_studentMistakes.Mistakes);
@@ -193,6 +194,9 @@ public class GradingReportServiceTests
 
     private sealed class FakeGradings : IGradingStore
     {
+        public Task<IReadOnlyList<TeachingAssistant.Application.Models.DiscardedDraft>> GetDiscardedAsync(string? courseId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         private readonly List<AiGrading> _gradings = [];
 
         public Task<AiGrading?> FindAsync(Guid gradingId, CancellationToken cancellationToken = default) =>

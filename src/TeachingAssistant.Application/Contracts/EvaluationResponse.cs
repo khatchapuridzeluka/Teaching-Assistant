@@ -4,8 +4,9 @@ namespace TeachingAssistant.Application.Contracts;
 
 /// <summary>
 /// How the AI's drafts compare with the teacher's approved reports made from them. Scores are compared as a share of the
-/// assignment's maximum, so assignments out of 50 and 100 count alike. Only approved reports count: they are the teacher's
-/// final word, and discarded or unreviewed drafts say nothing about whether the AI was right.
+/// assignment's maximum, so assignments out of 50 and 100 count alike. Only approved reports of drafts that were not
+/// discarded count: they are the teacher's final word. Discarded drafts are listed apart with why they were discarded,
+/// since a draft thrown away as poor grading is the clearest failure of all.
 /// </summary>
 /// <param name="Reports">How many approved reports were compared.</param>
 /// <param name="Scores">How close the AI's totals (score plus bonus) came to the teacher's.</param>
@@ -13,6 +14,7 @@ namespace TeachingAssistant.Application.Contracts;
 /// <param name="Strengths">What the teacher did with the AI's strengths.</param>
 /// <param name="Classroom">The AI's totals against the grades returned in Classroom, an independent check.</param>
 /// <param name="Models">The same numbers per model that wrote the drafts.</param>
+/// <param name="Discards">The discarded drafts, counted by reason and listed with their context.</param>
 /// <param name="Rows">One row per compared report, largest disagreement first.</param>
 public record EvaluationResponse(
     int Reports,
@@ -21,9 +23,42 @@ public record EvaluationResponse(
     EvaluationStrengths Strengths,
     EvaluationClassroom Classroom,
     IReadOnlyList<EvaluationModel> Models,
+    EvaluationDiscards Discards,
     IReadOnlyList<EvaluationRow> Rows);
 
+/// <param name="Total">Every discarded draft.</param>
+/// <param name="PoorGrading">Discarded because the grading was wrong or poor: the AI's clearest failures.</param>
+/// <param name="ByReason">How many per reason; a null reason means discarded before reasons were recorded.</param>
+/// <param name="Rows">Every discarded draft, newest discard first.</param>
+public record EvaluationDiscards(int Total, int PoorGrading, IReadOnlyList<DiscardReasonCount> ByReason, IReadOnlyList<DiscardedRow> Rows);
+
+public record DiscardReasonCount(DiscardReason? Reason, int Count);
+
+/// <summary>
+/// One discarded draft: whose and which assignment, the model, the AI's total (score plus bonus) and mistakes per severity,
+/// why it was discarded and the teacher's note, and the status its report had, if one was made.
+/// </summary>
+public record DiscardedRow(
+    Guid GradingId,
+    string CourseId,
+    string AssignmentId,
+    string? AssignmentTitle,
+    string StudentId,
+    string StudentName,
+    string Model,
+    double? AiScore,
+    double? MaxScore,
+    int Major,
+    int Minor,
+    int Style,
+    DiscardReason? Reason,
+    string? Note,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? DiscardedAt,
+    ReportStatus? ReportStatus);
+
 /// <param name="Compared">Reports where both totals and the maximum are known.</param>
+/// <param name="Accuracy">100 minus the average gap, in percent: 97.8 when the AI is off by 2.2 points per 100 on average.</param>
 /// <param name="TolerancePercent">How close counts as agreeing, in percent of the maximum (5 = 5 points out of 100).</param>
 /// <param name="WithinTolerance">How many of them agree within the tolerance.</param>
 /// <param name="Exact">How many have the very same total.</param>
@@ -34,6 +69,7 @@ public record EvaluationResponse(
 /// <param name="Buckets">How the differences spread, in 5-point steps of percent of the maximum.</param>
 public record EvaluationScores(
     int Compared,
+    double? Accuracy,
     double TolerancePercent,
     int WithinTolerance,
     int Exact,
@@ -80,14 +116,17 @@ public record EvaluationClassroom(
     double? AiMeanAbsoluteDifference,
     int TeacherWithinTolerance);
 
+/// <summary>The evaluation numbers for the drafts one model wrote, with how many of its drafts were discarded as poor grading.</summary>
 public record EvaluationModel(
     string Model,
     int Reports,
     int ScoresCompared,
+    double? Accuracy,
     int WithinTolerance,
     double? MeanAbsoluteDifference,
     int Mistakes,
-    int MistakesRejected);
+    int MistakesRejected,
+    int DiscardedPoorGrading);
 
 /// <summary>
 /// One compared report. Scores are totals (score plus bonus); AiPercent and TeacherPercent are those totals in percent of the

@@ -207,6 +207,9 @@ public class StudentAnalysisServiceTests
     private sealed class Fakes : IStudentMistakeStore, IStudentStrengthStore, ICourseAssignmentStore, ISubmissionStore, IGradingReportStore,
         IGradingStore, IStudentAnalysisStore, ILanguageModel
     {
+        public Task<IReadOnlyList<TeachingAssistant.Application.Models.DiscardedDraft>> GetDiscardedAsync(string? courseId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public Task<IReadOnlyList<TeachingAssistant.Application.Models.ApprovedReport>> GetApprovedAsync(string? courseId, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 

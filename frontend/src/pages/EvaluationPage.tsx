@@ -13,14 +13,18 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { ArrowRight, Gauge, ListChecks, Scale, Sparkles, Target, ThumbsUp } from "lucide-react";
-import type { Evaluation, EvaluationRow } from "../api/client";
+import { ArrowRight, Gauge, ListChecks, Scale, Target, ThumbsUp, Trash2 } from "lucide-react";
+import type { DiscardedRow, Evaluation, EvaluationRow } from "../api/client";
 import { useCourses, useEvaluation } from "../api/hooks";
 import { CourseName } from "../components/Layout";
+import { discardReasonLabel } from "../components/DiscardDraftButton";
 import { categoryLabels } from "../components/StudentMistakes";
 import { Card, CardHeader, Chip, EmptyState, ErrorPanel, PageHeader, Segmented, Spinner, Stat, StatStrip } from "../components/ui";
 import { formatDate } from "../format";
 import { chartText, palette, severityColor } from "../theme";
+
+// An average lean under one point per 100 is noise, not a tendency worth naming.
+const noLeanBelow = 1;
 
 const decisionColor = { kept: "#1c8a4e", edited: "#e0921a", rejected: "#cf3a2b" } as const;
 
@@ -96,7 +100,6 @@ export function EvaluationPage() {
 
 function EvaluationBody({ data }: { data: Evaluation }) {
   const { scores, mistakes, strengths } = data;
-  const agreement = percent(scores.withinTolerance, scores.compared);
   const confirmed = percent(mistakes.kept + mistakes.edited, mistakes.total);
   const strengthsKept = percent(strengths.kept + strengths.edited, strengths.total);
   const leaning = scores.meanDifference;
@@ -106,22 +109,28 @@ function EvaluationBody({ data }: { data: Evaluation }) {
       <StatStrip columns={6}>
         <Stat
           icon={<Target />}
-          label="Score agreement"
-          value={agreement == null ? "–" : `${agreement}%`}
-          note={`${scores.withinTolerance} of ${scores.compared} within ±${scores.tolerancePercent} of yours`}
+          label="Score accuracy"
+          value={scores.accuracy == null ? "–" : `${round(scores.accuracy)}%`}
+          note={scores.meanAbsoluteDifference == null ? "no scores to compare" : `off by ${round(scores.meanAbsoluteDifference)} points per 100 on average`}
           tone="mark"
         />
         <Stat
           icon={<Gauge />}
-          label="Average gap"
-          value={scores.meanAbsoluteDifference == null ? "–" : round(scores.meanAbsoluteDifference)}
-          note="points per 100, either way"
+          label={`Within ±${scores.tolerancePercent}`}
+          value={`${scores.withinTolerance} / ${scores.compared}`}
+          note={`reports within ${scores.tolerancePercent} points per 100 of yours`}
         />
         <Stat
           icon={<Scale />}
           label="Leaning"
           value={leaning == null ? "–" : signed(leaning)}
-          note={leaning == null || Math.abs(leaning) < 0.05 ? "no lean" : leaning > 0 ? "AI more lenient" : "AI stricter"}
+          note={
+            leaning == null || Math.abs(leaning) < noLeanBelow
+              ? `no real lean (under ${noLeanBelow} point per 100)`
+              : leaning > 0
+                ? "AI more lenient"
+                : "AI stricter"
+          }
         />
         <Stat
           icon={<ListChecks />}
@@ -136,7 +145,13 @@ function EvaluationBody({ data }: { data: Evaluation }) {
           value={strengthsKept == null ? "–" : `${strengthsKept}%`}
           note={`${strengths.total} proposed`}
         />
-        <Stat icon={<Sparkles />} label="Reports" value={data.reports} note="approved and compared" />
+        <Stat
+          icon={<Trash2 />}
+          label="Discarded as poor"
+          value={data.discards.poorGrading}
+          note={`of ${data.reports + data.discards.poorGrading} drafts you decided on`}
+          tone={data.discards.poorGrading > 0 ? "bad" : undefined}
+        />
       </StatStrip>
 
       <div className="grid gap-[18px] xl:grid-cols-2">
@@ -168,6 +183,8 @@ function EvaluationBody({ data }: { data: Evaluation }) {
       </div>
 
       <Disagreements rows={data.rows} tolerance={scores.tolerancePercent} />
+
+      <DiscardedCard data={data} />
     </div>
   );
 }
@@ -402,9 +419,11 @@ function ModelsCard({ data }: { data: Evaluation }) {
             <tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-ink-muted">
               <th className="px-[18px] py-2 font-semibold">Model</th>
               <th className="px-3 py-2 font-semibold">Reports</th>
+              <th className="px-3 py-2 font-semibold">Accuracy</th>
               <th className="px-3 py-2 font-semibold">Within ±{data.scores.tolerancePercent}</th>
               <th className="px-3 py-2 font-semibold">Average gap</th>
               <th className="px-3 py-2 font-semibold">Mistakes rejected</th>
+              <th className="px-3 py-2 font-semibold">Discarded as poor</th>
             </tr>
           </thead>
           <tbody>
@@ -412,6 +431,7 @@ function ModelsCard({ data }: { data: Evaluation }) {
               <tr key={m.model} className="border-b border-line last:border-b-0">
                 <td className="px-[18px] py-2 font-mono text-[12px]">{m.model}</td>
                 <td className="px-3 py-2 tabular-nums">{m.reports}</td>
+                <td className="px-3 py-2 font-semibold tabular-nums">{m.accuracy == null ? "–" : `${round(m.accuracy)}%`}</td>
                 <td className="px-3 py-2 tabular-nums">
                   {m.scoresCompared === 0 ? "–" : `${percent(m.withinTolerance, m.scoresCompared)}% (${m.withinTolerance}/${m.scoresCompared})`}
                 </td>
@@ -419,6 +439,7 @@ function ModelsCard({ data }: { data: Evaluation }) {
                 <td className="px-3 py-2 tabular-nums">
                   {m.mistakes === 0 ? "–" : `${percent(m.mistakesRejected, m.mistakes)}% (${m.mistakesRejected}/${m.mistakes})`}
                 </td>
+                <td className="px-3 py-2 tabular-nums">{m.discardedPoorGrading}</td>
               </tr>
             ))}
           </tbody>
@@ -509,5 +530,109 @@ function Disagreements({ rows, tolerance }: { rows: EvaluationRow[]; tolerance: 
         </table>
       </div>
     </Card>
+  );
+}
+
+function DiscardedCard({ data }: { data: Evaluation }) {
+  const { discards } = data;
+  const [showAutomatic, setShowAutomatic] = useState(false);
+  const automatic = discards.rows.filter((r) => r.reason === "Superseded").length;
+  const shown = showAutomatic ? discards.rows : discards.rows.filter((r) => r.reason !== "Superseded");
+
+  return (
+    <Card className="overflow-hidden">
+      <CardHeader
+        icon={<Trash2 />}
+        title="Discarded drafts"
+        subtitle="Drafts you threw away and why · Poor grading counts against the AI; drafts set aside because another draft was approved do not"
+        actions={
+          automatic > 0 && (
+            <button type="button" className="text-xs font-semibold text-accent hover:underline" onClick={() => setShowAutomatic(!showAutomatic)}>
+              {showAutomatic ? "Hide the ones set aside automatically" : `Also show ${automatic} set aside automatically`}
+            </button>
+          )
+        }
+      />
+      {discards.total === 0 ? (
+        <p className="px-[18px] py-6 text-xs text-ink-muted">No draft has been discarded.</p>
+      ) : (
+        <>
+          <div className="flex flex-wrap gap-2 px-[18px] pt-3">
+            {discards.byReason.map((r) => (
+              <Chip key={r.reason ?? "none"} tone={r.reason === "PoorGrading" ? "danger" : "muted"}>
+                {r.reason ? discardReasonLabel[r.reason] : "No reason recorded"} · {r.count}
+              </Chip>
+            ))}
+          </div>
+          {shown.length === 0 ? (
+            <p className="px-[18px] py-6 text-xs text-ink-muted">Only drafts set aside automatically; none discarded by you.</p>
+          ) : (
+            <div className="mt-2 overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-ink-muted">
+                    <th className="px-[18px] py-2 font-semibold">Student</th>
+                    <th className="px-3 py-2 font-semibold">Assignment</th>
+                    <th className="px-3 py-2 font-semibold">AI score</th>
+                    <th className="px-3 py-2 font-semibold">Mistakes</th>
+                    <th className="px-3 py-2 font-semibold">Why</th>
+                    <th className="px-3 py-2 font-semibold">Discarded</th>
+                    <th className="px-3 py-2" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {shown.map((r) => (
+                    <DiscardedLine key={r.gradingId} row={r} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+    </Card>
+  );
+}
+
+function DiscardedLine({ row }: { row: DiscardedRow }) {
+  return (
+    <tr className="border-b border-line last:border-b-0 align-top">
+      <td className="px-[18px] py-2 font-semibold">{row.studentName}</td>
+      <td className="px-3 py-2">
+        <div>{row.assignmentTitle ?? "Assignment"}</div>
+        <div className="text-[11px] text-ink-muted">
+          <CourseName courseId={row.courseId} /> · <span className="font-mono">{row.model}</span>
+        </div>
+      </td>
+      <td className="px-3 py-2 tabular-nums">
+        {row.aiScore ?? "–"}
+        <span className="text-ink-muted"> / {row.maxScore ?? "–"}</span>
+      </td>
+      <td className="px-3 py-2 text-xs">
+        {row.major + row.minor + row.style === 0 ? (
+          <span className="text-ink-muted">none</span>
+        ) : (
+          <span className="flex gap-2">
+            <span style={{ color: severityColor.Major }}>{row.major} major</span>
+            <span style={{ color: severityColor.Minor }}>{row.minor} minor</span>
+            <span style={{ color: severityColor.Style }}>{row.style} style</span>
+          </span>
+        )}
+      </td>
+      <td className="max-w-[360px] px-3 py-2">
+        <Chip tone={row.reason === "PoorGrading" ? "danger" : "muted"}>{row.reason ? discardReasonLabel[row.reason] : "No reason recorded"}</Chip>
+        {row.note && <div className="mt-1 text-xs text-ink-muted">{row.note}</div>}
+        {row.reportStatus === "Approved" && <div className="mt-1 text-[11px] text-ink-muted">Its report had been approved.</div>}
+      </td>
+      <td className="px-3 py-2 text-xs text-ink-muted">{row.discardedAt ? formatDate(row.discardedAt) : "–"}</td>
+      <td className="px-3 py-2 text-right">
+        <Link
+          to={`/courses/${row.courseId}/drafts?view=all&assignment=${row.assignmentId}&draft=${row.gradingId}&earlier=1`}
+          className="inline-flex items-center gap-1 text-xs font-semibold text-accent hover:underline"
+        >
+          Open <ArrowRight className="h-3 w-3" />
+        </Link>
+      </td>
+    </tr>
   );
 }

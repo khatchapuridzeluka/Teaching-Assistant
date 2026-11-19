@@ -153,6 +153,9 @@ public class GradingToolsTests
 
     private sealed class Fakes : ISubmissionFetchService, IJobService, IGradingStore
     {
+        public Task<IReadOnlyList<TeachingAssistant.Application.Models.DiscardedDraft>> GetDiscardedAsync(string? courseId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public List<GradingStatus> Drafts { get; } = [GradingStatus.Draft];
 
         public Task<IReadOnlyList<GradingSummary>> GetSummariesAsync(
