@@ -47,11 +47,15 @@ public class RecordingLanguageModel : ILanguageModel
     }
 
     public Task<LanguageModelReply> GradeAsync(
-        string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default)
+        string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, string? model = null,
+        CancellationToken cancellationToken = default)
     {
-        var purpose = _context.PartOfGradeAll ? ModelCallPurpose.GradeAll : ModelCallPurpose.Grading;
-        return RecordAsync(purpose, _inner.GradingModelId,
-            () => _inner.GradeAsync(systemPrompt, parts, outputSchema, cancellationToken));
+        var purpose = _context.Evaluation ? ModelCallPurpose.Evaluation
+            : _context.TryOut ? ModelCallPurpose.Try
+            : _context.PartOfGradeAll ? ModelCallPurpose.GradeAll : ModelCallPurpose.Grading;
+        var requested = model ?? _context.GradingModel;
+        return RecordAsync(purpose, requested ?? _inner.GradingModelId,
+            () => _inner.GradeAsync(systemPrompt, parts, outputSchema, requested, cancellationToken));
     }
 
     public Task<LanguageModelReply> AnalyzeAsync(

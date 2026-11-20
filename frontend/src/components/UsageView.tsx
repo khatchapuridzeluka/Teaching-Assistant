@@ -18,6 +18,8 @@ const purposeLabels: Record<string, string> = {
   GradeAll: "Grade all",
   MistakeAnalysis: "Common mistakes",
   StudentAnalysis: "Student analysis",
+  Evaluation: "Evaluation run",
+  Try: "Try with model",
   Chat: "Ask agent",
   HealthCheck: "Model check",
 };
@@ -30,6 +32,8 @@ const purposeOptions: { value: ModelCallPurpose | undefined; label: string }[] =
   { value: "GradeAll", label: "Grade all" },
   { value: "MistakeAnalysis", label: "Common mistakes" },
   { value: "StudentAnalysis", label: "Student analysis" },
+  { value: "Evaluation", label: "Evaluation run" },
+  { value: "Try", label: "Try with model" },
   { value: "Chat", label: "Ask agent" },
   { value: "HealthCheck", label: "Model check" },
 ];

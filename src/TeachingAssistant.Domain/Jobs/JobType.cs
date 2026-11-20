@@ -21,4 +21,8 @@ public enum JobType
     AnalyzeStudent,
 
     AgentRun,
+
+    EvaluationRun,
+
+    EvaluationGrade,
 }

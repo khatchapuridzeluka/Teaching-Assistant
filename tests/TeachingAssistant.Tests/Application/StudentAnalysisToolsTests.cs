@@ -126,6 +126,9 @@ public class StudentAnalysisToolsTests
 
     private sealed class QueueingJobs : IJobService
     {
+        public Task<TeachingAssistant.Application.Contracts.JobResponse> QueueEvaluationRunAsync(Guid runId, IReadOnlyList<Guid> resultIds, string? courseId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public List<StudentAnalysisKind> Queued { get; } = [];
 
         public Task<JobResponse> QueueAnalyzeStudentAsync(

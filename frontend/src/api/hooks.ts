@@ -469,6 +469,20 @@ export const useCancelJob = (courseId: string, assignmentId: string) => {
   });
 };
 
+export const useGradingModels = () =>
+  useQuery({
+    queryKey: ["grading-models"],
+    queryFn: () => unwrap(api.GET("/grading-models")),
+    staleTime: Infinity,
+  });
+
+/** Grades a version once with another model; the answer is returned, never saved, so no query needs refreshing. */
+export const useTryModel = () =>
+  useMutation({
+    mutationFn: ({ versionId, model }: { versionId: string; model: string }) =>
+      unwrap(api.POST("/versions/{versionId}/try", { params: { path: { versionId } }, body: { model } })),
+  });
+
 export const useReview = (versionId: string | undefined) =>
   useQuery({
     queryKey: ["reviews", versionId],
@@ -534,12 +548,32 @@ export const useCourseGradings = (
       ),
   });
 
-export const useEvaluation = (courseId?: string) =>
+/** The drafts you reviewed against your approved reports, or, with a model, that model's side gradings against them. */
+export const useEvaluation = (courseId?: string, model?: string) =>
   useQuery({
-    queryKey: ["evaluation", courseId ?? "all"],
-    queryFn: () => unwrap(api.GET("/evaluation", { params: { query: { courseId } } })),
+    queryKey: ["evaluation", courseId ?? "all", model ?? "drafts"],
+    queryFn: () => unwrap(api.GET("/evaluation", { params: { query: { courseId, model } } })),
     staleTime: 0,
   });
+
+export const useModelComparison = (courseId?: string) =>
+  useQuery({
+    queryKey: ["evaluation", "models", courseId ?? "all"],
+    queryFn: () => unwrap(api.GET("/evaluation/models", { params: { query: { courseId } } })),
+    // Follow a running evaluation until every side grading is done or failed.
+    refetchInterval: (query) => ((query.state.data?.latestRun?.pending ?? 0) > 0 ? 4000 : false),
+  });
+
+export const useStartEvaluationRun = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { models: string[]; courseId?: string }) => unwrap(api.POST("/evaluation/runs", { body })),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["evaluation"] });
+      void queryClient.invalidateQueries({ queryKey: ["jobs"] });
+    },
+  });
+};
 
 export const useReviewQueue = () =>
   useQuery({

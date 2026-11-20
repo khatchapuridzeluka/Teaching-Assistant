@@ -50,6 +50,7 @@ export type StudentAnalysisKind = components["schemas"]["StudentAnalysisKind"];
 export type GradingGuidance = components["schemas"]["GradingGuidanceResponse"];
 export type Evaluation = components["schemas"]["EvaluationResponse"];
 export type DiscardReason = components["schemas"]["DiscardReason"];
+export type ModelComparison = components["schemas"]["ModelComparisonResponse"];
 export type DiscardedRow = components["schemas"]["DiscardedRow"];
 export type EvaluationRow = components["schemas"]["EvaluationRow"];
 export type GradingPrinciple = components["schemas"]["GradingPrincipleResponse"];

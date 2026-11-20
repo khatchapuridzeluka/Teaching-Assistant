@@ -22,7 +22,7 @@ public class RecordingLanguageModelTests
         var versionId = Guid.NewGuid();
         _context.Describe("course-1", "assignment-1", versionId);
 
-        var reply = await Recorder().GradeAsync("system", [], "{}", TestContext.Current.CancellationToken);
+        var reply = await Recorder().GradeAsync("system", [], "{}", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal("answer", reply.Text);
         var call = Assert.Single(_calls.Calls);
@@ -32,11 +32,35 @@ public class RecordingLanguageModelTests
     }
 
     [Fact]
+    public async Task AnEvaluationGrading_UsesItsModel_AndIsRecordedUnderItsOwnPurpose()
+    {
+        _context.UseGradingModelForEvaluation("claude-haiku-5-5");
+
+        await Recorder().GradeAsync("system", [], "{}", cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Equal("claude-haiku-5-5", _model.RequestedGradingModel);
+        var call = Assert.Single(_calls.Calls);
+        Assert.Equal((ModelCallPurpose.Evaluation, "claude-haiku-5-5"), (call.Purpose, call.RequestedModel));
+    }
+
+    [Fact]
+    public async Task ATryWithAModel_UsesItsModel_AndIsRecordedUnderItsOwnPurpose()
+    {
+        _context.UseGradingModelForTry("claude-sonnet-5-5");
+
+        await Recorder().GradeAsync("system", [], "{}", cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Equal("claude-sonnet-5-5", _model.RequestedGradingModel);
+        var call = Assert.Single(_calls.Calls);
+        Assert.Equal((ModelCallPurpose.Try, "claude-sonnet-5-5"), (call.Purpose, call.RequestedModel));
+    }
+
+    [Fact]
     public async Task AGradingStartedByGradeAll_IsRecordedUnderItsOwnPurpose()
     {
         _context.MarkPartOfGradeAll();
 
-        await Recorder().GradeAsync("system", [], "{}", TestContext.Current.CancellationToken);
+        await Recorder().GradeAsync("system", [], "{}", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(ModelCallPurpose.GradeAll, Assert.Single(_calls.Calls).Purpose);
     }
@@ -108,9 +132,14 @@ public class RecordingLanguageModelTests
             string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default) =>
             Reply("grading-model");
 
+        public string? RequestedGradingModel { get; private set; }
+
         public Task<LanguageModelReply> GradeAsync(
-            string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default) =>
-            Reply("fallback-model");
+            string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, string? model, CancellationToken cancellationToken = default)
+        {
+            RequestedGradingModel = model;
+            return Reply("fallback-model");
+        }
 
         private Task<LanguageModelReply> Reply(string model)
         {

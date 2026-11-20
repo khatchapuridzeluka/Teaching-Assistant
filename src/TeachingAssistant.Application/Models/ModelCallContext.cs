@@ -10,6 +10,27 @@ public class ModelCallContext
 
     public bool StudentAnalysis { get; private set; }
 
+    /// <summary>The model this scope grades with instead of the configured one; null for the configured one.</summary>
+    public string? GradingModel { get; private set; }
+
+    /// <summary>True in an evaluation run, so its calls are recorded under their own purpose.</summary>
+    public bool Evaluation { get; private set; }
+
+    /// <summary>True for "Try with model", so its calls are recorded under their own purpose.</summary>
+    public bool TryOut { get; private set; }
+
+    public void UseGradingModelForEvaluation(string model)
+    {
+        GradingModel = model;
+        Evaluation = true;
+    }
+
+    public void UseGradingModelForTry(string model)
+    {
+        GradingModel = model;
+        TryOut = true;
+    }
+
     public void MarkStudentAnalysis()
     {
         StudentAnalysis = true;

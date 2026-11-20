@@ -278,6 +278,15 @@ public class JobServiceTests
 
     private sealed class FakeGrading : IGradingService
     {
+        public Task<TeachingAssistant.Application.Models.EvaluationGrading?> GradeForEvaluationAsync(Guid versionId, string model, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public GradingModelsResponse GetModels() =>
+            throw new NotSupportedException();
+
+        public Task<GradingResponse?> TryModelAsync(Guid versionId, string model, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         private readonly HashSet<Guid> _gradable = [];
         private readonly HashSet<Guid> _notGradable = [];
 

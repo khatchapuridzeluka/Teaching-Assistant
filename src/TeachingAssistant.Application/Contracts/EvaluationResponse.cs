@@ -16,6 +16,13 @@ namespace TeachingAssistant.Application.Contracts;
 /// <param name="Models">The same numbers per model that wrote the drafts.</param>
 /// <param name="Discards">The discarded drafts, counted by reason and listed with their context.</param>
 /// <param name="Rows">One row per compared report, largest disagreement first.</param>
+/// <param name="Model">
+/// Null for the drafts you reviewed; otherwise the model whose side gradings (evaluation runs) are compared with your
+/// approved reports instead. Then Mistakes counts the model's mistakes that match yours (kept: matches one you kept,
+/// rejected: repeats one you rejected), Found says which of your mistakes it found, and Strengths, Models and Discards,
+/// which are about drafts, are empty.
+/// </param>
+/// <param name="Found">Only for a model: how many of your kept mistakes its side gradings found.</param>
 public record EvaluationResponse(
     int Reports,
     EvaluationScores Scores,
@@ -24,7 +31,29 @@ public record EvaluationResponse(
     EvaluationClassroom Classroom,
     IReadOnlyList<EvaluationModel> Models,
     EvaluationDiscards Discards,
-    IReadOnlyList<EvaluationRow> Rows);
+    IReadOnlyList<EvaluationRow> Rows,
+    string? Model = null,
+    EvaluationFound? Found = null);
+
+/// <param name="ApprovedReports">Approved reports that count; Reports says how many of them this model has graded.</param>
+/// <param name="TeacherMistakes">The mistakes you kept in the graded reports.</param>
+/// <param name="Found">How many of them the model found again (same file and overlapping lines, or the same category for a whole-submission mistake).</param>
+/// <param name="RepeatedFalseAlarms">The model's mistakes that repeat one you rejected.</param>
+/// <param name="Unreviewed">The model's mistakes that match nothing in your report, so nobody has judged them.</param>
+public record EvaluationFound(
+    int ApprovedReports,
+    int TeacherMistakes,
+    int Found,
+    int RepeatedFalseAlarms,
+    int Unreviewed,
+    IReadOnlyList<CategoryFound> ByCategory,
+    IReadOnlyList<SeverityFound> BySeverity);
+
+/// <summary>Your kept mistakes of one category (as you filed it) and how many the model found.</summary>
+public record CategoryFound(MistakeCategory Category, int TeacherMistakes, int Found);
+
+/// <summary>Your kept mistakes of one severity (as you filed it) and how many the model found.</summary>
+public record SeverityFound(MistakeSeverity Severity, int TeacherMistakes, int Found);
 
 /// <param name="Total">Every discarded draft.</param>
 /// <param name="PoorGrading">Discarded because the grading was wrong or poor: the AI's clearest failures.</param>

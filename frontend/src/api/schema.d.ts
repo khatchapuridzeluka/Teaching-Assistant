@@ -739,7 +739,53 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Returns how the AI drafts compare with the approved reports made from them (scores, mistakes, strengths, per model), in all courses or one. */
+        /** Returns how the AI drafts, or one model's side gradings (model), compare with the approved reports, in all courses or one. */
+        get: {
+            parameters: {
+                query?: {
+                    courseId?: string;
+                    model?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Comparison computed; zero counts before any report is approved or graded by the model */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["EvaluationResponse"];
+                    };
+                };
+                /** @description Unknown model */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/evaluation/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Returns the models compared on the same homework against the approved reports, and the newest evaluation run's progress. */
         get: {
             parameters: {
                 query?: {
@@ -751,19 +797,68 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Comparison computed; zero counts before any report is approved */
+                /** @description Comparison computed; no rows before the first run */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["EvaluationResponse"];
+                        "application/json": components["schemas"]["ModelComparisonResponse"];
                     };
                 };
             };
         };
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/evaluation/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Starts an evaluation run: every approved report is graded again on the side by each chosen model, in the background; nothing becomes a draft. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["StartEvaluationRunRequest"];
+                    "text/json": components["schemas"]["StartEvaluationRunRequest"];
+                    "application/*+json": components["schemas"]["StartEvaluationRunRequest"];
+                };
+            };
+            responses: {
+                /** @description Run queued; the comparison with its progress */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ModelComparisonResponse"];
+                    };
+                };
+                /** @description No model chosen, an unknown model, or no approved report yet */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -998,6 +1093,107 @@ export interface paths {
                     };
                 };
                 /** @description Nothing to grade, instructions not stored yet (fetch first), or no instructions the model can read */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description No stored version with this ID */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Model unreachable, returned an error, or declined */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/grading-models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Returns the models a version can be tried with and the one that grades drafts now. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The models */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GradingModelsResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/versions/{versionId}/try": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Grades a stored version once with the chosen model, exactly like a draft, and returns the answer without saving it; can take a minute. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    versionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["TryModelRequest"];
+                    "text/json": components["schemas"]["TryModelRequest"];
+                    "application/*+json": components["schemas"]["TryModelRequest"];
+                };
+            };
+            responses: {
+                /** @description The grading, shown like a draft but not stored */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GradingResponse"];
+                    };
+                };
+                /** @description Unknown model, nothing to grade, or the instructions are not stored yet */
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -3277,6 +3473,14 @@ export interface components {
             /** Format: int32 */
             rejected: number;
         };
+        /** @description Your kept mistakes of one category (as you filed it) and how many the model found. */
+        CategoryFound: {
+            category: components["schemas"]["MistakeCategory"];
+            /** Format: int32 */
+            teacherMistakes: number;
+            /** Format: int32 */
+            found: number;
+        };
         ChatMessage: {
             role: components["schemas"]["ChatRole"];
             text: string;
@@ -3516,6 +3720,35 @@ export interface components {
             /** @description Every discarded draft, newest discard first. */
             rows: components["schemas"]["DiscardedRow"][];
         };
+        EvaluationFound: {
+            /**
+             * Format: int32
+             * @description Approved reports that count; Reports says how many of them this model has graded.
+             */
+            approvedReports: number;
+            /**
+             * Format: int32
+             * @description The mistakes you kept in the graded reports.
+             */
+            teacherMistakes: number;
+            /**
+             * Format: int32
+             * @description How many of them the model found again (same file and overlapping lines, or the same category for a whole-submission mistake).
+             */
+            found: number;
+            /**
+             * Format: int32
+             * @description The model's mistakes that repeat one you rejected.
+             */
+            repeatedFalseAlarms: number;
+            /**
+             * Format: int32
+             * @description The model's mistakes that match nothing in your report, so nobody has judged them.
+             */
+            unreviewed: number;
+            byCategory: components["schemas"]["CategoryFound"][];
+            bySeverity: components["schemas"]["SeverityFound"][];
+        };
         EvaluationMistakes: {
             /**
              * Format: int32
@@ -3593,6 +3826,14 @@ export interface components {
             discards: components["schemas"]["EvaluationDiscards"];
             /** @description One row per compared report, largest disagreement first. */
             rows: components["schemas"]["EvaluationRow"][];
+            /**
+             * @description Null for the drafts you reviewed; otherwise the model whose side gradings (evaluation runs) are compared with your
+             *     approved reports instead. Then Mistakes counts the model's mistakes that match yours (kept: matches one you kept,
+             *     rejected: repeats one you rejected), Found says which of your mistakes it found, and Strengths, Models and Discards,
+             *     which are about drafts, are empty.
+             */
+            model?: string | null;
+            found?: components["schemas"]["EvaluationFound"];
         };
         /**
          * @description One compared report. Scores are totals (score plus bonus); AiPercent and TeacherPercent are those totals in percent of the
@@ -3632,6 +3873,22 @@ export interface components {
             classroomGrade?: number | null;
             /** Format: date-time */
             approvedAt?: string | null;
+        };
+        /** @description A run and how far it is: its gradings done, failed (each retried a few times first) and still waiting. */
+        EvaluationRunSummary: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            createdAt: string;
+            models: string[];
+            /** Format: int32 */
+            total: number;
+            /** Format: int32 */
+            done: number;
+            /** Format: int32 */
+            failed: number;
+            /** Format: int32 */
+            pending: number;
         };
         EvaluationScores: {
             /**
@@ -3786,6 +4043,13 @@ export interface components {
             approach: components["schemas"]["GradingPrincipleResponse"][];
             rules: components["schemas"]["PolicyRuleResponse"][];
             notes: components["schemas"]["AssignmentNoteCount"][];
+        };
+        /** @description The models a version can be tried with. */
+        GradingModelsResponse: {
+            /** @description Every model "Try with model" and evaluation runs can use, most capable first. */
+            available: string[];
+            /** @description The model that grades drafts now. */
+            current: string;
         };
         GradingPrincipleRequest: {
             title: string;
@@ -3958,7 +4222,7 @@ export interface components {
         /** @enum {string} */
         JobStatus: "Queued" | "Running" | "Succeeded" | "Failed" | "Canceled";
         /** @enum {string} */
-        JobType: "GradeVersion" | "GradeAssignment" | "FetchAssignment" | "SyncCourse" | "ReExtract" | "AnalyzeMistakes" | "GradeStudent" | "FetchStudentWork" | "AnalyzeStudent" | "AgentRun";
+        JobType: "GradeVersion" | "GradeAssignment" | "FetchAssignment" | "SyncCourse" | "ReExtract" | "AnalyzeMistakes" | "GradeStudent" | "FetchStudentWork" | "AnalyzeStudent" | "AgentRun" | "EvaluationRun" | "EvaluationGrade";
         MistakeAssignmentOption: {
             assignmentId: string;
             title?: string | null;
@@ -4062,7 +4326,7 @@ export interface components {
             percent: number;
         };
         /** @enum {string} */
-        ModelCallPurpose: "Grading" | "GradeAll" | "Chat" | "HealthCheck" | "MistakeAnalysis" | "StudentAnalysis";
+        ModelCallPurpose: "Grading" | "GradeAll" | "Chat" | "HealthCheck" | "MistakeAnalysis" | "StudentAnalysis" | "Evaluation" | "Try";
         ModelCallResponse: {
             /** Format: uuid */
             id: string;
@@ -4091,6 +4355,58 @@ export interface components {
             studentName?: string | null;
             /** Format: date-time */
             createdAt: string;
+        };
+        /**
+         * @description The models compared on the same homework: each approved report graded again on the side by every model of an evaluation
+         *     run, against the teacher's report. Nothing a run produces is a draft.
+         */
+        ModelComparisonResponse: {
+            /** @description The models a run can use. */
+            availableModels: string[];
+            /** @description The model normal gradings use now (the Anthropic:GradingModel setting). */
+            gradingModel: string;
+            /**
+             * Format: int32
+             * @description How many approved reports a new run would grade again, per model.
+             */
+            approvedReports: number;
+            latestRun?: components["schemas"]["EvaluationRunSummary"];
+            /** @description One row per model, from each report's newest finished result. */
+            models: components["schemas"]["ModelComparisonRow"][];
+        };
+        /**
+         * @description One model against the teacher's approved reports. Accuracy is 100 minus the average gap between its total and the
+         *     teacher's, in points per 100. Of the mistakes the teacher kept, Found is how many it found again (matched by file and
+         *     lines, or category for whole-submission mistakes) and FoundPercent their share; RepeatedFalseAlarms are mistakes it
+         *     flagged that the teacher had rejected; Unreviewed are mistakes it flagged that match nothing in the report, so nobody has
+         *     judged them. AverageSeconds is the time per grading, compile check included.
+         */
+        ModelComparisonRow: {
+            model: string;
+            /** Format: int32 */
+            graded: number;
+            /** Format: int32 */
+            scoresCompared: number;
+            /** Format: double */
+            accuracy?: number | null;
+            /** Format: int32 */
+            withinTolerance: number;
+            /** Format: double */
+            meanDifference?: number | null;
+            /** Format: int32 */
+            teacherMistakes: number;
+            /** Format: int32 */
+            found: number;
+            /** Format: double */
+            foundPercent?: number | null;
+            /** Format: int32 */
+            repeatedFalseAlarms: number;
+            /** Format: int32 */
+            unreviewed: number;
+            /** Format: double */
+            averageSeconds?: number | null;
+            /** Format: int32 */
+            failed: number;
         };
         ModelHealthResponse: {
             healthy: boolean;
@@ -4342,6 +4658,14 @@ export interface components {
             /** Format: int32 */
             rejected: number;
         };
+        /** @description Your kept mistakes of one severity (as you filed it) and how many the model found. */
+        SeverityFound: {
+            severity: components["schemas"]["MistakeSeverity"];
+            /** Format: int32 */
+            teacherMistakes: number;
+            /** Format: int32 */
+            found: number;
+        };
         StartAgentRunRequest: {
             text: string;
             /** Format: uuid */
@@ -4349,6 +4673,11 @@ export interface components {
             page?: string | null;
             courseId?: string | null;
             assignmentId?: string | null;
+        };
+        /** @description Start an evaluation run: grade the approved reports again with these models, in one course or all (CourseId null). */
+        StartEvaluationRunRequest: {
+            models: string[];
+            courseId?: string | null;
         };
         StoredFileResponse: {
             /** Format: uuid */
@@ -4614,6 +4943,10 @@ export interface components {
             /** Format: double */
             assignedGrade?: number | null;
             gradeHistory: components["schemas"]["GradeChange"][];
+        };
+        /** @description Grade a version once with this model; the answer is shown, never saved. */
+        TryModelRequest: {
+            model: string;
         };
         UngradedSubmissionItem: {
             /** Format: uuid */

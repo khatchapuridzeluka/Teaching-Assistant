@@ -82,6 +82,53 @@ public class EvaluationServiceTests
     }
 
     [Fact]
+    public void FoundForAModel_CountsYourMistakesFound_PerCategoryAndSeverity()
+    {
+        var first = new RunComparison(80, 80, 100, 2, 1, 1, 2)
+        {
+            TeacherResults =
+            [
+                new TeacherMistakeResult(MistakeCategory.Naming, MistakeSeverity.Minor, true),
+                new TeacherMistakeResult(MistakeCategory.Design, MistakeSeverity.Major, false),
+            ],
+        };
+        var second = new RunComparison(70, 75, 100, 1, 1, 0, 1)
+        {
+            TeacherResults = [new TeacherMistakeResult(MistakeCategory.Naming, MistakeSeverity.Minor, true)],
+        };
+
+        var found = EvaluationService.Found(5, [first, second]);
+
+        Assert.Equal((5, 3, 2, 1, 3), (found.ApprovedReports, found.TeacherMistakes, found.Found, found.RepeatedFalseAlarms, found.Unreviewed));
+        Assert.Equal([(MistakeCategory.Naming, 2, 2), (MistakeCategory.Design, 1, 0)], found.ByCategory.Select(c => (c.Category, c.TeacherMistakes, c.Found)));
+        Assert.Equal([(MistakeSeverity.Major, 1, 0), (MistakeSeverity.Minor, 2, 2)], found.BySeverity.Select(s => (s.Severity, s.TeacherMistakes, s.Found)));
+    }
+
+    [Fact]
+    public void AModelRow_AddsUpAccuracy_MistakesFound_AndTime()
+    {
+        EvaluationRunResult Result(int seconds)
+        {
+            var result = new EvaluationRunResult(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "claude-sonnet-5-5", DateTimeOffset.UtcNow);
+            result.Complete("claude-sonnet-5-5", 0, 100, null, [], BuildStatus.Compiled, TimeSpan.FromSeconds(seconds), DateTimeOffset.UtcNow);
+            return result;
+        }
+
+        var row = EvaluationRunService.Row("claude-sonnet-5-5",
+        [
+            (Result(30), new RunComparison(82, 80, 100, 4, 3, 1, 0)),
+            (Result(50), new RunComparison(70, 76, 100, 2, 2, 0, 1)),
+        ], failed: 1);
+
+        Assert.Equal((2, 2, 1, 1), (row.Graded, row.ScoresCompared, row.WithinTolerance, row.Failed));
+        Assert.Equal(96.0, row.Accuracy!.Value, 6);
+        Assert.Equal(-2.0, row.MeanDifference!.Value, 6);
+        Assert.Equal((6, 5, 1, 1), (row.TeacherMistakes, row.Found, row.RepeatedFalseAlarms, row.Unreviewed));
+        Assert.Equal(83.333, row.FoundPercent!.Value, 3);
+        Assert.Equal(40.0, row.AverageSeconds!.Value, 6);
+    }
+
+    [Fact]
     public void NoReports_GiveZeroCountsAndNoAverages()
     {
         var scores = EvaluationService.Scores([]);

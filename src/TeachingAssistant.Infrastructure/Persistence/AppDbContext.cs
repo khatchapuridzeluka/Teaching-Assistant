@@ -39,6 +39,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<AgentConversation> AgentConversations => Set<AgentConversation>();
     public DbSet<AgentRun> AgentRuns => Set<AgentRun>();
     public DbSet<AgentMessage> AgentMessages => Set<AgentMessage>();
+    public DbSet<EvaluationRun> EvaluationRuns => Set<EvaluationRun>();
+    public DbSet<EvaluationRunResult> EvaluationRunResults => Set<EvaluationRunResult>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder) =>
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);

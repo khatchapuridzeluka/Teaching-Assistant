@@ -472,6 +472,119 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
                     b.ToTable("course_guidance", (string)null);
                 });
 
+            modelBuilder.Entity("TeachingAssistant.Domain.Grading.EvaluationRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("CourseId")
+                        .HasColumnType("text")
+                        .HasColumnName("course_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.PrimitiveCollection<string[]>("Models")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("models");
+
+                    b.HasKey("Id")
+                        .HasName("pk_evaluation_runs");
+
+                    b.HasIndex("CourseId", "CreatedAt")
+                        .HasDatabaseName("ix_evaluation_runs_course_id_created_at");
+
+                    b.ToTable("evaluation_runs", (string)null);
+                });
+
+            modelBuilder.Entity("TeachingAssistant.Domain.Grading.EvaluationRunResult", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AnsweredModel")
+                        .HasColumnType("text")
+                        .HasColumnName("answered_model");
+
+                    b.Property<double?>("Bonus")
+                        .HasColumnType("double precision")
+                        .HasColumnName("bonus");
+
+                    b.Property<string>("BuildStatus")
+                        .HasColumnType("text")
+                        .HasColumnName("build_status");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int?>("DurationMs")
+                        .HasColumnType("integer")
+                        .HasColumnName("duration_ms");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("error");
+
+                    b.Property<double?>("MaxScore")
+                        .HasColumnType("double precision")
+                        .HasColumnName("max_score");
+
+                    b.Property<string>("Mistakes")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("mistakes");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("model");
+
+                    b.Property<Guid>("ReportId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("report_id");
+
+                    b.Property<Guid>("RunId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("run_id");
+
+                    b.Property<double?>("Score")
+                        .HasColumnType("double precision")
+                        .HasColumnName("score");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("VersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("version_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_evaluation_run_results");
+
+                    b.HasIndex("RunId")
+                        .HasDatabaseName("ix_evaluation_run_results_run_id");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("ix_evaluation_run_results_status");
+
+                    b.HasIndex("ReportId", "Model")
+                        .HasDatabaseName("ix_evaluation_run_results_report_id_model");
+
+                    b.ToTable("evaluation_run_results", (string)null);
+                });
+
             modelBuilder.Entity("TeachingAssistant.Domain.Grading.GradeEvent", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2063,6 +2176,16 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_mistake_cluster_members_mistake_clusters_cluster_id");
+                });
+
+            modelBuilder.Entity("TeachingAssistant.Domain.Grading.EvaluationRunResult", b =>
+                {
+                    b.HasOne("TeachingAssistant.Domain.Grading.EvaluationRun", null)
+                        .WithMany()
+                        .HasForeignKey("RunId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_evaluation_run_results_evaluation_runs_run_id");
                 });
 
             modelBuilder.Entity("TeachingAssistant.Domain.Grading.GradeEvent", b =>

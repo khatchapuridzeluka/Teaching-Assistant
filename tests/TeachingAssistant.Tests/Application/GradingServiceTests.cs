@@ -247,6 +247,64 @@ public class GradingServiceTests
     }
 
     [Fact]
+    public async Task GradeForEvaluation_SendsTheSamePrompt_UsesTheRunsModel_AndSavesNoDraft()
+    {
+        _instructions.Store("Write a zoo.");
+        var versionId = _store.AddVersion(Content(ContentKind.CodeArchive, "zoo.zip", "application/zip"));
+        _storage.Code["Zoo.java"] = "class Zoo {}";
+        _model.Reply =
+            """
+            { "review": "R", "score": 70, "maxScore": 100, "bonus": null,
+              "mistakes": [ { "file": "Zoo.java", "startLine": 1, "endLine": 1, "severity": "Minor", "category": "Naming", "message": "Name.", "points": 3 } ] }
+            """;
+
+        await Service().GradeVersionAsync(versionId, TestContext.Current.CancellationToken);
+        var draftSystem = _model.System;
+        var draftParts = _model.Parts!.OfType<TextPart>().Select(p => p.Text).ToList();
+        _gradings.Saved.Clear();
+
+        var result = await Service().GradeForEvaluationAsync(versionId, "claude-haiku-5-5", TestContext.Current.CancellationToken);
+
+        Assert.Empty(_gradings.Saved);
+        Assert.Equal(draftSystem, _model.System);
+        Assert.Equal(draftParts, _model.Parts!.OfType<TextPart>().Select(p => p.Text));
+        Assert.Equal(("claude-haiku-5-5", true), (_callContext.GradingModel, _callContext.Evaluation));
+        Assert.Equal((70.0, 100.0), (result!.Score!.Value, result.MaxScore!.Value));
+        Assert.Equal(("Zoo.java", 3.0), (Assert.Single(result.Mistakes).File, result.Mistakes[0].Points!.Value));
+        Assert.Equal(BuildStatus.Unavailable, result.BuildStatus);
+    }
+
+    [Fact]
+    public async Task TryModel_GradesWithTheChosenModel_AndSavesNothing()
+    {
+        _instructions.Store("Write a zoo.");
+        var versionId = _store.AddVersion(Content(ContentKind.CodeArchive, "zoo.zip", "application/zip"));
+        _storage.Code["Zoo.java"] = "class Zoo {}";
+        _model.Reply =
+            """
+            { "review": "Tried.", "score": 64, "maxScore": 100, "bonus": null,
+              "mistakes": [ { "file": "Zoo.java", "startLine": 1, "endLine": 1, "severity": "Minor", "category": "Naming", "message": "Name.", "points": 3 } ] }
+            """;
+
+        var tried = await Service().TryModelAsync(versionId, "claude-sonnet-5-5", TestContext.Current.CancellationToken);
+
+        Assert.Empty(_gradings.Saved);
+        Assert.Equal(("claude-sonnet-5-5", true, false), (_callContext.GradingModel, _callContext.TryOut, _callContext.Evaluation));
+        Assert.Equal(("Tried.", 64.0), (tried!.Review, tried.Score!.Value));
+        Assert.Equal("Zoo.java", Assert.Single(tried.Mistakes).File);
+    }
+
+    [Fact]
+    public async Task TryModel_AnUnknownModel_IsRefusedBeforeAnyCall()
+    {
+        var versionId = _store.AddVersion(Content(ContentKind.CodeArchive, "zoo.zip", "application/zip"));
+
+        await Assert.ThrowsAsync<InvalidRequestException>(() =>
+            Service().TryModelAsync(versionId, "gpt-5", TestContext.Current.CancellationToken));
+        Assert.Null(_model.System);
+    }
+
+    [Fact]
     public async Task Grade_GradingTwice_SavesTwoDrafts()
     {
         _instructions.Store("Write a zoo.");
@@ -636,7 +694,7 @@ public class GradingServiceTests
             throw new NotSupportedException();
 
         public Task<LanguageModelReply> GradeAsync(
-            string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default)
+            string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, string? model, CancellationToken cancellationToken = default)
         {
             System = systemPrompt;
             Parts = parts.ToList();

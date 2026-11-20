@@ -72,7 +72,7 @@ public class ModelHealthServiceTests
             throw new NotSupportedException();
 
         public Task<LanguageModelReply> GradeAsync(
-            string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default) =>
+            string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, string? model, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
     }
 }

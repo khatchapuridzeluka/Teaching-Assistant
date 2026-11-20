@@ -13,6 +13,10 @@ public enum ModelCallPurpose
     MistakeAnalysis,
 
     StudentAnalysis,
+
+    Evaluation,
+
+    Try,
 }
 
 public class ModelCall

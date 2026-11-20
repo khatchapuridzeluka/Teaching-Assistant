@@ -31,6 +31,10 @@ public interface IJobService
         Guid parentId, string courseId, string studentId, int fetched, IReadOnlyList<string> fetchProblems,
         bool regrade = false, CancellationToken cancellationToken = default);
 
+    /// <summary>Queues an evaluation run: one group job with one side grading per result.</summary>
+    Task<JobResponse> QueueEvaluationRunAsync(
+        Guid runId, IReadOnlyList<Guid> resultIds, string? courseId, CancellationToken cancellationToken = default);
+
     Task<JobResponse> QueueAnalyzeMistakesAsync(string courseId, string assignmentId, CancellationToken cancellationToken = default);
 
     Task<JobResponse> QueueAnalyzeStudentAsync(

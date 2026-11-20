@@ -66,6 +66,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ICourseGuidanceStore, CourseGuidanceStore>();
         services.AddScoped<IPolicyRuleStore, PolicyRuleStore>();
         services.AddScoped<IAssignmentNoteStore, AssignmentNoteStore>();
+        services.AddScoped<IEvaluationRunStore, EvaluationRunStore>();
 
         services.Configure<StorageOptions>(configuration.GetSection(StorageOptions.SectionName));
         services.AddSingleton<ISnapshotStorage, FileSystemSnapshotStorage>();
@@ -153,6 +154,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IStudentOverviewService, StudentOverviewService>();
         services.AddScoped<IGradingGuidanceService, GradingGuidanceService>();
         services.AddScoped<IEvaluationService, EvaluationService>();
+        services.AddScoped<IEvaluationRunService, EvaluationRunService>();
         services.AddScoped<JavaBuildCheck>();
         services.AddScoped<IAssignmentNoteService, AssignmentNoteService>();
         services.AddScoped<IModelUsageService, ModelUsageService>();
@@ -164,6 +166,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IJobHandler, AnalyzeStudentJobHandler>();
         services.AddScoped<IJobHandler, FetchStudentWorkJobHandler>();
         services.AddScoped<IJobHandler, AgentRunJobHandler>();
+        services.AddScoped<IJobHandler, EvaluationGradeJobHandler>();
         services.AddScoped<ICourseSyncService, CourseSyncService>();
         services.AddScoped<IStudentService, StudentService>();
         services.AddScoped<IGradebookService, GradebookService>();

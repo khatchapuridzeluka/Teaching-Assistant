@@ -104,6 +104,9 @@ public class FetchStudentWorkJobHandlerTests
 
     private sealed class FakeJobs : IJobService
     {
+        public Task<TeachingAssistant.Application.Contracts.JobResponse> QueueEvaluationRunAsync(Guid runId, IReadOnlyList<Guid> resultIds, string? courseId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public Guid ParentId { get; private set; }
         public int Fetched { get; private set; }
         public bool? Regrade { get; private set; }

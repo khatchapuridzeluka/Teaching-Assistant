@@ -165,7 +165,8 @@ public class JobStore(AppDbContext db) : IJobStore
 
     public async Task<IReadOnlyList<Job>> GetOpenGroupsAsync(CancellationToken cancellationToken = default) =>
         await db.Jobs
-            .Where(j => j.Type == JobType.GradeAssignment && j.Status == JobStatus.Running)
+            .Where(j => (j.Type == JobType.GradeAssignment || j.Type == JobType.GradeStudent || j.Type == JobType.EvaluationRun)
+                && j.Status == JobStatus.Running)
             .ToListAsync(cancellationToken);
 
     public Task SaveChangesAsync(CancellationToken cancellationToken = default) => db.SaveChangesAsync(cancellationToken);

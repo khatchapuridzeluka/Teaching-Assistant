@@ -102,7 +102,12 @@ public class JobReporter
 
         if (job.IsGroup)
         {
-            var label = job.Type == JobType.GradeAssignment ? "Grade all" : "Grade student";
+            var label = job.Type switch
+            {
+                JobType.GradeAssignment => "Grade all",
+                JobType.EvaluationRun => "Evaluation run",
+                _ => "Grade student",
+            };
             var progress = job.ProgressTotal is { } total ? $", {job.ProgressDone ?? 0} of {total} gradings finished" : "";
             var counts = job is { IsFinished: true, Result: { } result }
                 ? JobPayloads.Read<GradeAssignmentResult>(result) is var r

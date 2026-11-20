@@ -86,10 +86,11 @@ public class ClaudeLanguageModel : ILanguageModel
     }
 
     public Task<LanguageModelReply> GradeAsync(
-        string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default)
+        string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, string? model = null,
+        CancellationToken cancellationToken = default)
     {
         return StructuredAsync(systemPrompt, parts, outputSchema, Beta.Effort.High, "The model declined to grade this submission.",
-            cancellationToken);
+            cancellationToken, model);
     }
 
     public Task<LanguageModelReply> AnalyzeAsync(
@@ -101,27 +102,48 @@ public class ClaudeLanguageModel : ILanguageModel
 
     private async Task<LanguageModelReply> StructuredAsync(
         string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, Beta.Effort effort, string refusal,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, string? model = null)
     {
+        var chosen = string.IsNullOrWhiteSpace(model) ? _options.GradingModel : model;
+
+        // The server-side fallback names an Opus model, which only an Opus request may fall back to; other models (an
+        // evaluation run on Sonnet or Haiku) go without it, and a refusal then surfaces as an error.
+        var opus = chosen.StartsWith("claude-opus", StringComparison.Ordinal);
+
         var schema = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(outputSchema)
             ?? throw new ArgumentException("The output schema is empty.", nameof(outputSchema));
 
         try
         {
-            var response = await _client.Beta.Messages.Create(new Beta.MessageCreateParams
-            {
-                Model = _options.GradingModel,
-                MaxTokens = _options.GradingMaxTokens,
-                OutputConfig = new Beta.BetaOutputConfig
+            var request = opus
+                ? new Beta.MessageCreateParams
                 {
-                    Effort = effort,
-                    Format = new Beta.BetaJsonOutputFormat { Schema = schema },
-                },
-                Betas = [AnthropicBeta.ServerSideFallback2026_06_01],
-                Fallbacks = new List<Beta.BetaFallbackParam> { new(Model.ClaudeOpus4_8) },
-                System = systemPrompt,
-                Messages = [new Beta.BetaUserMessageParam { Content = parts.Select(ToBlock).ToList() }],
-            }, cancellationToken);
+                    Model = chosen,
+                    MaxTokens = _options.GradingMaxTokens,
+                    OutputConfig = new Beta.BetaOutputConfig
+                    {
+                        Effort = effort,
+                        Format = new Beta.BetaJsonOutputFormat { Schema = schema },
+                    },
+                    Betas = [AnthropicBeta.ServerSideFallback2026_06_01],
+                    Fallbacks = new List<Beta.BetaFallbackParam> { new(Model.ClaudeOpus4_8) },
+                    System = systemPrompt,
+                    Messages = [new Beta.BetaUserMessageParam { Content = parts.Select(ToBlock).ToList() }],
+                }
+                : new Beta.MessageCreateParams
+                {
+                    Model = chosen,
+                    MaxTokens = _options.GradingMaxTokens,
+                    OutputConfig = new Beta.BetaOutputConfig
+                    {
+                        Effort = effort,
+                        Format = new Beta.BetaJsonOutputFormat { Schema = schema },
+                    },
+                    System = systemPrompt,
+                    Messages = [new Beta.BetaUserMessageParam { Content = parts.Select(ToBlock).ToList() }],
+                };
+
+            var response = await _client.Beta.Messages.Create(request, cancellationToken);
 
             if (response.StopReason == "refusal")
             {
@@ -137,7 +159,7 @@ public class ClaudeLanguageModel : ILanguageModel
             var text = string.Concat(response.Content.Select(b => b.Value).OfType<Beta.BetaTextBlock>().Select(t => t.Text)).Trim();
             return new LanguageModelReply(response.Model, text, ToUsage(response.Usage));
         }
-        catch (Exception ex) when (Translate(ex, _options.GradingModel) is { } translated)
+        catch (Exception ex) when (Translate(ex, chosen) is { } translated)
         {
             throw translated;
         }

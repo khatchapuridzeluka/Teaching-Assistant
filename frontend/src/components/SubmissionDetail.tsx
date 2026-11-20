@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { CodeMistake, CodeStrength, JobInfo, StoredFile, StoredSubmission, StoredVersion, Submission } from "../api/client";
+import type { CodeMistake, CodeStrength, GradingResult, JobInfo, StoredFile, StoredSubmission, StoredVersion, Submission } from "../api/client";
 import { useGradingReport, useReview, useVersionGradings } from "../api/hooks";
 import { formatDate, formatDay, initials } from "../format";
 import { CodeBrowser, type CodeFocus, severityColor, strengthColor } from "./CodeBrowser";
@@ -9,8 +9,9 @@ import { BuildCheck } from "./BuildCheck";
 import { DiscardDraftButton } from "./DiscardDraftButton";
 import { ExportPdfLink } from "./ExportPdfLink";
 import { keptMistakes, keptStrengths, ReportEditor } from "./ReportEditor";
+import { TriedGrading, TryModelDialog } from "./TryModel";
 import { Avatar, Button, Chip, type ChipTone, ErrorPanel, Notice, Spinner } from "./ui";
-import { ArrowLeft, BadgeCheck, CircleCheck, Eye, FileArchive, FileCode2, FileText, Image as ImageIcon, Maximize2, Minimize2, Pencil, Sparkles, ThumbsUp } from "lucide-react";
+import { ArrowLeft, BadgeCheck, CircleCheck, Eye, FileArchive, FlaskConical, FileCode2, FileText, Image as ImageIcon, Maximize2, Minimize2, Pencil, Sparkles, ThumbsUp } from "lucide-react";
 
 export const stateChip: Record<string, { tone: ChipTone; label: string }> = {
   TURNED_IN: { tone: "info", label: "Turned in" },
@@ -62,8 +63,15 @@ export function SubmissionDetail({
   const [editing, setEditing] = useState(false);
   const [showOriginal, setShowOriginal] = useState(false);
   const showReport = report != null && !showOriginal;
-  const shownMistakes: CodeMistake[] | undefined = showReport ? keptMistakes(report) : review?.mistakes;
-  const shownStrengths: CodeStrength[] | undefined = showReport ? keptStrengths(report) : review?.strengths;
+  // A grading tried with another model is shown in place of the draft until it is closed; it is never saved.
+  const [tried, setTried] = useState<GradingResult | null>(null);
+  const [choosingModel, setChoosingModel] = useState(false);
+  const shownMistakes: CodeMistake[] | undefined = tried ? tried.mistakes : showReport ? keptMistakes(report) : review?.mistakes;
+  const shownStrengths: CodeStrength[] | undefined = tried ? tried.strengths : showReport ? keptStrengths(report) : review?.strengths;
+
+  useEffect(() => {
+    setTried(null);
+  }, [version?.id]);
 
   useEffect(() => {
     setViewingId(null);
@@ -134,6 +142,14 @@ export function SubmissionDetail({
                 title={`Send v${version.number} and the assignment's instructions to the AI for a draft review`}
               >
                 {queuing ? "Queuing…" : grading ? (job.status === "Queued" ? "Queued…" : "Grading…") : review ? "Grade again" : "Grade with AI"}
+              </Button>
+              <Button
+                small
+                icon={<FlaskConical />}
+                onClick={() => setChoosingModel(true)}
+                title={`Grade v${version.number} once with another model and see its answer here; nothing is saved`}
+              >
+                Try with model
               </Button>
             </>
           )}
@@ -215,7 +231,13 @@ export function SubmissionDetail({
                 </div>
               )}
               {!grading && gradingError != null && <ErrorPanel error={gradingError} />}
-              {review ? (
+              {tried ? (
+                <div className="flex flex-col gap-4">
+                  <TriedGrading tried={tried} draftScore={review?.score} onClose={() => setTried(null)} />
+                  <MistakeList mistakes={tried.mistakes} onShow={showMistake} />
+                  <StrengthList strengths={tried.strengths} onShow={showMistake} />
+                </div>
+              ) : review ? (
                 <div className={`flex flex-col gap-4 ${grading ? "opacity-50" : ""}`}>
                   <div className="surface overflow-hidden">
                     <div
@@ -370,6 +392,18 @@ export function SubmissionDetail({
             )}
           </div>
         </div>
+      )}
+      {choosingModel && version && (
+        <TryModelDialog
+          versionId={version.id}
+          versionNumber={version.number}
+          onTried={(result) => {
+            setTried(result);
+            setChoosingModel(false);
+            setTab("review");
+          }}
+          onClose={() => setChoosingModel(false)}
+        />
       )}
     </section>
   );

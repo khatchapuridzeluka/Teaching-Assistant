@@ -32,6 +32,16 @@ export const jobTypeInfo: Record<JobType, { label: string; description: string }
     description:
       "An AI analysis of one student from each graded assignment (your newest report where you reviewed it, otherwise the newest AI draft), never the name. Mistakes: every kept mistake with its points and new / repeated label, plus trends counted in code; the model writes feedback of at most 200 words and what to work on next. Strengths: every kept strength; the model groups similar ones into skills and writes an overview. Overview: each assignment's score with its mistakes and strengths; the model writes the overall picture and what to work on next. Shown on the student's profile and on their mistakes, strengths or overview page.",
   },
+  EvaluationRun: {
+    label: "Evaluation run",
+    description:
+      "Grades every approved report's submission again on the side with each chosen model, to compare the models on the same homework against your own reports. It makes no AI call itself; its gradings run as Evaluation grading jobs under it. Nothing becomes a draft: no grading, report, profile or analysis changes.",
+  },
+  EvaluationGrade: {
+    label: "Evaluation grading",
+    description:
+      "One side grading of an evaluation run: the same prompt, rules and compile check as a real grading, with the run's model. The result is kept with the run on the Evaluation page and compared with your approved report; it never becomes a draft.",
+  },
   AgentRun: {
     label: "Agent",
     description:
@@ -109,6 +119,19 @@ const iconPaths: Record<JobType, ReactNode> = {
       <circle cx="10" cy="8" r="3.5" />
       <path d="M3 20a7 7 0 0 1 11-5.7" />
       <path d="M17 13l1.2 2.6 2.8.4-2 2 .5 2.8-2.5-1.3-2.5 1.3.5-2.8-2-2 2.8-.4z" />
+    </>
+  ),
+  EvaluationRun: (
+    <>
+      <path d="M9 3h6" />
+      <path d="M10 3v6L5 18a2 2 0 0 0 1.8 3h10.4A2 2 0 0 0 19 18l-5-9V3" />
+      <path d="M7.5 14h9" />
+    </>
+  ),
+  EvaluationGrade: (
+    <>
+      <path d="M9 3h6" />
+      <path d="M10 3v6L5 18a2 2 0 0 0 1.8 3h10.4A2 2 0 0 0 19 18l-5-9V3" />
     </>
   ),
   AgentRun: (

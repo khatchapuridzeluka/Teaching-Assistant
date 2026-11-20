@@ -26,20 +26,27 @@ public class EvaluationService : IEvaluationService
     private readonly ISubmissionStore _submissions;
     private readonly IStudentStore _students;
     private readonly ICourseAssignmentStore _assignments;
+    private readonly IEvaluationRunStore _runs;
 
     public EvaluationService(
         IGradingReportStore reports, IGradingStore gradings, ISubmissionStore submissions, IStudentStore students,
-        ICourseAssignmentStore assignments)
+        ICourseAssignmentStore assignments, IEvaluationRunStore runs)
     {
         _reports = reports;
         _gradings = gradings;
         _submissions = submissions;
         _students = students;
         _assignments = assignments;
+        _runs = runs;
     }
 
-    public async Task<EvaluationResponse> GetAsync(string? courseId = null, CancellationToken cancellationToken = default)
+    public async Task<EvaluationResponse> GetAsync(string? courseId = null, string? model = null, CancellationToken cancellationToken = default)
     {
+        if (model is not null)
+        {
+            return await GetForModelAsync(courseId, model, cancellationToken);
+        }
+
         var approved = await _reports.GetApprovedAsync(courseId, cancellationToken);
         var compared = approved
             .Where(a => a.Draft.Status != GradingStatus.Discarded)
@@ -47,24 +54,9 @@ public class EvaluationService : IEvaluationService
             .ToList();
         var discarded = await _gradings.GetDiscardedAsync(courseId, cancellationToken);
 
-        var titles = new Dictionary<(string Course, string Assignment), string>();
-        var grades = new Dictionary<(string Assignment, string Student), double?>();
-        foreach (var course in compared.Select(c => c.Report.CourseId).Concat(discarded.Select(d => d.CourseId)).Distinct())
-        {
-            foreach (var assignment in await _assignments.GetByCourseAsync(SubmissionSource.GoogleClassroom, course, cancellationToken))
-            {
-                titles[(course, assignment.ExternalAssignmentId)] = assignment.Title;
-            }
-
-            foreach (var submission in await _submissions.GetByCourseAsync(SubmissionSource.GoogleClassroom, course, cancellationToken))
-            {
-                grades[(submission.AssignmentId, submission.StudentId)] = submission.Grade;
-            }
-        }
-
-        var studentIds = compared.Select(c => c.Report.StudentId).Distinct().ToList();
-        var names = (await _students.FindByExternalIdsAsync(SubmissionSource.GoogleClassroom, studentIds, cancellationToken))
-            .ToDictionary(s => s.ExternalUserId, s => s.Name);
+        var (titles, grades, names) = await LookupsAsync(
+            compared.Select(c => c.Report.CourseId).Concat(discarded.Select(d => d.CourseId)),
+            compared.Select(c => c.Report.StudentId), cancellationToken);
 
         var rows = compared
             .Select(c => Row(c.Report, c.Draft, c.Comparison, titles, names, grades.GetValueOrDefault((c.Report.AssignmentId, c.Report.StudentId))))
@@ -78,7 +70,8 @@ public class EvaluationService : IEvaluationService
             Scores(comparisons),
             Mistakes(comparisons),
             Strengths(comparisons),
-            Classroom(compared.Select(c => (c.Comparison, grades.GetValueOrDefault((c.Report.AssignmentId, c.Report.StudentId)))).ToList()),
+            Classroom(compared.Select(c => (c.Comparison.AiTotal, c.Comparison.TeacherTotal, c.Comparison.MaxScore,
+                grades.GetValueOrDefault((c.Report.AssignmentId, c.Report.StudentId)))).ToList()),
             compared.Select(c => c.Draft.Model)
                 .Concat(discarded.Select(d => d.Model))
                 .Distinct()
@@ -91,9 +84,121 @@ public class EvaluationService : IEvaluationService
             rows);
     }
 
+    /// <summary>
+    /// One model's side gradings (its newest finished one per approved report, from evaluation runs) against the approved
+    /// reports, in the same shape as the drafts' evaluation. Reports it has not graded yet are left out.
+    /// </summary>
+    private async Task<EvaluationResponse> GetForModelAsync(string? courseId, string model, CancellationToken cancellationToken)
+    {
+        GradingModels.EnsureKnown([model]);
+        var approved = (await _reports.GetApprovedAsync(courseId, cancellationToken))
+            .Where(a => a.Draft.Status != GradingStatus.Discarded)
+            .ToDictionary(a => a.Report.Id);
+        var compared = (await _runs.GetDoneAsync(cancellationToken))
+            .Where(r => r.Model == model && approved.ContainsKey(r.ReportId))
+            .GroupBy(r => r.ReportId)
+            .Select(g => g.OrderByDescending(r => r.CompletedAt).First())
+            .Select(r =>
+            {
+                var pair = approved[r.ReportId];
+                return (pair.Report, pair.Draft, Result: r, Comparison: RunComparison.Of(r, pair.Report, pair.Draft.MaxScore));
+            })
+            .ToList();
+
+        var (titles, grades, names) = await LookupsAsync(
+            compared.Select(c => c.Report.CourseId), compared.Select(c => c.Report.StudentId), cancellationToken);
+
+        var rows = compared
+            .Select(c => new EvaluationRow(
+                c.Report.Id,
+                c.Draft.Id,
+                c.Report.CourseId,
+                c.Report.AssignmentId,
+                titles.GetValueOrDefault((c.Report.CourseId, c.Report.AssignmentId)),
+                c.Report.StudentId,
+                names.GetValueOrDefault(c.Report.StudentId),
+                c.Result.Model,
+                c.Comparison.ModelTotal,
+                c.Comparison.TeacherTotal,
+                c.Comparison.MaxScore,
+                c.Comparison.ModelPercent,
+                c.Comparison.TeacherPercent,
+                c.Comparison.DifferencePercent,
+                c.Result.Mistakes.Count,
+                0,
+                c.Comparison.RepeatedFalseAlarms,
+                grades.GetValueOrDefault((c.Report.AssignmentId, c.Report.StudentId)),
+                c.Report.ApprovedAt))
+            .OrderByDescending(r => r.Difference is { } d ? Math.Abs(d) : -1)
+            .ThenByDescending(r => r.ApprovedAt)
+            .ToList();
+
+        var comparisons = compared.Select(c => c.Comparison).ToList();
+        return new EvaluationResponse(
+            compared.Count,
+            ScoresOf(comparisons.Select(c => c.DifferencePercent).OfType<double>().ToList()),
+            MistakesOf(comparisons.SelectMany(c => c.Decisions).ToList()),
+            new EvaluationStrengths(0, 0, 0, 0),
+            Classroom(compared.Select(c => (c.Comparison.ModelTotal, c.Comparison.TeacherTotal, c.Comparison.MaxScore,
+                grades.GetValueOrDefault((c.Report.AssignmentId, c.Report.StudentId)))).ToList()),
+            [],
+            new EvaluationDiscards(0, 0, [], []),
+            rows,
+            model,
+            Found(approved.Count, comparisons));
+    }
+
+    internal static EvaluationFound Found(int approvedReports, IReadOnlyList<RunComparison> comparisons)
+    {
+        var results = comparisons.SelectMany(c => c.TeacherResults).ToList();
+        return new EvaluationFound(
+            approvedReports,
+            results.Count,
+            results.Count(r => r.Found),
+            comparisons.Sum(c => c.RepeatedFalseAlarms),
+            comparisons.Sum(c => c.Unreviewed),
+            results.GroupBy(r => r.Category)
+                .Select(g => new CategoryFound(g.Key, g.Count(), g.Count(r => r.Found)))
+                .OrderByDescending(c => c.TeacherMistakes)
+                .ToList(),
+            Enum.GetValues<MistakeSeverity>()
+                .Select(s => new SeverityFound(s, results.Count(r => r.Severity == s), results.Count(r => r.Severity == s && r.Found)))
+                .Where(s => s.TeacherMistakes > 0)
+                .ToList());
+    }
+
+    /// <summary>Assignment titles, returned Classroom grades and student names for the courses and students on the page.</summary>
+    private async Task<(Dictionary<(string Course, string Assignment), string> Titles, Dictionary<(string Assignment, string Student), double?> Grades,
+        Dictionary<string, string> Names)> LookupsAsync(IEnumerable<string> courseIds, IEnumerable<string> studentIds, CancellationToken cancellationToken)
+    {
+        var titles = new Dictionary<(string Course, string Assignment), string>();
+        var grades = new Dictionary<(string Assignment, string Student), double?>();
+        foreach (var course in courseIds.Distinct())
+        {
+            foreach (var assignment in await _assignments.GetByCourseAsync(SubmissionSource.GoogleClassroom, course, cancellationToken))
+            {
+                titles[(course, assignment.ExternalAssignmentId)] = assignment.Title;
+            }
+
+            foreach (var submission in await _submissions.GetByCourseAsync(SubmissionSource.GoogleClassroom, course, cancellationToken))
+            {
+                grades[(submission.AssignmentId, submission.StudentId)] = submission.Grade;
+            }
+        }
+
+        var names = (await _students.FindByExternalIdsAsync(SubmissionSource.GoogleClassroom, studentIds.Distinct().ToList(), cancellationToken))
+            .ToDictionary(s => s.ExternalUserId, s => s.Name);
+        return (titles, grades, names);
+    }
+
     internal static EvaluationScores Scores(IReadOnlyList<DraftComparison> comparisons)
     {
-        var differences = comparisons.Select(c => c.DifferencePercent).OfType<double>().ToList();
+        return ScoresOf(comparisons.Select(c => c.DifferencePercent).OfType<double>().ToList());
+    }
+
+    /// <summary>The score numbers from the differences (AI or model minus teacher, in percent of the maximum).</summary>
+    internal static EvaluationScores ScoresOf(IReadOnlyList<double> differences)
+    {
         // 5-point steps from -25 to +25; anything further out lands in the outermost step.
         var steps = BucketLimit / BucketSize;
         var counts = new int[2 * steps];
@@ -123,7 +228,11 @@ public class EvaluationService : IEvaluationService
 
     internal static EvaluationMistakes Mistakes(IReadOnlyList<DraftComparison> comparisons)
     {
-        var mistakes = comparisons.SelectMany(c => c.Mistakes).ToList();
+        return MistakesOf(comparisons.SelectMany(c => c.Mistakes).ToList());
+    }
+
+    internal static EvaluationMistakes MistakesOf(IReadOnlyList<MistakeComparison> mistakes)
+    {
         var changed = mistakes.Where(m => m.PointsChanged).ToList();
 
         return new EvaluationMistakes(
@@ -154,16 +263,17 @@ public class EvaluationService : IEvaluationService
         return new EvaluationStrengths(kept + edited + rejected, kept, edited, rejected);
     }
 
-    private static EvaluationClassroom Classroom(IReadOnlyList<(DraftComparison Comparison, double? Grade)> pairs)
+    private static EvaluationClassroom Classroom(
+        IReadOnlyList<(double? AiTotal, double? TeacherTotal, double? MaxScore, double? Grade)> pairs)
     {
-        var graded = pairs.Where(p => p.Grade is not null && p.Comparison.MaxScore is > 0).ToList();
+        var graded = pairs.Where(p => p.Grade is not null && p.MaxScore is > 0).ToList();
         var aiDifferences = graded
-            .Where(p => p.Comparison.AiTotal is not null)
-            .Select(p => (p.Comparison.AiTotal!.Value - p.Grade!.Value) / p.Comparison.MaxScore!.Value * 100)
+            .Where(p => p.AiTotal is not null)
+            .Select(p => (p.AiTotal!.Value - p.Grade!.Value) / p.MaxScore!.Value * 100)
             .ToList();
         var teacherDifferences = graded
-            .Where(p => p.Comparison.TeacherTotal is not null)
-            .Select(p => (p.Comparison.TeacherTotal!.Value - p.Grade!.Value) / p.Comparison.MaxScore!.Value * 100)
+            .Where(p => p.TeacherTotal is not null)
+            .Select(p => (p.TeacherTotal!.Value - p.Grade!.Value) / p.MaxScore!.Value * 100)
             .ToList();
 
         return new EvaluationClassroom(

@@ -85,12 +85,15 @@ public class Job
 
     public bool IsFinished => Status is JobStatus.Succeeded or JobStatus.Failed or JobStatus.Canceled;
 
-    public bool IsGroup => Type is JobType.GradeAssignment or JobType.GradeStudent;
+    public bool IsGroup => IsGroupType(Type);
+
+    /// <summary>Whether jobs of this type only group child jobs and finish when their children do.</summary>
+    public static bool IsGroupType(JobType type) => type is JobType.GradeAssignment or JobType.GradeStudent or JobType.EvaluationRun;
 
     public static Job Group(
         JobType type, string payload, DateTimeOffset createdAt, string? dedupKey = null, string? courseId = null, string? assignmentId = null)
     {
-        if (type is not (JobType.GradeAssignment or JobType.GradeStudent))
+        if (!IsGroupType(type))
         {
             throw new ArgumentException($"{type} is not a job that groups other jobs.", nameof(type));
         }

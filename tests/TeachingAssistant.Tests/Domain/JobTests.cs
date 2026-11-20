@@ -15,6 +15,7 @@ public class JobTests
         Assert.False(group.HasExpiredLease(now.AddDays(1)));
         Assert.Throws<ArgumentException>(() => Job.Group(JobType.GradeVersion, "{}", now));
         Assert.True(Job.Group(JobType.GradeStudent, "{}", now).IsGroup);
+        Assert.True(Job.Group(JobType.EvaluationRun, "{}", now).IsGroup);
     }
 
     [Fact]

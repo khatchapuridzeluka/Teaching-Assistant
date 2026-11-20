@@ -204,6 +204,73 @@ public class GradingService : IGradingService
 
     public async Task<GradingResponse?> GradeVersionAsync(Guid versionId, CancellationToken cancellationToken = default)
     {
+        var run = await RunGradingAsync(versionId, cancellationToken);
+        if (run is null)
+        {
+            return null;
+        }
+
+        var grading = ToGrading(versionId, run);
+        _gradings.Add(grading);
+        await _gradings.SaveChangesAsync(cancellationToken);
+        return GradingDraftService.ToResponse(grading);
+    }
+
+    public GradingModelsResponse GetModels()
+    {
+        return new GradingModelsResponse(GradingModels.Available, _languageModel.GradingModelId);
+    }
+
+    public async Task<GradingResponse?> TryModelAsync(Guid versionId, string model, CancellationToken cancellationToken = default)
+    {
+        GradingModels.EnsureKnown([model]);
+        _callContext.UseGradingModelForTry(model);
+        var run = await RunGradingAsync(versionId, cancellationToken);
+        if (run is null)
+        {
+            return null;
+        }
+
+        // Built like a draft so it shows like one, but never added to the store: it is gone once the teacher closes it.
+        return GradingDraftService.ToResponse(ToGrading(versionId, run));
+    }
+
+    private AiGrading ToGrading(Guid versionId, GradingRun run)
+    {
+        var (instructions, prompt, build, reply, read) = run;
+        var grading = new AiGrading(versionId, reply.Model, read.Review, read.Score, read.MaxScore, read.Bonus,
+            instructions.Number, prompt.Sent, prompt.Skipped, reply.Text,
+            read.Mistakes.Select(m => new GradingMistake(m.File, m.StartLine, m.EndLine, m.Severity, m.Category, m.Message, m.Points)),
+            _timeProvider.GetUtcNow(),
+            read.Strengths.Select(s => new GradingStrength(s.File, s.StartLine, s.EndLine, s.Category, s.Message)));
+        grading.RecordBuild(build.Status, build.Output, build.StyleFindings, build.StyleOutput, build.PmdFindings, build.PmdOutput);
+        return grading;
+    }
+
+    public async Task<EvaluationGrading?> GradeForEvaluationAsync(Guid versionId, string model, CancellationToken cancellationToken = default)
+    {
+        _callContext.UseGradingModelForEvaluation(model);
+        var run = await RunGradingAsync(versionId, cancellationToken);
+        if (run is null)
+        {
+            return null;
+        }
+
+        var read = run.Read;
+        return new EvaluationGrading(run.Reply.Model, read.Score, read.MaxScore, read.Bonus,
+            read.Mistakes.Select(m => new RunMistake(m.File, m.StartLine, m.EndLine, m.Severity, m.Category, m.Message, m.Points)).ToList(),
+            run.Build.Status);
+    }
+
+    private sealed record GradingRun(
+        InstructionsVersion Instructions, Prompt Prompt, BuildCheckOutcome Build, LanguageModelReply Reply, GradingOutput.ReadReply Read);
+
+    /// <summary>
+    /// Everything a grading does except saving it: the prompt, the compile check, the model call and reading the answer. A
+    /// normal grading saves the result as a draft; an evaluation run keeps it apart, so both use exactly the same prompt.
+    /// </summary>
+    private async Task<GradingRun?> RunGradingAsync(Guid versionId, CancellationToken cancellationToken)
+    {
         var prepared = await PrepareAsync(versionId, cancellationToken);
         if (prepared is null)
         {
@@ -227,18 +294,10 @@ public class GradingService : IGradingService
         var rules = await _rules.GetActiveAsync(cancellationToken);
         var notes = await _notes.GetActiveAsync(submission.AssignmentId, cancellationToken);
         var reply = await _languageModel.GradeAsync(
-            SystemPromptFor(principles, guidance?.Text, rules, notes), prompt.Parts, GradingOutput.Schema, cancellationToken);
+            SystemPromptFor(principles, guidance?.Text, rules, notes), prompt.Parts, GradingOutput.Schema,
+            cancellationToken: cancellationToken);
         var read = GradingOutput.Read(reply.Text, prompt.CodeLines);
-
-        var grading = new AiGrading(versionId, reply.Model, read.Review, read.Score, read.MaxScore, read.Bonus,
-            instructions.Number, prompt.Sent, prompt.Skipped, reply.Text,
-            read.Mistakes.Select(m => new GradingMistake(m.File, m.StartLine, m.EndLine, m.Severity, m.Category, m.Message, m.Points)),
-            _timeProvider.GetUtcNow(),
-            read.Strengths.Select(s => new GradingStrength(s.File, s.StartLine, s.EndLine, s.Category, s.Message)));
-        grading.RecordBuild(build.Status, build.Output, build.StyleFindings, build.StyleOutput, build.PmdFindings, build.PmdOutput);
-        _gradings.Add(grading);
-        await _gradings.SaveChangesAsync(cancellationToken);
-        return GradingDraftService.ToResponse(grading);
+        return new GradingRun(instructions, prompt, build, reply, read);
     }
 
     private async Task<Prepared?> PrepareAsync(Guid versionId, CancellationToken cancellationToken)

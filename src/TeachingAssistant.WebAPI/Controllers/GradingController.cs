@@ -39,6 +39,35 @@ public class GradingController : ControllerBase
     }
 
     /// <summary>
+    /// Returns the models a version can be tried with and the one that grades drafts now.
+    /// </summary>
+    /// <response code="200">The models</response>
+    [HttpGet("grading-models")]
+    public ActionResult<GradingModelsResponse> GetModels()
+    {
+        return Ok(_gradingService.GetModels());
+    }
+
+    /// <summary>
+    /// Grades a stored version once with the chosen model, exactly like a draft, and returns the answer without saving it; can take a minute.
+    /// </summary>
+    /// <response code="200">The grading, shown like a draft but not stored</response>
+    /// <response code="400">Unknown model, nothing to grade, or the instructions are not stored yet</response>
+    /// <response code="404">No stored version with this ID</response>
+    /// <response code="503">Model unreachable, returned an error, or declined</response>
+    [HttpPost("versions/{versionId:guid}/try")]
+    public async Task<ActionResult<GradingResponse>> TryModelAsync(Guid versionId, TryModelRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _gradingService.TryModelAsync(versionId, request.Model, cancellationToken);
+        if (result is null)
+        {
+            return NotFound();
+        }
+
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Returns the current draft of a version: its newest saved grading that was not discarded.
     /// </summary>
     /// <response code="200">The current draft</response>

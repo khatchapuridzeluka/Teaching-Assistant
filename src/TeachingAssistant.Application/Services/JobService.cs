@@ -190,6 +190,27 @@ public class JobService : IJobService
         return (queued, alreadyQueued);
     }
 
+    public async Task<JobResponse> QueueEvaluationRunAsync(
+        Guid runId, IReadOnlyList<Guid> resultIds, string? courseId, CancellationToken cancellationToken = default)
+    {
+        var now = _timeProvider.GetUtcNow();
+        var group = Job.Group(JobType.EvaluationRun, JobPayloads.Write(new EvaluationRunPayload(runId, courseId)), now,
+            dedupKey: $"evaluation-run:{runId}", courseId: courseId);
+        group.SetChildTotal(resultIds.Count);
+        await _jobs.AddOrGetActiveAsync(group, cancellationToken);
+
+        foreach (var resultId in resultIds)
+        {
+            var child = new Job(JobType.EvaluationGrade, JobPayloads.Write(new EvaluationGradePayload(resultId)), now,
+                parentId: group.Id, dedupKey: $"evaluation-grade:{resultId}", courseId: courseId, maxAttempts: MaxGradingAttempts);
+            await _jobs.AddOrGetActiveAsync(child, cancellationToken);
+        }
+
+        await _jobs.SaveChangesAsync(cancellationToken);
+        _signal.Notify();
+        return JobPayloads.ToResponse(group);
+    }
+
     public async Task<JobResponse> QueueAnalyzeMistakesAsync(string courseId, string assignmentId, CancellationToken cancellationToken = default)
     {
         var job = new Job(JobType.AnalyzeMistakes, JobPayloads.Write(new AnalyzeMistakesPayload(courseId, assignmentId)),
@@ -342,6 +363,21 @@ public class JobService : IJobService
         {
             var payload = JobPayloads.Read<AnalyzeStudentPayload>(job.Payload);
             return await QueueAnalyzeStudentAsync(payload.CourseId, payload.StudentId, payload.Kind, cancellationToken);
+        }
+
+        if (job.Type == JobType.EvaluationGrade)
+        {
+            var again = new Job(JobType.EvaluationGrade, job.Payload, _timeProvider.GetUtcNow(), courseId: job.CourseId,
+                maxAttempts: MaxGradingAttempts);
+            var queued = await _jobs.AddOrGetActiveAsync(again, cancellationToken);
+            await _jobs.SaveChangesAsync(cancellationToken);
+            _signal.Notify();
+            return JobPayloads.ToResponse(queued);
+        }
+
+        if (job.Type == JobType.EvaluationRun)
+        {
+            throw new InvalidRequestException("Start a new evaluation run on the Evaluation page; it grades every approved report again.");
         }
 
         if (job.Type == JobType.FetchStudentWork)
