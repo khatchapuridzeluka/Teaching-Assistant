@@ -16,7 +16,7 @@ public class AgentRunServiceTests
     private readonly FakeAgentJobs _jobs = new();
     private readonly ScriptedModel _model = new();
     private readonly AgentRunContext _runContext = new();
-    private readonly ClassroomTools _tools = new(null!, null!, null!, null!); // never called here: only the model calls tools
+    private readonly ClassroomTools _tools = new(null!, null!, null!, null!, null!); // never called here: only the model calls tools
     private readonly StudentTools _studentTools = new(null!, null!, null!, null!, null!, null!, TimeProvider.System);
 
     private AgentRunService Service()

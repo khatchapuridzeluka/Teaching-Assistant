@@ -12,15 +12,17 @@ public class ClassroomTools
     private readonly IAssignmentService _assignmentService;
     private readonly ISubmissionFetchService _fetchService;
     private readonly IStoredSubmissionService _storedService;
+    private readonly ICourseSyncService _syncService;
 
     public ClassroomTools(
         ICourseService courseService, IAssignmentService assignmentService, ISubmissionFetchService fetchService,
-        IStoredSubmissionService storedService)
+        IStoredSubmissionService storedService, ICourseSyncService syncService)
     {
         _courseService = courseService;
         _assignmentService = assignmentService;
         _fetchService = fetchService;
         _storedService = storedService;
+        _syncService = syncService;
     }
 
     [AgentTool("list_courses")]
@@ -47,6 +49,24 @@ public class ClassroomTools
             return assignments.Count == 0
                 ? "This course has no assignments."
                 : string.Join("\n", assignments.Select(a => $"- {a.Title} (assignment id {a.Id}, {Due(a.DueAt)})"));
+        });
+    }
+
+    [AgentTool("sync_course")]
+    [Description(
+        "Syncs one course from Google Classroom, read-only and free (no AI call): its roster of students, its assignments and "
+        + "the list of submissions with their Classroom grades, like the Sync button on the course page. It does not download "
+        + "submission files; fetch_submissions does that. Use it when a course has no students synced yet, or when a student, "
+        + "an assignment or a turn-in the teacher mentions is missing, then repeat the step that needed it.")]
+    public Task<string> SyncCourseAsync(
+        [Description("The id of the course")] string courseId, CancellationToken cancellationToken)
+    {
+        return RunAsync(async () =>
+        {
+            var summary = await _syncService.SyncAsync(courseId, cancellationToken);
+            return $"Sync finished. Students: {summary.Students} ({summary.NewStudents} new, {summary.LeftStudents} left the course). "
+                + $"Assignments: {summary.Assignments}. Submissions checked: {summary.Submissions}, of which {summary.NewSubmissions} "
+                + $"were new; {summary.Graded} have a Classroom grade. Student ids can now be looked up with find_students.";
         });
     }
 

@@ -64,6 +64,18 @@ public class StudentToolsTests
     }
 
     [Fact]
+    public async Task FindStudents_PointsToSyncCourse_WhenTheRosterIsEmpty()
+    {
+        _fakes.RosterSynced = false;
+
+        var result = await Tools().FindStudentsAsync("course-1", "Nino", TestContext.Current.CancellationToken);
+
+        Assert.Equal(
+            "This course has no students synced yet. Call sync_course for this course (free, read-only), then call find_students again.",
+            result);
+    }
+
+    [Fact]
     public async Task ListStudentAssignments_DescribesEachAssignmentForThatStudent()
     {
         var result = await Tools().ListStudentAssignmentsAsync("course-1", "s-1", TestContext.Current.CancellationToken);
@@ -203,6 +215,8 @@ public class StudentToolsTests
 
         public bool ExistingJob { get; set; }
 
+        public bool RosterSynced { get; set; } = true;
+
         public List<(string CourseId, string StudentId, bool Regrade)> StudentGradings { get; } = [];
 
         public Submission AddSubmission(string studentId, string name, int versions)
@@ -229,12 +243,14 @@ public class StudentToolsTests
                 new("a-4", "sub-4", "TURNED_IN", true, true, false, GradeStatus.Graded, 80),
                 new("a-5", null, null, false, false, true, GradeStatus.Missing, null),
             ];
-            CourseStudentResponse[] students =
-            [
-                Student("s-1", "Nino Beridze", true, results),
-                Student("s-2", "Nino Kapanadze", false, []),
-                Student("s-3", "Giorgi Lomidze", true, []),
-            ];
+            CourseStudentResponse[] students = RosterSynced
+                ?
+                [
+                    Student("s-1", "Nino Beridze", true, results),
+                    Student("s-2", "Nino Kapanadze", false, []),
+                    Student("s-3", "Giorgi Lomidze", true, []),
+                ]
+                : [];
             return Task.FromResult(new CourseStudentsResponse(Now, assignments, students));
         }
 

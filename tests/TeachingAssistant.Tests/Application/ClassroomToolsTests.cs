@@ -14,7 +14,7 @@ public class ClassroomToolsTests
 
     private ClassroomTools Tools()
     {
-        return new ClassroomTools(_services, _services, _services, _services);
+        return new ClassroomTools(_services, _services, _services, _services, _services);
     }
 
     [Fact]
@@ -25,7 +25,29 @@ public class ClassroomToolsTests
             .OfType<string>()
             .Order();
 
-        Assert.Equal(["fetch_submissions", "list_assignments", "list_courses", "list_submissions"], names);
+        Assert.Equal(["fetch_submissions", "list_assignments", "list_courses", "list_submissions", "sync_course"], names);
+    }
+
+    [Fact]
+    public async Task SyncCourse_SyncsThatCourse_AndReturnsCounts()
+    {
+        var result = await Tools().SyncCourseAsync("course-1", TestContext.Current.CancellationToken);
+
+        Assert.Equal("course-1", Assert.Single(_services.Syncs));
+        Assert.Equal(
+            "Sync finished. Students: 9 (9 new, 0 left the course). Assignments: 3. Submissions checked: 20, of which 7 were new; "
+            + "4 have a Classroom grade. Student ids can now be looked up with find_students.",
+            result);
+    }
+
+    [Fact]
+    public async Task SyncCourse_ReturnsAFailureToTheModel_InsteadOfThrowing()
+    {
+        _services.Failure = new SubmissionSourceNotConnectedException("Google account not connected.");
+
+        var result = await Tools().SyncCourseAsync("course-1", TestContext.Current.CancellationToken);
+
+        Assert.Equal("Failed: Google account not connected.", result);
     }
 
     [Fact]
@@ -88,11 +110,24 @@ public class ClassroomToolsTests
         Assert.Equal("Failed: Google account not connected.", result);
     }
 
-    private sealed class FakeServices : ICourseService, IAssignmentService, ISubmissionFetchService, IStoredSubmissionService
+    private sealed class FakeServices : ICourseService, IAssignmentService, ISubmissionFetchService, IStoredSubmissionService, ICourseSyncService
     {
         public static readonly Guid SubmissionId = Guid.Parse("11111111-1111-1111-1111-111111111111");
 
         public List<(string CourseId, string AssignmentId)> Fetches { get; } = [];
+
+        public List<string> Syncs { get; } = [];
+
+        public Task<CourseSyncSummary> SyncAsync(string courseId, CancellationToken cancellationToken = default)
+        {
+            Syncs.Add(courseId);
+            if (Failure is not null)
+            {
+                throw Failure;
+            }
+
+            return Task.FromResult(new CourseSyncSummary(9, 9, 0, 3, 20, 7, 4, 9, 0));
+        }
 
         public string? ListedAssignmentId { get; private set; }
 

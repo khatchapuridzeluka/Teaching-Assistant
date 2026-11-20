@@ -49,7 +49,8 @@ public class StudentTools
             var students = (await _studentService.GetCourseStudentsAsync(courseId, cancellationToken)).Students;
             if (students.Count == 0)
             {
-                return "This course has no students synced yet.";
+                return "This course has no students synced yet. Call sync_course for this course (free, read-only), then call "
+                    + "find_students again.";
             }
 
             var words = name.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
