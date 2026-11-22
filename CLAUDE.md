@@ -1,78 +1,79 @@
 # AI Teaching Assistant — Grading Agent
 
-Solo hackathon project for the **AI Agents Builder Program (HIGGS × KIU)**, Oct 31 – Nov 28, 2026. No stack or data restrictions from organizers.
-Demo Day: **Nov 28** — 5 min demo + 10 min Q&A, jury grades on predefined criteria (criteria not yet known — ask organizers).
+Grades Java homework for the teacher's Advanced Java courses: fetches submissions from Google Classroom (zip or GitHub link), compiles and checks them in Docker sandboxes, and drafts rubric-based scores, mistakes and feedback with Claude; the teacher reviews, edits and approves everything in a React dashboard, and student profiles track mistakes and strengths over time. One score per grading; regrading creates a new draft. The agent only drafts; nothing is final until the teacher approves it.
+The product spec (problem, scope, features, submissions, rubric layers, UI screens, evaluation, technical choices, the deployment plan, open questions) is in [docs/PRODUCT.md](docs/PRODUCT.md).
 
-## The problem
+## Non-negotiables
 
-The author teaches **Advanced Java**, up to 8 students per course: advanced OOP, class design, design patterns, console I/O now; SQL, Maven/Gradle, Spring Boot, multithreading coming soon.
+These outrank every other rule in this file. Breaking one harms students, the teacher's Google account or the teacher's bill, and reverting the commit does not undo it. If a task seems to need one broken, stop and ask the teacher.
 
-Today grading means: download each submission from Google Classroom, send it to Claude with the grading plan, then correct the result by hand. Plus writing a personal overview for every student. It takes hours.
+1. **Never run student code on the host.** It runs only through `ISandboxRunner`, in a throwaway, locked-down Docker container. That includes a quick `javac` or `java` on a submission "just to check": student code is untrusted.
+2. **Never widen Google or GitHub access beyond read-only.** The scopes in `src/TeachingAssistant.Infrastructure/Google/GoogleAuthorization.cs` stay read-only (plus `classroom.profile.photos`), the GitHub token stays limited to reading public repositories, and no code writes to Classroom, Drive or GitHub. Read-only access is what guarantees that grades never leave the tool and no student's repository is changed.
+3. **Never trigger paid LLM calls** unless the teacher explicitly asks: gradings (single, Grade all, Try with model), class and student analyses, evaluation runs, agent chats and runs, and `GET /health/model`. Verify with fakes and free endpoints.
+4. **Never send student names, emails or photos to grading or analysis prompts.** The model gets only what grading needs; the one exception is the chat agent's `list_submissions` (see Privacy).
 
-## Scope order
+## Commands
 
-Java only, starting with class design and design patterns, then SQL/Maven/Gradle/Spring Boot.
+Run from the repository root; they work in bash and PowerShell alike. `.claude/launch.json` has `api` and `frontend` entries that start the API and Vite.
 
-## The product (priority order)
+```bash
+# Tests on Microsoft.Testing.Platform (global.json), which needs --project; builds the test project, not the WebAPI
+dotnet test --project tests/TeachingAssistant.Tests
+dotnet test --project tests/TeachingAssistant.Tests --filter-class "*GradesTests"   # one class; --filter-method and --filter-namespace work too
 
-1. **Grader — the core (~70% of effort).**
-   - Ingestion via an `ISubmissionSource` adapter. **Google Classroom first**, zip upload as fallback. Classroom submissions may contain a **GitHub link** instead of a zip — the GitHub adapter clones it; the project may become GitHub-heavy.
-   - Build + run in **Docker sandboxes**. Never run student code on the host.
-   - Deterministic facts before the LLM: compiler warnings, Checkstyle/PMD/SpotBugs, stdin/stdout tests for console tasks.
-   - Class design/patterns are mostly judged by the LLM against the rubric (task statements usually don't fix class/method names).
-   - Batch features (all students solve the same task): calibration pass for consistent scores, class-wide clustering of common mistakes, review one explanation per cluster, similarity flags (flag only, never accuse).
-   - **Human in the loop:** the agent only drafts; the teacher approves/edits in a review dashboard.
-2. **Student profiler — thin layer on top of grading.** Every mistake stored as a structured record; new submissions labeled new / repeated / similar / previously fixed (to track growth, not to lower grades). GitHub commit history feeds it. Trends computed in code; LLM writes the narrative.
+# Add missing braces (IDE0011)
+dotnet format style --diagnostics IDE0011
 
-## Java submissions
+# API: http profile on :5288 (the https profile adds :7107); Development applies pending migrations on start
+dotnet run --project src/TeachingAssistant.WebAPI --launch-profile http
 
-- Usually a `.zip` of loose `.java` files, **no build file** (sometimes Maven/Gradle). Or a GitHub link.
-- Java version varies per student, **17 to 27**. Compile with the newest JDK first (backward compatible for almost all student code); fall back to an older JDK image if needed.
-- No build file → the runner must find all `.java` files, respect `package` declarations, locate `main`, and ignore junk (`__MACOSX`, `.idea`, `out/`, `.class` files, nested zips).
-- Later: cached Maven/Gradle dependencies in the sandbox; Postgres container for SQL/Spring Boot; concurrency tests run multiple times + SpotBugs concurrency checks.
+# Frontend: install once, then the dev server on :5173, which forwards /api to :5288 (set API_URL for another API)
+npm --prefix frontend install
+npm --prefix frontend run dev
+npm --prefix frontend run build     # type check (tsc --noEmit), then a production build into frontend/dist
+npm --prefix frontend run gen:api   # regenerate frontend/src/api/schema.d.ts; needs the API running at :5288
 
-## Rubric and grading policy
+# EF Core migrations (dotnet-ef is a local tool); they build the WebAPI
+dotnet tool restore
+dotnet ef migrations add <Name> --project src/TeachingAssistant.Infrastructure --startup-project src/TeachingAssistant.WebAPI --output-dir Persistence/Migrations
+dotnet ef migrations remove --project src/TeachingAssistant.Infrastructure --startup-project src/TeachingAssistant.WebAPI
+dotnet ef database update --project src/TeachingAssistant.Infrastructure --startup-project src/TeachingAssistant.WebAPI   # outside Development only
 
-Layered, all in the teacher's files:
-1. **Base rubric** — static, general, reused across all assignments.
-2. **Per-assignment extensions** — what this task adds or overrides.
-3. **Policy rules** — explicit judgment calls, e.g. "typo in a printed string: not a mistake", "bad variable name: −5 points".
+# Postgres 18 + pgvector on 127.0.0.1:5432; copy .env.example to .env and set POSTGRES_PASSWORD first
+docker compose up -d
 
-Rules are defined together with the teacher (old Claude chats had no hard rules). The teacher's edits in the review dashboard should suggest new policy rules. Policy goes into every grading prompt.
+# Sandbox images: ta-java:27 (first choice) and ta-java:21 (fallback); rebuild after changing sandbox/java/Dockerfile
+docker build -t ta-java:27 sandbox/java
+docker build -t ta-java:21 --build-arg JDK_VERSION=21 sandbox/java
 
-## Scores
+# User-secrets of the WebAPI project; the teacher fills in the values, never print them (no `user-secrets list`)
+dotnet user-secrets set "Anthropic:ApiKey" "<key>" --project src/TeachingAssistant.WebAPI
+dotnet user-secrets set "Google:ClientId" "<client-id>" --project src/TeachingAssistant.WebAPI
+dotnet user-secrets set "Google:ClientSecret" "<client-secret>" --project src/TeachingAssistant.WebAPI
+dotnet user-secrets set "ConnectionStrings:Postgres" "Host=localhost;Port=5432;Database=teaching_assistant;Username=teaching_assistant;Password=<POSTGRES_PASSWORD>" --project src/TeachingAssistant.WebAPI
+dotnet user-secrets set "GitHub:Token" "<token>" --project src/TeachingAssistant.WebAPI   # optional: fine-grained, public repositories read-only
+```
 
-One score per grading. **Dropped for Demo Day:** separate initial and final scores, diff-aware regrading (previous mistakes + diff → fixed / remaining / new) and the teacher choosing a final version. Grading a version again is enough: the latest draft is current, earlier drafts stay in the history to compare.
+## Definition of done
 
-**Resubmissions have no fixed form:** usually new commits, but possibly a new zip or just a new/changed file in Classroom. No fixed deadline. Every fetch stores a **snapshot** (files + content hash, commit SHA for GitHub); a changed hash/SHA vs. the graded snapshot = new version detected, shown in the UI, and the teacher grades it again.
+A change is done when all of these hold. Each item checks a rule stated elsewhere in this file:
 
-Stored **only in the tool** (DB + UI, exportable to the teacher's own file). **The agent must never upload or write grades anywhere** — enforced technically by using read-only Google OAuth scopes and read-only GitHub access, not only by instructions.
-
-## UI (React) — the teacher's workspace
-
-Agents work in the background; the UI is where the teacher reviews and decides. Screens:
-1. **Home** — courses → assignments with status counts (new, drafted, approved, new version).
-2. **Assignment** — student table (status, score, flags), "Grade all", class-wide mistake clusters with approve-per-cluster.
-3. **Submission review** — code viewer with mistakes as **inline line comments** (like a PR review) + rubric scores, mistakes, feedback; edit/approve; version diff; "ask why" chat with the agent.
-4. **Student profile** — score trend, mistake categories, repeated vs. fixed, narrative overview.
-5. **Settings** — base rubric, policy rules, Classroom/GitHub connections.
-
-## Evaluation
-
-Previously graded homework exists (Claude-drafted, teacher-corrected). Use it as the eval set: "the agent agrees with the teacher's final grade X% of the time" is the key Demo Day number.
+1. `dotnet test --project tests/TeachingAssistant.Tests` passes.
+2. The build shows no IDE0011 warnings (Braces).
+3. If contracts changed, the API types are regenerated (API types, under Working conventions).
+4. If the change touches anything `README.md` describes, `README.md` is updated (README, under Working conventions).
+5. No paid LLM calls were made (non-negotiable 3), and the final message says what was verified and how.
 
 ## Tech stack
 
-- **Web app**, run locally first (single user, no auth yet), deployed to GCP later.
-- **Backend:** C# / ASP.NET Core API (the tool is .NET even though graded code is Java). Written and reviewed carefully by the teacher — all grading logic, agents and data live here.
-- **Frontend:** React + Vite + TypeScript, Tailwind + shadcn/ui, `@monaco-editor/react` (code viewer, inline comments, diff), Recharts, TanStack Query. **Mostly AI-generated ("vibe-coded")** — so it must stay a thin client: no grading/business logic in the frontend, it only displays and edits what the API returns.
-- **API contract first:** endpoints and DTOs defined in the backend, exposed via **Swashbuckle** (Swagger UI at `/swagger`, spec at `/swagger/v1/swagger.json`; not Microsoft.AspNetCore.OpenApi); TypeScript types are generated from it, never hand-written.
-- **Microsoft Agent Framework** (`Microsoft.Agents.AI`) for agents with tools, over the Anthropic SDK's `IChatClient` — Semantic Kernel is in maintenance mode since Agent Framework 1.0 (April 2026). A tool is a method marked `[AgentTool("name")]` with a `[Description]`, in a class under `Application/Tools/`: a small adapter that calls an existing service and returns only what the model needs, with failures returned as text. Infrastructure registers every marked method; only Infrastructure references the framework
+- **Web app**, runs locally (single user, no auth yet).
+- **Backend:** C# / ASP.NET Core API on .NET 10 (the tool is .NET even though graded code is Java). Written and reviewed carefully by the teacher — all grading logic, agents and data live here.
+- **Frontend:** React + Vite + TypeScript, Tailwind CSS with the project's own components (no component library), `@monaco-editor/react` (code viewer with inline mistake marks), Recharts, TanStack Query, React Router. **Mostly AI-generated ("vibe-coded")** — so it must stay a thin client: no grading/business logic in the frontend, it only displays and edits what the API returns.
+- **API contract first:** endpoints and contracts defined in the backend, exposed via **Swashbuckle** (Swagger UI at `/swagger`, spec at `/swagger/v1/swagger.json`; not Microsoft.AspNetCore.OpenApi); TypeScript types are generated from it.
+- **Microsoft Agent Framework** (`Microsoft.Agents.AI`) for agents with tools, over the Anthropic SDK's `IChatClient`. A tool is a public method marked `[AgentTool("name")]` with a `[Description]` (from `System.ComponentModel`), in a class under `Application/Tools/`: a small adapter that calls an existing service and returns only what the model needs, with failures returned as text. `AgentToolAttribute` is the project's own attribute, defined in `Application/Tools/AgentToolAttribute.cs`, so tools need no framework package; `ClaudeAgent` (`Infrastructure/LanguageModel/`) finds the marked methods by reflection and wraps each with `AIFunctionFactory.Create`. Only Infrastructure references `Microsoft.Agents.AI` (and `Microsoft.Extensions.AI`, which comes with it); never add either to Application or Domain.
 - Google Classroom API + Drive API (read-only scopes), **personal Google account**: own Google Cloud project, OAuth consent screen in "Testing" mode with the teacher as test user. Note: refresh tokens in Testing mode expire after ~7 days — re-auth flow must be easy.
-- Postgres + pgvector (grades, mistake records, profiles)
-- Docker sandboxes (multiple JDK images); Polly for retries; OpenTelemetry logging
-- Deploy: Cloud Run (web + API) + Vertex AI. Cloud Run can't run Docker inside itself → sandboxes run as Cloud Run Jobs or on a small Compute Engine VM. Keep the sandbox runner a separate component from day one.
-- Course teaches Python LangChain/LangGraph — translate concepts: tools→`[AgentTool]` methods, LangGraph→the background agent run (`AgentRun` jobs with `wait_for_jobs`, see README), retrievers→pgvector behind a port
+- **Postgres 18** with EF Core 10 (grades, mistake records, profiles); the pgvector extension is installed but not used yet.
+- **Docker sandboxes** (`ta-java:27`, with `ta-java:21` as fallback) driven by the `docker` command line; **Serilog** for logging; **QuestPDF** with Markdig for the PDF reports.
 
 ## Architecture
 
@@ -83,22 +84,22 @@ TeachingAssistant.WebAPI.sln
 src/TeachingAssistant.Domain          entities, enums, pure rules (score calc, policy, new/repeated labels, version compare)
 src/TeachingAssistant.Application     use cases (GradeAssignment, RegradeNewVersion, ApproveGrade), interfaces, prompt templates
 src/TeachingAssistant.Infrastructure  Claude (Anthropic SDK), EF Core/Postgres, Classroom/GitHub adapters, Docker runner
-src/TeachingAssistant.WebAPI          presentation: thin controllers, DTOs, OpenAPI, DI composition root; serves built React from wwwroot
+src/TeachingAssistant.WebAPI          presentation: thin controllers, OpenAPI, DI composition root
 tests/TeachingAssistant.Tests         xUnit v3 — focus on Domain rules and Application flows with fakes
-frontend/                             React + Vite (edited in Rider); Vite proxies /api → ASP.NET in dev
+frontend/                             React + Vite (edited in Rider)
 ```
 
 - Dependencies point inward: WebAPI → Application → Domain; Infrastructure → Application/Domain. WebAPI references Infrastructure **only** for DI registration.
 - Domain and Application reference **no** external packages (no Anthropic, EF Core, Google, Docker). If they do, the boundary is broken.
 - Organize inside projects by feature folders: `Ingestion/`, `Grading/`, `Sandbox/`, `Profiling/`.
-- Application layout: `Interfaces/` (ports like `ILanguageModel`), `Interfaces/Services/` (use-case interfaces), `Services/` (use-case implementations — pure, no SDKs), `Contracts/` (what the API returns), `Models/` (internal port types), `Exceptions/`. Infrastructure implements ports and translates SDK exceptions into Application exceptions (e.g. `LanguageModelUnavailableException`).- All LLM calls go through `ILanguageModel` — never call the Anthropic SDK from anywhere else. Model and settings in the `Anthropic` config section; the API key only in user-secrets (`Anthropic:ApiKey`) or the `ANTHROPIC_API_KEY` env var.
+- Application layout: `Interfaces/` (ports like `ILanguageModel`), `Interfaces/Services/` (use-case interfaces), `Services/` (use-case implementations — pure, no SDKs), `Contracts/` (what the API returns), `Models/` (internal port types), `Exceptions/`. Infrastructure implements ports and translates SDK exceptions into Application exceptions (e.g. `LanguageModelUnavailableException`).
+- All LLM calls go through `ILanguageModel` — never call the Anthropic SDK from anywhere else. Model and settings in the `Anthropic` config section; the API key only in user-secrets (`Anthropic:ApiKey`) or the `ANTHROPIC_API_KEY` env var.
 - No MediatR/CQRS, no generic repository/unit-of-work over EF, no mapping layers between identical shapes.
-- Sandbox runner is the only part that becomes a separate deployable (week 3, Cloud Run Job/VM), behind `ISandboxRunner`.
-- Production: one container — ASP.NET serves the API and the built React app.
+- All sandbox work goes through `ISandboxRunner`; only `Infrastructure/Sandbox/` starts the `docker` program.
 
 ### Controller conventions
 
-Controllers live in `src/TeachingAssistant.WebAPI/Controllers/`. Contracts (use-case inputs/outputs the API returns) live in `src/TeachingAssistant.Application/Contracts/`; controllers return them directly. A WebAPI-side request type exists only for HTTP-specific shapes (e.g. `IFormFile` uploads), mapped to an Application contract in the controller. Controllers stay thin: constructor-inject an Application service, call it, return the result. Document every action with a short `<summary>` (what it returns/does, one sentence) and one `<response code>` line per status — no long remarks. Return `ActionResult<T>`, suffix async actions with `Async`. Every controller member uses a block body `{ }` with an explicit `return`, never an expression body (`=>`), even for one line. The XML docs flow into the OpenAPI document.
+Controllers live in `src/TeachingAssistant.WebAPI/Controllers/`. Contracts (use-case inputs/outputs the API returns) live in `src/TeachingAssistant.Application/Contracts/`; controllers return them directly. Contract names never get a `Dto` suffix: what an endpoint returns ends in `Response` (`AssignmentResponse`), what it takes ends in `Request` (`PolicyRuleRequest`), and the result of an action may be a `Summary` (`FetchSummary`). Smaller records used only inside a contract may have plain names (`FetchProblem`, `GradebookColumn`). The contracts of one feature area share a file named after the main one (`GradingGuidanceResponse.cs` also holds `PolicyRuleRequest` and `PolicyRuleResponse`). A WebAPI-side request type exists only for HTTP-specific shapes (e.g. `IFormFile` uploads), mapped to an Application contract in the controller. Controllers stay thin: constructor-inject an Application service, call it, return the result. Document every action with a short `<summary>` (what it returns/does, one sentence) and one `<response code>` line per status — no long remarks. Return `ActionResult<T>`, suffix async actions with `Async`. Every controller member uses a block body `{ }` with an explicit `return`, never an expression body (`=>`), even for one line. The XML docs flow into the OpenAPI document.
 
 ```csharp
 /// <summary>
@@ -107,7 +108,7 @@ Controllers live in `src/TeachingAssistant.WebAPI/Controllers/`. Contracts (use-
 /// <response code="200">Assignment retrieved successfully</response>
 /// <response code="404">Assignment not found</response>
 [HttpGet("{id:guid}")]
-public async Task<ActionResult<AssignmentDto>> GetByIdAsync(Guid id)
+public async Task<ActionResult<AssignmentResponse>> GetByIdAsync(Guid id)
 {
     return Ok(await _assignmentService.GetByIdAsync(id));
 }
@@ -131,22 +132,25 @@ if (request.Messages.Count == 0)
 
 Generated code (EF Core migrations, `schema.d.ts`) is left as generated. For C# the rule is enforced: `.editorconfig` sets IDE0011 and `Directory.Build.props` turns on `EnforceCodeStyleInBuild`, so `dotnet build` warns about a missing brace. `dotnet format style --diagnostics IDE0011` fixes them automatically. TypeScript has no linter yet, so check it by hand.
 
-## README
+### Frontend layout
 
-When a change affects anything `README.md` describes (features and their status, stack, project structure, setup steps, configuration, API endpoints, security notes), update `README.md` in the same change.
+- `frontend/src/api/`: `schema.d.ts` is generated; `client.ts` holds the `openapi-fetch` client, `unwrap` and short aliases of the generated types (`export type Course = components["schemas"]["CourseResponse"]`); every TanStack Query hook goes in `hooks.ts` as `export const useX = …` with a hierarchical query key (`["courses", courseId, "assignments"]`), the agent chat's in `chat.ts`. Pages and components never call `api`, `fetch` or `useQuery` themselves.
+- `frontend/src/pages/`: one `<Name>Page.tsx` per route; routes are registered in `main.tsx`, and the course and workspace sections (with their icons) in `navigation.ts`.
+- `frontend/src/components/`: feature components named after what they show (`SubmissionDetail.tsx`, `Rubric*.tsx` for the rubric page's tabs). Shared primitives (`Button`, `Card`, `Modal`, `Chip`, `Tabs`, …) are in `ui.tsx` and small grading displays (`Score`, `SeverityDots`, `DueChip`) in `bits.tsx`; reuse them before writing new ones.
+- `frontend/src/format.ts` holds formatting helpers; `theme.ts` holds colours for charts and code marks, kept in step with the design tokens in `index.css`.
 
 ## Working conventions
 
-- **Tests:** build with `dotnet build tests/TeachingAssistant.Tests`, then run `dotnet tests/TeachingAssistant.Tests/bin/Debug/net10.0/TeachingAssistant.Tests.dll` — `dotnet test` reports zero tests on this setup.
-- **The API runs in Rider** and locks its DLLs, so `dotnet build` of the WebAPI fails to copy while it runs; build the test project instead (or the WebAPI with `-o` to a temp folder). After backend changes, ask the teacher to restart the API in Rider.
-- **API types:** after changing contracts, regenerate `frontend/src/api/schema.d.ts` with `npm run gen:api` (needs the API running at :5288). Never hand-write types; a hand edit is only a stopgap until the regeneration.
+- **The API runs in Rider** on :5288, usually with Vite on :5173, and Rider locks the WebAPI's DLLs: anything that builds the WebAPI while it runs fails, `dotnet ef` included. Build and test through the test project instead, or build the WebAPI with `-o` to a temp folder. After backend changes, ask the teacher to restart the API in Rider.
+- **API types:** after changing contracts and the teacher's restart, regenerate `frontend/src/api/schema.d.ts` with `npm --prefix frontend run gen:api`. Never hand-write or edit the types; a hand edit is only a stopgap until the regeneration.
+- **README:** when a change touches anything `README.md` describes (features and their status, stack, project structure, setup steps, configuration, API endpoints, security notes), update `README.md` in the same change.
 - **No Prettier or other formatters on the frontend** — the project does not use one, and running it rewraps whole files.
-- **Paid AI calls:** never trigger gradings, analyses or agent runs while verifying a change unless the teacher agrees; test with fakes and free endpoints.
 - **Comments:** none in `src/` or the frontend except the controller XML docs.
 - **Commits:** only when the teacher asks; the teacher often commits themselves.
 
 ## Prompting conventions
 
+- **Where prompts live:** each prompt's fixed wording is a Markdown file in `src/TeachingAssistant.Application/Prompts/` (`agent.md`, `grading.md`, `class-mistakes.md`, `student-*.md`), embedded in the assembly (the csproj embeds `Prompts/*.md`) and read once by `PromptLibrary`. A `{{name}}` placeholder is filled with `PromptLibrary.Render`, and one left unfilled throws. Wording goes in the `.md` files, never in C# strings; only what changes per call (the teacher's rubric layers, the student's code and records, the JSON output schemas, the `[Description]` on each tool) is built in code. A new prompt is a new `.md` file plus a property on `PromptLibrary`.
 - Instructions in natural language, explain the *why*.
 - Student code raw, never JSON-escaped. Sections delimited with XML tags (`<task>`, `<rubric>`, `<grading_policy>`, `<build_and_test_results>`, `<submission>`, `<student_history>`).
 - Order: shared parts first (task, rubric, policy, reference solution) → per-student parts last, for prompt caching.
@@ -157,16 +161,4 @@ When a change affects anything `README.md` describes (features and their status,
 
 ## Privacy
 
-The program owners approved real student data for the MVP and Demo Day (sensitive data reaching the LLM is acceptable at this stage). Still send the model only what grading needs: never names, emails or photos. One exception, decided by the teacher for the demo: the chat agent's `list_submissions` tool returns student names so the teacher can ask about students by name; grading and analysis prompts still never get them. For later scale, consider a local model or anonymizing again before anything goes to an LLM. Student photos are stored locally (one copy per student, no history) and never sent to the model.
-
-## Timeline
-
-- **By Nov 8:** Classroom fetch (zip + GitHub link) → sandbox compile → rubric + policy grading of a Java class-design task → review screen with the score.
-- **By Nov 15:** mistake DB + new/repeated labels, orchestrator, batch calibration + mistake clustering.
-- **By Nov 22:** student profile page with charts, accuracy eval vs. past grades, GCP deploy.
-- **Nov 23–28:** demo polish only — no new features.
-
-## Open questions
-
-- **Automated tests vs. free naming:** task statements don't always fix class/method names. Options: fix names in future tasks (enables hidden JUnit tests), test only console input → output, or rely on LLM review. Decide per assignment type.
-- **Base rubric:** write it together with the teacher — categories, point weights, policy rules.
+The program owners approved real student data for the MVP and Demo Day (sensitive data reaching the LLM is acceptable at this stage); what the model may still never get is non-negotiable 4. Its one exception, decided by the teacher for the demo: the chat agent's `list_submissions` tool returns student names so the teacher can ask about students by name. Student photos are stored locally (one copy per student, no history). For later scale, consider a local model or anonymizing again before anything goes to an LLM.
