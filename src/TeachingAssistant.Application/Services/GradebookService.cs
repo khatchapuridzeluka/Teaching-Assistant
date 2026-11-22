@@ -22,7 +22,13 @@ public class GradebookService : IGradebookService
         var columns = course.Assignments.Select(a => Column(a, students)).ToList();
         var overall = students.Where(s => s.OverallPercent is not null).Select(s => s.OverallPercent!.Value).ToList();
 
-        return new GradebookResponse(course.SyncedAt, columns, students, overall.Count == 0 ? null : overall.Average());
+        return new GradebookResponse
+        {
+            SyncedAt = course.SyncedAt,
+            Assignments = columns,
+            Students = students,
+            ClassAveragePercent = overall.Count == 0 ? null : overall.Average(),
+        };
     }
 
     public async Task<byte[]> ExportCsvAsync(string courseId, CancellationToken cancellationToken = default)
@@ -63,8 +69,17 @@ public class GradebookService : IGradebookService
             ? graded.Average(c => c.Grade!.Value / assignment.MaxPoints.Value * 100)
             : null;
 
-        return new GradebookColumn(assignment.Id, assignment.Title, assignment.MaxPoints, assignment.DueAt, graded.Count,
-            cells.Count(c => c.GradeStatus == GradeStatus.AwaitingGrade), cells.Count(c => c.GradeStatus == GradeStatus.Missing), average);
+        return new GradebookColumn
+        {
+            Id = assignment.Id,
+            Title = assignment.Title,
+            MaxPoints = assignment.MaxPoints,
+            DueAt = assignment.DueAt,
+            Graded = graded.Count,
+            AwaitingGrade = cells.Count(c => c.GradeStatus == GradeStatus.AwaitingGrade),
+            Missing = cells.Count(c => c.GradeStatus == GradeStatus.Missing),
+            AveragePercent = average,
+        };
     }
 
     private static string Cell(StudentAssignmentResult result)

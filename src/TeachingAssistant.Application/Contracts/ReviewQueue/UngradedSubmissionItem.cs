@@ -1,13 +1,15 @@
 namespace TeachingAssistant.Application.Contracts;
 
-public record UngradedSubmissionItem(
-    Guid VersionId,
-    int VersionNumber,
-    string CourseId,
-    string AssignmentId,
-    string? AssignmentTitle,
-    string SubmissionId,
-    string StudentId,
-    string StudentName,
-    bool Late,
-    DateTimeOffset FetchedAt);
+public record UngradedSubmissionItem
+{
+    public required Guid VersionId { get; init; }
+    public required int VersionNumber { get; init; }
+    public required string CourseId { get; init; }
+    public required string AssignmentId { get; init; }
+    public string? AssignmentTitle { get; init; }
+    public required string SubmissionId { get; init; }
+    public required string StudentId { get; init; }
+    public required string StudentName { get; init; }
+    public required bool Late { get; init; }
+    public required DateTimeOffset FetchedAt { get; init; }
+}

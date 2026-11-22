@@ -105,6 +105,27 @@ Every class, record, enum, interface and struct gets its own file, named after t
 - **One flat namespace for all contracts:** every file in `Contracts/` declares `namespace TeachingAssistant.Application.Contracts;`, whatever its folder. Swagger names each schema by its bare type name and the frontend's type aliases come from those names, so contract names must be unique, and one namespace makes the compiler check that. Contracts may expose Domain enums; `ContractsTests` fails if any type the contracts expose shares a schema name with another.
 - **Enforced in the build:** StyleCop's SA1402 (one type per file) and SA1649 (file named after its type) are errors for `Contracts/`, set in `.editorconfig`; every other StyleCop rule is off. Domain, the rest of Application, Infrastructure, WebAPI and the tests still have files holding several types; they move to this rule next, with namespaces following their folders, and the two rules then apply everywhere.
 
+### Records
+
+Every record, single-property ones included, is declared with `init` properties, never a positional parameter list, and is built with an object initializer, never positionally:
+
+- A non-nullable property that must be set is `required`. An optional property is nullable with no default; give a default (`= …`) only when it must be a non-null value. Lists are `required` and never nullable (empty is `[]`).
+- One property per line, in the order callers set them; one-line `<summary>` docs go on the property, not as `<param>` tags on the record.
+- Build with `new AgentLink { Kind = …, Label = …, CourseId = … }`, or `new() { … }` when the type is clear; leave out optional properties instead of setting them to `null`.
+- Some records are stored as JSON and read back (job payloads and results, `AgentToolCall`, `AgentLink`, `RunMistake`): a property added to one of them must be optional or have a default, never `required`, or rows written before it no longer load.
+- `RecordsTests` fails if any record still has a positional constructor.
+
+```csharp
+public record StartAgentRunRequest
+{
+    public required string Text { get; init; }
+    public Guid? ConversationId { get; init; }
+    public string? Page { get; init; }
+    public string? CourseId { get; init; }
+    public string? AssignmentId { get; init; }
+}
+```
+
 ### Controller conventions
 
 Controllers live in `src/TeachingAssistant.WebAPI/Controllers/`. Contracts (use-case inputs/outputs the API returns) live in `src/TeachingAssistant.Application/Contracts/`; controllers return them directly. Contract names never get a `Dto` suffix: what an endpoint returns ends in `Response` (`AssignmentResponse`), what it takes ends in `Request` (`PolicyRuleRequest`), and the result of an action may be a `Summary` (`FetchSummary`). Smaller records used only inside a contract may have plain names (`FetchProblem`, `GradebookColumn`). Where each contract file goes is under One type per file. A WebAPI-side request type exists only for HTTP-specific shapes (e.g. `IFormFile` uploads), mapped to an Application contract in the controller. Controllers stay thin: constructor-inject an Application service, call it, return the result. Document every action with a short `<summary>` (what it returns/does, one sentence) and one `<response code>` line per status — no long remarks. Return `ActionResult<T>`, suffix async actions with `Async`. Every controller member uses a block body `{ }` with an explicit `return`, never an expression body (`=>`), even for one line. The XML docs flow into the OpenAPI document.

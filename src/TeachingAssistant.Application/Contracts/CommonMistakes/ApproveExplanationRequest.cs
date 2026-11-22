@@ -1,3 +1,6 @@
 namespace TeachingAssistant.Application.Contracts;
 
-public record ApproveExplanationRequest(string Explanation);
+public record ApproveExplanationRequest
+{
+    public required string Explanation { get; init; }
+}

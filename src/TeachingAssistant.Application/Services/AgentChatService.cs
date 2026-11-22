@@ -41,12 +41,16 @@ public class AgentChatService : IAgentChatService
         messages.Add(question);
 
         var history = messages
-            .Select(m => new AgentEntry(m.Role == ChatRole.User ? AgentMessageRole.User : AgentMessageRole.Assistant, m.Text))
+            .Select(m => new AgentEntry
+            {
+                Role = m.Role == ChatRole.User ? AgentMessageRole.User : AgentMessageRole.Assistant,
+                Text = m.Text,
+            })
             .ToList();
         var system = SystemPromptFor(request.Page, request.CourseId, request.AssignmentId);
 
         var reply = await _languageModel.RunAgentAsync(system, history, [_classroomTools], cancellationToken: cancellationToken);
-        return new ChatResponse(reply.Text);
+        return new ChatResponse { Text = reply.Text };
     }
 
     internal static string SystemPromptFor(string? page, string? courseId, string? assignmentId)

@@ -1,3 +1,7 @@
 namespace TeachingAssistant.Application.Contracts;
 
-public record GradingPrincipleRequest(string Title, string Detail);
+public record GradingPrincipleRequest
+{
+    public required string Title { get; init; }
+    public required string Detail { get; init; }
+}

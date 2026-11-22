@@ -118,7 +118,7 @@ internal static class GradingOutput
 
         if (parsed?.Review is null)
         {
-            return new ReadReply(reply, null, null, null, [], []);
+            return new ReadReply { Review = reply, Mistakes = [], Strengths = [] };
         }
 
         var mistakes = (parsed.Mistakes ?? [])
@@ -130,7 +130,15 @@ internal static class GradingOutput
             .Take(MaxStrengths)
             .Select(s => Locate(s, codeLines))
             .ToList();
-        return new ReadReply(parsed.Review, parsed.Score, parsed.MaxScore, parsed.Bonus, mistakes, strengths);
+        return new ReadReply
+        {
+            Review = parsed.Review,
+            Score = parsed.Score,
+            MaxScore = parsed.MaxScore,
+            Bonus = parsed.Bonus,
+            Mistakes = mistakes,
+            Strengths = strengths,
+        };
     }
 
     private const int MaxStrengths = 3;
@@ -138,7 +146,14 @@ internal static class GradingOutput
     private static CodeStrength Locate(ReplyStrength strength, IReadOnlyDictionary<string, int> codeLines)
     {
         var (file, start, end) = Lines(strength.File, strength.StartLine, strength.EndLine, codeLines);
-        return new CodeStrength(file, start, end, strength.Category, strength.Message!.Trim());
+        return new CodeStrength
+        {
+            File = file,
+            StartLine = start,
+            EndLine = end,
+            Category = strength.Category,
+            Message = strength.Message!.Trim(),
+        };
     }
 
     private static (string? File, int? Start, int? End) Lines(
@@ -158,7 +173,16 @@ internal static class GradingOutput
         var (file, start, end) = Lines(mistake.File, mistake.StartLine, mistake.EndLine, codeLines);
 
         double? points = mistake.Points is { } value ? Math.Abs(value) : null;
-        return new CodeMistake(file, start, end, mistake.Severity, mistake.Category, mistake.Message!.Trim(), Points: points);
+        return new CodeMistake
+        {
+            File = file,
+            StartLine = start,
+            EndLine = end,
+            Severity = mistake.Severity,
+            Category = mistake.Category,
+            Message = mistake.Message!.Trim(),
+            Points = points,
+        };
     }
 
     private static string? ResolveFile(string? path, IEnumerable<string> files)
@@ -180,15 +204,43 @@ internal static class GradingOutput
         return bySuffix.Count == 1 ? bySuffix[0] : null;
     }
 
-    public sealed record ReadReply(
-        string Review, double? Score, double? MaxScore, double? Bonus, IReadOnlyList<CodeMistake> Mistakes,
-        IReadOnlyList<CodeStrength> Strengths);
+    public sealed record ReadReply
+    {
+        public required string Review { get; init; }
+        public double? Score { get; init; }
+        public double? MaxScore { get; init; }
+        public double? Bonus { get; init; }
+        public required IReadOnlyList<CodeMistake> Mistakes { get; init; }
+        public required IReadOnlyList<CodeStrength> Strengths { get; init; }
+    }
 
-    private sealed record Reply(
-        string? Review, double? Score, double? MaxScore, double? Bonus, List<ReplyMistake>? Mistakes, List<ReplyStrength>? Strengths);
+    private sealed record Reply
+    {
+        public string? Review { get; init; }
+        public double? Score { get; init; }
+        public double? MaxScore { get; init; }
+        public double? Bonus { get; init; }
+        public List<ReplyMistake>? Mistakes { get; init; }
+        public List<ReplyStrength>? Strengths { get; init; }
+    }
 
-    private sealed record ReplyStrength(string? File, int? StartLine, int? EndLine, MistakeCategory Category, string? Message);
+    private sealed record ReplyStrength
+    {
+        public string? File { get; init; }
+        public int? StartLine { get; init; }
+        public int? EndLine { get; init; }
+        public required MistakeCategory Category { get; init; }
+        public string? Message { get; init; }
+    }
 
-    private sealed record ReplyMistake(
-        string? File, int? StartLine, int? EndLine, MistakeSeverity Severity, MistakeCategory Category, string? Message, double? Points);
+    private sealed record ReplyMistake
+    {
+        public string? File { get; init; }
+        public int? StartLine { get; init; }
+        public int? EndLine { get; init; }
+        public required MistakeSeverity Severity { get; init; }
+        public required MistakeCategory Category { get; init; }
+        public string? Message { get; init; }
+        public double? Points { get; init; }
+    }
 }

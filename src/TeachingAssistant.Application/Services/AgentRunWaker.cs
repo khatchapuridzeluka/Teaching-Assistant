@@ -129,7 +129,7 @@ public class AgentRunWaker : IAgentRunWaker
         _chats.Add(conversation.AddNotice(run.Id, text, null, now, AgentLinks.Write(links)));
         run.Resume();
 
-        var job = new Job(JobType.AgentRun, JobPayloads.Write(new AgentRunPayload(run.Id)), now, courseId: run.CourseId,
+        var job = new Job(JobType.AgentRun, JobPayloads.Write(new AgentRunPayload { RunId = run.Id }), now, courseId: run.CourseId,
             assignmentId: run.AssignmentId, maxAttempts: 1);
         await _jobs.AddOrGetActiveAsync(job, cancellationToken);
         run.AttachJob(job.Id);

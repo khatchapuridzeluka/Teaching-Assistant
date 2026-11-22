@@ -37,14 +37,24 @@ public class AgentRunWakerTests
     private Job Grading(string student, double? score)
     {
         var versionId = Guid.NewGuid();
-        var job = new Job(JobType.GradeVersion, JobPayloads.Write(new GradeVersionPayload(versionId)), Now);
+        var job = new Job(JobType.GradeVersion, JobPayloads.Write(new GradeVersionPayload { VersionId = versionId }), Now);
         _jobs.Jobs.Add(job);
-        _jobs.Subjects.Add(new JobSubject(versionId, 2, "course-1", "a-4", "Assignment 4", $"sub-{student}", "s-1", student));
+        _jobs.Subjects.Add(new JobSubject
+        {
+            VersionId = versionId,
+            VersionNumber = 2,
+            CourseId = "course-1",
+            AssignmentId = "a-4",
+            AssignmentTitle = "Assignment 4",
+            SubmissionId = $"sub-{student}",
+            StudentId = "s-1",
+            StudentName = student,
+        });
         if (score is { } points)
         {
             var grading = new AiGrading(versionId, "model", "review", points, 100, null, 1, [], [], "{}", [], Now);
             _jobs.Gradings.Add(grading);
-            Finish(job, JobPayloads.Write(new GradeVersionResult(grading.Id)));
+            Finish(job, JobPayloads.Write(new GradeVersionResult { GradingId = grading.Id }));
         }
 
         return job;
@@ -68,7 +78,7 @@ public class AgentRunWakerTests
 
         var grading = new AiGrading(Guid.NewGuid(), "model", "review", 64, 100, null, 1, [], [], "{}", [], Now);
         _jobs.Gradings.Add(grading);
-        Finish(second, JobPayloads.Write(new GradeVersionResult(grading.Id)));
+        Finish(second, JobPayloads.Write(new GradeVersionResult { GradingId = grading.Id }));
         await Waker().OnJobFinishedAsync(second.Id, TestContext.Current.CancellationToken);
 
         Assert.Equal(AgentRunStatus.Queued, run.Status);
@@ -80,7 +90,14 @@ public class AgentRunWakerTests
 
         Assert.Equal(
         [
-            new AgentLink(AgentLinkKind.Submission, "Nino's draft · Assignment 4", "course-1", "a-4", "sub-Nino"),
+            new AgentLink
+            {
+                Kind = AgentLinkKind.Submission,
+                Label = "Nino's draft · Assignment 4",
+                CourseId = "course-1",
+                AssignmentId = "a-4",
+                SubmissionId = "sub-Nino",
+            },
         ], AgentLinks.Read(notice.Links).Where(l => l.Label.StartsWith("Nino")));
         Assert.Equal(2, AgentLinks.Read(notice.Links).Count);
 
@@ -101,10 +118,14 @@ public class AgentRunWakerTests
             new MistakeCluster("Other", "…", true, [Member("s-4"), Member("s-5")]),
         ], Now);
         _jobs.Analyses.Add(analysis);
-        var job = new Job(JobType.AnalyzeMistakes, JobPayloads.Write(new AnalyzeMistakesPayload("course-1", "a-4")), Now,
+        var job = new Job(JobType.AnalyzeMistakes, JobPayloads.Write(new AnalyzeMistakesPayload
+        {
+            CourseId = "course-1",
+            AssignmentId = "a-4",
+        }), Now,
             courseId: "course-1", assignmentId: "a-4");
         _jobs.Jobs.Add(job);
-        Finish(job, JobPayloads.Write(new AnalyzeMistakesResult(analysis.Id)));
+        Finish(job, JobPayloads.Write(new AnalyzeMistakesResult { AnalysisId = analysis.Id }));
         WaitingRun(job);
 
         await Waker().OnJobFinishedAsync(job.Id, TestContext.Current.CancellationToken);
@@ -115,7 +136,13 @@ public class AgentRunWakerTests
         Assert.Contains("  - Inheritance used for code reuse: 2 students, 3 mistakes\n  - Public fields: 1 student, 1 mistake", notice);
         Assert.Contains("(2 mistakes not grouped)", notice);
         Assert.Contains("For the next lecture: Revisit composition with one worked example.", notice);
-        Assert.Equal([new AgentLink(AgentLinkKind.CommonMistakes, "Common mistakes", "course-1", "a-4")], AgentLinks.Read(_chats.Messages[^1].Links));
+        Assert.Equal([new AgentLink
+        {
+            Kind = AgentLinkKind.CommonMistakes,
+            Label = "Common mistakes",
+            CourseId = "course-1",
+            AssignmentId = "a-4",
+        }], AgentLinks.Read(_chats.Messages[^1].Links));
     }
 
     private static ClusterMember Member(string studentId)
@@ -144,7 +171,11 @@ public class AgentRunWakerTests
     [Fact]
     public async Task ARun_IsWokenAsSoonAsItsOwnTurnEnds_WhenItsJobFinishedBeforeItStartedWaiting()
     {
-        var analysis = new Job(JobType.AnalyzeMistakes, JobPayloads.Write(new AnalyzeMistakesPayload("course-1", "a-4")), Now,
+        var analysis = new Job(JobType.AnalyzeMistakes, JobPayloads.Write(new AnalyzeMistakesPayload
+        {
+            CourseId = "course-1",
+            AssignmentId = "a-4",
+        }), Now,
             courseId: "course-1", assignmentId: "a-4");
         _jobs.Jobs.Add(analysis);
         analysis.Start("worker", Now, TimeSpan.FromMinutes(10));
@@ -154,7 +185,7 @@ public class AgentRunWakerTests
         var run = new AgentRun(conversation.Id, Now);
         _chats.Conversations.Add(conversation);
         _chats.Runs.Add(run);
-        var turn = new Job(JobType.AgentRun, JobPayloads.Write(new AgentRunPayload(run.Id)), Now, maxAttempts: 1);
+        var turn = new Job(JobType.AgentRun, JobPayloads.Write(new AgentRunPayload { RunId = run.Id }), Now, maxAttempts: 1);
         _jobs.Jobs.Add(turn);
         run.AttachJob(turn.Id);
         run.Start(Now);
@@ -185,7 +216,7 @@ public class AgentRunWakerTests
         var conversation = new AgentConversation(Now);
         var run = new AgentRun(conversation.Id, Now);
         _chats.Runs.Add(run);
-        var job = new Job(JobType.AgentRun, JobPayloads.Write(new AgentRunPayload(run.Id)), Now, maxAttempts: 1);
+        var job = new Job(JobType.AgentRun, JobPayloads.Write(new AgentRunPayload { RunId = run.Id }), Now, maxAttempts: 1);
         _jobs.Jobs.Add(job);
         run.AttachJob(job.Id);
         run.Start(Now);
@@ -204,7 +235,7 @@ public class AgentRunWakerTests
         var conversation = new AgentConversation(Now);
         var run = new AgentRun(conversation.Id, Now);
         _chats.Runs.Add(run);
-        var job = new Job(JobType.AgentRun, JobPayloads.Write(new AgentRunPayload(run.Id)), Now, maxAttempts: 1);
+        var job = new Job(JobType.AgentRun, JobPayloads.Write(new AgentRunPayload { RunId = run.Id }), Now, maxAttempts: 1);
         _jobs.Jobs.Add(job);
         run.AttachJob(job.Id);
         job.Cancel(Now);

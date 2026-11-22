@@ -28,6 +28,6 @@ public class GradeVersionJobHandler : IJobHandler
 
         var grading = await _grading.GradeVersionAsync(input.VersionId, cancellationToken)
                       ?? throw new InvalidRequestException($"Version {input.VersionId} no longer exists.");
-        return JobPayloads.Write(new GradeVersionResult(grading.Id));
+        return JobPayloads.Write(new GradeVersionResult { GradingId = grading.Id });
     }
 }

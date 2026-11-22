@@ -61,10 +61,24 @@ public class StudentOverviewService : IStudentOverviewService
                 var bonus = reviewed ? a.Score?.Bonus : a.Score?.AiBonus;
                 var maxPoints = assignments.GetValueOrDefault(a.AssignmentId)?.MaxPoints ?? a.Score?.MaxScore;
                 double? percent = score is { } s && maxPoints is > 0 ? Math.Round(s * 100 / maxPoints.Value, 1) : null;
-                return new OverviewAssignmentResponse(a.AssignmentId, Title(a.AssignmentId), DueAt(a.AssignmentId), a.Source, score, bonus,
-                    maxPoints, percent, a.Score?.AiScore, own.Count, own.Count(l => l.Mistake.Severity == MistakeSeverity.Major),
-                    own.Count(l => l.Label == MistakeLabel.Repeated), own.Sum(l => l.Mistake.Points ?? 0), shown.Count,
-                    shown.Count(l => l.Label == StrengthLabel.Improved));
+                return new OverviewAssignmentResponse
+                {
+                    AssignmentId = a.AssignmentId,
+                    Title = Title(a.AssignmentId),
+                    DueAt = DueAt(a.AssignmentId),
+                    Source = a.Source,
+                    Score = score,
+                    Bonus = bonus,
+                    MaxPoints = maxPoints,
+                    Percent = percent,
+                    AiScore = a.Score?.AiScore,
+                    Mistakes = own.Count,
+                    Major = own.Count(l => l.Mistake.Severity == MistakeSeverity.Major),
+                    Repeated = own.Count(l => l.Label == MistakeLabel.Repeated),
+                    PointsLost = own.Sum(l => l.Mistake.Points ?? 0),
+                    Strengths = shown.Count,
+                    Improved = shown.Count(l => l.Label == StrengthLabel.Improved),
+                };
             })
             .ToList();
 
@@ -72,30 +86,66 @@ public class StudentOverviewService : IStudentOverviewService
 
         var topMistakes = MistakeHistory.Trends(records.Mistakes, DueAt)
             .Take(TopCategories)
-            .Select(t => new MistakeCategoryResponse(t.Category, t.Count, Percent(t.Count, records.Mistakes.Count), t.Assignments,
-                t.Repeated, t.PointsLost, Title(t.FirstAssignmentId), Title(t.LastAssignmentId)))
+            .Select(t => new MistakeCategoryResponse
+            {
+                Category = t.Category,
+                Count = t.Count,
+                Percent = Percent(t.Count, records.Mistakes.Count),
+                Assignments = t.Assignments,
+                Repeated = t.Repeated,
+                PointsLost = t.PointsLost,
+                FirstAssignmentTitle = Title(t.FirstAssignmentId),
+                LastAssignmentTitle = Title(t.LastAssignmentId),
+            })
             .ToList();
 
         var topStrengths = StrengthHistory.Trends(records.Strengths, records.Mistakes, DueAt)
             .Take(TopCategories)
-            .Select(t => new StrengthCategoryResponse(t.Category, t.Count, Percent(t.Count, records.Strengths.Count), t.Assignments,
-                t.Consistent, t.Mistakes, Title(t.ImprovedSinceAssignmentId), Title(t.FirstAssignmentId), Title(t.LastAssignmentId)))
+            .Select(t => new StrengthCategoryResponse
+            {
+                Category = t.Category,
+                Count = t.Count,
+                Percent = Percent(t.Count, records.Strengths.Count),
+                Assignments = t.Assignments,
+                Consistent = t.Consistent,
+                Mistakes = t.Mistakes,
+                ImprovedSinceAssignmentTitle = Title(t.ImprovedSinceAssignmentId),
+                FirstAssignmentTitle = Title(t.FirstAssignmentId),
+                LastAssignmentTitle = Title(t.LastAssignmentId),
+            })
             .ToList();
 
         var categories = records.Mistakes.Select(m => m.Category)
             .Concat(records.Strengths.Select(s => s.Category))
             .Distinct()
-            .Select(c => new OverviewCategoryResponse(c, records.Strengths.Count(s => s.Category == c),
-                records.Mistakes.Count(m => m.Category == c), records.Mistakes.Where(m => m.Category == c).Sum(m => m.Points ?? 0)))
+            .Select(c => new OverviewCategoryResponse
+            {
+                Category = c,
+                Strengths = records.Strengths.Count(s => s.Category == c),
+                Mistakes = records.Mistakes.Count(m => m.Category == c),
+                PointsLost = records.Mistakes.Where(m => m.Category == c).Sum(m => m.Points ?? 0),
+            })
             .OrderByDescending(c => c.Strengths + c.Mistakes)
             .ThenBy(c => c.Category)
             .ToList();
 
-        return new StudentOverviewResponse(rows.Count, percents.Count == 0 ? null : Math.Round(percents.Average(), 1),
-            percents.Count == 0 ? null : percents[0], percents.Count == 0 ? null : percents[^1], mistakes.Count,
-            mistakes.Count(l => l.Label == MistakeLabel.Repeated), records.Mistakes.Sum(m => m.Points ?? 0), strengths.Count,
-            strengths.Count(l => l.Label == StrengthLabel.Consistent), strengths.Count(l => l.Label == StrengthLabel.Improved), rows,
-            topMistakes, topStrengths, categories);
+        return new StudentOverviewResponse
+        {
+            GradedAssignments = rows.Count,
+            AveragePercent = percents.Count == 0 ? null : Math.Round(percents.Average(), 1),
+            FirstPercent = percents.Count == 0 ? null : percents[0],
+            LatestPercent = percents.Count == 0 ? null : percents[^1],
+            Mistakes = mistakes.Count,
+            RepeatedMistakes = mistakes.Count(l => l.Label == MistakeLabel.Repeated),
+            PointsLost = records.Mistakes.Sum(m => m.Points ?? 0),
+            Strengths = strengths.Count,
+            ConsistentStrengths = strengths.Count(l => l.Label == StrengthLabel.Consistent),
+            ImprovedStrengths = strengths.Count(l => l.Label == StrengthLabel.Improved),
+            Assignments = rows,
+            TopMistakes = topMistakes,
+            TopStrengths = topStrengths,
+            Categories = categories,
+        };
     }
 
     private static double Percent(int count, int total)

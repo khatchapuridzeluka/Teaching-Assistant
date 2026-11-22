@@ -1,6 +1,10 @@
 namespace TeachingAssistant.Application.Interfaces;
 
-public record DownloadedPhoto(byte[] Bytes, string ContentType);
+public record DownloadedPhoto
+{
+    public required byte[] Bytes { get; init; }
+    public required string ContentType { get; init; }
+}
 
 public interface IStudentPhotoSource
 {

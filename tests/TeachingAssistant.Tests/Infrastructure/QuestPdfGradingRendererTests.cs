@@ -9,19 +9,20 @@ public class QuestPdfGradingRendererTests
 {
     private static readonly DateTimeOffset Now = new(2026, 11, 13, 10, 0, 0, TimeSpan.Zero);
 
-    private static GradingDocument Sample(GradingDocumentStatus status, string student = "Nini Beridze") => new(
-        student,
-        "Assignment 2: At the Zoo",
-        Now.AddDays(-20),
-        1,
-        Now.AddDays(-21),
-        status,
-        88,
-        100,
-        7,
-        85,
-        7,
-        """
+    private static GradingDocument Sample(GradingDocumentStatus status, string student = "Nini Beridze") => new()
+    {
+        StudentName = student,
+        AssignmentTitle = "Assignment 2: At the Zoo",
+        DueAt = Now.AddDays(-20),
+        VersionNumber = 1,
+        TurnedInAt = Now.AddDays(-21),
+        Status = status,
+        Score = 88,
+        MaxScore = 100,
+        Bonus = 7,
+        AiScore = 85,
+        AiBonus = 7,
+        Review = """
         ## Score
 
         | Task | Points | Reason |
@@ -38,16 +39,48 @@ public class QuestPdfGradingRendererTests
         - Use the exact names the assignment gives.
         - Build joined strings with `String.join`.
         """,
-        [
-            new GradingDocumentMistake(MistakeSeverity.Minor, MistakeCategory.Naming, "The field is costs instead of foodCosts.", 3, "Animal.java", 4, 4),
-            new GradingDocumentMistake(MistakeSeverity.Major, MistakeCategory.MissingRequirement, "Zoo.toString() is not visible in the submission.", 0, "Zoo.java", 12, 30),
-            new GradingDocumentMistake(MistakeSeverity.Style, MistakeCategory.Readability, "Leftover commented-out code.", 0, null, null, null),
+        Mistakes = [
+            new GradingDocumentMistake
+            {
+                Severity = MistakeSeverity.Minor,
+                Category = MistakeCategory.Naming,
+                Message = "The field is costs instead of foodCosts.",
+                Points = 3,
+                File = "Animal.java",
+                StartLine = 4,
+                EndLine = 4,
+            },
+            new GradingDocumentMistake
+            {
+                Severity = MistakeSeverity.Major,
+                Category = MistakeCategory.MissingRequirement,
+                Message = "Zoo.toString() is not visible in the submission.",
+                Points = 0,
+                File = "Zoo.java",
+                StartLine = 12,
+                EndLine = 30,
+            },
+            new GradingDocumentMistake
+            {
+                Severity = MistakeSeverity.Style,
+                Category = MistakeCategory.Readability,
+                Message = "Leftover commented-out code.",
+                Points = 0,
+            },
         ],
-        [new GradingDocumentStrength(MistakeCategory.Design, "Vivarium.toString() reuses Animal.toString(), as the hint suggested.", "Vivarium.java", 30, 41)],
-        "model",
-        Now.AddDays(-1),
-        status == GradingDocumentStatus.Approved ? Now : null,
-        Now);
+        Strengths = [new GradingDocumentStrength
+        {
+            Category = MistakeCategory.Design,
+            Message = "Vivarium.toString() reuses Animal.toString(), as the hint suggested.",
+            File = "Vivarium.java",
+            StartLine = 30,
+            EndLine = 41,
+        }],
+        Model = "model",
+        GradedAt = Now.AddDays(-1),
+        ApprovedAt = status == GradingDocumentStatus.Approved ? Now : null,
+        GeneratedAt = Now,
+    };
 
     [Theory]
     [InlineData(GradingDocumentStatus.Draft)]

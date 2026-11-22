@@ -66,7 +66,13 @@ public class StrengthHistoryTests
             [new GradingStrength(null, null, null, MistakeCategory.Design, "a"), new GradingStrength(null, null, null, MistakeCategory.Naming, "b")]);
         var report = new GradingReport(grading, submission, Now);
         report.Save(grading, 80, null, "review", [], Now,
-            [new ReportStrengthEdit(grading.Strengths[0].Id, true, MistakeCategory.Design, "a")]);
+            [new ReportStrengthEdit
+            {
+                SourceStrengthId = grading.Strengths[0].Id,
+                Rejected = true,
+                Category = MistakeCategory.Design,
+                Message = "a",
+            }]);
         report.Approve(Now);
 
         var recorded = Assert.Single(StudentStrength.FromApprovedReport(report, submission));

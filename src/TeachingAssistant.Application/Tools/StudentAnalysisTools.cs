@@ -74,9 +74,27 @@ public class StudentAnalysisTools
     {
         return kind switch
         {
-            StudentAnalysisKind.Mistakes => new AgentLink(AgentLinkKind.StudentMistakes, $"{owner} mistakes", courseId, StudentId: studentId),
-            StudentAnalysisKind.Strengths => new AgentLink(AgentLinkKind.StudentStrengths, $"{owner} strengths", courseId, StudentId: studentId),
-            _ => new AgentLink(AgentLinkKind.StudentOverview, $"{owner} overview", courseId, StudentId: studentId),
+            StudentAnalysisKind.Mistakes => new AgentLink
+            {
+                Kind = AgentLinkKind.StudentMistakes,
+                Label = $"{owner} mistakes",
+                CourseId = courseId,
+                StudentId = studentId,
+            },
+            StudentAnalysisKind.Strengths => new AgentLink
+            {
+                Kind = AgentLinkKind.StudentStrengths,
+                Label = $"{owner} strengths",
+                CourseId = courseId,
+                StudentId = studentId,
+            },
+            _ => new AgentLink
+            {
+                Kind = AgentLinkKind.StudentOverview,
+                Label = $"{owner} overview",
+                CourseId = courseId,
+                StudentId = studentId,
+            },
         };
     }
 

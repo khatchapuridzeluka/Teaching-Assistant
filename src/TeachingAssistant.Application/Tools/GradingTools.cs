@@ -53,7 +53,13 @@ public class GradingTools
         var started = _timeProvider.GetUtcNow();
         var job = await _jobService.QueueAnalyzeMistakesAsync(courseId, assignmentId, cancellationToken);
         _context.RecordQueuedJob(job.Id);
-        _context.RecordLinks([new AgentLink(AgentLinkKind.CommonMistakes, "Common mistakes", courseId, assignmentId)]);
+        _context.RecordLinks([new AgentLink
+        {
+            Kind = AgentLinkKind.CommonMistakes,
+            Label = "Common mistakes",
+            CourseId = courseId,
+            AssignmentId = assignmentId,
+        }]);
         if (job.CreatedAt < started)
         {
             return $"A Common mistakes analysis of this assignment is already in progress (job id {job.Id}); nothing new was started. "
@@ -89,8 +95,16 @@ public class GradingTools
                 + "the grading), wait for it, then call this again.";
         }
 
-        _context.RecordLinks([new AgentLink(AgentLinkKind.GradingPdf, $"PDF · {current.StudentName}", courseId, assignmentId,
-            current.SubmissionId, studentId, current.Id)]);
+        _context.RecordLinks([new AgentLink
+        {
+            Kind = AgentLinkKind.GradingPdf,
+            Label = $"PDF · {current.StudentName}",
+            CourseId = courseId,
+            AssignmentId = assignmentId,
+            SubmissionId = current.SubmissionId,
+            StudentId = studentId,
+            GradingId = current.Id,
+        }]);
 
         var state = current.ReportStatus switch
         {
@@ -124,7 +138,13 @@ public class GradingTools
             var result = await _jobService.QueueGradeAssignmentAsync(courseId, assignmentId, regrade, cancellationToken);
             if (result.Job is not null)
             {
-                _context.RecordLinks([new AgentLink(AgentLinkKind.Assignment, "The assignment's drafts", courseId, assignmentId)]);
+                _context.RecordLinks([new AgentLink
+                {
+                    Kind = AgentLinkKind.Assignment,
+                    Label = "The assignment's drafts",
+                    CourseId = courseId,
+                    AssignmentId = assignmentId,
+                }]);
             }
 
             return Describe(result, regrade);

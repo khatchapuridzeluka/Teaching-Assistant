@@ -1,3 +1,9 @@
 namespace TeachingAssistant.Application.Contracts;
 
-public record EvaluationStrengths(int Total, int Kept, int Edited, int Rejected);
+public record EvaluationStrengths
+{
+    public required int Total { get; init; }
+    public required int Kept { get; init; }
+    public required int Edited { get; init; }
+    public required int Rejected { get; init; }
+}

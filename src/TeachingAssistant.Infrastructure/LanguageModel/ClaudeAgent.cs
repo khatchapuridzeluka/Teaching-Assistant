@@ -30,7 +30,7 @@ internal static class ClaudeAgent
             tools: tools.SelectMany(t => ToFunctions(t, hooks, answered)).ToList());
 
         var response = await agent.RunAsync(messages, cancellationToken: cancellationToken);
-        return new AgentReply(model, ToEntries(response.Messages), ToUsage(response.Usage));
+        return new AgentReply { Model = model, Entries = ToEntries(response.Messages), Usage = ToUsage(response.Usage) };
     }
 
     private static IEnumerable<AITool> ToFunctions(object tools, AgentRunHooks? hooks, HashSet<string> answered)
@@ -125,8 +125,13 @@ internal static class ClaudeAgent
             {
                 foreach (var result in message.Contents.OfType<FunctionResultContent>())
                 {
-                    entries.Add(new AgentEntry(AgentMessageRole.Tool, ResultText(result.Result), ToolCallId: result.CallId,
-                        ToolName: toolNames.GetValueOrDefault(result.CallId, "")));
+                    entries.Add(new AgentEntry
+                    {
+                        Role = AgentMessageRole.Tool,
+                        Text = ResultText(result.Result),
+                        ToolCallId = result.CallId,
+                        ToolName = toolNames.GetValueOrDefault(result.CallId, ""),
+                    });
                 }
 
                 continue;
@@ -154,9 +159,19 @@ internal static class ClaudeAgent
         }
 
         var calls = message.Contents.OfType<FunctionCallContent>()
-            .Select(c => new AgentToolCall(c.CallId, c.Name, JsonSerializer.Serialize(c.Arguments ?? new Dictionary<string, object?>())))
+            .Select(c => new AgentToolCall
+            {
+                Id = c.CallId,
+                Name = c.Name,
+                Arguments = JsonSerializer.Serialize(c.Arguments ?? new Dictionary<string, object?>()),
+            })
             .ToList();
-        return new AgentEntry(AgentMessageRole.Assistant, message.Text.Trim(), calls.Count == 0 ? null : calls);
+        return new AgentEntry
+        {
+            Role = AgentMessageRole.Assistant,
+            Text = message.Text.Trim(),
+            ToolCalls = calls.Count == 0 ? null : calls,
+        };
     }
 
     private static string ResultText(object? result)
@@ -174,7 +189,13 @@ internal static class ClaudeAgent
     {
         return usage is null
             ? null
-            : new LanguageModelUsage(usage.InputTokenCount ?? 0, usage.OutputTokenCount ?? 0, usage.CachedInputTokenCount ?? 0, 0);
+            : new LanguageModelUsage
+            {
+                InputTokens = usage.InputTokenCount ?? 0,
+                OutputTokens = usage.OutputTokenCount ?? 0,
+                CacheReadTokens = usage.CachedInputTokenCount ?? 0,
+                CacheWriteTokens = 0,
+            };
     }
 
     private sealed class StepObserver(IChatClient inner, AgentRunHooks hooks, HashSet<string> answered) : DelegatingChatClient(inner)
@@ -219,8 +240,13 @@ internal static class ClaudeAgent
                     text = $"Failed: {exception.Message}";
                 }
 
-                await hooks.OnStep(new AgentEntry(AgentMessageRole.Tool, text, ToolCallId: result.CallId,
-                    ToolName: names.GetValueOrDefault(result.CallId, "unknown")));
+                await hooks.OnStep(new AgentEntry
+                {
+                    Role = AgentMessageRole.Tool,
+                    Text = text,
+                    ToolCallId = result.CallId,
+                    ToolName = names.GetValueOrDefault(result.CallId, "unknown"),
+                });
             }
         }
     }
@@ -257,7 +283,13 @@ internal static class ClaudeAgent
                 answered.Add(callId);
             }
 
-            await hooks.OnStep(new AgentEntry(AgentMessageRole.Tool, ResultText(result), ToolCallId: callId, ToolName: Name));
+            await hooks.OnStep(new AgentEntry
+            {
+                Role = AgentMessageRole.Tool,
+                Text = ResultText(result),
+                ToolCallId = callId,
+                ToolName = Name,
+            });
             if (hooks.ShouldStop() && context is not null)
             {
                 context.Terminate = true;

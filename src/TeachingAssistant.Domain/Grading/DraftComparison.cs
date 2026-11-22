@@ -5,15 +5,16 @@ namespace TeachingAssistant.Domain.Grading;
 /// teacher did with each of the AI's mistakes and strengths. The mistakes keep the AI's own category, severity and points,
 /// so a category the teacher changed still counts against the category the AI chose.
 /// </summary>
-public sealed record DraftComparison(
-    double? AiTotal,
-    double? TeacherTotal,
-    double? MaxScore,
-    IReadOnlyList<MistakeComparison> Mistakes,
-    int StrengthsKept,
-    int StrengthsEdited,
-    int StrengthsRejected)
+public sealed record DraftComparison
 {
+    public double? AiTotal { get; init; }
+    public double? TeacherTotal { get; init; }
+    public double? MaxScore { get; init; }
+    public required IReadOnlyList<MistakeComparison> Mistakes { get; init; }
+    public required int StrengthsKept { get; init; }
+    public required int StrengthsEdited { get; init; }
+    public required int StrengthsRejected { get; init; }
+
     /// <summary>AI total minus the teacher's total: positive when the AI was more lenient.</summary>
     public double? Difference => AiTotal is { } ai && TeacherTotal is { } teacher ? ai - teacher : null;
 
@@ -44,22 +45,30 @@ public sealed record DraftComparison(
             .Select(m =>
             {
                 var source = sources[m.SourceMistakeId!.Value];
-                return new MistakeComparison(source.Severity, source.Category, m.Decision, source.Points,
-                    m.Decision == MistakeDecision.Rejected ? 0 : m.Points);
+                return new MistakeComparison
+                {
+                    Severity = source.Severity,
+                    Category = source.Category,
+                    Decision = m.Decision,
+                    AiPoints = source.Points,
+                    TeacherPoints = m.Decision == MistakeDecision.Rejected ? 0 : m.Points,
+                };
             })
             .ToList();
 
         var sourceStrengths = draft.Strengths.Select(s => s.Id).ToHashSet();
         var strengths = report.Strengths.Where(s => s.SourceStrengthId is { } id && sourceStrengths.Contains(id)).ToList();
 
-        return new DraftComparison(
-            Total(draft.Score, draft.Bonus),
-            Total(report.Score, report.Bonus),
-            draft.MaxScore,
-            mistakes,
-            strengths.Count(s => s.Decision == MistakeDecision.Kept),
-            strengths.Count(s => s.Decision == MistakeDecision.Edited),
-            strengths.Count(s => s.Decision == MistakeDecision.Rejected));
+        return new DraftComparison
+        {
+            AiTotal = Total(draft.Score, draft.Bonus),
+            TeacherTotal = Total(report.Score, report.Bonus),
+            MaxScore = draft.MaxScore,
+            Mistakes = mistakes,
+            StrengthsKept = strengths.Count(s => s.Decision == MistakeDecision.Kept),
+            StrengthsEdited = strengths.Count(s => s.Decision == MistakeDecision.Edited),
+            StrengthsRejected = strengths.Count(s => s.Decision == MistakeDecision.Rejected),
+        };
     }
 
     private double? Percent(double points)
@@ -74,14 +83,19 @@ public sealed record DraftComparison(
 }
 
 /// <summary>One of the AI's mistakes as the AI wrote it (severity, category, points) and what the teacher decided.</summary>
-/// <param name="TeacherPoints">The points the teacher kept for it; 0 when rejected.</param>
-public sealed record MistakeComparison(
-    MistakeSeverity Severity,
-    MistakeCategory Category,
-    MistakeDecision Decision,
-    double? AiPoints,
-    double? TeacherPoints)
+public sealed record MistakeComparison
 {
+    public required MistakeSeverity Severity { get; init; }
+
+    public required MistakeCategory Category { get; init; }
+
+    public required MistakeDecision Decision { get; init; }
+
+    public double? AiPoints { get; init; }
+
+    /// <summary>The points the teacher kept for it; 0 when rejected.</summary>
+    public double? TeacherPoints { get; init; }
+
     /// <summary>True when the teacher kept the mistake (as it was or edited) but changed how many points it costs.</summary>
     public bool PointsChanged => Decision != MistakeDecision.Rejected && (AiPoints ?? 0) != (TeacherPoints ?? 0);
 }

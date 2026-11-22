@@ -51,9 +51,27 @@ public class GradingDraftService : IGradingDraftService
 
         return rows
             .Where(r => includeAll || current.Contains(r.Id))
-            .Select(r => new AssignmentGradingResponse(r.Id, r.VersionId, r.VersionNumber, r.AssignmentId, r.SubmissionId,
-                r.StudentId, r.StudentName, r.Status, current.Contains(r.Id), r.Score, r.MaxScore, r.Bonus, r.Major, r.Minor, r.Style,
-                r.Model, r.CreatedAt, r.ReportStatus))
+            .Select(r => new AssignmentGradingResponse
+            {
+                Id = r.Id,
+                VersionId = r.VersionId,
+                VersionNumber = r.VersionNumber,
+                AssignmentId = r.AssignmentId,
+                SubmissionId = r.SubmissionId,
+                StudentId = r.StudentId,
+                StudentName = r.StudentName,
+                Status = r.Status,
+                Current = current.Contains(r.Id),
+                Score = r.Score,
+                MaxScore = r.MaxScore,
+                Bonus = r.Bonus,
+                Major = r.Major,
+                Minor = r.Minor,
+                Style = r.Style,
+                Model = r.Model,
+                CreatedAt = r.CreatedAt,
+                ReportStatus = r.ReportStatus,
+            })
             .ToList();
     }
 
@@ -87,12 +105,49 @@ public class GradingDraftService : IGradingDraftService
         return ToResponse(grading);
     }
 
-    internal static GradingResponse ToResponse(AiGrading g) => new(
-        g.Id, g.VersionId, g.Status, g.Model, g.Review, g.Score, g.MaxScore, g.Bonus,
-        g.Mistakes.OrderBy(m => m.Position)
-            .Select(m => new CodeMistake(m.File, m.StartLine, m.EndLine, m.Severity, m.Category, m.Message, m.Id, m.Points)).ToList(),
-        g.InstructionsVersion, g.SentFiles, g.SkippedFiles, g.CreatedAt,
-        g.Strengths.OrderBy(s => s.Position)
-            .Select(s => new CodeStrength(s.File, s.StartLine, s.EndLine, s.Category, s.Message, s.Id)).ToList(),
-        g.BuildStatus, g.BuildOutput, g.StyleFindings, g.StyleOutput, g.PmdFindings, g.PmdOutput, g.DiscardReason, g.DiscardNote);
+    internal static GradingResponse ToResponse(AiGrading g) => new()
+    {
+        Id = g.Id,
+        VersionId = g.VersionId,
+        Status = g.Status,
+        Model = g.Model,
+        Review = g.Review,
+        Score = g.Score,
+        MaxScore = g.MaxScore,
+        Bonus = g.Bonus,
+        Mistakes = g.Mistakes.OrderBy(m => m.Position)
+            .Select(m => new CodeMistake
+            {
+                File = m.File,
+                StartLine = m.StartLine,
+                EndLine = m.EndLine,
+                Severity = m.Severity,
+                Category = m.Category,
+                Message = m.Message,
+                Id = m.Id,
+                Points = m.Points,
+            }).ToList(),
+        InstructionsVersion = g.InstructionsVersion,
+        SentFiles = g.SentFiles,
+        SkippedFiles = g.SkippedFiles,
+        CreatedAt = g.CreatedAt,
+        Strengths = g.Strengths.OrderBy(s => s.Position)
+            .Select(s => new CodeStrength
+            {
+                File = s.File,
+                StartLine = s.StartLine,
+                EndLine = s.EndLine,
+                Category = s.Category,
+                Message = s.Message,
+                Id = s.Id,
+            }).ToList(),
+        BuildStatus = g.BuildStatus,
+        BuildOutput = g.BuildOutput,
+        StyleFindings = g.StyleFindings,
+        StyleOutput = g.StyleOutput,
+        PmdFindings = g.PmdFindings,
+        PmdOutput = g.PmdOutput,
+        DiscardReason = g.DiscardReason,
+        DiscardNote = g.DiscardNote,
+    };
 }

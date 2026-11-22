@@ -42,18 +42,48 @@ public class GradebookServiceTests
     }
 
     private static StudentAssignmentResult Result(GradeStatus state, double? grade) =>
-        new("a1", "sub", null, state is GradeStatus.Graded or GradeStatus.AwaitingGrade, false,
-            state == GradeStatus.Missing, state, grade);
+        new()
+        {
+            AssignmentId = "a1",
+            SubmissionId = "sub",
+            TurnedIn = state is GradeStatus.Graded or GradeStatus.AwaitingGrade,
+            Late = false,
+            Missing = state == GradeStatus.Missing,
+            GradeStatus = state,
+            Grade = grade,
+        };
 
     private sealed class FakeStudents : IStudentService
     {
         private readonly List<CourseStudentResponse> _rows = [];
 
         public void Add(string name, bool active, StudentAssignmentResult result, double? overall) =>
-            _rows.Add(new CourseStudentResponse(Guid.NewGuid(), name, name, active, 1, 0, 0, overall, 0, 0, [result]));
+            _rows.Add(new CourseStudentResponse
+            {
+                Id = Guid.NewGuid(),
+                ExternalUserId = name,
+                Name = name,
+                Active = active,
+                TurnedIn = 1,
+                Missing = 0,
+                Late = 0,
+                OverallPercent = overall,
+                Earned = 0,
+                Possible = 0,
+                Results = [result],
+            });
 
         public Task<CourseStudentsResponse> GetCourseStudentsAsync(string courseId, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new CourseStudentsResponse(null, [new StudentAssignmentColumn("a1", "Task 1", 100, null)], _rows));
+            Task.FromResult(new CourseStudentsResponse
+            {
+                Assignments = [new StudentAssignmentColumn
+                {
+                    Id = "a1",
+                    Title = "Task 1",
+                    MaxPoints = 100,
+                }],
+                Students = _rows,
+            });
 
         public Task<StudentPhoto?> OpenPhotoAsync(string externalUserId, CancellationToken cancellationToken = default) =>
             Task.FromResult<StudentPhoto?>(null);

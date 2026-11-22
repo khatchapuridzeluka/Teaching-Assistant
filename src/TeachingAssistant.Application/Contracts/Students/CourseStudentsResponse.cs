@@ -1,6 +1,8 @@
 namespace TeachingAssistant.Application.Contracts;
 
-public record CourseStudentsResponse(
-    DateTimeOffset? SyncedAt,
-    IReadOnlyList<StudentAssignmentColumn> Assignments,
-    IReadOnlyList<CourseStudentResponse> Students);
+public record CourseStudentsResponse
+{
+    public DateTimeOffset? SyncedAt { get; init; }
+    public required IReadOnlyList<StudentAssignmentColumn> Assignments { get; init; }
+    public required IReadOnlyList<CourseStudentResponse> Students { get; init; }
+}

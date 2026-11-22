@@ -140,8 +140,8 @@ public class SubmissionFetchServiceTests
         _files.Add("file-1", "homework.zip", "md5-a");
         _source.Add("sub-1", "Ana K.", "TURNED_IN", DriveAttachment("file-1"));
         _source.AddGraded("sub-2", "Gio M.", "RETURNED", 90,
-            new GradeChange(GradeEventKind.AssignedGrade, 70, 100, returned),
-            new GradeChange(GradeEventKind.AssignedGrade, 90, 100, returned.AddDays(4)));
+            new GradeChange { Kind = GradeEventKind.AssignedGrade, PointsEarned = 70, MaxPoints = 100, At = returned },
+            new GradeChange { Kind = GradeEventKind.AssignedGrade, PointsEarned = 90, MaxPoints = 100, At = returned.AddDays(4) });
 
         await FetchAsync();
 
@@ -317,7 +317,7 @@ public class SubmissionFetchServiceTests
     [Fact]
     public async Task Fetch_StoresTheInstructions_AndReportsTheirVersion()
     {
-        _instructions.Result = new InstructionsFetchResult(2, IsNew: true, []);
+        _instructions.Result = new InstructionsFetchResult { VersionNumber = 2, IsNew = true, Problems = [] };
 
         var summary = await FetchAsync();
 
@@ -341,10 +341,10 @@ public class SubmissionFetchServiceTests
     }
 
     private static SubmissionAttachment DriveAttachment(string fileId) =>
-        new(AttachmentKind.DriveFile, fileId, null, fileId);
+        new() { Kind = AttachmentKind.DriveFile, Title = fileId, FileId = fileId };
 
     private static SubmissionAttachment GitHubAttachment(string url) =>
-        new(AttachmentKind.Link, "library", url, null);
+        new() { Kind = AttachmentKind.Link, Title = "library", Url = url };
 
     private sealed class FakeRepositories : IRepositorySource
     {
@@ -372,7 +372,7 @@ public class SubmissionFetchServiceTests
             }
 
             var name = url.Split('/')[^1];
-            return Task.FromResult(new RepositorySnapshot("ana", name, sha, "main"));
+            return Task.FromResult(new RepositorySnapshot { Owner = "ana", Repository = name, CommitSha = sha, Ref = "main" });
         }
 
         public async Task DownloadAsync(RepositorySnapshot snapshot, Stream destination, CancellationToken cancellationToken = default)
@@ -388,21 +388,51 @@ public class SubmissionFetchServiceTests
         private readonly List<SubmissionResponse> _submissions = [];
 
         public void Add(string id, string student, string state, params SubmissionAttachment[] attachments) =>
-            _submissions.Add(new SubmissionResponse(id, "assignment-1", $"user-{id}", student, state, false,
-                DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, attachments, null, null, []));
+            _submissions.Add(new SubmissionResponse
+            {
+                Id = id,
+                AssignmentId = "assignment-1",
+                StudentId = $"user-{id}",
+                StudentName = student,
+                State = state,
+                Late = false,
+                TurnedInAt = DateTimeOffset.UtcNow,
+                UpdatedAt = DateTimeOffset.UtcNow,
+                Attachments = attachments,
+                GradeHistory = [],
+            });
 
         public void AddGraded(string id, string student, string state, double grade, params GradeChange[] history) =>
-            _submissions.Add(new SubmissionResponse(id, "assignment-1", $"user-{id}", student, state, false,
-                null, DateTimeOffset.UtcNow, [], null, grade, history));
+            _submissions.Add(new SubmissionResponse
+            {
+                Id = id,
+                AssignmentId = "assignment-1",
+                StudentId = $"user-{id}",
+                StudentName = student,
+                State = state,
+                Late = false,
+                UpdatedAt = DateTimeOffset.UtcNow,
+                Attachments = [],
+                AssignedGrade = grade,
+                GradeHistory = history,
+            });
 
         public Task<IReadOnlyList<SubmissionResponse>> GetSubmissionsAsync(string courseId, string assignmentId, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<SubmissionResponse>>(_submissions);
 
         public Task<CourseResponse> GetCourseAsync(string courseId, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new CourseResponse(courseId, "Java II", null, "ACTIVE", null));
+            Task.FromResult(new CourseResponse { Id = courseId, Name = "Java II", State = "ACTIVE" });
 
         public Task<AssignmentResponse> GetAssignmentAsync(string courseId, string assignmentId, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new AssignmentResponse(assignmentId, courseId, "Assignment 4", null, "ASSIGNMENT", 100, null, null, null, []));
+            Task.FromResult(new AssignmentResponse
+            {
+                Id = assignmentId,
+                CourseId = courseId,
+                Title = "Assignment 4",
+                WorkType = "ASSIGNMENT",
+                MaxPoints = 100,
+                Materials = [],
+            });
 
         public Task<IReadOnlyList<CourseResponse>> GetCoursesAsync(CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
@@ -432,7 +462,17 @@ public class SubmissionFetchServiceTests
         public bool FailDownloads { get; set; }
 
         public void Add(string id, string name, string md5) =>
-            _files[id] = new RemoteFile(id, name, "application/octet-stream", 3, md5, null, name, "application/octet-stream", true);
+            _files[id] = new RemoteFile
+            {
+                Id = id,
+                Name = name,
+                MimeType = "application/octet-stream",
+                SizeBytes = 3,
+                Revision = md5,
+                DownloadName = name,
+                DownloadMimeType = "application/octet-stream",
+                IsDownloadable = true,
+            };
 
         public Task<RemoteFile> GetFileAsync(string fileId, CancellationToken cancellationToken = default) =>
             _files.TryGetValue(fileId, out var file)
@@ -489,11 +529,17 @@ public class SubmissionFetchServiceTests
             LostCode.TryRemove(versionPath, out _);
             ReExtracted.Add(versionPath);
             var code = files.Where(f => ContentClassifier.IsCode(f.Kind)).Select(f => f.StoredName).ToList();
-            return Task.FromResult(new CodeExtraction(code.Count > 0 ? "code-hash" : null, code.Count, code, []));
+            return Task.FromResult(new CodeExtraction
+            {
+                ContentHash = code.Count > 0 ? "code-hash" : null,
+                FileCount = code.Count,
+                ExtractedStoredNames = code,
+                Problems = [],
+            });
         }
 
         public IReadOnlyList<CodeFile> ListCode(string versionPath) =>
-            LostCode.ContainsKey(versionPath) ? [] : [new CodeFile("Main.java", 10)];
+            LostCode.ContainsKey(versionPath) ? [] : [new CodeFile { Path = "Main.java", SizeBytes = 10 }];
 
         public Stream? OpenCode(string versionPath, string relativePath) => throw new NotSupportedException();
 
@@ -511,7 +557,13 @@ public class SubmissionFetchServiceTests
             public Task<CodeExtraction> ExtractCodeAsync(IReadOnlyList<ExtractableFile> files, CancellationToken cancellationToken = default)
             {
                 var code = files.Where(f => ContentClassifier.IsCode(f.Kind)).Select(f => f.StoredName).ToList();
-                return Task.FromResult(new CodeExtraction(code.Count > 0 ? "code-hash" : null, code.Count, code, []));
+                return Task.FromResult(new CodeExtraction
+                {
+                    ContentHash = code.Count > 0 ? "code-hash" : null,
+                    FileCount = code.Count,
+                    ExtractedStoredNames = code,
+                    Problems = [],
+                });
             }
 
             public async Task<string> AddOriginalAsync(string fileName, Func<Stream, Task> write, CancellationToken cancellationToken = default)
@@ -571,7 +623,7 @@ public class SubmissionFetchServiceTests
     // Instructions have their own tests (InstructionsFetchServiceTests); here only how the fetch uses the result.
     private sealed class FakeInstructionsFetch : IInstructionsFetchService
     {
-        public InstructionsFetchResult Result { get; set; } = new(1, IsNew: false, []);
+        public InstructionsFetchResult Result { get; set; } = new() { VersionNumber = 1, IsNew = false, Problems = [] };
         public Exception? Failure { get; set; }
         public string? FetchedAssignmentId { get; private set; }
 

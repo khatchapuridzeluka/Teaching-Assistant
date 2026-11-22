@@ -20,19 +20,21 @@ public class ReviewQueueStore(AppDbContext db) : IReviewQueueStore
                 on new { submission.Source, submission.CourseId, Id = submission.AssignmentId }
                 equals new { assignment.Source, assignment.CourseId, Id = assignment.ExternalAssignmentId } into assignments
             from assignment in assignments.DefaultIfEmpty()
-            select new LatestVersionRow(
-                version.Id,
-                version.Number,
-                version.Status,
-                version.FetchedAt,
-                submission.CourseId,
-                submission.AssignmentId,
-                assignment == null ? null : assignment.Title,
-                submission.ExternalSubmissionId,
-                submission.StudentId,
-                submission.StudentName,
-                submission.State,
-                submission.Late);
+            select new LatestVersionRow
+            {
+                VersionId = version.Id,
+                VersionNumber = version.Number,
+                VersionStatus = version.Status,
+                FetchedAt = version.FetchedAt,
+                CourseId = submission.CourseId,
+                AssignmentId = submission.AssignmentId,
+                AssignmentTitle = assignment == null ? null : assignment.Title,
+                SubmissionId = submission.ExternalSubmissionId,
+                StudentId = submission.StudentId,
+                StudentName = submission.StudentName,
+                State = submission.State,
+                Late = submission.Late,
+            };
 
         return await rows.ToListAsync(cancellationToken);
     }
@@ -48,24 +50,26 @@ public class ReviewQueueStore(AppDbContext db) : IReviewQueueStore
                 on new { submission.Source, submission.CourseId, Id = submission.AssignmentId }
                 equals new { assignment.Source, assignment.CourseId, Id = assignment.ExternalAssignmentId } into assignments
             from assignment in assignments.DefaultIfEmpty()
-            select new DraftRow(
-                grading.Id,
-                grading.VersionId,
-                version.Number,
-                submission.CourseId,
-                submission.AssignmentId,
-                assignment == null ? null : assignment.Title,
-                submission.ExternalSubmissionId,
-                submission.StudentId,
-                submission.StudentName,
-                grading.Score,
-                grading.MaxScore,
-                grading.Bonus,
-                grading.Mistakes.Count(m => m.Severity == MistakeSeverity.Major),
-                grading.Mistakes.Count(m => m.Severity == MistakeSeverity.Minor),
-                grading.Mistakes.Count(m => m.Severity == MistakeSeverity.Style),
-                grading.CreatedAt,
-                db.GradingReports.Where(r => r.GradingId == grading.Id).Select(r => (ReportStatus?)r.Status).FirstOrDefault());
+            select new DraftRow
+            {
+                GradingId = grading.Id,
+                VersionId = grading.VersionId,
+                VersionNumber = version.Number,
+                CourseId = submission.CourseId,
+                AssignmentId = submission.AssignmentId,
+                AssignmentTitle = assignment == null ? null : assignment.Title,
+                SubmissionId = submission.ExternalSubmissionId,
+                StudentId = submission.StudentId,
+                StudentName = submission.StudentName,
+                Score = grading.Score,
+                MaxScore = grading.MaxScore,
+                Bonus = grading.Bonus,
+                Major = grading.Mistakes.Count(m => m.Severity == MistakeSeverity.Major),
+                Minor = grading.Mistakes.Count(m => m.Severity == MistakeSeverity.Minor),
+                Style = grading.Mistakes.Count(m => m.Severity == MistakeSeverity.Style),
+                CreatedAt = grading.CreatedAt,
+                ReportStatus = db.GradingReports.Where(r => r.GradingId == grading.Id).Select(r => (ReportStatus?)r.Status).FirstOrDefault(),
+            };
 
         return await rows.ToListAsync(cancellationToken);
     }

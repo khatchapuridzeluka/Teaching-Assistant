@@ -235,13 +235,29 @@ public class StudentToolsTests
         {
             StudentAssignmentColumn[] assignments =
             [
-                new("a-4", "Assignment 4", 100, new DateTimeOffset(2026, 11, 20, 19, 0, 0, TimeSpan.Zero)),
-                new("a-5", "Assignment 5", 100, null),
+                new()
+                {
+                    Id = "a-4",
+                    Title = "Assignment 4",
+                    MaxPoints = 100,
+                    DueAt = new DateTimeOffset(2026, 11, 20, 19, 0, 0, TimeSpan.Zero),
+                },
+                new() { Id = "a-5", Title = "Assignment 5", MaxPoints = 100 },
             ];
             StudentAssignmentResult[] results =
             [
-                new("a-4", "sub-4", "TURNED_IN", true, true, false, GradeStatus.Graded, 80),
-                new("a-5", null, null, false, false, true, GradeStatus.Missing, null),
+                new()
+                {
+                    AssignmentId = "a-4",
+                    SubmissionId = "sub-4",
+                    State = "TURNED_IN",
+                    TurnedIn = true,
+                    Late = true,
+                    Missing = false,
+                    GradeStatus = GradeStatus.Graded,
+                    Grade = 80,
+                },
+                new() { AssignmentId = "a-5", TurnedIn = false, Late = false, Missing = true, GradeStatus = GradeStatus.Missing },
             ];
             CourseStudentResponse[] students = RosterSynced
                 ?
@@ -251,12 +267,24 @@ public class StudentToolsTests
                     Student("s-3", "Giorgi Lomidze", true, []),
                 ]
                 : [];
-            return Task.FromResult(new CourseStudentsResponse(Now, assignments, students));
+            return Task.FromResult(new CourseStudentsResponse { SyncedAt = Now, Assignments = assignments, Students = students });
         }
 
         private static CourseStudentResponse Student(string id, string name, bool active, IReadOnlyList<StudentAssignmentResult> results)
         {
-            return new CourseStudentResponse(Guid.NewGuid(), id, name, active, 1, 1, 1, null, 0, 0, results);
+            return new CourseStudentResponse
+            {
+                Id = Guid.NewGuid(),
+                ExternalUserId = id,
+                Name = name,
+                Active = active,
+                TurnedIn = 1,
+                Missing = 1,
+                Late = 1,
+                Earned = 0,
+                Possible = 0,
+                Results = results,
+            };
         }
 
         public Task<StudentPhoto?> OpenPhotoAsync(string externalUserId, CancellationToken cancellationToken = default) =>
@@ -265,7 +293,17 @@ public class StudentToolsTests
         public Task<FetchSummary> FetchAsync(string courseId, string assignmentId, CancellationToken cancellationToken = default)
         {
             Fetches.Add((courseId, assignmentId));
-            return Task.FromResult(new FetchSummary(1, 0, 0, 1, 0, [], 1, false));
+            return Task.FromResult(new FetchSummary
+            {
+                Submissions = 1,
+                NewSubmissions = 0,
+                NewVersions = 0,
+                Unchanged = 1,
+                NotSubmitted = 0,
+                Problems = [],
+                InstructionsVersion = 1,
+                NewInstructions = false,
+            });
         }
 
         public Task<IReadOnlyList<Submission>> GetByAssignmentAsync(
@@ -308,7 +346,7 @@ public class StudentToolsTests
             }
 
             Queued.Add(versionId);
-            var job = new Job(JobType.GradeVersion, JobPayloads.Write(new GradeVersionPayload(versionId)), ExistingJob ? Now : Now.AddMinutes(1));
+            var job = new Job(JobType.GradeVersion, JobPayloads.Write(new GradeVersionPayload { VersionId = versionId }), ExistingJob ? Now : Now.AddMinutes(1));
             return Task.FromResult<JobResponse?>(JobPayloads.ToResponse(job));
         }
 
@@ -334,7 +372,11 @@ public class StudentToolsTests
         public Task<JobResponse> QueueGradeStudentAsync(string courseId, string studentId, bool regrade = false, CancellationToken cancellationToken = default)
         {
             StudentGradings.Add((courseId, studentId, regrade));
-            var job = Job.Group(JobType.GradeStudent, JobPayloads.Write(new GradeStudentPayload(courseId, studentId)), Now.AddMinutes(1));
+            var job = Job.Group(JobType.GradeStudent, JobPayloads.Write(new GradeStudentPayload
+            {
+                CourseId = courseId,
+                StudentId = studentId,
+            }), Now.AddMinutes(1));
             return Task.FromResult(JobPayloads.ToResponse(job));
         }
 

@@ -40,7 +40,7 @@ public class ClaudeLanguageModel : ILanguageModel
             }, cancellationToken);
 
             var text = string.Concat(response.Content.Select(b => b.Value).OfType<TextBlock>().Select(t => t.Text));
-            return new LanguageModelReply(_options.Model, text.Trim(), ToUsage(response.Usage));
+            return new LanguageModelReply { Model = _options.Model, Text = text.Trim(), Usage = ToUsage(response.Usage) };
         }
         catch (Exception ex) when (Translate(ex, _options.Model) is { } translated)
         {
@@ -62,7 +62,7 @@ public class ClaudeLanguageModel : ILanguageModel
             }, cancellationToken);
 
             var text = string.Concat(response.Content.Select(b => b.Value).OfType<TextBlock>().Select(t => t.Text));
-            return new LanguageModelReply(_options.Model, text.Trim(), ToUsage(response.Usage));
+            return new LanguageModelReply { Model = _options.Model, Text = text.Trim(), Usage = ToUsage(response.Usage) };
         }
         catch (Exception ex) when (Translate(ex, _options.Model) is { } translated)
         {
@@ -157,7 +157,7 @@ public class ClaudeLanguageModel : ILanguageModel
             }
 
             var text = string.Concat(response.Content.Select(b => b.Value).OfType<Beta.BetaTextBlock>().Select(t => t.Text)).Trim();
-            return new LanguageModelReply(response.Model, text, ToUsage(response.Usage));
+            return new LanguageModelReply { Model = response.Model, Text = text, Usage = ToUsage(response.Usage) };
         }
         catch (Exception ex) when (Translate(ex, chosen) is { } translated)
         {
@@ -180,11 +180,21 @@ public class ClaudeLanguageModel : ILanguageModel
         _ => throw new ArgumentException($"Unsupported prompt part: {part}", nameof(part)),
     };
 
-    private static LanguageModelUsage ToUsage(Usage usage) => new(
-        usage.InputTokens, usage.OutputTokens, usage.CacheReadInputTokens ?? 0, usage.CacheCreationInputTokens ?? 0);
+    private static LanguageModelUsage ToUsage(Usage usage) => new()
+    {
+        InputTokens = usage.InputTokens,
+        OutputTokens = usage.OutputTokens,
+        CacheReadTokens = usage.CacheReadInputTokens ?? 0,
+        CacheWriteTokens = usage.CacheCreationInputTokens ?? 0,
+    };
 
-    private static LanguageModelUsage ToUsage(Beta.BetaUsage usage) => new(
-        usage.InputTokens, usage.OutputTokens, usage.CacheReadInputTokens ?? 0, usage.CacheCreationInputTokens ?? 0);
+    private static LanguageModelUsage ToUsage(Beta.BetaUsage usage) => new()
+    {
+        InputTokens = usage.InputTokens,
+        OutputTokens = usage.OutputTokens,
+        CacheReadTokens = usage.CacheReadInputTokens ?? 0,
+        CacheWriteTokens = usage.CacheCreationInputTokens ?? 0,
+    };
 
     private static MessageParam ToParam(ChatMessage message) => message.Role == ChatRole.User
         ? new UserMessageParam { Content = message.Text }

@@ -31,7 +31,14 @@ public class AgentRunServiceTests
     private async Task<AgentRunResponse> StartAsync(string text, Guid? conversationId = null)
     {
         var run = await Service().StartAsync(
-            new StartAgentRunRequest(text, conversationId, "Assignment 'A4' in course 'Java'", "course-1", "assignment-4"),
+            new StartAgentRunRequest
+            {
+                Text = text,
+                ConversationId = conversationId,
+                Page = "Assignment 'A4' in course 'Java'",
+                CourseId = "course-1",
+                AssignmentId = "assignment-4",
+            },
             TestContext.Current.CancellationToken);
         return run!;
     }
@@ -58,7 +65,7 @@ public class AgentRunServiceTests
     {
         await Assert.ThrowsAsync<InvalidRequestException>(() => StartAsync("   "));
 
-        var unknown = await Service().StartAsync(new StartAgentRunRequest("hi", Guid.NewGuid()), TestContext.Current.CancellationToken);
+        var unknown = await Service().StartAsync(new StartAgentRunRequest { Text = "hi", ConversationId = Guid.NewGuid() }, TestContext.Current.CancellationToken);
 
         Assert.Null(unknown);
         Assert.Empty(_jobs.Jobs);
@@ -76,12 +83,31 @@ public class AgentRunServiceTests
     public async Task Execute_StoresEveryStepInOrder_AndSucceedsWithTheFinalText()
     {
         var started = await StartAsync("what courses do I have?");
-        _model.Reply = new AgentReply("fake-model",
-        [
-            new AgentEntry(AgentMessageRole.Assistant, "", [new AgentToolCall("call-1", "list_courses", "{}")]),
-            new AgentEntry(AgentMessageRole.Tool, "- Java II (course id course-1, ACTIVE)", ToolCallId: "call-1", ToolName: "list_courses"),
-            new AgentEntry(AgentMessageRole.Assistant, "You have one course: Java II."),
-        ]);
+        _model.Reply = new AgentReply
+        {
+            Model = "fake-model",
+            Entries = [
+                new AgentEntry
+                {
+                    Role = AgentMessageRole.Assistant,
+                    Text = "",
+                    ToolCalls = [new AgentToolCall
+                    {
+                        Id = "call-1",
+                        Name = "list_courses",
+                        Arguments = "{}",
+                    }],
+                },
+                new AgentEntry
+                {
+                    Role = AgentMessageRole.Tool,
+                    Text = "- Java II (course id course-1, ACTIVE)",
+                    ToolCallId = "call-1",
+                    ToolName = "list_courses",
+                },
+                new AgentEntry { Role = AgentMessageRole.Assistant, Text = "You have one course: Java II." },
+            ],
+        };
 
         await Service().ExecuteAsync(started.Id, TestContext.Current.CancellationToken);
 
@@ -114,13 +140,26 @@ public class AgentRunServiceTests
                 answer = tools.SuggestReplies([" Yes, grade it ", "yes, grade it", "", new string('x', 61), "No, leave it", "Grade all his work", "Later"]);
             }
         };
-        _model.Reply = new AgentReply("fake-model",
-        [
-            new AgentEntry(AgentMessageRole.Assistant, "He has no grading yet. Should I grade it first?",
-                [new AgentToolCall("call-1", "suggest_replies", "{}")]),
-            new AgentEntry(AgentMessageRole.Tool, "3 buttons are shown", ToolCallId: "call-1", ToolName: "suggest_replies"),
-            new AgentEntry(AgentMessageRole.Assistant, ""),
-        ]);
+        _model.Reply = new AgentReply
+        {
+            Model = "fake-model",
+            Entries = [
+                new AgentEntry
+                {
+                    Role = AgentMessageRole.Assistant,
+                    Text = "He has no grading yet. Should I grade it first?",
+                    ToolCalls = [new AgentToolCall { Id = "call-1", Name = "suggest_replies", Arguments = "{}" }],
+                },
+                new AgentEntry
+                {
+                    Role = AgentMessageRole.Tool,
+                    Text = "3 buttons are shown",
+                    ToolCallId = "call-1",
+                    ToolName = "suggest_replies",
+                },
+                new AgentEntry { Role = AgentMessageRole.Assistant, Text = "" },
+            ],
+        };
 
         await Service().ExecuteAsync(started.Id, TestContext.Current.CancellationToken);
 
@@ -146,16 +185,33 @@ public class AgentRunServiceTests
     public async Task Execute_OfAFollowUp_SendsTheEarlierToolStepsBackToTheModel()
     {
         var first = await StartAsync("what courses do I have?");
-        _model.Reply = new AgentReply("fake-model",
-        [
-            new AgentEntry(AgentMessageRole.Assistant, "", [new AgentToolCall("call-1", "list_courses", "{}")]),
-            new AgentEntry(AgentMessageRole.Tool, "- Java II", ToolCallId: "call-1", ToolName: "list_courses"),
-            new AgentEntry(AgentMessageRole.Assistant, "Java II."),
-        ]);
+        _model.Reply = new AgentReply
+        {
+            Model = "fake-model",
+            Entries = [
+                new AgentEntry
+                {
+                    Role = AgentMessageRole.Assistant,
+                    Text = "",
+                    ToolCalls = [new AgentToolCall
+                    {
+                        Id = "call-1",
+                        Name = "list_courses",
+                        Arguments = "{}",
+                    }],
+                },
+                new AgentEntry { Role = AgentMessageRole.Tool, Text = "- Java II", ToolCallId = "call-1", ToolName = "list_courses" },
+                new AgentEntry { Role = AgentMessageRole.Assistant, Text = "Java II." },
+            ],
+        };
         await Service().ExecuteAsync(first.Id, TestContext.Current.CancellationToken);
 
         var second = await StartAsync("and its assignments?", first.ConversationId);
-        _model.Reply = new AgentReply("fake-model", [new AgentEntry(AgentMessageRole.Assistant, "Assignment 4.")]);
+        _model.Reply = new AgentReply
+        {
+            Model = "fake-model",
+            Entries = [new AgentEntry { Role = AgentMessageRole.Assistant, Text = "Assignment 4." }],
+        };
         await Service().ExecuteAsync(second.Id, TestContext.Current.CancellationToken);
 
         Assert.Equal(
@@ -187,11 +243,24 @@ public class AgentRunServiceTests
     public async Task Execute_FailsTheRun_WhenTheModelStopsWithoutAnAnswer()
     {
         var started = await StartAsync("hi");
-        _model.Reply = new AgentReply("fake-model",
-        [
-            new AgentEntry(AgentMessageRole.Assistant, "", [new AgentToolCall("call-1", "list_courses", "{}")]),
-            new AgentEntry(AgentMessageRole.Tool, "- Java II", ToolCallId: "call-1", ToolName: "list_courses"),
-        ]);
+        _model.Reply = new AgentReply
+        {
+            Model = "fake-model",
+            Entries = [
+                new AgentEntry
+                {
+                    Role = AgentMessageRole.Assistant,
+                    Text = "",
+                    ToolCalls = [new AgentToolCall
+                    {
+                        Id = "call-1",
+                        Name = "list_courses",
+                        Arguments = "{}",
+                    }],
+                },
+                new AgentEntry { Role = AgentMessageRole.Tool, Text = "- Java II", ToolCallId = "call-1", ToolName = "list_courses" },
+            ],
+        };
 
         await Service().ExecuteAsync(started.Id, TestContext.Current.CancellationToken);
 
@@ -205,12 +274,25 @@ public class AgentRunServiceTests
     {
         var started = await StartAsync("what courses do I have?");
         var savesBefore = _chats.Saves;
-        _model.Reply = new AgentReply("fake-model",
-        [
-            new AgentEntry(AgentMessageRole.Assistant, "", [new AgentToolCall("call-1", "list_courses", "{}")]),
-            new AgentEntry(AgentMessageRole.Tool, "- Java II", ToolCallId: "call-1", ToolName: "list_courses"),
-            new AgentEntry(AgentMessageRole.Assistant, "Java II."),
-        ]);
+        _model.Reply = new AgentReply
+        {
+            Model = "fake-model",
+            Entries = [
+                new AgentEntry
+                {
+                    Role = AgentMessageRole.Assistant,
+                    Text = "",
+                    ToolCalls = [new AgentToolCall
+                    {
+                        Id = "call-1",
+                        Name = "list_courses",
+                        Arguments = "{}",
+                    }],
+                },
+                new AgentEntry { Role = AgentMessageRole.Tool, Text = "- Java II", ToolCallId = "call-1", ToolName = "list_courses" },
+                new AgentEntry { Role = AgentMessageRole.Assistant, Text = "Java II." },
+            ],
+        };
 
         await Service().ExecuteAsync(started.Id, TestContext.Current.CancellationToken);
 
@@ -221,28 +303,70 @@ public class AgentRunServiceTests
     public async Task Execute_EndsTheTurnAndWaits_WhenTheModelWaitsForAJob()
     {
         var started = await StartAsync("grade Nino and tell me the score");
-        var grading = new Job(JobType.GradeVersion, JobPayloads.Write(new GradeVersionPayload(Guid.NewGuid())), DateTimeOffset.UtcNow);
+        var grading = new Job(JobType.GradeVersion, JobPayloads.Write(new GradeVersionPayload { VersionId = Guid.NewGuid() }), DateTimeOffset.UtcNow);
         _jobs.Jobs.Add(grading);
         _model.OnTool = entry =>
         {
             if (entry.ToolName == "grade_student_assignment")
             {
                 _runContext.RecordQueuedJob(grading.Id);
-                _runContext.RecordLinks([new AgentLink(AgentLinkKind.Submission, "Nino's submission", "course-1", "a-4", "sub-1")]);
+                _runContext.RecordLinks([new AgentLink
+                {
+                    Kind = AgentLinkKind.Submission,
+                    Label = "Nino's submission",
+                    CourseId = "course-1",
+                    AssignmentId = "a-4",
+                    SubmissionId = "sub-1",
+                }]);
             }
             else if (entry.ToolName == "wait_for_jobs")
             {
                 _runContext.RequestWait([grading.Id]);
             }
         };
-        _model.Reply = new AgentReply("fake-model",
-        [
-            new AgentEntry(AgentMessageRole.Assistant, "", [new AgentToolCall("call-1", "grade_student_assignment", "{}")]),
-            new AgentEntry(AgentMessageRole.Tool, $"Grading queued (job id {grading.Id})", ToolCallId: "call-1", ToolName: "grade_student_assignment"),
-            new AgentEntry(AgentMessageRole.Assistant, "", [new AgentToolCall("call-2", "wait_for_jobs", "{}")]),
-            new AgentEntry(AgentMessageRole.Tool, "Waiting for 1 job", ToolCallId: "call-2", ToolName: "wait_for_jobs"),
-            new AgentEntry(AgentMessageRole.Assistant, "This must not be reached."),
-        ]);
+        _model.Reply = new AgentReply
+        {
+            Model = "fake-model",
+            Entries = [
+                new AgentEntry
+                {
+                    Role = AgentMessageRole.Assistant,
+                    Text = "",
+                    ToolCalls = [new AgentToolCall
+                    {
+                        Id = "call-1",
+                        Name = "grade_student_assignment",
+                        Arguments = "{}",
+                    }],
+                },
+                new AgentEntry
+                {
+                    Role = AgentMessageRole.Tool,
+                    Text = $"Grading queued (job id {grading.Id})",
+                    ToolCallId = "call-1",
+                    ToolName = "grade_student_assignment",
+                },
+                new AgentEntry
+                {
+                    Role = AgentMessageRole.Assistant,
+                    Text = "",
+                    ToolCalls = [new AgentToolCall
+                    {
+                        Id = "call-2",
+                        Name = "wait_for_jobs",
+                        Arguments = "{}",
+                    }],
+                },
+                new AgentEntry
+                {
+                    Role = AgentMessageRole.Tool,
+                    Text = "Waiting for 1 job",
+                    ToolCallId = "call-2",
+                    ToolName = "wait_for_jobs",
+                },
+                new AgentEntry { Role = AgentMessageRole.Assistant, Text = "This must not be reached." },
+            ],
+        };
 
         await Service().ExecuteAsync(started.Id, TestContext.Current.CancellationToken);
 
@@ -264,11 +388,27 @@ public class AgentRunServiceTests
         var entries = new List<AgentEntry>();
         for (var i = 0; i < AgentRun.DefaultMaxSteps + 1; i++)
         {
-            entries.Add(new AgentEntry(AgentMessageRole.Assistant, "", [new AgentToolCall($"call-{i}", "list_courses", "{}")]));
-            entries.Add(new AgentEntry(AgentMessageRole.Tool, "- Java II", ToolCallId: $"call-{i}", ToolName: "list_courses"));
+            entries.Add(new AgentEntry
+            {
+                Role = AgentMessageRole.Assistant,
+                Text = "",
+                ToolCalls = [new AgentToolCall
+                {
+                    Id = $"call-{i}",
+                    Name = "list_courses",
+                    Arguments = "{}",
+                }],
+            });
+            entries.Add(new AgentEntry
+            {
+                Role = AgentMessageRole.Tool,
+                Text = "- Java II",
+                ToolCallId = $"call-{i}",
+                ToolName = "list_courses",
+            });
         }
 
-        _model.Reply = new AgentReply("fake-model", entries);
+        _model.Reply = new AgentReply { Model = "fake-model", Entries = entries };
 
         await Service().ExecuteAsync(started.Id, TestContext.Current.CancellationToken);
 
@@ -293,14 +433,27 @@ public class AgentRunServiceTests
     public async Task Cancel_StopsAWaitingRun_ButNotTheJobsItStarted()
     {
         var started = await StartAsync("grade and wait");
-        var grading = new Job(JobType.GradeVersion, JobPayloads.Write(new GradeVersionPayload(Guid.NewGuid())), DateTimeOffset.UtcNow);
+        var grading = new Job(JobType.GradeVersion, JobPayloads.Write(new GradeVersionPayload { VersionId = Guid.NewGuid() }), DateTimeOffset.UtcNow);
         _jobs.Jobs.Add(grading);
         _model.OnTool = _ => _runContext.RequestWait([grading.Id]);
-        _model.Reply = new AgentReply("fake-model",
-        [
-            new AgentEntry(AgentMessageRole.Assistant, "", [new AgentToolCall("call-1", "wait_for_jobs", "{}")]),
-            new AgentEntry(AgentMessageRole.Tool, "Waiting", ToolCallId: "call-1", ToolName: "wait_for_jobs"),
-        ]);
+        _model.Reply = new AgentReply
+        {
+            Model = "fake-model",
+            Entries = [
+                new AgentEntry
+                {
+                    Role = AgentMessageRole.Assistant,
+                    Text = "",
+                    ToolCalls = [new AgentToolCall
+                    {
+                        Id = "call-1",
+                        Name = "wait_for_jobs",
+                        Arguments = "{}",
+                    }],
+                },
+                new AgentEntry { Role = AgentMessageRole.Tool, Text = "Waiting", ToolCallId = "call-1", ToolName = "wait_for_jobs" },
+            ],
+        };
         await Service().ExecuteAsync(started.Id, TestContext.Current.CancellationToken);
 
         var run = (await Service().CancelAsync(started.Id, TestContext.Current.CancellationToken))!;
@@ -313,7 +466,11 @@ public class AgentRunServiceTests
     public async Task Execute_DoesNothing_ForAFinishedRun()
     {
         var started = await StartAsync("hi");
-        _model.Reply = new AgentReply("fake-model", [new AgentEntry(AgentMessageRole.Assistant, "Hello!")]);
+        _model.Reply = new AgentReply
+        {
+            Model = "fake-model",
+            Entries = [new AgentEntry { Role = AgentMessageRole.Assistant, Text = "Hello!" }],
+        };
         await Service().ExecuteAsync(started.Id, TestContext.Current.CancellationToken);
 
         await Service().ExecuteAsync(started.Id, TestContext.Current.CancellationToken);
@@ -323,7 +480,7 @@ public class AgentRunServiceTests
 
     private sealed class ScriptedModel : ILanguageModel
     {
-        public AgentReply Reply { get; set; } = new("fake-model", []);
+        public AgentReply Reply { get; set; } = new() { Model = "fake-model", Entries = [] };
 
         public Exception? Failure { get; set; }
 
@@ -369,7 +526,11 @@ public class AgentRunServiceTests
                 await hooks.OnStep(entry);
                 if (entry.Role == AgentMessageRole.Tool && hooks.ShouldStop())
                 {
-                    return new AgentReply(Reply.Model, Reply.Entries.TakeWhile(e => e != entry).Append(entry).ToList());
+                    return new AgentReply
+                    {
+                        Model = Reply.Model,
+                        Entries = Reply.Entries.TakeWhile(e => e != entry).Append(entry).ToList(),
+                    };
                 }
             }
 

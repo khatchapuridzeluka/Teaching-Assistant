@@ -86,7 +86,14 @@ public partial class AssignmentNoteService : IAssignmentNoteService
 
     private static AssignmentNoteResponse ToResponse(AssignmentNote note)
     {
-        return new AssignmentNoteResponse(note.Id, note.AssignmentId, note.Title, OneLine(note.Detail), note.UpdatedAt);
+        return new AssignmentNoteResponse
+        {
+            Id = note.Id,
+            AssignmentId = note.AssignmentId,
+            Title = note.Title,
+            Detail = OneLine(note.Detail),
+            UpdatedAt = note.UpdatedAt,
+        };
     }
 
     private static string OneLine(string text)

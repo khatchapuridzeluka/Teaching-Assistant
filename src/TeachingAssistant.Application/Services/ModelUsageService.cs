@@ -48,9 +48,15 @@ public class ModelUsageService : IModelUsageService
         for (var day = firstDay; day <= lastDay; day = day.AddDays(1))
         {
             var dayCalls = byDay[day].ToList();
-            series.Add(new ModelUsageDay(day, dayCalls.Count, dayCalls.Sum(c => c.InputTokens ?? 0),
-                dayCalls.Sum(c => c.CacheReadTokens ?? 0), dayCalls.Sum(c => c.CacheWriteTokens ?? 0),
-                dayCalls.Sum(c => c.OutputTokens ?? 0)));
+            series.Add(new ModelUsageDay
+            {
+                Date = day,
+                Calls = dayCalls.Count,
+                InputTokens = dayCalls.Sum(c => c.InputTokens ?? 0),
+                CacheReadTokens = dayCalls.Sum(c => c.CacheReadTokens ?? 0),
+                CacheWriteTokens = dayCalls.Sum(c => c.CacheWriteTokens ?? 0),
+                OutputTokens = dayCalls.Sum(c => c.OutputTokens ?? 0),
+            });
         }
 
         var recent = calls.Take(RecentCalls).ToList();
@@ -61,20 +67,59 @@ public class ModelUsageService : IModelUsageService
             .Select(c =>
             {
                 var subject = c.VersionId is { } versionId ? subjects.GetValueOrDefault(versionId) : null;
-                return new ModelCallResponse(c.Id, c.Purpose, c.RequestedModel, c.Model, c.Succeeded, c.Error, c.InputTokens,
-                    c.OutputTokens, c.CacheReadTokens, c.CacheWriteTokens, c.DurationMs, c.CourseId, c.AssignmentId,
-                    subject?.AssignmentTitle, c.VersionId, subject?.SubmissionId, subject?.StudentId, subject?.StudentName, c.CreatedAt);
+                return new ModelCallResponse
+                {
+                    Id = c.Id,
+                    Purpose = c.Purpose,
+                    RequestedModel = c.RequestedModel,
+                    Model = c.Model,
+                    Succeeded = c.Succeeded,
+                    Error = c.Error,
+                    InputTokens = c.InputTokens,
+                    OutputTokens = c.OutputTokens,
+                    CacheReadTokens = c.CacheReadTokens,
+                    CacheWriteTokens = c.CacheWriteTokens,
+                    DurationMs = c.DurationMs,
+                    CourseId = c.CourseId,
+                    AssignmentId = c.AssignmentId,
+                    AssignmentTitle = subject?.AssignmentTitle,
+                    VersionId = c.VersionId,
+                    SubmissionId = subject?.SubmissionId,
+                    StudentId = subject?.StudentId,
+                    StudentName = subject?.StudentName,
+                    CreatedAt = c.CreatedAt,
+                };
             })
             .ToList();
 
-        return new ModelUsageResponse(since, purpose, summary, totals, series, recentResponses);
+        return new ModelUsageResponse
+        {
+            Since = since,
+            Purpose = purpose,
+            Summary = summary,
+            Totals = totals,
+            Days = series,
+            Recent = recentResponses,
+        };
     }
 
     private static ModelUsageTotal Total(ModelCallPurpose purpose, List<ModelCall> calls)
     {
         var s = Summarize(calls);
-        return new ModelUsageTotal(purpose, s.Calls, s.Failed, s.InputTokens, s.OutputTokens, s.CacheReadTokens, s.CacheWriteTokens,
-            s.AveragePromptTokens, s.AverageOutputTokens, s.CacheHitRate, s.AverageDurationMs);
+        return new ModelUsageTotal
+        {
+            Purpose = purpose,
+            Calls = s.Calls,
+            Failed = s.Failed,
+            InputTokens = s.InputTokens,
+            OutputTokens = s.OutputTokens,
+            CacheReadTokens = s.CacheReadTokens,
+            CacheWriteTokens = s.CacheWriteTokens,
+            AveragePromptTokens = s.AveragePromptTokens,
+            AverageOutputTokens = s.AverageOutputTokens,
+            CacheHitRate = s.CacheHitRate,
+            AverageDurationMs = s.AverageDurationMs,
+        };
     }
 
     private static ModelUsageSummary Summarize(List<ModelCall> calls)
@@ -86,16 +131,18 @@ public class ModelUsageService : IModelUsageService
         var answered = calls.Count(c => c.Succeeded);
         var prompt = input + cacheRead + cacheWrite;
 
-        return new ModelUsageSummary(
-            calls.Count,
-            calls.Count - answered,
-            input,
-            output,
-            cacheRead,
-            cacheWrite,
-            answered == 0 ? 0 : prompt / answered,
-            answered == 0 ? 0 : output / answered,
-            prompt == 0 ? null : (double)cacheRead / prompt,
-            calls.Count == 0 ? 0 : (long)calls.Average(c => c.DurationMs));
+        return new ModelUsageSummary
+        {
+            Calls = calls.Count,
+            Failed = calls.Count - answered,
+            InputTokens = input,
+            OutputTokens = output,
+            CacheReadTokens = cacheRead,
+            CacheWriteTokens = cacheWrite,
+            AveragePromptTokens = answered == 0 ? 0 : prompt / answered,
+            AverageOutputTokens = answered == 0 ? 0 : output / answered,
+            CacheHitRate = prompt == 0 ? null : (double)cacheRead / prompt,
+            AverageDurationMs = calls.Count == 0 ? 0 : (long)calls.Average(c => c.DurationMs),
+        };
     }
 }

@@ -58,4 +58,9 @@ public interface IJobProcessor
     Task<int> ReconcileGroupsAsync(CancellationToken cancellationToken = default);
 }
 
-public record ClaimedJob(Guid Id, JobType Type, string Payload);
+public record ClaimedJob
+{
+    public required Guid Id { get; init; }
+    public required JobType Type { get; init; }
+    public required string Payload { get; init; }
+}

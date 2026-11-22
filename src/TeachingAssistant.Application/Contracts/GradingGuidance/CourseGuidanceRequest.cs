@@ -1,3 +1,6 @@
 namespace TeachingAssistant.Application.Contracts;
 
-public record CourseGuidanceRequest(string? Text);
+public record CourseGuidanceRequest
+{
+    public string? Text { get; init; }
+}

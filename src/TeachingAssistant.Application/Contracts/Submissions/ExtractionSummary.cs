@@ -1,3 +1,8 @@
 namespace TeachingAssistant.Application.Contracts;
 
-public record ExtractionSummary(int Versions, int VersionsWithCode, IReadOnlyList<FetchProblem> Problems);
+public record ExtractionSummary
+{
+    public required int Versions { get; init; }
+    public required int VersionsWithCode { get; init; }
+    public required IReadOnlyList<FetchProblem> Problems { get; init; }
+}

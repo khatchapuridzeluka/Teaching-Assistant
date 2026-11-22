@@ -74,8 +74,20 @@ public class GradingReportServiceTests
         {
             Strengths =
             [
-                new ReportStrengthInput(grading.Strengths[0].Id, true, MistakeCategory.Design, grading.Strengths[0].Message),
-                new ReportStrengthInput(grading.Strengths[1].Id, false, MistakeCategory.ErrorHandling, "  Validates every input value. "),
+                new ReportStrengthInput
+                {
+                    SourceStrengthId = grading.Strengths[0].Id,
+                    Rejected = true,
+                    Category = MistakeCategory.Design,
+                    Message = grading.Strengths[0].Message,
+                },
+                new ReportStrengthInput
+                {
+                    SourceStrengthId = grading.Strengths[1].Id,
+                    Rejected = false,
+                    Category = MistakeCategory.ErrorHandling,
+                    Message = "  Validates every input value. ",
+                },
             ],
         };
 
@@ -136,7 +148,14 @@ public class GradingReportServiceTests
         var grading = Create();
         var unknownMistake = Request(grading, 80) with
         {
-            Mistakes = [new ReportMistakeInput(Guid.NewGuid(), false, MistakeSeverity.Minor, MistakeCategory.Other, "x")],
+            Mistakes = [new ReportMistakeInput
+            {
+                SourceMistakeId = Guid.NewGuid(),
+                Rejected = false,
+                Severity = MistakeSeverity.Minor,
+                Category = MistakeCategory.Other,
+                Message = "x",
+            }],
         };
 
         Assert.Null(await Service().SaveAsync(Guid.NewGuid(), Request(grading, 80), TestContext.Current.CancellationToken));
@@ -149,12 +168,24 @@ public class GradingReportServiceTests
         await Assert.ThrowsAsync<InvalidRequestException>(() =>
             Service().SaveAsync(grading.Id, Request(grading, 80) with
             {
-                Strengths = [new ReportStrengthInput(Guid.NewGuid(), false, MistakeCategory.Design, "x")],
+                Strengths = [new ReportStrengthInput
+                {
+                    SourceStrengthId = Guid.NewGuid(),
+                    Rejected = false,
+                    Category = MistakeCategory.Design,
+                    Message = "x",
+                }],
             }, TestContext.Current.CancellationToken));
         await Assert.ThrowsAsync<InvalidRequestException>(() =>
             Service().SaveAsync(grading.Id, Request(grading, 80) with
             {
-                Strengths = [new ReportStrengthInput(grading.Strengths[0].Id, false, MistakeCategory.Design, " ")],
+                Strengths = [new ReportStrengthInput
+                {
+                    SourceStrengthId = grading.Strengths[0].Id,
+                    Rejected = false,
+                    Category = MistakeCategory.Design,
+                    Message = " ",
+                }],
             }, TestContext.Current.CancellationToken));
         Assert.Empty(_reports.Reports);
     }
@@ -189,8 +220,19 @@ public class GradingReportServiceTests
     }
 
     private static SaveGradingReportRequest Request(AiGrading grading, double score, bool rejectFirst = false) =>
-        new(score, null, "Teacher review",
-            grading.Mistakes.Select((m, i) => new ReportMistakeInput(m.Id, rejectFirst && i == 0, m.Severity, m.Category, m.Message)).ToList());
+        new()
+        {
+            Score = score,
+            Review = "Teacher review",
+            Mistakes = grading.Mistakes.Select((m, i) => new ReportMistakeInput
+            {
+                SourceMistakeId = m.Id,
+                Rejected = rejectFirst && i == 0,
+                Severity = m.Severity,
+                Category = m.Category,
+                Message = m.Message,
+            }).ToList(),
+        };
 
     private sealed class FakeGradings : IGradingStore
     {

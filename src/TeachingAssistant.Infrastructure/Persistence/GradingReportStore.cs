@@ -25,7 +25,15 @@ public class GradingReportStore(AppDbContext db) : IGradingReportStore
         return await db.GradingReports
             .Where(r => reportIds.Contains(r.Id))
             .Join(db.Gradings, r => r.GradingId, g => g.Id,
-                (r, g) => new ReportScore(r.Id, r.Score, r.Bonus, g.Score, g.Bonus, g.MaxScore))
+                (r, g) => new ReportScore
+                {
+                    ReportId = r.Id,
+                    Score = r.Score,
+                    Bonus = r.Bonus,
+                    AiScore = g.Score,
+                    AiBonus = g.Bonus,
+                    MaxScore = g.MaxScore,
+                })
             .ToListAsync(cancellationToken);
     }
 
@@ -52,7 +60,7 @@ public class GradingReportStore(AppDbContext db) : IGradingReportStore
 
         return reports
             .Where(r => drafts.ContainsKey(r.GradingId))
-            .Select(r => new ApprovedReport(r, drafts[r.GradingId]))
+            .Select(r => new ApprovedReport { Report = r, Draft = drafts[r.GradingId] })
             .ToList();
     }
 

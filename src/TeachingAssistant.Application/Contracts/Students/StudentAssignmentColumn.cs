@@ -1,3 +1,9 @@
 namespace TeachingAssistant.Application.Contracts;
 
-public record StudentAssignmentColumn(string Id, string Title, double? MaxPoints, DateTimeOffset? DueAt);
+public record StudentAssignmentColumn
+{
+    public required string Id { get; init; }
+    public required string Title { get; init; }
+    public double? MaxPoints { get; init; }
+    public DateTimeOffset? DueAt { get; init; }
+}

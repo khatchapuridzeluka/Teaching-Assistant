@@ -55,7 +55,7 @@ public class ModelHealthServiceTests
 
         public Task<LanguageModelReply> CompleteAsync(string prompt, CancellationToken cancellationToken = default) =>
             failure is null
-                ? Task.FromResult(new LanguageModelReply(Id, reply!))
+                ? Task.FromResult(new LanguageModelReply { Model = Id, Text = reply! })
                 : Task.FromException<LanguageModelReply>(failure);
 
         public Task<LanguageModelReply> ChatAsync(

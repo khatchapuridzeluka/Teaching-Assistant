@@ -92,9 +92,15 @@ public class StudentAnalysisToolsTests
         var analysis = Analysis(StudentAnalysisKind.Overview, outdated: false);
         _store.StudentAnalyses.Add(analysis);
         var job = new Job(JobType.AnalyzeStudent,
-            JobPayloads.Write(new AnalyzeStudentPayload("course-1", "s-1", "Nino", StudentAnalysisKind.Overview)), Now, courseId: "course-1");
+            JobPayloads.Write(new AnalyzeStudentPayload
+            {
+                CourseId = "course-1",
+                StudentId = "s-1",
+                StudentName = "Nino",
+                Kind = StudentAnalysisKind.Overview,
+            }), Now, courseId: "course-1");
         job.Start("worker", Now, TimeSpan.FromMinutes(10));
-        job.Succeed(JobPayloads.Write(new AnalyzeStudentResult(analysis.Id)), Now);
+        job.Succeed(JobPayloads.Write(new AnalyzeStudentResult { AnalysisId = analysis.Id }), Now);
         var reporter = new JobReporter(_store, _store, _store, _store);
 
         var text = await reporter.DescribeAsync([job], TestContext.Current.CancellationToken);
@@ -111,12 +117,41 @@ public class StudentAnalysisToolsTests
         var groups = kind == StudentAnalysisKind.Strengths
             ? new List<StrengthGroupResponse>
             {
-                new("Clean class design", "Keeps classes focused.", false, 3, 2, [], []),
-                new("Not grouped", "", true, 1, 1, [], []),
+                new()
+                {
+                    Title = "Clean class design",
+                    Explanation = "Keeps classes focused.",
+                    Ungrouped = false,
+                    Count = 3,
+                    Assignments = 2,
+                    Categories = [],
+                    Strengths = [],
+                },
+                new()
+                {
+                    Title = "Not grouped",
+                    Explanation = "",
+                    Ungrouped = true,
+                    Count = 1,
+                    Assignments = 1,
+                    Categories = [],
+                    Strengths = [],
+                },
             }
             : [];
-        return new StudentAnalysisResponse(Guid.NewGuid(), kind, "model", "Strong in design.",
-            kind == StudentAnalysisKind.Strengths ? "" : "Name things well.", 2, 4, Now.AddDays(-1), outdated, groups);
+        return new StudentAnalysisResponse
+        {
+            Id = Guid.NewGuid(),
+            Kind = kind,
+            Model = "model",
+            Summary = "Strong in design.",
+            NextSteps = kind == StudentAnalysisKind.Strengths ? "" : "Name things well.",
+            Assignments = 2,
+            Records = 4,
+            CreatedAt = Now.AddDays(-1),
+            Outdated = outdated,
+            Groups = groups,
+        };
     }
 
     private sealed class FixedClock(DateTimeOffset now) : TimeProvider
@@ -135,7 +170,12 @@ public class StudentAnalysisToolsTests
             string courseId, string studentId, StudentAnalysisKind kind, CancellationToken cancellationToken = default)
         {
             Queued.Add(kind);
-            var job = new Job(JobType.AnalyzeStudent, JobPayloads.Write(new AnalyzeStudentPayload(courseId, studentId, null, kind)), Now,
+            var job = new Job(JobType.AnalyzeStudent, JobPayloads.Write(new AnalyzeStudentPayload
+            {
+                CourseId = courseId,
+                StudentId = studentId,
+                Kind = kind,
+            }), Now,
                 courseId: courseId);
             return Task.FromResult(JobPayloads.ToResponse(job));
         }

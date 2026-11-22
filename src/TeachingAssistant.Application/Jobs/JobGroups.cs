@@ -8,8 +8,12 @@ internal static class JobGroups
     {
         var finished = children.Count(c => c.IsFinished);
         var failed = children.Count(c => c.Status == JobStatus.Failed);
-        var result = JobPayloads.Write(new GradeAssignmentResult(
-            children.Count(c => c.Status == JobStatus.Succeeded), failed, children.Count(c => c.Status == JobStatus.Canceled)));
+        var result = JobPayloads.Write(new GradeAssignmentResult
+        {
+            Succeeded = children.Count(c => c.Status == JobStatus.Succeeded),
+            Failed = failed,
+            Canceled = children.Count(c => c.Status == JobStatus.Canceled),
+        });
         group.TrackChildren(Math.Max(group.ProgressTotal ?? 0, children.Count), finished, failed, result, now);
     }
 }

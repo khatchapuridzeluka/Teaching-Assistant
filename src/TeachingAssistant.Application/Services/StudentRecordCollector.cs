@@ -60,8 +60,20 @@ public class StudentRecordCollector
                 source = StudentRecordSource.Draft;
             }
 
-            assignments[submission.AssignmentId] = new StudentRecordAssignment(submission.AssignmentId, source,
-                new ReportScore(report?.Id ?? Guid.Empty, report?.Score, report?.Bonus, draft.Score, draft.Bonus, draft.MaxScore));
+            assignments[submission.AssignmentId] = new StudentRecordAssignment
+            {
+                AssignmentId = submission.AssignmentId,
+                Source = source,
+                Score = new ReportScore
+                {
+                    ReportId = report?.Id ?? Guid.Empty,
+                    Score = report?.Score,
+                    Bonus = report?.Bonus,
+                    AiScore = draft.Score,
+                    AiBonus = draft.Bonus,
+                    MaxScore = draft.MaxScore,
+                },
+            };
         }
 
         var approvedMistakes = (await _mistakes.GetByStudentAsync(courseId, studentId, cancellationToken))
@@ -81,10 +93,15 @@ public class StudentRecordCollector
             .ToDictionary(s => s.ReportId);
         foreach (var (assignmentId, reportId) in approvedReports)
         {
-            assignments[assignmentId] = new StudentRecordAssignment(assignmentId, StudentRecordSource.Approved, scores.GetValueOrDefault(reportId));
+            assignments[assignmentId] = new StudentRecordAssignment
+            {
+                AssignmentId = assignmentId,
+                Source = StudentRecordSource.Approved,
+                Score = scores.GetValueOrDefault(reportId),
+            };
         }
 
-        return new StudentRecords(mistakes, strengths, assignments);
+        return new StudentRecords { Mistakes = mistakes, Strengths = strengths, Assignments = assignments };
     }
 
     /// <summary>

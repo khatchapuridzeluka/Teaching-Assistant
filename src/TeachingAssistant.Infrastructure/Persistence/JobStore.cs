@@ -135,9 +135,17 @@ public class JobStore(AppDbContext db) : IJobStore
                 on new { submission.Source, submission.CourseId, Id = submission.AssignmentId }
                 equals new { assignment.Source, assignment.CourseId, Id = assignment.ExternalAssignmentId } into assignments
             from assignment in assignments.DefaultIfEmpty()
-            select new JobSubject(version.Id, version.Number, submission.CourseId, submission.AssignmentId,
-                assignment == null ? null : assignment.Title, submission.ExternalSubmissionId, submission.StudentId,
-                submission.StudentName);
+            select new JobSubject
+            {
+                VersionId = version.Id,
+                VersionNumber = version.Number,
+                CourseId = submission.CourseId,
+                AssignmentId = submission.AssignmentId,
+                AssignmentTitle = assignment == null ? null : assignment.Title,
+                SubmissionId = submission.ExternalSubmissionId,
+                StudentId = submission.StudentId,
+                StudentName = submission.StudentName,
+            };
 
         return await rows.ToListAsync(cancellationToken);
     }
@@ -159,7 +167,7 @@ public class JobStore(AppDbContext db) : IJobStore
         return await db.Jobs
             .Where(j => j.ParentId != null && parentIds.Contains(j.ParentId.Value))
             .GroupBy(j => new { ParentId = j.ParentId!.Value, j.Status })
-            .Select(g => new JobChildCount(g.Key.ParentId, g.Key.Status, g.Count()))
+            .Select(g => new JobChildCount { ParentId = g.Key.ParentId, Status = g.Key.Status, Count = g.Count() })
             .ToListAsync(cancellationToken);
     }
 

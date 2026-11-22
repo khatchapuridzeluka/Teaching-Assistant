@@ -20,7 +20,11 @@ public class AssignmentNoteServiceTests
         _notes.Add("a-1", 1, "Old", "Removed.").Delete(Now);
         _notes.Add("a-2", 5, "Other", "Another assignment.");
 
-        var added = await Service().AddAsync("course-1", "a-1", new AssignmentNoteRequest(" Strategy pattern ", " Deduct if it is missing. "),
+        var added = await Service().AddAsync("course-1", "a-1", new AssignmentNoteRequest
+        {
+            Title = " Strategy pattern ",
+            Detail = " Deduct if it is missing. ",
+        },
             TestContext.Current.CancellationToken);
 
         var stored = Assert.Single(_notes.All, n => n.Id == added.Id);
@@ -34,10 +38,10 @@ public class AssignmentNoteServiceTests
     {
         var note = _notes.Add("a-1", 1, "Title", "Line one\n  line two");
 
-        await Service().UpdateAsync(note.Id, new AssignmentNoteRequest("Title", "Line one line two"), TestContext.Current.CancellationToken);
+        await Service().UpdateAsync(note.Id, new AssignmentNoteRequest { Title = "Title", Detail = "Line one line two" }, TestContext.Current.CancellationToken);
         Assert.Equal(0, _notes.Saves);
 
-        var updated = await Service().UpdateAsync(note.Id, new AssignmentNoteRequest("New", "New text."), TestContext.Current.CancellationToken);
+        var updated = await Service().UpdateAsync(note.Id, new AssignmentNoteRequest { Title = "New", Detail = "New text." }, TestContext.Current.CancellationToken);
         Assert.Equal(("New", "New text.", Now), (updated!.Title, updated.Detail, updated.UpdatedAt));
     }
 
@@ -49,9 +53,9 @@ public class AssignmentNoteServiceTests
         Assert.True(await Service().DeleteAsync(note.Id, TestContext.Current.CancellationToken));
         Assert.True(note.IsDeleted);
         Assert.False(await Service().DeleteAsync(note.Id, TestContext.Current.CancellationToken));
-        Assert.Null(await Service().UpdateAsync(note.Id, new AssignmentNoteRequest("A", "B"), TestContext.Current.CancellationToken));
+        Assert.Null(await Service().UpdateAsync(note.Id, new AssignmentNoteRequest { Title = "A", Detail = "B" }, TestContext.Current.CancellationToken));
         await Assert.ThrowsAsync<InvalidRequestException>(() =>
-            Service().AddAsync("course-1", "a-1", new AssignmentNoteRequest("Title", " "), TestContext.Current.CancellationToken));
+            Service().AddAsync("course-1", "a-1", new AssignmentNoteRequest { Title = "Title", Detail = " " }, TestContext.Current.CancellationToken));
     }
 
     private sealed class FixedClock(DateTimeOffset now) : TimeProvider

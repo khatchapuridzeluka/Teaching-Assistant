@@ -18,6 +18,6 @@ public class AnalyzeStudentJobHandler : IJobHandler
     {
         var input = JobPayloads.Read<AnalyzeStudentPayload>(payload);
         var analysisId = await _analysis.AnalyzeAsync(input.CourseId, input.StudentId, input.Kind, cancellationToken);
-        return JobPayloads.Write(new AnalyzeStudentResult(analysisId));
+        return JobPayloads.Write(new AnalyzeStudentResult { AnalysisId = analysisId });
     }
 }

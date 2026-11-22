@@ -50,7 +50,13 @@ public class StudentsController : ControllerBase
         string courseId, string userId, [FromQuery] string? assignmentId, [FromQuery] MistakeCategory? category,
         [FromQuery] MistakeSeverity? severity, [FromQuery] MistakeLabel? label, CancellationToken cancellationToken)
     {
-        var filter = new StudentMistakeFilter(assignmentId, category, severity, label);
+        var filter = new StudentMistakeFilter
+        {
+            AssignmentId = assignmentId,
+            Category = category,
+            Severity = severity,
+            Label = label,
+        };
         return Ok(await _mistakeService.GetAsync(courseId, userId, filter, cancellationToken));
     }
 
@@ -63,7 +69,7 @@ public class StudentsController : ControllerBase
         string courseId, string userId, [FromQuery] string? assignmentId, [FromQuery] MistakeCategory? category,
         [FromQuery] StrengthLabel? label, CancellationToken cancellationToken)
     {
-        var filter = new StudentStrengthFilter(assignmentId, category, label);
+        var filter = new StudentStrengthFilter { AssignmentId = assignmentId, Category = category, Label = label };
         return Ok(await _strengthService.GetAsync(courseId, userId, filter, cancellationToken));
     }
 

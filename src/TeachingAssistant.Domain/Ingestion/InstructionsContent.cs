@@ -42,5 +42,5 @@ public class InstructionsContent
     public string? StoredName { get; private set; }
     public ContentStatus Status { get; private set; }
 
-    public ContentFingerprint ToFingerprint() => new(Origin, ExternalId, Fingerprint);
+    public ContentFingerprint ToFingerprint() => new() { Origin = Origin, ExternalId = ExternalId, Fingerprint = Fingerprint };
 }

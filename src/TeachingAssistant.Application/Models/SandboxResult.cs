@@ -1,26 +1,39 @@
 namespace TeachingAssistant.Application.Models;
 
 /// <summary>What happened in one sandbox run: every requested step, in order, including the skipped ones.</summary>
-/// <param name="Steps">One result per requested step.</param>
-/// <param name="Duration">How long the run took, container start and removal included.</param>
-public record SandboxResult(IReadOnlyList<SandboxStepResult> Steps, TimeSpan Duration);
+public record SandboxResult
+{
+    /// <summary>One result per requested step.</summary>
+    public required IReadOnlyList<SandboxStepResult> Steps { get; init; }
+
+    /// <summary>How long the run took, container start and removal included.</summary>
+    public required TimeSpan Duration { get; init; }
+}
 
 /// <summary>What one step did.</summary>
-/// <param name="Name">The step's name from the request.</param>
-/// <param name="Outcome">Whether it succeeded, failed, ran out of time or was skipped.</param>
-/// <param name="ExitCode">The command's exit code; null when it timed out or was skipped.</param>
-/// <param name="Stdout">What it printed to standard output, cut off at the output limit.</param>
-/// <param name="Stderr">What it printed to standard error (compiler errors, exceptions), cut off at the output limit.</param>
-/// <param name="OutputTruncated">True when standard output or standard error was cut off.</param>
-/// <param name="Duration">How long the step ran.</param>
-public record SandboxStepResult(
-    string Name,
-    SandboxStepOutcome Outcome,
-    int? ExitCode,
-    string Stdout,
-    string Stderr,
-    bool OutputTruncated,
-    TimeSpan Duration);
+public record SandboxStepResult
+{
+    /// <summary>The step's name from the request.</summary>
+    public required string Name { get; init; }
+
+    /// <summary>Whether it succeeded, failed, ran out of time or was skipped.</summary>
+    public required SandboxStepOutcome Outcome { get; init; }
+
+    /// <summary>The command's exit code; null when it timed out or was skipped.</summary>
+    public int? ExitCode { get; init; }
+
+    /// <summary>What it printed to standard output, cut off at the output limit.</summary>
+    public required string Stdout { get; init; }
+
+    /// <summary>What it printed to standard error (compiler errors, exceptions), cut off at the output limit.</summary>
+    public required string Stderr { get; init; }
+
+    /// <summary>True when standard output or standard error was cut off.</summary>
+    public required bool OutputTruncated { get; init; }
+
+    /// <summary>How long the step ran.</summary>
+    public required TimeSpan Duration { get; init; }
+}
 
 public enum SandboxStepOutcome
 {

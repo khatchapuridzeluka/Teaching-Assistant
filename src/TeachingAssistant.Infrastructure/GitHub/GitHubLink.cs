@@ -15,8 +15,13 @@ public enum GitHubLinkKind
 /// A GitHub link as students paste it: the repository, a branch or folder (tree/... or blob/...), a pull request or a commit.
 /// For a branch link the whole repository at that branch is fetched, not only the folder.
 /// </summary>
-public sealed record GitHubLink(string Owner, string Repository, GitHubLinkKind Kind, string? Ref)
+public sealed record GitHubLink
 {
+    public required string Owner { get; init; }
+    public required string Repository { get; init; }
+    public required GitHubLinkKind Kind { get; init; }
+    public string? Ref { get; init; }
+
     public static GitHubLink? TryParse(string url)
     {
         if (!Uri.TryCreate(url.Trim(), UriKind.Absolute, out var uri)
@@ -43,10 +48,28 @@ public sealed record GitHubLink(string Owner, string Repository, GitHubLinkKind 
         var value = segments.Length > 3 ? segments[3] : null;
         return section switch
         {
-            "pull" when int.TryParse(value, out _) => new GitHubLink(owner, repository, GitHubLinkKind.PullRequest, value),
-            "commit" when value is not null => new GitHubLink(owner, repository, GitHubLinkKind.Commit, value),
-            "tree" or "blob" when value is not null => new GitHubLink(owner, repository, GitHubLinkKind.Branch, value),
-            _ => new GitHubLink(owner, repository, GitHubLinkKind.Repository, null),
+            "pull" when int.TryParse(value, out _) => new GitHubLink
+            {
+                Owner = owner,
+                Repository = repository,
+                Kind = GitHubLinkKind.PullRequest,
+                Ref = value,
+            },
+            "commit" when value is not null => new GitHubLink
+            {
+                Owner = owner,
+                Repository = repository,
+                Kind = GitHubLinkKind.Commit,
+                Ref = value,
+            },
+            "tree" or "blob" when value is not null => new GitHubLink
+            {
+                Owner = owner,
+                Repository = repository,
+                Kind = GitHubLinkKind.Branch,
+                Ref = value,
+            },
+            _ => new GitHubLink { Owner = owner, Repository = repository, Kind = GitHubLinkKind.Repository },
         };
     }
 }

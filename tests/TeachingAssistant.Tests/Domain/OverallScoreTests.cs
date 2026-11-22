@@ -11,7 +11,13 @@ public class OverallScoreTests
     [Fact]
     public void GradedWork_IsPointsEarnedOverPointsPossible()
     {
-        var score = OverallScore.Compute([new(100, Past, 90, true), new(50, Past, 25, true)], Now);
+        var score = OverallScore.Compute([new() { MaxPoints = 100, DueAt = Past, Grade = 90, TurnedIn = true }, new()
+        {
+            MaxPoints = 50,
+            DueAt = Past,
+            Grade = 25,
+            TurnedIn = true,
+        }], Now);
 
         Assert.Equal((115, 150, 2), (score.Earned, score.Possible, score.Counted));
         Assert.Equal(115.0 / 150 * 100, score.Percent);
@@ -20,7 +26,7 @@ public class OverallScoreTests
     [Fact]
     public void MissingWorkPastTheDeadline_CountsAsZero()
     {
-        var score = OverallScore.Compute([new(100, Past, 80, true), new(100, Past, null, false)], Now);
+        var score = OverallScore.Compute([new() { MaxPoints = 100, DueAt = Past, Grade = 80, TurnedIn = true }, new() { MaxPoints = 100, DueAt = Past, TurnedIn = false }], Now);
 
         Assert.Equal((80, 200, 2), (score.Earned, score.Possible, score.Counted));
         Assert.Equal(40, score.Percent);
@@ -29,7 +35,11 @@ public class OverallScoreTests
     [Fact]
     public void UngradedWorkNotDueYet_IsLeftOut()
     {
-        var score = OverallScore.Compute([new(100, Past, 80, true), new(100, Future, null, false), new(100, null, null, false)], Now);
+        var score = OverallScore.Compute([new() { MaxPoints = 100, DueAt = Past, Grade = 80, TurnedIn = true }, new() { MaxPoints = 100, DueAt = Future, TurnedIn = false }, new()
+        {
+            MaxPoints = 100,
+            TurnedIn = false,
+        }], Now);
 
         Assert.Equal((80, 100, 1), (score.Earned, score.Possible, score.Counted));
     }
@@ -37,7 +47,7 @@ public class OverallScoreTests
     [Fact]
     public void WorkGradedBeforeTheDeadline_Counts()
     {
-        var score = OverallScore.Compute([new(100, Future, 70, true)], Now);
+        var score = OverallScore.Compute([new() { MaxPoints = 100, DueAt = Future, Grade = 70, TurnedIn = true }], Now);
 
         Assert.Equal((70, 100, 1), (score.Earned, score.Possible, score.Counted));
     }
@@ -45,17 +55,17 @@ public class OverallScoreTests
     [Fact]
     public void TurnedInButNotGradedYet_IsLeftOut_EvenPastTheDeadline()
     {
-        var score = OverallScore.Compute([new(100, Past, 80, true), new(100, Past, null, true)], Now);
+        var score = OverallScore.Compute([new() { MaxPoints = 100, DueAt = Past, Grade = 80, TurnedIn = true }, new() { MaxPoints = 100, DueAt = Past, TurnedIn = true }], Now);
 
         Assert.Equal((80, 100, 1), (score.Earned, score.Possible, score.Counted));
-        Assert.False(new AssignmentResult(100, Past, null, true).IsMissing(Now));
-        Assert.True(new AssignmentResult(100, Past, null, false).IsMissing(Now));
+        Assert.False(new AssignmentResult { MaxPoints = 100, DueAt = Past, TurnedIn = true }.IsMissing(Now));
+        Assert.True(new AssignmentResult { MaxPoints = 100, DueAt = Past, TurnedIn = false }.IsMissing(Now));
     }
 
     [Fact]
     public void AssignmentsWithoutPoints_NeverCount()
     {
-        var score = OverallScore.Compute([new(null, Past, null, false), new(0, Past, null, false)], Now);
+        var score = OverallScore.Compute([new() { DueAt = Past, TurnedIn = false }, new() { MaxPoints = 0, DueAt = Past, TurnedIn = false }], Now);
 
         Assert.Equal(0, score.Counted);
         Assert.Null(score.Percent);

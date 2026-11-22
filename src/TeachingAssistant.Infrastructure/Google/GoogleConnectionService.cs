@@ -29,28 +29,41 @@ public class GoogleConnectionService : IGoogleConnectionService
         var token = await flow.LoadTokenAsync(GoogleAuthorization.UserKey, cancellationToken);
         if (token is null)
         {
-            return new GoogleConnectionStatus(GoogleConnectionState.NotConnected, [], "Not connected. Call POST /auth/google/connect.");
+            return new GoogleConnectionStatus
+            {
+                State = GoogleConnectionState.NotConnected,
+                GrantedScopes = [],
+                Message = "Not connected. Call POST /auth/google/connect.",
+            };
         }
 
         var granted = GrantedScopes(token);
         var missing = GoogleAuthorization.Scopes.Except(granted).ToList();
         if (missing.Count > 0)
         {
-            return new GoogleConnectionStatus(GoogleConnectionState.ReconnectRequired, granted,
-                $"Missing scopes: {string.Join(", ", missing)}. Connect again and allow all requested access.");
+            return new GoogleConnectionStatus
+            {
+                State = GoogleConnectionState.ReconnectRequired,
+                GrantedScopes = granted,
+                Message = $"Missing scopes: {string.Join(", ", missing)}. Connect again and allow all requested access.",
+            };
         }
 
         try
         {
             var credential = new UserCredential(flow, GoogleAuthorization.UserKey, token);
             await credential.GetAccessTokenForRequestAsync(cancellationToken: cancellationToken);
-            return new GoogleConnectionStatus(GoogleConnectionState.Connected, granted, null);
+            return new GoogleConnectionStatus { State = GoogleConnectionState.Connected, GrantedScopes = granted };
         }
         catch (TokenResponseException ex)
         {
             _logger.LogWarning("Stored Google token is no longer valid: {GoogleError}", ex.Error.Error);
-            return new GoogleConnectionStatus(GoogleConnectionState.ReconnectRequired, granted,
-                $"Stored authorization is no longer valid ({ex.Error.Error}). Connect again.");
+            return new GoogleConnectionStatus
+            {
+                State = GoogleConnectionState.ReconnectRequired,
+                GrantedScopes = granted,
+                Message = $"Stored authorization is no longer valid ({ex.Error.Error}). Connect again.",
+            };
         }
     }
 
@@ -80,13 +93,21 @@ public class GoogleConnectionService : IGoogleConnectionService
         catch (TokenResponseException ex)
         {
             _logger.LogWarning("Google authorization failed: {GoogleError}", ex.Error.Error);
-            return new GoogleConnectionStatus(GoogleConnectionState.NotConnected, [],
-                $"Google authorization failed ({ex.Error.Error}).");
+            return new GoogleConnectionStatus
+            {
+                State = GoogleConnectionState.NotConnected,
+                GrantedScopes = [],
+                Message = $"Google authorization failed ({ex.Error.Error}).",
+            };
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            return new GoogleConnectionStatus(GoogleConnectionState.NotConnected, [],
-                $"No approval in the browser within {ConnectTimeout.TotalMinutes} minutes.");
+            return new GoogleConnectionStatus
+            {
+                State = GoogleConnectionState.NotConnected,
+                GrantedScopes = [],
+                Message = $"No approval in the browser within {ConnectTimeout.TotalMinutes} minutes.",
+            };
         }
     }
 
@@ -128,6 +149,10 @@ public class GoogleConnectionService : IGoogleConnectionService
             .Select(scope => ScopeAliases.GetValueOrDefault(scope, scope))
             .ToList();
 
-    private static GoogleConnectionStatus NotConfigured() => new(GoogleConnectionState.NotConfigured, [],
-        "Google:ClientId and Google:ClientSecret are not set. Add them with dotnet user-secrets.");
+    private static GoogleConnectionStatus NotConfigured() => new()
+    {
+        State = GoogleConnectionState.NotConfigured,
+        GrantedScopes = [],
+        Message = "Google:ClientId and Google:ClientSecret are not set. Add them with dotnet user-secrets.",
+    };
 }

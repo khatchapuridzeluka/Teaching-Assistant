@@ -1,7 +1,9 @@
 namespace TeachingAssistant.Application.Contracts;
 
-public record SubmissionAttachment(
-    AttachmentKind Kind,
-    string Title,
-    string? Url,
-    string? FileId);
+public record SubmissionAttachment
+{
+    public required AttachmentKind Kind { get; init; }
+    public required string Title { get; init; }
+    public string? Url { get; init; }
+    public string? FileId { get; init; }
+}

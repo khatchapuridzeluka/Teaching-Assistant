@@ -1,5 +1,7 @@
 namespace TeachingAssistant.Application.Contracts;
 
-public record ReviewQueueResponse(
-    IReadOnlyList<ReviewDraftItem> Drafts,
-    IReadOnlyList<UngradedSubmissionItem> Ungraded);
+public record ReviewQueueResponse
+{
+    public required IReadOnlyList<ReviewDraftItem> Drafts { get; init; }
+    public required IReadOnlyList<UngradedSubmissionItem> Ungraded { get; init; }
+}

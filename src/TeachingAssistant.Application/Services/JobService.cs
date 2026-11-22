@@ -37,7 +37,7 @@ public class JobService : IJobService
             return null;
         }
 
-        var job = new Job(JobType.GradeVersion, JobPayloads.Write(new GradeVersionPayload(versionId)), _timeProvider.GetUtcNow(),
+        var job = new Job(JobType.GradeVersion, JobPayloads.Write(new GradeVersionPayload { VersionId = versionId }), _timeProvider.GetUtcNow(),
             dedupKey: $"grade:{versionId}", courseId: gradable.CourseId, assignmentId: gradable.AssignmentId,
             maxAttempts: MaxGradingAttempts);
         var queued = await _jobs.AddOrGetActiveAsync(job, cancellationToken);
@@ -87,9 +87,19 @@ public class JobService : IJobService
     {
         var plan = await _grading.PlanGradeAllAsync(courseId, assignmentId, regrade, cancellationToken);
         var (job, queued, alreadyQueued, problems) = await QueueGroupAsync(plan, JobType.GradeAssignment,
-            JobPayloads.Write(new GradeAssignmentPayload(courseId, assignmentId, regrade)), $"grade-all:{assignmentId}", courseId, assignmentId,
+            JobPayloads.Write(new GradeAssignmentPayload { CourseId = courseId, AssignmentId = assignmentId, Regrade = regrade }), $"grade-all:{assignmentId}", courseId, assignmentId,
             "Grading all students of this assignment is already running.", cancellationToken);
-        return new GradeAllResponse(job, queued, plan.Students, plan.AlreadyDrafted, alreadyQueued, plan.NoWork, plan.NotFetched, problems);
+        return new GradeAllResponse
+        {
+            Job = job,
+            Queued = queued,
+            Students = plan.Students,
+            AlreadyDrafted = plan.AlreadyDrafted,
+            AlreadyQueued = alreadyQueued,
+            NoWork = plan.NoWork,
+            NotFetched = plan.NotFetched,
+            Problems = problems,
+        };
     }
 
     public async Task<JobResponse> QueueGradeStudentAsync(
@@ -97,7 +107,13 @@ public class JobService : IJobService
     {
         var now = _timeProvider.GetUtcNow();
         var name = await _grading.FindStudentNameAsync(courseId, studentId, cancellationToken);
-        var group = Job.Group(JobType.GradeStudent, JobPayloads.Write(new GradeStudentPayload(courseId, studentId, name, regrade)), now,
+        var group = Job.Group(JobType.GradeStudent, JobPayloads.Write(new GradeStudentPayload
+        {
+            CourseId = courseId,
+            StudentId = studentId,
+            StudentName = name,
+            Regrade = regrade,
+        }), now,
             dedupKey: $"grade-student:{courseId}:{studentId}", courseId: courseId);
         group.SetChildTotal(1);
         var active = await _jobs.AddOrGetActiveAsync(group, cancellationToken);
@@ -106,7 +122,13 @@ public class JobService : IJobService
             return JobPayloads.ToResponse(active);
         }
 
-        var fetch = new Job(JobType.FetchStudentWork, JobPayloads.Write(new FetchStudentWorkPayload(courseId, studentId, group.Id, regrade)), now,
+        var fetch = new Job(JobType.FetchStudentWork, JobPayloads.Write(new FetchStudentWorkPayload
+        {
+            CourseId = courseId,
+            StudentId = studentId,
+            ParentId = group.Id,
+            Regrade = regrade,
+        }), now,
             parentId: group.Id, courseId: courseId, maxAttempts: MaxGradingAttempts);
         await _jobs.AddOrGetActiveAsync(fetch, cancellationToken);
         _signal.Notify();
@@ -122,7 +144,16 @@ public class JobService : IJobService
         var parent = await _jobs.FindAsync(parentId, cancellationToken);
         if (parent is not { IsGroup: true, Status: JobStatus.Running, CancelRequested: false })
         {
-            return new FetchStudentWorkResult(fetched, 0, plan.AlreadyDrafted, 0, plan.NoWork, plan.NotFetched, problems);
+            return new FetchStudentWorkResult
+            {
+                Fetched = fetched,
+                Queued = 0,
+                AlreadyDrafted = plan.AlreadyDrafted,
+                AlreadyQueued = 0,
+                NoWork = plan.NoWork,
+                NotFetched = plan.NotFetched,
+                Problems = problems,
+            };
         }
 
         var now = _timeProvider.GetUtcNow();
@@ -132,7 +163,16 @@ public class JobService : IJobService
         parent.SetChildTotal(existing + queued);
         await _jobs.SaveChangesAsync(cancellationToken);
         _signal.Notify();
-        return new FetchStudentWorkResult(fetched, queued, plan.AlreadyDrafted, alreadyQueued, plan.NoWork, plan.NotFetched, problems);
+        return new FetchStudentWorkResult
+        {
+            Fetched = fetched,
+            Queued = queued,
+            AlreadyDrafted = plan.AlreadyDrafted,
+            AlreadyQueued = alreadyQueued,
+            NoWork = plan.NoWork,
+            NotFetched = plan.NotFetched,
+            Problems = problems,
+        };
     }
 
     private async Task<(JobResponse? Job, int Queued, int AlreadyQueued, IReadOnlyList<string> Problems)> QueueGroupAsync(
@@ -173,7 +213,11 @@ public class JobService : IJobService
         foreach (var versionId in plan.VersionIds)
         {
             var childAssignment = plan.AssignmentIds?.GetValueOrDefault(versionId) ?? assignmentId;
-            var child = new Job(JobType.GradeVersion, JobPayloads.Write(new GradeVersionPayload(versionId, PartOfGradeAll: true)), now,
+            var child = new Job(JobType.GradeVersion, JobPayloads.Write(new GradeVersionPayload
+            {
+                VersionId = versionId,
+                PartOfGradeAll = true,
+            }), now,
                 parentId: group.Id, dedupKey: $"grade:{versionId}", courseId: courseId, assignmentId: childAssignment,
                 maxAttempts: MaxGradingAttempts);
             var added = await _jobs.AddOrGetActiveAsync(child, cancellationToken);
@@ -194,14 +238,18 @@ public class JobService : IJobService
         Guid runId, IReadOnlyList<Guid> resultIds, string? courseId, CancellationToken cancellationToken = default)
     {
         var now = _timeProvider.GetUtcNow();
-        var group = Job.Group(JobType.EvaluationRun, JobPayloads.Write(new EvaluationRunPayload(runId, courseId)), now,
+        var group = Job.Group(JobType.EvaluationRun, JobPayloads.Write(new EvaluationRunPayload
+        {
+            RunId = runId,
+            CourseId = courseId,
+        }), now,
             dedupKey: $"evaluation-run:{runId}", courseId: courseId);
         group.SetChildTotal(resultIds.Count);
         await _jobs.AddOrGetActiveAsync(group, cancellationToken);
 
         foreach (var resultId in resultIds)
         {
-            var child = new Job(JobType.EvaluationGrade, JobPayloads.Write(new EvaluationGradePayload(resultId)), now,
+            var child = new Job(JobType.EvaluationGrade, JobPayloads.Write(new EvaluationGradePayload { ResultId = resultId }), now,
                 parentId: group.Id, dedupKey: $"evaluation-grade:{resultId}", courseId: courseId, maxAttempts: MaxGradingAttempts);
             await _jobs.AddOrGetActiveAsync(child, cancellationToken);
         }
@@ -213,7 +261,11 @@ public class JobService : IJobService
 
     public async Task<JobResponse> QueueAnalyzeMistakesAsync(string courseId, string assignmentId, CancellationToken cancellationToken = default)
     {
-        var job = new Job(JobType.AnalyzeMistakes, JobPayloads.Write(new AnalyzeMistakesPayload(courseId, assignmentId)),
+        var job = new Job(JobType.AnalyzeMistakes, JobPayloads.Write(new AnalyzeMistakesPayload
+        {
+            CourseId = courseId,
+            AssignmentId = assignmentId,
+        }),
             _timeProvider.GetUtcNow(), dedupKey: $"analyze-mistakes:{assignmentId}", courseId: courseId, assignmentId: assignmentId,
             maxAttempts: MaxGradingAttempts);
         var queued = await _jobs.AddOrGetActiveAsync(job, cancellationToken);
@@ -225,7 +277,13 @@ public class JobService : IJobService
         string courseId, string studentId, StudentAnalysisKind kind, CancellationToken cancellationToken = default)
     {
         var name = await _grading.FindStudentNameAsync(courseId, studentId, cancellationToken);
-        var job = new Job(JobType.AnalyzeStudent, JobPayloads.Write(new AnalyzeStudentPayload(courseId, studentId, name, kind)),
+        var job = new Job(JobType.AnalyzeStudent, JobPayloads.Write(new AnalyzeStudentPayload
+        {
+            CourseId = courseId,
+            StudentId = studentId,
+            StudentName = name,
+            Kind = kind,
+        }),
             _timeProvider.GetUtcNow(), dedupKey: $"analyze-student:{kind}:{courseId}:{studentId}", courseId: courseId,
             maxAttempts: MaxGradingAttempts);
         var queued = await _jobs.AddOrGetActiveAsync(job, cancellationToken);
@@ -254,10 +312,19 @@ public class JobService : IJobService
 
         var items = await DescribeAsync(jobs, cancellationToken);
 
-        return new JobOverviewResponse(
-            new JobCounts(Count(JobStatus.Queued), Count(JobStatus.Running), Count(JobStatus.Succeeded), Count(JobStatus.Failed),
-                Count(JobStatus.Canceled), since),
-            items);
+        return new JobOverviewResponse
+        {
+            Counts = new JobCounts
+            {
+                Queued = Count(JobStatus.Queued),
+                Running = Count(JobStatus.Running),
+                Succeeded = Count(JobStatus.Succeeded),
+                Failed = Count(JobStatus.Failed),
+                Canceled = Count(JobStatus.Canceled),
+                FinishedSince = since,
+            },
+            Jobs = items,
+        };
 
         int Count(JobStatus key)
         {
@@ -288,30 +355,57 @@ public class JobService : IJobService
                 if (job.IsGroup)
                 {
                     var counts = childCounts[job.Id].ToDictionary(c => c.Status, c => c.Count);
-                    children = new JobChildCounts(counts.Values.Sum(), counts.GetValueOrDefault(JobStatus.Queued),
-                        counts.GetValueOrDefault(JobStatus.Running), counts.GetValueOrDefault(JobStatus.Succeeded),
-                        counts.GetValueOrDefault(JobStatus.Failed), counts.GetValueOrDefault(JobStatus.Canceled));
+                    children = new JobChildCounts
+                    {
+                        Total = counts.Values.Sum(),
+                        Queued = counts.GetValueOrDefault(JobStatus.Queued),
+                        Running = counts.GetValueOrDefault(JobStatus.Running),
+                        Succeeded = counts.GetValueOrDefault(JobStatus.Succeeded),
+                        Failed = counts.GetValueOrDefault(JobStatus.Failed),
+                        Canceled = counts.GetValueOrDefault(JobStatus.Canceled),
+                    };
                 }
 
                 var groupSubject = job.IsGroup ? groupSubjects.GetValueOrDefault(job.Id) : null;
                 if (job.Type == JobType.GradeStudent)
                 {
                     var student = JobPayloads.Read<GradeStudentPayload>(job.Payload);
-                    return new JobOverviewItem(response, job.CourseId, null, null, null, student.StudentId,
-                        student.StudentName ?? groupSubject?.StudentName, null, children);
+                    return new JobOverviewItem
+                    {
+                        Job = response,
+                        CourseId = job.CourseId,
+                        StudentId = student.StudentId,
+                        StudentName = student.StudentName ?? groupSubject?.StudentName,
+                        Children = children,
+                    };
                 }
 
                 if (job.Type == JobType.AnalyzeStudent)
                 {
                     var analyzed = JobPayloads.Read<AnalyzeStudentPayload>(job.Payload);
-                    return new JobOverviewItem(response, job.CourseId, null, null, null, analyzed.StudentId, analyzed.StudentName, null,
-                        null);
+                    return new JobOverviewItem
+                    {
+                        Job = response,
+                        CourseId = job.CourseId,
+                        StudentId = analyzed.StudentId,
+                        StudentName = analyzed.StudentName,
+                    };
                 }
 
                 var assignmentId = subject?.AssignmentId ?? job.AssignmentId;
                 var title = subject?.AssignmentTitle ?? groupSubject?.AssignmentTitle;
-                return new JobOverviewItem(response, subject?.CourseId ?? job.CourseId, assignmentId, title, subject?.SubmissionId,
-                    subject?.StudentId, subject?.StudentName, subject?.VersionNumber, children);
+                return new JobOverviewItem
+                {
+                    Job = response,
+                    CourseId = subject?.CourseId ?? job.CourseId,
+                    AssignmentId = assignmentId,
+                    AssignmentTitle = title,
+                    SubmissionId = subject?.SubmissionId,
+                    StudentId = subject?.StudentId,
+                    StudentName = subject?.StudentName,
+                    VersionNumber = subject?.VersionNumber,
+                    Children = children,
+                };
             })
             .ToList();
     }

@@ -37,7 +37,12 @@ public class StudentService : IStudentService
         }
 
         var stream = _photos.Open(storedName);
-        return stream is null ? null : new StudentPhoto(stream, student.PhotoContentType ?? "image/jpeg", hash);
+        return stream is null ? null : new StudentPhoto
+        {
+            Content = stream,
+            ContentType = student.PhotoContentType ?? "image/jpeg",
+            Hash = hash,
+        };
     }
 
     public async Task<CourseStudentsResponse> GetCourseStudentsAsync(string courseId, CancellationToken cancellationToken = default)
@@ -57,10 +62,18 @@ public class StudentService : IStudentService
             .ThenBy(r => r.Name)
             .ToList();
 
-        return new CourseStudentsResponse(
-            assignments.Count == 0 ? null : assignments.Max(a => a.SyncedAt),
-            assignments.Select(a => new StudentAssignmentColumn(a.ExternalAssignmentId, a.Title, a.MaxPoints, a.DueAt)).ToList(),
-            rows);
+        return new CourseStudentsResponse
+        {
+            SyncedAt = assignments.Count == 0 ? null : assignments.Max(a => a.SyncedAt),
+            Assignments = assignments.Select(a => new StudentAssignmentColumn
+            {
+                Id = a.ExternalAssignmentId,
+                Title = a.Title,
+                MaxPoints = a.MaxPoints,
+                DueAt = a.DueAt,
+            }).ToList(),
+            Students = rows,
+        };
     }
 
     private static CourseStudentResponse Row(
@@ -73,16 +86,41 @@ public class StudentService : IStudentService
         foreach (var assignment in assignments)
         {
             var submission = byAssignment.GetValueOrDefault(assignment.ExternalAssignmentId);
-            var result = new AssignmentResult(assignment.MaxPoints, assignment.DueAt, submission?.Grade, submission?.IsTurnedIn ?? false);
+            var result = new AssignmentResult
+            {
+                MaxPoints = assignment.MaxPoints,
+                DueAt = assignment.DueAt,
+                Grade = submission?.Grade,
+                TurnedIn = submission?.IsTurnedIn ?? false,
+            };
             scored.Add(result);
-            results.Add(new StudentAssignmentResult(assignment.ExternalAssignmentId, submission?.ExternalSubmissionId,
-                submission?.State, result.TurnedIn, submission?.Late ?? false, result.IsMissing(now), result.GradeStatusAt(now),
-                submission?.Grade));
+            results.Add(new StudentAssignmentResult
+            {
+                AssignmentId = assignment.ExternalAssignmentId,
+                SubmissionId = submission?.ExternalSubmissionId,
+                State = submission?.State,
+                TurnedIn = result.TurnedIn,
+                Late = submission?.Late ?? false,
+                Missing = result.IsMissing(now),
+                GradeStatus = result.GradeStatusAt(now),
+                Grade = submission?.Grade,
+            });
         }
 
         var overall = OverallScore.Compute(scored, now);
-        return new CourseStudentResponse(student.Id, student.ExternalUserId, student.Name, student.IsEnrolledIn(courseId),
-            results.Count(r => r.TurnedIn), results.Count(r => r.Missing), results.Count(r => r.TurnedIn && r.Late),
-            overall.Percent, overall.Earned, overall.Possible, results);
+        return new CourseStudentResponse
+        {
+            Id = student.Id,
+            ExternalUserId = student.ExternalUserId,
+            Name = student.Name,
+            Active = student.IsEnrolledIn(courseId),
+            TurnedIn = results.Count(r => r.TurnedIn),
+            Missing = results.Count(r => r.Missing),
+            Late = results.Count(r => r.TurnedIn && r.Late),
+            OverallPercent = overall.Percent,
+            Earned = overall.Earned,
+            Possible = overall.Possible,
+            Results = results,
+        };
     }
 }

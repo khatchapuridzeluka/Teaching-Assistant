@@ -28,9 +28,27 @@ public class ReviewQueueService : IReviewQueueService
         var currentDrafts = newestDrafts
             .Where(d => d.ReportStatus != ReportStatus.Approved)
             .OrderBy(d => d.CreatedAt)
-            .Select(d => new ReviewDraftItem(d.GradingId, d.VersionId, d.VersionNumber, latestVersionIds.Contains(d.VersionId),
-                d.CourseId, d.AssignmentId, d.AssignmentTitle, d.SubmissionId, d.StudentId, d.StudentName,
-                d.Score, d.MaxScore, d.Bonus, d.Major, d.Minor, d.Style, d.CreatedAt, d.ReportStatus))
+            .Select(d => new ReviewDraftItem
+            {
+                GradingId = d.GradingId,
+                VersionId = d.VersionId,
+                VersionNumber = d.VersionNumber,
+                IsLatestVersion = latestVersionIds.Contains(d.VersionId),
+                CourseId = d.CourseId,
+                AssignmentId = d.AssignmentId,
+                AssignmentTitle = d.AssignmentTitle,
+                SubmissionId = d.SubmissionId,
+                StudentId = d.StudentId,
+                StudentName = d.StudentName,
+                Score = d.Score,
+                MaxScore = d.MaxScore,
+                Bonus = d.Bonus,
+                Major = d.Major,
+                Minor = d.Minor,
+                Style = d.Style,
+                CreatedAt = d.CreatedAt,
+                ReportStatus = d.ReportStatus,
+            })
             .ToList();
 
         var draftedVersionIds = newestDrafts.Select(d => d.VersionId).ToHashSet();
@@ -39,10 +57,21 @@ public class ReviewQueueService : IReviewQueueService
             .Where(v => v.VersionStatus != VersionStatus.Failed)
             .Where(v => !draftedVersionIds.Contains(v.VersionId))
             .OrderBy(v => v.FetchedAt)
-            .Select(v => new UngradedSubmissionItem(v.VersionId, v.VersionNumber, v.CourseId, v.AssignmentId, v.AssignmentTitle,
-                v.SubmissionId, v.StudentId, v.StudentName, v.Late, v.FetchedAt))
+            .Select(v => new UngradedSubmissionItem
+            {
+                VersionId = v.VersionId,
+                VersionNumber = v.VersionNumber,
+                CourseId = v.CourseId,
+                AssignmentId = v.AssignmentId,
+                AssignmentTitle = v.AssignmentTitle,
+                SubmissionId = v.SubmissionId,
+                StudentId = v.StudentId,
+                StudentName = v.StudentName,
+                Late = v.Late,
+                FetchedAt = v.FetchedAt,
+            })
             .ToList();
 
-        return new ReviewQueueResponse(currentDrafts, ungraded);
+        return new ReviewQueueResponse { Drafts = currentDrafts, Ungraded = ungraded };
     }
 }

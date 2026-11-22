@@ -37,7 +37,12 @@ public class GradingExportService : IGradingExportService
             return null;
         }
 
-        return new ExportedFile(_renderer.RenderPdf(document), "application/pdf", FileName(document));
+        return new ExportedFile
+        {
+            Content = _renderer.RenderPdf(document),
+            ContentType = "application/pdf",
+            FileName = FileName(document),
+        };
     }
 
     internal async Task<GradingDocument?> BuildAsync(Guid gradingId, CancellationToken cancellationToken)
@@ -71,43 +76,77 @@ public class GradingExportService : IGradingExportService
             ? report.Mistakes
                 .Where(m => m.Decision != MistakeDecision.Rejected)
                 .OrderBy(m => m.Position)
-                .Select(m => new GradingDocumentMistake(m.Severity, m.Category, m.Message, m.Points, m.File, m.StartLine, m.EndLine))
+                .Select(m => new GradingDocumentMistake
+                {
+                    Severity = m.Severity,
+                    Category = m.Category,
+                    Message = m.Message,
+                    Points = m.Points,
+                    File = m.File,
+                    StartLine = m.StartLine,
+                    EndLine = m.EndLine,
+                })
                 .ToList()
             : grading.Mistakes
                 .OrderBy(m => m.Position)
-                .Select(m => new GradingDocumentMistake(m.Severity, m.Category, m.Message, m.Points, m.File, m.StartLine, m.EndLine))
+                .Select(m => new GradingDocumentMistake
+                {
+                    Severity = m.Severity,
+                    Category = m.Category,
+                    Message = m.Message,
+                    Points = m.Points,
+                    File = m.File,
+                    StartLine = m.StartLine,
+                    EndLine = m.EndLine,
+                })
                 .ToList();
 
         var strengths = report is not null
             ? report.Strengths
                 .Where(s => s.Decision != MistakeDecision.Rejected)
                 .OrderBy(s => s.Position)
-                .Select(s => new GradingDocumentStrength(s.Category, s.Message, s.File, s.StartLine, s.EndLine))
+                .Select(s => new GradingDocumentStrength
+                {
+                    Category = s.Category,
+                    Message = s.Message,
+                    File = s.File,
+                    StartLine = s.StartLine,
+                    EndLine = s.EndLine,
+                })
                 .ToList()
             : grading.Strengths
                 .OrderBy(s => s.Position)
-                .Select(s => new GradingDocumentStrength(s.Category, s.Message, s.File, s.StartLine, s.EndLine))
+                .Select(s => new GradingDocumentStrength
+                {
+                    Category = s.Category,
+                    Message = s.Message,
+                    File = s.File,
+                    StartLine = s.StartLine,
+                    EndLine = s.EndLine,
+                })
                 .ToList();
 
-        return new GradingDocument(
-            submission.StudentName,
-            assignment?.Title ?? "Assignment",
-            assignment?.DueAt,
-            version.Number,
-            version.TurnedInAt,
-            status,
-            report?.Score ?? grading.Score,
-            grading.MaxScore ?? assignment?.MaxPoints,
-            report is null ? grading.Bonus : report.Bonus,
-            grading.Score,
-            grading.Bonus,
-            report?.Review ?? grading.Review,
-            mistakes,
-            strengths,
-            grading.Model,
-            grading.CreatedAt,
-            report?.ApprovedAt,
-            _timeProvider.GetUtcNow());
+        return new GradingDocument
+        {
+            StudentName = submission.StudentName,
+            AssignmentTitle = assignment?.Title ?? "Assignment",
+            DueAt = assignment?.DueAt,
+            VersionNumber = version.Number,
+            TurnedInAt = version.TurnedInAt,
+            Status = status,
+            Score = report?.Score ?? grading.Score,
+            MaxScore = grading.MaxScore ?? assignment?.MaxPoints,
+            Bonus = report is null ? grading.Bonus : report.Bonus,
+            AiScore = grading.Score,
+            AiBonus = grading.Bonus,
+            Review = report?.Review ?? grading.Review,
+            Mistakes = mistakes,
+            Strengths = strengths,
+            Model = grading.Model,
+            GradedAt = grading.CreatedAt,
+            ApprovedAt = report?.ApprovedAt,
+            GeneratedAt = _timeProvider.GetUtcNow(),
+        };
     }
 
     internal static string FileName(GradingDocument document)

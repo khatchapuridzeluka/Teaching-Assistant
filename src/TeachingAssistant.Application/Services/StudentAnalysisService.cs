@@ -110,7 +110,7 @@ public class StudentAnalysisService : IStudentAnalysisService
             }
 
             var reply = await _languageModel.AnalyzeAsync(PromptLibrary.StudentMistakes,
-                [new TextPart(MistakesPromptText(mistakes, DueAt, Title, MaxPoints))], MistakesSchema, cancellationToken);
+                [new TextPart { Text = MistakesPromptText(mistakes, DueAt, Title, MaxPoints) }], MistakesSchema, cancellationToken);
             var answer = Read<MistakesReply>(reply.Text);
             analysis = new StudentAnalysis(courseId, studentId, kind, reply.Model, answer.Summary ?? "", answer.NextSteps ?? "",
                 mistakes.Select(m => m.AssignmentId).Distinct().Count(), mistakes.Count, Latest(mistakes.Select(m => m.ApprovedAt)), now);
@@ -125,7 +125,7 @@ public class StudentAnalysisService : IStudentAnalysisService
 
             var ordered = Ordered(strengths, DueAt);
             var reply = await _languageModel.AnalyzeAsync(PromptLibrary.StudentStrengths,
-                [new TextPart(StrengthsPromptText(ordered, mistakes, DueAt, Title))], StrengthsSchema, cancellationToken);
+                [new TextPart { Text = StrengthsPromptText(ordered, mistakes, DueAt, Title) }], StrengthsSchema, cancellationToken);
             var answer = Read<StrengthsReply>(reply.Text);
             analysis = new StudentAnalysis(courseId, studentId, kind, reply.Model, answer.Overview ?? "", "",
                 strengths.Select(s => s.AssignmentId).Distinct().Count(), strengths.Count, Latest(strengths.Select(s => s.ApprovedAt)), now,
@@ -140,7 +140,7 @@ public class StudentAnalysisService : IStudentAnalysisService
             }
 
             var reply = await _languageModel.AnalyzeAsync(PromptLibrary.StudentOverview,
-                [new TextPart(OverviewPromptText(records, assignments))], MistakesSchema, cancellationToken);
+                [new TextPart { Text = OverviewPromptText(records, assignments) }], MistakesSchema, cancellationToken);
             var answer = Read<MistakesReply>(reply.Text);
             analysis = new StudentAnalysis(courseId, studentId, kind, reply.Model, answer.Summary ?? "", answer.NextSteps ?? "",
                 records.Assignments.Count, mistakes.Count + strengths.Count, LatestOf(mistakes, strengths), now);
@@ -160,7 +160,9 @@ public class StudentAnalysisService : IStudentAnalysisService
             return null;
         }
 
-        var (mistakes, strengths, _) = await _records.CollectAsync(courseId, studentId, cancellationToken);
+        var records = await _records.CollectAsync(courseId, studentId, cancellationToken);
+        var mistakes = records.Mistakes;
+        var strengths = records.Strengths;
         var outdated = kind switch
         {
             StudentAnalysisKind.Mistakes => analysis.IsOutdated(mistakes.Count, Latest(mistakes.Select(m => m.ApprovedAt))),
@@ -177,15 +179,38 @@ public class StudentAnalysisService : IStudentAnalysisService
             foreach (var group in analysis.Groups.OrderBy(g => g.Position))
             {
                 var members = group.StrengthIds.Where(byId.ContainsKey).Select(id => byId[id]).ToList();
-                groups.Add(new StrengthGroupResponse(group.Title, group.Explanation, group.Ungrouped, members.Count,
-                    members.Select(m => m.AssignmentId).Distinct().Count(),
-                    members.Select(m => m.Category).Distinct().ToList(),
-                    members.Select(m => new GroupedStrength(Key(m), titles.GetValueOrDefault(m.AssignmentId), m.Category, m.Message)).ToList()));
+                groups.Add(new StrengthGroupResponse
+                {
+                    Title = group.Title,
+                    Explanation = group.Explanation,
+                    Ungrouped = group.Ungrouped,
+                    Count = members.Count,
+                    Assignments = members.Select(m => m.AssignmentId).Distinct().Count(),
+                    Categories = members.Select(m => m.Category).Distinct().ToList(),
+                    Strengths = members.Select(m => new GroupedStrength
+                    {
+                        Id = Key(m),
+                        AssignmentTitle = titles.GetValueOrDefault(m.AssignmentId),
+                        Category = m.Category,
+                        Message = m.Message,
+                    }).ToList(),
+                });
             }
         }
 
-        return new StudentAnalysisResponse(analysis.Id, analysis.Kind, analysis.Model, analysis.Summary, analysis.NextSteps,
-            analysis.Assignments, analysis.Records, analysis.CreatedAt, outdated, groups);
+        return new StudentAnalysisResponse
+        {
+            Id = analysis.Id,
+            Kind = analysis.Kind,
+            Model = analysis.Model,
+            Summary = analysis.Summary,
+            NextSteps = analysis.NextSteps,
+            Assignments = analysis.Assignments,
+            Records = analysis.Records,
+            CreatedAt = analysis.CreatedAt,
+            Outdated = outdated,
+            Groups = groups,
+        };
     }
 
     internal static string MistakesPromptText(
@@ -432,9 +457,22 @@ public class StudentAnalysisService : IStudentAnalysisService
         }
     }
 
-    private sealed record MistakesReply(string? Summary, string? NextSteps);
+    private sealed record MistakesReply
+    {
+        public string? Summary { get; init; }
+        public string? NextSteps { get; init; }
+    }
 
-    private sealed record StrengthsReply(List<ReplyGroup>? Groups, string? Overview);
+    private sealed record StrengthsReply
+    {
+        public List<ReplyGroup>? Groups { get; init; }
+        public string? Overview { get; init; }
+    }
 
-    internal sealed record ReplyGroup(string? Title, string? Explanation, List<int>? StrengthIds);
+    internal sealed record ReplyGroup
+    {
+        public string? Title { get; init; }
+        public string? Explanation { get; init; }
+        public List<int>? StrengthIds { get; init; }
+    }
 }

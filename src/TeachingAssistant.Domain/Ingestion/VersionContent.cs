@@ -54,7 +54,7 @@ public class VersionContent
 
     public ContentStatus Status { get; private set; }
 
-    public ContentFingerprint ToFingerprint() => new(Origin, ExternalId, Fingerprint);
+    public ContentFingerprint ToFingerprint() => new() { Origin = Origin, ExternalId = ExternalId, Fingerprint = Fingerprint };
 
     internal void SetExtracted(bool extracted)
     {

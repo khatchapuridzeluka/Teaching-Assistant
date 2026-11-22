@@ -2,12 +2,14 @@ using TeachingAssistant.Domain.Profiling;
 
 namespace TeachingAssistant.Application.Contracts;
 
-public record StudentAssignmentResult(
-    string AssignmentId,
-    string? SubmissionId,
-    string? State,
-    bool TurnedIn,
-    bool Late,
-    bool Missing,
-    GradeStatus GradeStatus,
-    double? Grade);
+public record StudentAssignmentResult
+{
+    public required string AssignmentId { get; init; }
+    public string? SubmissionId { get; init; }
+    public string? State { get; init; }
+    public required bool TurnedIn { get; init; }
+    public required bool Late { get; init; }
+    public required bool Missing { get; init; }
+    public required GradeStatus GradeStatus { get; init; }
+    public double? Grade { get; init; }
+}

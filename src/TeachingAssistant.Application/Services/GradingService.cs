@@ -84,7 +84,11 @@ public class GradingService : IGradingService
     public async Task<GradableVersion?> CheckAsync(Guid versionId, CancellationToken cancellationToken = default)
     {
         var prepared = await PrepareAsync(versionId, cancellationToken);
-        return prepared is null ? null : new GradableVersion(prepared.Submission.CourseId, prepared.Submission.AssignmentId);
+        return prepared is null ? null : new GradableVersion
+        {
+            CourseId = prepared.Submission.CourseId,
+            AssignmentId = prepared.Submission.AssignmentId,
+        };
     }
 
     public async Task<GradeAllPlan> PlanGradeAllAsync(
@@ -121,8 +125,15 @@ public class GradingService : IGradingService
         }
 
         var (noWork, notFetched) = Unstored(submissions);
-        return new GradeAllPlan(toGrade, submissions.Count, latest.Count(x => drafted.Contains(x.Version!.Id)), noWork, problems,
-            NotFetched: notFetched);
+        return new GradeAllPlan
+        {
+            VersionIds = toGrade,
+            Students = submissions.Count,
+            AlreadyDrafted = latest.Count(x => drafted.Contains(x.Version!.Id)),
+            NoWork = noWork,
+            Problems = problems,
+            NotFetched = notFetched,
+        };
     }
 
     public async Task<GradeAllPlan> PlanGradeStudentAsync(string courseId, string studentId, bool regrade = false, CancellationToken cancellationToken = default)
@@ -172,8 +183,16 @@ public class GradingService : IGradingService
         }
 
         var (noWork, notFetched) = Unstored(submissions);
-        return new GradeAllPlan(toGrade, submissions.Count, latest.Count(x => drafted.Contains(x.Version!.Id)), noWork, problems,
-            assignmentIds, notFetched);
+        return new GradeAllPlan
+        {
+            VersionIds = toGrade,
+            Students = submissions.Count,
+            AlreadyDrafted = latest.Count(x => drafted.Contains(x.Version!.Id)),
+            NoWork = noWork,
+            Problems = problems,
+            AssignmentIds = assignmentIds,
+            NotFetched = notFetched,
+        };
     }
 
     private static (int NoWork, int NotFetched) Unstored(IReadOnlyList<Submission> submissions)
@@ -218,7 +237,7 @@ public class GradingService : IGradingService
 
     public GradingModelsResponse GetModels()
     {
-        return new GradingModelsResponse(GradingModels.Available, _languageModel.GradingModelId);
+        return new GradingModelsResponse { Available = GradingModels.Available, Current = _languageModel.GradingModelId };
     }
 
     public async Task<GradingResponse?> TryModelAsync(Guid versionId, string model, CancellationToken cancellationToken = default)
@@ -237,7 +256,11 @@ public class GradingService : IGradingService
 
     private AiGrading ToGrading(Guid versionId, GradingRun run)
     {
-        var (instructions, prompt, build, reply, read) = run;
+        var instructions = run.Instructions;
+        var prompt = run.Prompt;
+        var build = run.Build;
+        var reply = run.Reply;
+        var read = run.Read;
         var grading = new AiGrading(versionId, reply.Model, read.Review, read.Score, read.MaxScore, read.Bonus,
             instructions.Number, prompt.Sent, prompt.Skipped, reply.Text,
             read.Mistakes.Select(m => new GradingMistake(m.File, m.StartLine, m.EndLine, m.Severity, m.Category, m.Message, m.Points)),
@@ -257,13 +280,34 @@ public class GradingService : IGradingService
         }
 
         var read = run.Read;
-        return new EvaluationGrading(run.Reply.Model, read.Score, read.MaxScore, read.Bonus,
-            read.Mistakes.Select(m => new RunMistake(m.File, m.StartLine, m.EndLine, m.Severity, m.Category, m.Message, m.Points)).ToList(),
-            run.Build.Status);
+        return new EvaluationGrading
+        {
+            AnsweredModel = run.Reply.Model,
+            Score = read.Score,
+            MaxScore = read.MaxScore,
+            Bonus = read.Bonus,
+            Mistakes = read.Mistakes.Select(m => new RunMistake
+            {
+                File = m.File,
+                StartLine = m.StartLine,
+                EndLine = m.EndLine,
+                Severity = m.Severity,
+                Category = m.Category,
+                Message = m.Message,
+                Points = m.Points,
+            }).ToList(),
+            BuildStatus = run.Build.Status,
+        };
     }
 
-    private sealed record GradingRun(
-        InstructionsVersion Instructions, Prompt Prompt, BuildCheckOutcome Build, LanguageModelReply Reply, GradingOutput.ReadReply Read);
+    private sealed record GradingRun
+    {
+        public required InstructionsVersion Instructions { get; init; }
+        public required Prompt Prompt { get; init; }
+        public required BuildCheckOutcome Build { get; init; }
+        public required LanguageModelReply Reply { get; init; }
+        public required GradingOutput.ReadReply Read { get; init; }
+    }
 
     /// <summary>
     /// Everything a grading does except saving it: the prompt, the compile check, the model call and reading the answer. A
@@ -277,7 +321,9 @@ public class GradingService : IGradingService
             return null;
         }
 
-        var (submission, instructions, prompt) = prepared;
+        var submission = prepared.Submission;
+        var instructions = prepared.Instructions;
+        var prompt = prepared.Prompt;
 
         // Compile first, so the grader gets "it compiles" or the compiler's errors as facts. The facts go just before the
         // closing "Grade this submission" line; when there is nothing to say (no Java files, sandbox not available) the
@@ -285,7 +331,7 @@ public class GradingService : IGradingService
         var build = await _buildCheck.CheckAsync(submission.Versions.Single(v => v.Id == versionId), cancellationToken);
         if (JavaBuildCheck.PromptSection(build) is { } facts)
         {
-            prompt.Parts.Insert(prompt.Parts.Count - 1, new TextPart(facts));
+            prompt.Parts.Insert(prompt.Parts.Count - 1, new TextPart { Text = facts });
         }
 
         _callContext.Describe(submission.CourseId, submission.AssignmentId, versionId);
@@ -297,7 +343,7 @@ public class GradingService : IGradingService
             SystemPromptFor(principles, guidance?.Text, rules, notes), prompt.Parts, GradingOutput.Schema,
             cancellationToken: cancellationToken);
         var read = GradingOutput.Read(reply.Text, prompt.CodeLines);
-        return new GradingRun(instructions, prompt, build, reply, read);
+        return new GradingRun { Instructions = instructions, Prompt = prompt, Build = build, Reply = reply, Read = read };
     }
 
     private async Task<Prepared?> PrepareAsync(Guid versionId, CancellationToken cancellationToken)
@@ -342,10 +388,15 @@ public class GradingService : IGradingService
               string.Join("\n", prompt.Skipped.Select(s => $"- {s}")) +
               "\n\nGrade this submission against the instructions.");
 
-        return new Prepared(submission, instructions, prompt);
+        return new Prepared { Submission = submission, Instructions = instructions, Prompt = prompt };
     }
 
-    private sealed record Prepared(Submission Submission, InstructionsVersion Instructions, Prompt Prompt);
+    private sealed record Prepared
+    {
+        public required Submission Submission { get; init; }
+        public required InstructionsVersion Instructions { get; init; }
+        public required Prompt Prompt { get; init; }
+    }
 
     private void AddInstructions(Prompt prompt, InstructionsVersion instructions)
     {
@@ -383,7 +434,12 @@ public class GradingService : IGradingService
 
             if (FilePart.IsSupported(content.MimeType) && prompt.FitsFiles(bytes.Length))
             {
-                prompt.File($"Instructions file: {content.StoredName}", new FilePart(content.StoredName, content.MimeType!, bytes));
+                prompt.File($"Instructions file: {content.StoredName}", new FilePart
+                {
+                    Name = content.StoredName,
+                    MediaType = content.MimeType!,
+                    Content = bytes,
+                });
                 prompt.Sent.Add($"Instructions: {content.StoredName}");
             }
             else if (_documentReader.CanRead(content.StoredName, content.MimeType) && _documentReader.Read(bytes) is { } document)
@@ -420,7 +476,7 @@ public class GradingService : IGradingService
                 }
                 else if (ReadAll(_storage.OpenCode(version.StoragePath, file.Path)) is { } image)
                 {
-                    images.Add((file.Path, new FilePart(file.Path, imageType, image)));
+                    images.Add((file.Path, new FilePart { Name = file.Path, MediaType = imageType, Content = image }));
                     imageBytes += image.Length;
                 }
 
@@ -513,7 +569,12 @@ public class GradingService : IGradingService
 
             if (asFile)
             {
-                prompt.File($"The student's attached file: {content.Name}", new FilePart(content.Name, content.MimeType!, bytes));
+                prompt.File($"The student's attached file: {content.Name}", new FilePart
+                {
+                    Name = content.Name,
+                    MediaType = content.MimeType!,
+                    Content = bytes,
+                });
                 prompt.Sent.Add($"Student file: {content.Name}");
             }
             else if (_documentReader.Read(bytes) is { } document)
@@ -544,7 +605,12 @@ public class GradingService : IGradingService
                 continue;
             }
 
-            prompt.File($"[image {i + 1}] in {name}:", new FilePart($"{name} [image {i + 1}]", image.MediaType, image.Content));
+            prompt.File($"[image {i + 1}] in {name}:", new FilePart
+            {
+                Name = $"{name} [image {i + 1}]",
+                MediaType = image.MediaType,
+                Content = image.Content,
+            });
             images++;
         }
 
@@ -581,11 +647,11 @@ public class GradingService : IGradingService
         public bool HasInstructions { get; set; }
         public bool HasStudentWork { get; set; }
 
-        public void Text(string text) => Parts.Add(new TextPart(text));
+        public void Text(string text) => Parts.Add(new TextPart { Text = text });
 
         public void File(string label, FilePart file)
         {
-            Parts.Add(new TextPart(label));
+            Parts.Add(new TextPart { Text = label });
             Parts.Add(file);
             _fileBytes += file.Content.Length;
         }

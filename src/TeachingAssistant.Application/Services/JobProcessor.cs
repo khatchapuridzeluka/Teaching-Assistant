@@ -19,7 +19,7 @@ public class JobProcessor : IJobProcessor
     public async Task<ClaimedJob?> ClaimNextAsync(string workerId, TimeSpan lease, CancellationToken cancellationToken = default)
     {
         var job = await _jobs.ClaimNextAsync(workerId, _timeProvider.GetUtcNow(), lease, cancellationToken);
-        return job is null ? null : new ClaimedJob(job.Id, job.Type, job.Payload);
+        return job is null ? null : new ClaimedJob { Id = job.Id, Type = job.Type, Payload = job.Payload };
     }
 
     public async Task<bool> HeartbeatAsync(Guid jobId, TimeSpan lease, CancellationToken cancellationToken = default)

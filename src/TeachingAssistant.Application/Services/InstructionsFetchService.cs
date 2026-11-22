@@ -39,7 +39,12 @@ public class InstructionsFetchService : IInstructionsFetchService
         if (existing is { LatestVersion: { } latest }
             && !existing.HasChanged(assignment.Title, assignment.Description, assignment.MaxPoints, current.Select(c => c.Fingerprint)))
         {
-            return new InstructionsFetchResult(latest.Number, IsNew: false, await RestoreMissingAsync(latest, current, cancellationToken));
+            return new InstructionsFetchResult
+            {
+                VersionNumber = latest.Number,
+                IsNew = false,
+                Problems = await RestoreMissingAsync(latest, current, cancellationToken),
+            };
         }
 
         var instructions = existing ?? new AssignmentInstructions(SubmissionSource.GoogleClassroom, courseId, assignment.Id,
@@ -65,7 +70,7 @@ public class InstructionsFetchService : IInstructionsFetchService
             }
 
             await _store.SaveChangesAsync(cancellationToken);
-            return new InstructionsFetchResult(version.Number, IsNew: true, problems);
+            return new InstructionsFetchResult { VersionNumber = version.Number, IsNew = true, Problems = problems };
         }
     }
 
@@ -103,12 +108,31 @@ public class InstructionsFetchService : IInstructionsFetchService
             if (material is { Kind: AttachmentKind.DriveFile, FileId: { } fileId })
             {
                 var file = await _fileSource.GetFileAsync(fileId, cancellationToken);
-                current.Add(new CurrentMaterial(new ContentFingerprint(ContentOrigin.Drive, file.Id, file.Revision), material.Title, file));
+                current.Add(new CurrentMaterial
+                {
+                    Fingerprint = new ContentFingerprint
+                    {
+                        Origin = ContentOrigin.Drive,
+                        ExternalId = file.Id,
+                        Fingerprint = file.Revision,
+                    },
+                    Title = material.Title,
+                    File = file,
+                });
             }
             else
             {
                 var id = material.Url ?? material.Title;
-                current.Add(new CurrentMaterial(new ContentFingerprint(ContentOrigin.Link, id, id), material.Title, null));
+                current.Add(new CurrentMaterial
+                {
+                    Fingerprint = new ContentFingerprint
+                    {
+                        Origin = ContentOrigin.Link,
+                        ExternalId = id,
+                        Fingerprint = id,
+                    },
+                    Title = material.Title,
+                });
             }
         }
 
@@ -149,5 +173,10 @@ public class InstructionsFetchService : IInstructionsFetchService
             file.SizeBytes, storedName, status);
     }
 
-    private sealed record CurrentMaterial(ContentFingerprint Fingerprint, string Title, RemoteFile? File);
+    private sealed record CurrentMaterial
+    {
+        public required ContentFingerprint Fingerprint { get; init; }
+        public required string Title { get; init; }
+        public RemoteFile? File { get; init; }
+    }
 }

@@ -75,13 +75,19 @@ public static class CodeExtractor
             problems.Add("No code files were found in the submitted archives.");
         }
 
-        return new CodeExtraction(hash, fileCount, extracted, problems);
+        return new CodeExtraction
+        {
+            ContentHash = hash,
+            FileCount = fileCount,
+            ExtractedStoredNames = extracted,
+            Problems = problems,
+        };
     }
 
     public static IReadOnlyList<CodeFile> List(string codeDirectory) =>
         Directory.Exists(codeDirectory)
             ? Directory.EnumerateFiles(codeDirectory, "*", SearchOption.AllDirectories)
-                .Select(path => new CodeFile(RelativePath(codeDirectory, path), new FileInfo(path).Length))
+                .Select(path => new CodeFile { Path = RelativePath(codeDirectory, path), SizeBytes = new FileInfo(path).Length })
                 .OrderBy(f => f.Path, StringComparer.Ordinal)
                 .ToList()
             : [];

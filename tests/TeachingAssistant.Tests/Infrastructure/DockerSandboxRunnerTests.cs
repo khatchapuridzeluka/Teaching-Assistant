@@ -27,7 +27,7 @@ public class DockerSandboxRunnerTests
 
     private static SandboxFile File(string path, string text)
     {
-        return new SandboxFile(path, Encoding.UTF8.GetBytes(text));
+        return new SandboxFile { Path = path, Content = Encoding.UTF8.GetBytes(text) };
     }
 
     private static void SkipWithoutDocker()
@@ -39,39 +39,47 @@ public class DockerSandboxRunnerTests
     public async Task CompilesAndRunsAProgramInAPackage_WithStdinAndGeorgianOutput()
     {
         SkipWithoutDocker();
-        var request = new SandboxRequest(Image,
-        [
-            File("src/shop/Main.java", """
-                package shop;
+        var request = new SandboxRequest
+        {
+            Image = Image,
+            Files = [
+                File("src/shop/Main.java", """
+                    package shop;
 
-                import java.util.Scanner;
+                    import java.util.Scanner;
 
-                public class Main {
-                    public static void main(String[] args) {
-                        int n = new Scanner(System.in).nextInt();
-                        System.out.println("Factorial: " + new Calculator().factorial(n));
-                        System.out.println("გამარჯობა");
-                    }
-                }
-                """),
-            File("src/shop/Calculator.java", """
-                package shop;
-
-                public class Calculator {
-                    public long factorial(int n) {
-                        long r = 1;
-                        for (int i = 2; i <= n; i++) {
-                            r *= i;
+                    public class Main {
+                        public static void main(String[] args) {
+                            int n = new Scanner(System.in).nextInt();
+                            System.out.println("Factorial: " + new Calculator().factorial(n));
+                            System.out.println("გამარჯობა");
                         }
-                        return r;
                     }
-                }
-                """),
-        ],
-        [
-            new SandboxStep("compile", ["javac", "-d", "out", "src/shop/Main.java", "src/shop/Calculator.java"], StopOnFailure: true),
-            new SandboxStep("run", ["java", "-cp", "out", "shop.Main"], Stdin: "5\n"),
-        ]);
+                    """),
+                File("src/shop/Calculator.java", """
+                    package shop;
+
+                    public class Calculator {
+                        public long factorial(int n) {
+                            long r = 1;
+                            for (int i = 2; i <= n; i++) {
+                                r *= i;
+                            }
+                            return r;
+                        }
+                    }
+                    """),
+            ],
+            Steps = [
+                new SandboxStep
+                {
+                    Name = "compile",
+                    Command = ["javac", "-d", "out", "src/shop/Main.java", "src/shop/Calculator.java"],
+                    StopOnFailure = true,
+                },
+                new SandboxStep { Name = "run", Command = ["java", "-cp", "out", "shop.Main"], Stdin = "5\n" },
+            ],
+        };
 
         var result = await Runner().RunAsync(request, TestContext.Current.CancellationToken);
 
@@ -84,12 +92,15 @@ public class DockerSandboxRunnerTests
     public async Task ACompileError_FailsTheStep_AndSkipsTheStepsAfterIt()
     {
         SkipWithoutDocker();
-        var request = new SandboxRequest(Image,
-            [File("Main.java", "public class Main { void f() { int x = \"text\"; } }")],
-            [
-                new SandboxStep("compile", ["javac", "Main.java"], StopOnFailure: true),
-                new SandboxStep("run", ["java", "Main"]),
-            ]);
+        var request = new SandboxRequest
+        {
+            Image = Image,
+            Files = [File("Main.java", "public class Main { void f() { int x = \"text\"; } }")],
+            Steps = [
+                new SandboxStep { Name = "compile", Command = ["javac", "Main.java"], StopOnFailure = true },
+                new SandboxStep { Name = "run", Command = ["java", "Main"] },
+            ],
+        };
 
         var result = await Runner().RunAsync(request, TestContext.Current.CancellationToken);
 
@@ -104,13 +115,16 @@ public class DockerSandboxRunnerTests
     public async Task AnEndlessLoop_TimesOut_AndTheNextStepStillRuns()
     {
         SkipWithoutDocker();
-        var request = new SandboxRequest(Image,
-            [File("Loop.java", "public class Loop { public static void main(String[] a) { while (true) { } } }")],
-            [
-                new SandboxStep("compile", ["javac", "Loop.java"], StopOnFailure: true),
-                new SandboxStep("run", ["java", "Loop"], Timeout: TimeSpan.FromSeconds(2)),
-                new SandboxStep("after", ["echo", "still here"]),
-            ]);
+        var request = new SandboxRequest
+        {
+            Image = Image,
+            Files = [File("Loop.java", "public class Loop { public static void main(String[] a) { while (true) { } } }")],
+            Steps = [
+                new SandboxStep { Name = "compile", Command = ["javac", "Loop.java"], StopOnFailure = true },
+                new SandboxStep { Name = "run", Command = ["java", "Loop"], Timeout = TimeSpan.FromSeconds(2) },
+                new SandboxStep { Name = "after", Command = ["echo", "still here"] },
+            ],
+        };
 
         var watch = Stopwatch.StartNew();
         var result = await Runner().RunAsync(request, TestContext.Current.CancellationToken);
@@ -125,9 +139,13 @@ public class DockerSandboxRunnerTests
     public async Task EndlessOutput_IsCutOffAtTheLimit()
     {
         SkipWithoutDocker();
-        var request = new SandboxRequest(Image, [],
-            [new SandboxStep("spam", ["sh", "-c", "yes 'line of output' | head -c 200000"])],
-            new SandboxLimits(MaxOutputBytes: 1000));
+        var request = new SandboxRequest
+        {
+            Image = Image,
+            Files = [],
+            Steps = [new SandboxStep { Name = "spam", Command = ["sh", "-c", "yes 'line of output' | head -c 200000"] }],
+            Limits = new SandboxLimits { MaxOutputBytes = 1000 },
+        };
 
         var result = await Runner().RunAsync(request, TestContext.Current.CancellationToken);
 
@@ -141,13 +159,17 @@ public class DockerSandboxRunnerTests
     public async Task TheContainerIsLockedDown_AndRemovedAfterwards()
     {
         SkipWithoutDocker();
-        var request = new SandboxRequest(Image, [File("note.txt", "hi")],
-            [
-                new SandboxStep("user", ["id", "-u"]),
-                new SandboxStep("network", ["getent", "hosts", "example.com"]),
-                new SandboxStep("write outside work", ["touch", "/etc/x"]),
-                new SandboxStep("read work", ["cat", "note.txt"]),
-            ]);
+        var request = new SandboxRequest
+        {
+            Image = Image,
+            Files = [File("note.txt", "hi")],
+            Steps = [
+                new SandboxStep { Name = "user", Command = ["id", "-u"] },
+                new SandboxStep { Name = "network", Command = ["getent", "hosts", "example.com"] },
+                new SandboxStep { Name = "write outside work", Command = ["touch", "/etc/x"] },
+                new SandboxStep { Name = "read work", Command = ["cat", "note.txt"] },
+            ],
+        };
 
         var result = await Runner().RunAsync(request, TestContext.Current.CancellationToken);
 
@@ -162,7 +184,12 @@ public class DockerSandboxRunnerTests
     public async Task AMissingImage_IsReportedAsUnavailable()
     {
         SkipWithoutDocker();
-        var request = new SandboxRequest("ta-java:does-not-exist", [], [new SandboxStep("x", ["true"])]);
+        var request = new SandboxRequest
+        {
+            Image = "ta-java:does-not-exist",
+            Files = [],
+            Steps = [new SandboxStep { Name = "x", Command = ["true"] }],
+        };
 
         var error = await Assert.ThrowsAsync<SandboxUnavailableException>(() =>
             Runner().RunAsync(request, TestContext.Current.CancellationToken));
@@ -173,7 +200,12 @@ public class DockerSandboxRunnerTests
     [Fact]
     public async Task AMissingDockerProgram_IsReportedAsUnavailable()
     {
-        var request = new SandboxRequest(Image, [], [new SandboxStep("x", ["true"])]);
+        var request = new SandboxRequest
+        {
+            Image = Image,
+            Files = [],
+            Steps = [new SandboxStep { Name = "x", Command = ["true"] }],
+        };
 
         await Assert.ThrowsAsync<SandboxUnavailableException>(() =>
             Runner(new SandboxOptions { DockerPath = "no-such-docker-program" }).RunAsync(request, TestContext.Current.CancellationToken));

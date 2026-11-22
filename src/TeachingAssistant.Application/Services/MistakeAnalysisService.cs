@@ -81,7 +81,7 @@ public class MistakeAnalysisService : IMistakeAnalysisService
                                "The assignment's instructions are not stored or cannot be read. Fetch the assignment first.");
 
         _callContext.DescribeAssignment(courseId, assignmentId);
-        var parts = instructions.Append(new TextPart(Prompt(mistakes, scores))).ToList();
+        var parts = instructions.Append(new TextPart { Text = Prompt(mistakes, scores) }).ToList();
         var reply = await _languageModel.AnalyzeAsync(PromptLibrary.ClassMistakes, parts, Schema, cancellationToken);
         var answer = Read(reply.Text);
 
@@ -262,8 +262,14 @@ public class MistakeAnalysisService : IMistakeAnalysisService
                         m.StartLine, m.EndLine)));
             }
 
-            scores.Add(new StudentScore(submission.StudentId, report?.Score ?? draft.Score, draft.MaxScore, report?.Bonus ?? draft.Bonus,
-                mistakes.Count - before));
+            scores.Add(new StudentScore
+            {
+                StudentId = submission.StudentId,
+                Score = report?.Score ?? draft.Score,
+                MaxScore = draft.MaxScore,
+                Bonus = report?.Bonus ?? draft.Bonus,
+                Mistakes = mistakes.Count - before,
+            });
         }
 
         return (mistakes, scores);
@@ -287,41 +293,84 @@ public class MistakeAnalysisService : IMistakeAnalysisService
             .ThenBy(c => c.Title)
             .ToList();
         var members = analysis.Clusters.SelectMany(c => c.Members).ToList();
-        return new CommonMistakesResponse(analysis.Id, analysis.CreatedAt, analysis.Model, analysis.Summary, analysis.NextLecture,
-            analysis.Students,
-            analysis.Mistakes, members.Count(m => m.Severity == MistakeSeverity.Major), members.Count(m => m.Severity == MistakeSeverity.Minor),
-            members.Count(m => m.Severity == MistakeSeverity.Style), clusters);
+        return new CommonMistakesResponse
+        {
+            AnalysisId = analysis.Id,
+            AnalyzedAt = analysis.CreatedAt,
+            Model = analysis.Model,
+            Summary = analysis.Summary,
+            NextLecture = analysis.NextLecture,
+            Students = analysis.Students,
+            Mistakes = analysis.Mistakes,
+            Major = members.Count(m => m.Severity == MistakeSeverity.Major),
+            Minor = members.Count(m => m.Severity == MistakeSeverity.Minor),
+            Style = members.Count(m => m.Severity == MistakeSeverity.Style),
+            Groups = clusters,
+        };
     }
 
     private static MistakeClusterResponse ToResponse(MistakeCluster cluster, int students)
     {
         var affected = cluster.Members.Select(m => m.StudentId).Distinct().Count();
         var withPoints = cluster.Members.Where(m => m.Points is not null).ToList();
-        return new MistakeClusterResponse(
-            cluster.Id,
-            cluster.Title,
-            cluster.Explanation,
-            cluster.ApprovedExplanation,
-            cluster.ApprovedAt,
-            cluster.Ungrouped,
-            affected,
-            students == 0 ? 0 : Math.Round(affected * 100.0 / students, 1),
-            cluster.Members.Count,
-            withPoints.Sum(m => m.Points!.Value),
-            withPoints.Count == 0 ? null : Math.Round(withPoints.Average(m => m.Points!.Value), 1),
-            cluster.Members.Count(m => m.Severity == MistakeSeverity.Major),
-            cluster.Members.Count(m => m.Severity == MistakeSeverity.Minor),
-            cluster.Members.Count(m => m.Severity == MistakeSeverity.Style),
-            cluster.Members
+        return new MistakeClusterResponse
+        {
+            Id = cluster.Id,
+            Title = cluster.Title,
+            Explanation = cluster.Explanation,
+            ApprovedExplanation = cluster.ApprovedExplanation,
+            ApprovedAt = cluster.ApprovedAt,
+            Ungrouped = cluster.Ungrouped,
+            Students = affected,
+            StudentPercent = students == 0 ? 0 : Math.Round(affected * 100.0 / students, 1),
+            Count = cluster.Members.Count,
+            PointsLost = withPoints.Sum(m => m.Points!.Value),
+            AveragePoints = withPoints.Count == 0 ? null : Math.Round(withPoints.Average(m => m.Points!.Value), 1),
+            Major = cluster.Members.Count(m => m.Severity == MistakeSeverity.Major),
+            Minor = cluster.Members.Count(m => m.Severity == MistakeSeverity.Minor),
+            Style = cluster.Members.Count(m => m.Severity == MistakeSeverity.Style),
+            Members = cluster.Members
                 .OrderBy(m => m.StudentName)
-                .Select(m => new ClusterMemberResponse(m.Id, m.GradingMistakeId, m.VersionId, m.StudentId, m.StudentName, m.SubmissionId,
-                    m.Severity, m.Category, m.Points, m.Message, m.File, m.StartLine, m.EndLine))
-                .ToList());
+                .Select(m => new ClusterMemberResponse
+                {
+                    Id = m.Id,
+                    GradingMistakeId = m.GradingMistakeId,
+                    VersionId = m.VersionId,
+                    StudentId = m.StudentId,
+                    StudentName = m.StudentName,
+                    SubmissionId = m.SubmissionId,
+                    Severity = m.Severity,
+                    Category = m.Category,
+                    Points = m.Points,
+                    Message = m.Message,
+                    File = m.File,
+                    StartLine = m.StartLine,
+                    EndLine = m.EndLine,
+                })
+                .ToList(),
+        };
     }
 
-    internal sealed record Reply(string? Summary, string? NextLecture, List<ReplyGroup>? Groups);
+    internal sealed record Reply
+    {
+        public string? Summary { get; init; }
+        public string? NextLecture { get; init; }
+        public List<ReplyGroup>? Groups { get; init; }
+    }
 
-    internal sealed record StudentScore(string StudentId, double? Score, double? MaxScore, double? Bonus, int Mistakes);
+    internal sealed record StudentScore
+    {
+        public required string StudentId { get; init; }
+        public double? Score { get; init; }
+        public double? MaxScore { get; init; }
+        public double? Bonus { get; init; }
+        public required int Mistakes { get; init; }
+    }
 
-    internal sealed record ReplyGroup(string? Title, string? Explanation, List<int>? MistakeIds);
+    internal sealed record ReplyGroup
+    {
+        public string? Title { get; init; }
+        public string? Explanation { get; init; }
+        public List<int>? MistakeIds { get; init; }
+    }
 }

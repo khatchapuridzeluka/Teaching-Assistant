@@ -53,7 +53,7 @@ public class SubmissionFetchService : ISubmissionFetchService
         var assignmentCall = _submissionSource.GetAssignmentAsync(courseId, assignmentId, cancellationToken);
         await Task.WhenAll(listedCall, courseCall, assignmentCall);
         var (listed, course, assignment) = (await listedCall, await courseCall, await assignmentCall);
-        var names = new FolderNames(course.Name, assignment.Title);
+        var names = new FolderNames { CourseName = course.Name, AssignmentTitle = assignment.Title };
 
         var problems = new List<FetchProblem>();
         var instructions = await FetchInstructionsAsync(courseId, course.Name, assignment, problems, cancellationToken);
@@ -140,8 +140,17 @@ public class SubmissionFetchService : ISubmissionFetchService
         }
 
         await _store.SaveChangesAsync(cancellationToken);
-        return new FetchSummary(listed.Count, newSubmissions, newVersions, unchanged,
-            listed.Count - turnedIn.Count, problems, instructions?.VersionNumber, instructions?.IsNew ?? false);
+        return new FetchSummary
+        {
+            Submissions = listed.Count,
+            NewSubmissions = newSubmissions,
+            NewVersions = newVersions,
+            Unchanged = unchanged,
+            NotSubmitted = listed.Count - turnedIn.Count,
+            Problems = problems,
+            InstructionsVersion = instructions?.VersionNumber,
+            NewInstructions = instructions?.IsNew ?? false,
+        };
     }
 
     private async Task<InstructionsFetchResult?> FetchInstructionsAsync(
@@ -151,14 +160,17 @@ public class SubmissionFetchService : ISubmissionFetchService
         try
         {
             var result = await _instructionsFetch.FetchAsync(courseId, courseName, assignment, cancellationToken);
-            problems.AddRange(result.Problems.Select(p => new FetchProblem(InstructionsLabel, p)));
+            problems.AddRange(result.Problems.Select(p => new FetchProblem { StudentName = InstructionsLabel, Detail = p }));
             return result;
         }
         catch (Exception ex) when (ex is SubmissionSourceNotFoundException or SubmissionSourceUnavailableException)
         {
-            problems.Add(new FetchProblem(InstructionsLabel,
-                $"Could not store the assignment's instructions: {ex.Message} Grading uses the previously stored " +
-                "instructions, if any; retried on the next fetch."));
+            problems.Add(new FetchProblem
+            {
+                StudentName = InstructionsLabel,
+                Detail = $"Could not store the assignment's instructions: {ex.Message} Grading uses the previously stored " +
+                "instructions, if any; retried on the next fetch.",
+            });
             return null;
         }
     }
@@ -177,7 +189,7 @@ public class SubmissionFetchService : ISubmissionFetchService
 
         if (current.Count == 0)
         {
-            problems.Add(new FetchProblem(item.StudentName, "Turned in without attachments."));
+            problems.Add(new FetchProblem { StudentName = item.StudentName, Detail = "Turned in without attachments." });
             return StudentResult.Skipped(item, problems);
         }
 
@@ -189,13 +201,27 @@ public class SubmissionFetchService : ISubmissionFetchService
         if (!submission.HasChanged(current.Select(c => c.Fingerprint)))
         {
             var repair = await RepairLatestAsync(submission, item, current, problems, cancellationToken);
-            return new StudentResult(item, submission, existing is null, null, problems, repair);
+            return new StudentResult
+            {
+                Item = item,
+                Submission = submission,
+                IsNew = existing is null,
+                Problems = problems,
+                Repair = repair,
+            };
         }
 
         var version = await TryStoreFilesAsync(submission, item, current, problems, cancellationToken);
         return version is null
             ? StudentResult.Skipped(item, problems)
-            : new StudentResult(item, submission, existing is null, version, problems);
+            : new StudentResult
+            {
+                Item = item,
+                Submission = submission,
+                IsNew = existing is null,
+                Version = version,
+                Problems = problems,
+            };
     }
 
     private async Task<CodeExtraction?> RepairLatestAsync(
@@ -240,20 +266,27 @@ public class SubmissionFetchService : ISubmissionFetchService
         }
         catch (Exception ex) when (ex is SubmissionSourceNotFoundException or SubmissionSourceUnavailableException)
         {
-            problems.Add(new FetchProblem(item.StudentName,
-                $"v{version.Number} has files missing from storage, and downloading them again failed: {ex.Message} " +
-                "Retried on the next fetch."));
+            problems.Add(new FetchProblem
+            {
+                StudentName = item.StudentName,
+                Detail = $"v{version.Number} has files missing from storage, and downloading them again failed: {ex.Message} " +
+                "Retried on the next fetch.",
+            });
             return null;
         }
 
         var extraction = await _storage.ReExtractAsync(version.StoragePath, version.Contents
             .Where(c => c.StoredName is not null)
-            .Select(c => new ExtractableFile(c.StoredName!, c.Kind))
+            .Select(c => new ExtractableFile { StoredName = c.StoredName!, Kind = c.Kind })
             .ToList(), cancellationToken);
 
-        problems.Add(new FetchProblem(item.StudentName, missing.Count > 0
-            ? $"v{version.Number}: {string.Join(", ", missing.Select(c => $"'{c.Name}'"))} missing from storage; downloaded again."
-            : $"v{version.Number}: extracted code was missing from storage; extracted again."));
+        problems.Add(new FetchProblem
+        {
+            StudentName = item.StudentName,
+            Detail = missing.Count > 0
+                ? $"v{version.Number}: {string.Join(", ", missing.Select(c => $"'{c.Name}'"))} missing from storage; downloaded again."
+                : $"v{version.Number}: extracted code was missing from storage; extracted again.",
+        });
         return extraction;
     }
 
@@ -280,42 +313,98 @@ public class SubmissionFetchService : ISubmissionFetchService
                 try
                 {
                     var file = await LimitedAsync(() => _fileSource.GetFileAsync(fileId, cancellationToken), cancellationToken);
-                    return new DescribedAttachment(
-                        new CurrentContent(new ContentFingerprint(ContentOrigin.Drive, file.Id, file.Revision), file), null);
+                    return new DescribedAttachment
+                    {
+                        Content = new CurrentContent
+                        {
+                            Fingerprint = new ContentFingerprint
+                            {
+                                Origin = ContentOrigin.Drive,
+                                ExternalId = file.Id,
+                                Fingerprint = file.Revision,
+                            },
+                            File = file,
+                        },
+                    };
                 }
                 catch (Exception ex) when (ex is SubmissionSourceNotFoundException or SubmissionSourceUnavailableException)
                 {
-                    return new DescribedAttachment(null, new FetchProblem(item.StudentName,
-                        $"Could not read '{attachment.Title}': {ex.Message} Skipped; retried on the next fetch."), Failed: true);
+                    return new DescribedAttachment
+                    {
+                        Problem = new FetchProblem
+                        {
+                            StudentName = item.StudentName,
+                            Detail = $"Could not read '{attachment.Title}': {ex.Message} Skipped; retried on the next fetch.",
+                        },
+                        Failed = true,
+                    };
                 }
 
             case { Kind: AttachmentKind.Link, Url: { } url } when IsGitHub(url):
                 try
                 {
                     var repository = await LimitedAsync(() => _repositorySource.ResolveAsync(url, cancellationToken), cancellationToken);
-                    return new DescribedAttachment(new CurrentContent(
-                        new ContentFingerprint(ContentOrigin.GitHub, url, repository.CommitSha), null, attachment.Title, repository), null);
+                    return new DescribedAttachment
+                    {
+                        Content = new CurrentContent
+                        {
+                            Fingerprint = new ContentFingerprint
+                            {
+                                Origin = ContentOrigin.GitHub,
+                                ExternalId = url,
+                                Fingerprint = repository.CommitSha,
+                            },
+                            Title = attachment.Title,
+                            Repository = repository,
+                        },
+                    };
                 }
                 catch (SubmissionSourceNotFoundException ex)
                 {
                     // Private, renamed or deleted: recorded with the reason, so the teacher sees it; a later fetch picks the
                     // code up once the student makes the repository public.
-                    return new DescribedAttachment(new CurrentContent(
-                        new ContentFingerprint(ContentOrigin.GitHub, url, url), null, attachment.Title, NotFoundReason: ex.Message), null);
+                    return new DescribedAttachment
+                    {
+                        Content = new CurrentContent
+                        {
+                            Fingerprint = new ContentFingerprint { Origin = ContentOrigin.GitHub, ExternalId = url, Fingerprint = url },
+                            Title = attachment.Title,
+                            NotFoundReason = ex.Message,
+                        },
+                    };
                 }
                 catch (SubmissionSourceUnavailableException ex)
                 {
-                    return new DescribedAttachment(null, new FetchProblem(item.StudentName,
-                        $"Could not read '{attachment.Title}': {ex.Message} Skipped; retried on the next fetch."), Failed: true);
+                    return new DescribedAttachment
+                    {
+                        Problem = new FetchProblem
+                        {
+                            StudentName = item.StudentName,
+                            Detail = $"Could not read '{attachment.Title}': {ex.Message} Skipped; retried on the next fetch.",
+                        },
+                        Failed = true,
+                    };
                 }
 
             case { Kind: AttachmentKind.Link, Url: { } url }:
-                return new DescribedAttachment(
-                    new CurrentContent(new ContentFingerprint(ContentOrigin.Link, url, url), null, attachment.Title), null);
+                return new DescribedAttachment
+                {
+                    Content = new CurrentContent
+                    {
+                        Fingerprint = new ContentFingerprint { Origin = ContentOrigin.Link, ExternalId = url, Fingerprint = url },
+                        Title = attachment.Title,
+                    },
+                };
 
             default:
-                return new DescribedAttachment(null,
-                    new FetchProblem(item.StudentName, $"'{attachment.Title}' is not a file or link and was ignored."));
+                return new DescribedAttachment
+                {
+                    Problem = new FetchProblem
+                    {
+                        StudentName = item.StudentName,
+                        Detail = $"'{attachment.Title}' is not a file or link and was ignored.",
+                    },
+                };
         }
     }
 
@@ -338,14 +427,18 @@ public class SubmissionFetchService : ISubmissionFetchService
 
             extraction = await writer.ExtractCodeAsync(results
                 .Where(r => r.Content.StoredName is not null)
-                .Select(r => new ExtractableFile(r.Content.StoredName!, r.Content.Kind))
+                .Select(r => new ExtractableFile { StoredName = r.Content.StoredName!, Kind = r.Content.Kind })
                 .ToList(), cancellationToken);
 
             await writer.CommitAsync(cancellationToken);
         }
         catch (Exception ex) when (ex is SubmissionSourceNotFoundException or SubmissionSourceUnavailableException)
         {
-            problems.Add(new FetchProblem(item.StudentName, $"Download failed: {ex.Message} Skipped; retried on the next fetch."));
+            problems.Add(new FetchProblem
+            {
+                StudentName = item.StudentName,
+                Detail = $"Download failed: {ex.Message} Skipped; retried on the next fetch.",
+            });
             return null;
         }
 
@@ -358,12 +451,20 @@ public class SubmissionFetchService : ISubmissionFetchService
         var detail = notStored.Count == 0 ? null : string.Join(" ", notStored);
         if (detail is not null)
         {
-            problems.Add(new FetchProblem(item.StudentName, detail));
+            problems.Add(new FetchProblem { StudentName = item.StudentName, Detail = detail });
         }
 
-        problems.AddRange(extraction.Problems.Select(p => new FetchProblem(item.StudentName, p)));
+        problems.AddRange(extraction.Problems.Select(p => new FetchProblem { StudentName = item.StudentName, Detail = p }));
 
-        return new PreparedVersion(status, detail, writer.RelativePath, _timeProvider.GetUtcNow(), contents, extraction);
+        return new PreparedVersion
+        {
+            Status = status,
+            StatusDetail = detail,
+            StoragePath = writer.RelativePath,
+            FetchedAt = _timeProvider.GetUtcNow(),
+            Contents = contents,
+            Extraction = extraction,
+        };
     }
 
     private async Task<StoredContent> StoreFileAsync(ISnapshotWriter writer, RemoteFile file, CancellationToken cancellationToken)
@@ -396,7 +497,7 @@ public class SubmissionFetchService : ISubmissionFetchService
 
         var content = new VersionContent(ContentOrigin.Drive, ContentClassifier.Classify(file.DownloadName, file.DownloadMimeType),
             file.Id, file.Name, file.DownloadMimeType, file.Revision, null, file.SizeBytes, storedName, null, status);
-        return new StoredContent(content, notStoredReason);
+        return new StoredContent { Content = content, NotStoredReason = notStoredReason };
     }
 
     private async Task<StoredContent> StoreRepositoryAsync(
@@ -407,7 +508,7 @@ public class SubmissionFetchService : ISubmissionFetchService
         var url = content.Fingerprint.ExternalId;
         var versionContent = new VersionContent(ContentOrigin.GitHub, ContentKind.Repository, url, content.Title ?? repository.FullName,
             "application/zip", repository.CommitSha, repository.Ref, null, storedName, null, ContentStatus.Stored);
-        return new StoredContent(versionContent, null);
+        return new StoredContent { Content = versionContent };
     }
 
     private Task<bool> DownloadRepositoryAsync(RepositorySnapshot repository, Stream stream, CancellationToken cancellationToken)
@@ -426,8 +527,11 @@ public class SubmissionFetchService : ISubmissionFetchService
 
         var versionContent = new VersionContent(content.Fingerprint.Origin, isRepository ? ContentKind.Repository : ContentKind.Other,
             url, content.Title ?? url, null, content.Fingerprint.Fingerprint, null, null, null, null, ContentStatus.Unsupported);
-        return new StoredContent(versionContent,
-            isRepository ? content.NotFoundReason ?? $"GitHub repository {url} could not be fetched." : $"Link {url} cannot be downloaded.");
+        return new StoredContent
+        {
+            Content = versionContent,
+            NotStoredReason = isRepository ? content.NotFoundReason ?? $"GitHub repository {url} could not be fetched." : $"Link {url} cannot be downloaded.",
+        };
     }
 
     internal static string? ExtractionDetail(CodeExtraction extraction) =>
@@ -451,25 +555,54 @@ public class SubmissionFetchService : ISubmissionFetchService
         && (uri.Host.Equals("github.com", StringComparison.OrdinalIgnoreCase)
             || uri.Host.EndsWith(".github.com", StringComparison.OrdinalIgnoreCase));
 
-    private sealed record FolderNames(string CourseName, string AssignmentTitle);
-
-    private sealed record CurrentContent(
-        ContentFingerprint Fingerprint, RemoteFile? File, string? Title = null, RepositorySnapshot? Repository = null,
-        string? NotFoundReason = null);
-
-    private sealed record DescribedAttachment(CurrentContent? Content, FetchProblem? Problem, bool Failed = false);
-
-    private sealed record StoredContent(VersionContent Content, string? NotStoredReason);
-
-    private sealed record PreparedVersion(
-        VersionStatus Status, string? StatusDetail, string StoragePath, DateTimeOffset FetchedAt,
-        List<VersionContent> Contents, CodeExtraction Extraction);
-
-    private sealed record StudentResult(
-        SubmissionResponse Item, Submission? Submission, bool IsNew, PreparedVersion? Version, List<FetchProblem> Problems,
-        CodeExtraction? Repair = null)
+    private sealed record FolderNames
     {
+        public required string CourseName { get; init; }
+        public required string AssignmentTitle { get; init; }
+    }
+
+    private sealed record CurrentContent
+    {
+        public required ContentFingerprint Fingerprint { get; init; }
+        public RemoteFile? File { get; init; }
+        public string? Title { get; init; }
+        public RepositorySnapshot? Repository { get; init; }
+        public string? NotFoundReason { get; init; }
+    }
+
+    private sealed record DescribedAttachment
+    {
+        public CurrentContent? Content { get; init; }
+        public FetchProblem? Problem { get; init; }
+        public bool Failed { get; init; }
+    }
+
+    private sealed record StoredContent
+    {
+        public required VersionContent Content { get; init; }
+        public string? NotStoredReason { get; init; }
+    }
+
+    private sealed record PreparedVersion
+    {
+        public required VersionStatus Status { get; init; }
+        public string? StatusDetail { get; init; }
+        public required string StoragePath { get; init; }
+        public required DateTimeOffset FetchedAt { get; init; }
+        public required List<VersionContent> Contents { get; init; }
+        public required CodeExtraction Extraction { get; init; }
+    }
+
+    private sealed record StudentResult
+    {
+        public required SubmissionResponse Item { get; init; }
+        public Submission? Submission { get; init; }
+        public required bool IsNew { get; init; }
+        public PreparedVersion? Version { get; init; }
+        public required List<FetchProblem> Problems { get; init; }
+        public CodeExtraction? Repair { get; init; }
+
         public static StudentResult Skipped(SubmissionResponse item, List<FetchProblem> problems) =>
-            new(item, null, false, null, problems);
+            new() { Item = item, IsNew = false, Problems = problems };
     }
 }

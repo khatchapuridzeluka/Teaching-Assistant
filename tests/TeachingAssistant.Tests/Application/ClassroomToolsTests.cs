@@ -126,18 +126,34 @@ public class ClassroomToolsTests
                 throw Failure;
             }
 
-            return Task.FromResult(new CourseSyncSummary(9, 9, 0, 3, 20, 7, 4, 9, 0));
+            return Task.FromResult(new CourseSyncSummary
+            {
+                Students = 9,
+                NewStudents = 9,
+                LeftStudents = 0,
+                Assignments = 3,
+                Submissions = 20,
+                NewSubmissions = 7,
+                Graded = 4,
+                PhotosUpdated = 9,
+                PhotosFailed = 0,
+            });
         }
 
         public string? ListedAssignmentId { get; private set; }
 
         public IReadOnlyList<StoredSubmissionResponse> Stored { get; set; } =
         [
-            new StoredSubmissionResponse(SubmissionId, "external-1", "Nino",
-            [
-                Version(1, new DateTimeOffset(2026, 11, 18, 9, 0, 0, TimeSpan.Zero)),
-                Version(2, new DateTimeOffset(2026, 11, 19, 19, 30, 0, TimeSpan.FromHours(4))),
-            ]),
+            new StoredSubmissionResponse
+            {
+                Id = SubmissionId,
+                ExternalSubmissionId = "external-1",
+                StudentName = "Nino",
+                Versions = [
+                    Version(1, new DateTimeOffset(2026, 11, 18, 9, 0, 0, TimeSpan.Zero)),
+                    Version(2, new DateTimeOffset(2026, 11, 19, 19, 30, 0, TimeSpan.FromHours(4))),
+                ],
+            },
         ];
 
         public Task<IReadOnlyList<StoredSubmissionResponse>> GetByAssignmentAsync(string assignmentId, CancellationToken cancellationToken = default)
@@ -160,15 +176,38 @@ public class ClassroomToolsTests
 
         private static StoredVersionResponse Version(int number, DateTimeOffset turnedInAt)
         {
-            var file = new StoredFileResponse(Guid.NewGuid(), "work.zip", ContentKind.CodeArchive, "application/zip", 1024, ContentStatus.Stored, true);
-            return new StoredVersionResponse(Guid.NewGuid(), number, VersionStatus.Ready, null, true, null, turnedInAt, turnedInAt, [file]);
+            var file = new StoredFileResponse
+            {
+                Id = Guid.NewGuid(),
+                Name = "work.zip",
+                Kind = ContentKind.CodeArchive,
+                MimeType = "application/zip",
+                SizeBytes = 1024,
+                Status = ContentStatus.Stored,
+                Stored = true,
+            };
+            return new StoredVersionResponse
+            {
+                Id = Guid.NewGuid(),
+                Number = number,
+                Status = VersionStatus.Ready,
+                HasCode = true,
+                FetchedAt = turnedInAt,
+                TurnedInAt = turnedInAt,
+                Files = [file],
+            };
         }
 
         public Exception? Failure { get; set; }
 
         public Task<IReadOnlyList<CourseResponse>> GetCoursesAsync(CancellationToken cancellationToken = default)
         {
-            return Task.FromResult<IReadOnlyList<CourseResponse>>([new CourseResponse("course-1", "Java II", null, "ACTIVE", null)]);
+            return Task.FromResult<IReadOnlyList<CourseResponse>>([new CourseResponse
+            {
+                Id = "course-1",
+                Name = "Java II",
+                State = "ACTIVE",
+            }]);
         }
 
         public Task<IReadOnlyList<AssignmentResponse>> GetAssignmentsAsync(string courseId, CancellationToken cancellationToken = default)
@@ -176,8 +215,25 @@ public class ClassroomToolsTests
             var due = new DateTimeOffset(2026, 11, 20, 19, 0, 0, TimeSpan.Zero);
             return Task.FromResult<IReadOnlyList<AssignmentResponse>>(
             [
-                new AssignmentResponse("a-4", courseId, "Assignment 4", null, "ASSIGNMENT", 100, due, null, null, []),
-                new AssignmentResponse("a-5", courseId, "Assignment 5", null, "ASSIGNMENT", 100, null, null, null, []),
+                new AssignmentResponse
+                {
+                    Id = "a-4",
+                    CourseId = courseId,
+                    Title = "Assignment 4",
+                    WorkType = "ASSIGNMENT",
+                    MaxPoints = 100,
+                    DueAt = due,
+                    Materials = [],
+                },
+                new AssignmentResponse
+                {
+                    Id = "a-5",
+                    CourseId = courseId,
+                    Title = "Assignment 5",
+                    WorkType = "ASSIGNMENT",
+                    MaxPoints = 100,
+                    Materials = [],
+                },
             ]);
         }
 
@@ -189,7 +245,21 @@ public class ClassroomToolsTests
                 throw Failure;
             }
 
-            return Task.FromResult(new FetchSummary(5, 2, 1, 2, 3, [new FetchProblem("Nino", "The zip could not be opened.")], 1, false));
+            return Task.FromResult(new FetchSummary
+            {
+                Submissions = 5,
+                NewSubmissions = 2,
+                NewVersions = 1,
+                Unchanged = 2,
+                NotSubmitted = 3,
+                Problems = [new FetchProblem
+                {
+                    StudentName = "Nino",
+                    Detail = "The zip could not be opened.",
+                }],
+                InstructionsVersion = 1,
+                NewInstructions = false,
+            });
         }
     }
 }
