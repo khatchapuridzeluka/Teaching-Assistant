@@ -23,15 +23,3 @@ public class StudentAnalysisConfiguration : IEntityTypeConfiguration<StudentAnal
         builder.Navigation(a => a.Groups).UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }
-
-public class StrengthGroupConfiguration : IEntityTypeConfiguration<StrengthGroup>
-{
-    public void Configure(EntityTypeBuilder<StrengthGroup> builder)
-    {
-        builder.ToTable("student_strength_groups");
-        builder.HasKey(g => g.Id);
-        builder.Property(g => g.Id).ValueGeneratedNever();
-        builder.Property(g => g.Explanation).HasColumnType("text");
-        builder.HasIndex(g => g.AnalysisId);
-    }
-}

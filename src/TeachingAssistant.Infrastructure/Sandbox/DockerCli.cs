@@ -5,22 +5,6 @@ using TeachingAssistant.Application.Exceptions;
 
 namespace TeachingAssistant.Infrastructure.Sandbox;
 
-/// <summary>What one docker command did: its exit code and the start of what it printed.</summary>
-internal sealed record DockerCommandResult
-{
-    /// <summary>The exit code; -1 when it was stopped from the host for taking too long.</summary>
-    public required int ExitCode { get; init; }
-
-    public required string Stdout { get; init; }
-
-    public required string Stderr { get; init; }
-
-    public required bool OutputTruncated { get; init; }
-
-    /// <summary>True when the host stopped the command because it took too long.</summary>
-    public required bool HostTimedOut { get; init; }
-}
-
 /// <summary>
 /// Runs the docker command line program with arguments passed one by one (never through a shell, so nothing in them is
 /// interpreted), optional bytes on its standard input, a time limit and a cap on how much output is kept.

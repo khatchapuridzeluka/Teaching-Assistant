@@ -2,12 +2,6 @@ using TeachingAssistant.Application.Contracts;
 
 namespace TeachingAssistant.Application.Models;
 
-public record AgentRunHooks
-{
-    public required Func<AgentEntry, Task> OnStep { get; init; }
-    public required Func<bool> ShouldStop { get; init; }
-}
-
 public class AgentRunContext
 {
     private readonly Queue<Guid> _queuedJobs = new();

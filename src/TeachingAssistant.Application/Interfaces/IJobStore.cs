@@ -31,8 +31,3 @@ public interface IJobStore
 
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }
-
-public interface IJobSignal
-{
-    void Notify();
-}

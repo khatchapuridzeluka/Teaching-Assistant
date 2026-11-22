@@ -2,22 +2,6 @@ using TeachingAssistant.Domain.Agents;
 
 namespace TeachingAssistant.Application.Models;
 
-public record AgentToolCall
-{
-    public required string Id { get; init; }
-    public required string Name { get; init; }
-    public required string Arguments { get; init; }
-}
-
-public record AgentEntry
-{
-    public required AgentMessageRole Role { get; init; }
-    public required string Text { get; init; }
-    public IReadOnlyList<AgentToolCall>? ToolCalls { get; init; }
-    public string? ToolCallId { get; init; }
-    public string? ToolName { get; init; }
-}
-
 public record AgentReply
 {
     public required string Model { get; init; }

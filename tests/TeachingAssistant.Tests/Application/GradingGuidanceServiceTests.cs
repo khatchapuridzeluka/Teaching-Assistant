@@ -1,6 +1,5 @@
 using TeachingAssistant.Application.Contracts;
 using TeachingAssistant.Application.Exceptions;
-using TeachingAssistant.Application.Interfaces;
 using TeachingAssistant.Application.Services;
 using TeachingAssistant.Domain.Grading;
 
@@ -239,82 +238,5 @@ public class GradingGuidanceServiceTests
     private sealed class FixedClock(DateTimeOffset now) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => now;
-    }
-}
-
-internal sealed class FakeGradingPrinciples : IGradingPrincipleStore
-{
-    public List<GradingPrinciple> All { get; } = [];
-
-    public int Saves { get; private set; }
-
-    public GradingPrinciple Add(int position, string title, string detail)
-    {
-        var principle = new GradingPrinciple(Guid.NewGuid(), position, title, detail, new DateTimeOffset(2026, 11, 1, 0, 0, 0, TimeSpan.Zero));
-        All.Add(principle);
-        return principle;
-    }
-
-    public Task<IReadOnlyList<GradingPrinciple>> GetActiveAsync(CancellationToken cancellationToken = default) =>
-        Task.FromResult<IReadOnlyList<GradingPrinciple>>(All.Where(p => !p.IsDeleted).OrderBy(p => p.Position).ToList());
-
-    public Task<GradingPrinciple?> FindAsync(Guid id, CancellationToken cancellationToken = default) =>
-        Task.FromResult(All.FirstOrDefault(p => p.Id == id));
-
-    public Task<int> GetLastPositionAsync(CancellationToken cancellationToken = default) =>
-        Task.FromResult(All.Count == 0 ? 0 : All.Max(p => p.Position));
-
-    void IGradingPrincipleStore.Add(GradingPrinciple principle) => All.Add(principle);
-
-    public Task SaveChangesAsync(CancellationToken cancellationToken = default)
-    {
-        Saves++;
-        return Task.CompletedTask;
-    }
-}
-
-internal sealed class FakeCourseGuidance : ICourseGuidanceStore
-{
-    public List<CourseGuidance> All { get; } = [];
-
-    public Task<CourseGuidance?> FindAsync(string courseId, CancellationToken cancellationToken = default) =>
-        Task.FromResult(All.FirstOrDefault(g => g.CourseId == courseId));
-
-    public void Add(CourseGuidance guidance) => All.Add(guidance);
-
-    public void Remove(CourseGuidance guidance) => All.Remove(guidance);
-
-    public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
-}
-
-internal sealed class FakePolicyRules : IPolicyRuleStore
-{
-    public List<PolicyRule> All { get; } = [];
-
-    public int Saves { get; private set; }
-
-    public PolicyRule Add(int position, string title, string detail)
-    {
-        var rule = new PolicyRule(Guid.NewGuid(), position, title, PolicyEffect.NoDeduction, null, null, title, detail,
-            new DateTimeOffset(2026, 11, 1, 0, 0, 0, TimeSpan.Zero));
-        All.Add(rule);
-        return rule;
-    }
-
-    public Task<IReadOnlyList<PolicyRule>> GetActiveAsync(CancellationToken cancellationToken = default) =>
-        Task.FromResult<IReadOnlyList<PolicyRule>>(All.Where(r => !r.IsDeleted).OrderBy(r => r.Position).ToList());
-
-    public Task<PolicyRule?> FindAsync(Guid id, CancellationToken cancellationToken = default) =>
-        Task.FromResult(All.FirstOrDefault(r => r.Id == id));
-
-    public Task<int> GetLastPositionAsync(CancellationToken cancellationToken = default) =>
-        Task.FromResult(All.Count == 0 ? 0 : All.Max(r => r.Position));
-
-    void IPolicyRuleStore.Add(PolicyRule rule) => All.Add(rule);
-
-    public Task SaveChangesAsync(CancellationToken cancellationToken = default)
-    {
-        Saves++;
-        return Task.CompletedTask;
     }
 }

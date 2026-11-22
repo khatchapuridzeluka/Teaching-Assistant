@@ -10,10 +10,3 @@ public record GradeAllPlan
     public IReadOnlyDictionary<Guid, string>? AssignmentIds { get; init; }
     public int NotFetched { get; init; }
 }
-
-public record JobChildCount
-{
-    public required Guid ParentId { get; init; }
-    public required Domain.Jobs.JobStatus Status { get; init; }
-    public required int Count { get; init; }
-}

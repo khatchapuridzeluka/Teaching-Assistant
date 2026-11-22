@@ -103,7 +103,8 @@ Every class, record, enum, interface and struct gets its own file, named after t
 
 - **Contracts:** one folder per controller, named exactly like it (`Contracts/Agent/` for `AgentController`, `Contracts/Students/` for `StudentsController`). A contract goes in the folder of the controller that accepts or returns it; a helper record no controller names goes with the contract that holds it; a contract several controllers use goes with the feature that owns it (`JobResponse` in `Jobs/`). No nested types.
 - **One flat namespace for all contracts:** every file in `Contracts/` declares `namespace TeachingAssistant.Application.Contracts;`, whatever its folder. Swagger names each schema by its bare type name and the frontend's type aliases come from those names, so contract names must be unique, and one namespace makes the compiler check that. Contracts may expose Domain enums; `ContractsTests` fails if any type the contracts expose shares a schema name with another.
-- **Enforced in the build:** StyleCop's SA1402 (one type per file) and SA1649 (file named after its type) are errors for `Contracts/`, set in `.editorconfig`; every other StyleCop rule is off. Domain, the rest of Application, Infrastructure, WebAPI and the tests still have files holding several types; they move to this rule next, with namespaces following their folders, and the two rules then apply everywhere.
+- **Nested types:** only `private` helper types may stay nested inside a class (and `internal` ones the tests use); anything else gets its own file.
+- **Enforced in the build:** StyleCop's SA1402 (one type per file) and SA1649 (file named after its type) are errors everywhere except the generated migrations, and IDE0130 (namespace matches folder) warns everywhere except `Contracts/`; all set in `.editorconfig`, where every other StyleCop rule is off.
 
 ### Records
 

@@ -8,8 +8,12 @@ root = true
 csharp_prefer_braces = true:warning
 dotnet_diagnostic.IDE0011.severity = warning
 
-# StyleCop is used only for "one type per file" (SA1402) and "file named after its type" (SA1649), switched on below
-# where they apply; every other StyleCop rule is off.
+# One type per file (SA1402), named after it (SA1649), and namespaces that match folders (IDE0130), see CLAUDE.md,
+# "One type per file". StyleCop is used only for those two rules; every other StyleCop rule is off.
+dotnet_diagnostic.SA1402.severity = error
+dotnet_diagnostic.SA1649.severity = error
+dotnet_style_namespace_match_folder = true
+dotnet_diagnostic.IDE0130.severity = warning
 dotnet_analyzer_diagnostic.category-StyleCop.CSharp.DocumentationRules.severity = none
 dotnet_analyzer_diagnostic.category-StyleCop.CSharp.LayoutRules.severity = none
 dotnet_analyzer_diagnostic.category-StyleCop.CSharp.MaintainabilityRules.severity = none
@@ -19,14 +23,15 @@ dotnet_analyzer_diagnostic.category-StyleCop.CSharp.ReadabilityRules.severity = 
 dotnet_analyzer_diagnostic.category-StyleCop.CSharp.SpacingRules.severity = none
 dotnet_analyzer_diagnostic.category-StyleCop.CSharp.SpecialRules.severity = none
 
-# Contracts: one type per file, named after it, in feature folders that share one flat namespace
-# (TeachingAssistant.Application.Contracts), because Swagger names every schema by its bare type name (see CLAUDE.md).
+# Contracts sit in feature folders that share one flat namespace (TeachingAssistant.Application.Contracts), because
+# Swagger names every schema by its bare type name (see CLAUDE.md).
 [src/TeachingAssistant.Application/Contracts/**.cs]
-dotnet_diagnostic.SA1402.severity = error
-dotnet_diagnostic.SA1649.severity = error
 dotnet_diagnostic.IDE0130.severity = none
 resharper_check_namespace_highlighting = none
 
 # EF Core migrations are generated; leave them as the tool writes them.
 [**/Migrations/*.cs]
 dotnet_diagnostic.IDE0011.severity = none
+dotnet_diagnostic.SA1402.severity = none
+dotnet_diagnostic.SA1649.severity = none
+dotnet_diagnostic.IDE0130.severity = none

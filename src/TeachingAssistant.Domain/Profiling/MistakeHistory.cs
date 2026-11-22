@@ -1,31 +1,4 @@
-using TeachingAssistant.Domain.Grading;
-
 namespace TeachingAssistant.Domain.Profiling;
-
-public enum MistakeLabel
-{
-    New,
-
-    Repeated,
-}
-
-public sealed record LabeledMistake
-{
-    public required StudentMistake Mistake { get; init; }
-    public required MistakeLabel Label { get; init; }
-    public string? FirstAssignmentId { get; init; }
-}
-
-public sealed record MistakeCategoryTrend
-{
-    public required MistakeCategory Category { get; init; }
-    public required int Count { get; init; }
-    public required int Assignments { get; init; }
-    public required bool Repeated { get; init; }
-    public required double PointsLost { get; init; }
-    public required string FirstAssignmentId { get; init; }
-    public required string LastAssignmentId { get; init; }
-}
 
 public static class MistakeHistory
 {

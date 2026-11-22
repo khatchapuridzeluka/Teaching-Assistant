@@ -306,7 +306,7 @@ public class GradingService : IGradingService
         public required Prompt Prompt { get; init; }
         public required BuildCheckOutcome Build { get; init; }
         public required LanguageModelReply Reply { get; init; }
-        public required GradingOutput.ReadReply Read { get; init; }
+        public required ReadReply Read { get; init; }
     }
 
     /// <summary>

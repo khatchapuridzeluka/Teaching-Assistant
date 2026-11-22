@@ -1,24 +1,5 @@
 namespace TeachingAssistant.Domain.Usage;
 
-public enum ModelCallPurpose
-{
-    Grading,
-
-    GradeAll,
-
-    Chat,
-
-    HealthCheck,
-
-    MistakeAnalysis,
-
-    StudentAnalysis,
-
-    Evaluation,
-
-    Try,
-}
-
 public class ModelCall
 {
     private ModelCall()
@@ -92,19 +73,4 @@ public class ModelCall
             Error = error.Length > 1000 ? error[..1000] : error,
         };
     }
-}
-
-public sealed record ModelCallTokens
-{
-    public required long Input { get; init; }
-    public required long Output { get; init; }
-    public required long CacheRead { get; init; }
-    public required long CacheWrite { get; init; }
-}
-
-public sealed record ModelCallSubject
-{
-    public string? CourseId { get; init; }
-    public string? AssignmentId { get; init; }
-    public Guid? VersionId { get; init; }
 }

@@ -1,20 +1,5 @@
 namespace TeachingAssistant.Domain.Agents;
 
-public enum AgentRunStatus
-{
-    Queued,
-
-    Running,
-
-    Waiting,
-
-    Succeeded,
-
-    Failed,
-
-    Canceled,
-}
-
 public class AgentRun
 {
     public const int DefaultMaxSteps = 25;

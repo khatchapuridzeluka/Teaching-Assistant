@@ -1,16 +1,5 @@
 namespace TeachingAssistant.Infrastructure.GitHub;
 
-public enum GitHubLinkKind
-{
-    Repository,
-
-    Branch,
-
-    PullRequest,
-
-    Commit,
-}
-
 /// <summary>
 /// A GitHub link as students paste it: the repository, a branch or folder (tree/... or blob/...), a pull request or a commit.
 /// For a branch link the whole repository at that branch is fetched, not only the folder.

@@ -40,27 +40,3 @@ public interface IJobService
     Task<JobResponse> QueueAnalyzeStudentAsync(
         string courseId, string studentId, StudentAnalysisKind kind, CancellationToken cancellationToken = default);
 }
-
-public interface IJobProcessor
-{
-    Task<ClaimedJob?> ClaimNextAsync(string workerId, TimeSpan lease, CancellationToken cancellationToken = default);
-
-    Task<bool> HeartbeatAsync(Guid jobId, TimeSpan lease, CancellationToken cancellationToken = default);
-
-    Task CompleteAsync(Guid jobId, string? result, CancellationToken cancellationToken = default);
-
-    Task FailAsync(Guid jobId, Exception exception, CancellationToken cancellationToken = default);
-
-    Task ConfirmCanceledAsync(Guid jobId, CancellationToken cancellationToken = default);
-
-    Task<int> RecoverExpiredLeasesAsync(CancellationToken cancellationToken = default);
-
-    Task<int> ReconcileGroupsAsync(CancellationToken cancellationToken = default);
-}
-
-public record ClaimedJob
-{
-    public required Guid Id { get; init; }
-    public required JobType Type { get; init; }
-    public required string Payload { get; init; }
-}

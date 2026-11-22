@@ -204,16 +204,6 @@ internal static class GradingOutput
         return bySuffix.Count == 1 ? bySuffix[0] : null;
     }
 
-    public sealed record ReadReply
-    {
-        public required string Review { get; init; }
-        public double? Score { get; init; }
-        public double? MaxScore { get; init; }
-        public double? Bonus { get; init; }
-        public required IReadOnlyList<CodeMistake> Mistakes { get; init; }
-        public required IReadOnlyList<CodeStrength> Strengths { get; init; }
-    }
-
     private sealed record Reply
     {
         public string? Review { get; init; }

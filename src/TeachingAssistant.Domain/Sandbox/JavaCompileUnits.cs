@@ -2,23 +2,6 @@ using System.Text.RegularExpressions;
 
 namespace TeachingAssistant.Domain.Sandbox;
 
-/// <summary>A Java source file of a submission: its path inside the submission and its text.</summary>
-public record JavaSourceFile
-{
-    public required string Path { get; init; }
-    public required string Text { get; init; }
-}
-
-/// <summary>Files that are compiled together: one program, or one task of a submission that holds several.</summary>
-public record JavaCompileUnit
-{
-    /// <summary>The folder the program's packages start from, relative to the submission; "" for the top.</summary>
-    public required string Root { get; init; }
-
-    /// <summary>The paths of its .java files, as in the submission.</summary>
-    public required IReadOnlyList<string> Files { get; init; }
-}
-
 /// <summary>
 /// Decides which of a submission's Java files are compiled together. Students often zip several tasks side by side, each
 /// with its own Main class and no package; compiling them all at once would fail with "duplicate class" although every

@@ -42,28 +42,3 @@ public class AiGradingConfiguration : IEntityTypeConfiguration<AiGrading>
         builder.Navigation(g => g.Strengths).UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }
-
-public class GradingStrengthConfiguration : IEntityTypeConfiguration<GradingStrength>
-{
-    public void Configure(EntityTypeBuilder<GradingStrength> builder)
-    {
-        builder.ToTable("grading_strengths");
-        builder.HasKey(s => s.Id);
-        builder.Property(s => s.Id).ValueGeneratedNever();
-        builder.Property(s => s.Category).HasConversion<string>();
-        builder.HasIndex(s => s.GradingId);
-    }
-}
-
-public class GradingMistakeConfiguration : IEntityTypeConfiguration<GradingMistake>
-{
-    public void Configure(EntityTypeBuilder<GradingMistake> builder)
-    {
-        builder.ToTable("grading_mistakes");
-        builder.HasKey(m => m.Id);
-        builder.Property(m => m.Id).ValueGeneratedNever();
-        builder.Property(m => m.Severity).HasConversion<string>();
-        builder.Property(m => m.Category).HasConversion<string>();
-        builder.HasIndex(m => m.GradingId);
-    }
-}

@@ -1,6 +1,4 @@
 using System.Text;
-using TeachingAssistant.Application.Exceptions;
-using TeachingAssistant.Application.Interfaces;
 using TeachingAssistant.Application.Models;
 using TeachingAssistant.Application.Services;
 using TeachingAssistant.Domain.Grading;
@@ -282,68 +280,4 @@ public class JavaBuildCheckTests
 
     private static string Text(SandboxRequest request, string path) =>
         Encoding.UTF8.GetString(request.Files.Single(f => f.Path == path).Content);
-}
-
-/// <summary>A sandbox that records the request and answers with a scripted result, or is unavailable.</summary>
-internal sealed class FakeSandbox : ISandboxRunner
-{
-    public SandboxRequest? Request { get; private set; }
-
-    public SandboxResult? Result { get; set; }
-
-    public string? Unavailable { get; set; }
-
-    public Task<SandboxResult> RunAsync(SandboxRequest request, CancellationToken cancellationToken = default)
-    {
-        Request = request;
-        if (Unavailable is not null)
-        {
-            throw new SandboxUnavailableException(Unavailable);
-        }
-
-        return Task.FromResult(Result ?? new SandboxResult
-        {
-            Steps = request.Steps.Select(s => new SandboxStepResult
-            {
-                Name = s.Name,
-                Outcome = SandboxStepOutcome.Succeeded,
-                ExitCode = 0,
-                Stdout = "",
-                Stderr = "",
-                OutputTruncated = false,
-                Duration = TimeSpan.Zero,
-            }).ToList(),
-            Duration = TimeSpan.Zero,
-        });
-    }
-}
-
-/// <summary>Extracted code by path; everything else a snapshot storage does is not used here.</summary>
-internal sealed class FakeCodeStorage : ISnapshotStorage
-{
-    public Dictionary<string, byte[]> Files { get; } = [];
-
-    public IReadOnlyList<CodeFile> ListCode(string versionPath) =>
-        Files.OrderBy(f => f.Key).Select(f => new CodeFile { Path = f.Key, SizeBytes = f.Value.Length }).ToList();
-
-    public Stream? OpenCode(string versionPath, string relativePath) =>
-        Files.TryGetValue(relativePath, out var bytes) ? new MemoryStream(bytes) : null;
-
-    public bool OriginalExists(string versionPath, string storedName) => throw new NotSupportedException();
-
-    public Task RestoreOriginalAsync(string versionPath, string storedName, Func<Stream, Task> write, CancellationToken cancellationToken = default) =>
-        throw new NotSupportedException();
-
-    public Stream? OpenOriginal(string versionPath, string storedName) => throw new NotSupportedException();
-
-    public string GetSubmissionFolder(string courseName, string assignmentTitle, string studentName, string studentId) =>
-        throw new NotSupportedException();
-
-    public string GetInstructionsFolder(string courseName, string assignmentTitle, string assignmentId) =>
-        throw new NotSupportedException();
-
-    public ISnapshotWriter BeginVersion(string submissionFolder, int versionNumber) => throw new NotSupportedException();
-
-    public Task<CodeExtraction> ReExtractAsync(string versionPath, IReadOnlyList<ExtractableFile> files, CancellationToken cancellationToken = default) =>
-        throw new NotSupportedException();
 }
