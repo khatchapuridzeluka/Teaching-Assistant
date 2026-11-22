@@ -73,7 +73,8 @@ src/
     Jobs/                                background jobs (queued work such as grading and fetching) and their life cycle
     Agents/                              stored agent chats: conversation, its messages, and one run per teacher message
   TeachingAssistant.Application/
-    Contracts/                           what the API returns
+    Contracts/                           what the API returns and accepts: one folder per controller, one type per file,
+                                         one flat namespace (contract names are unique, as Swagger needs)
     Interfaces/                          ports (ILanguageModel, ISubmissionSource)
     Interfaces/Services/                 use-case interfaces
     Services/                            use-case implementations

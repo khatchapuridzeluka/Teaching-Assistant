@@ -5,6 +5,16 @@
         <!-- dotnet build reports the code-style rules from .editorconfig (e.g. braces, IDE0011) as warnings,
              not only the IDE. -->
         <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+        <!-- SA0001 only says StyleCop's documentation rules are idle, and they are off on purpose (see the ItemGroup below). -->
+        <NoWarn>$(NoWarn);SA0001</NoWarn>
     </PropertyGroup>
+
+    <!-- StyleCop is only here for its one-type-per-file rules (SA1402, SA1649); .editorconfig turns every other
+         StyleCop rule off and says where those two apply. -->
+    <ItemGroup>
+        <PackageReference Include="StyleCop.Analyzers" Version="1.3.180" PrivateAssets="all"
+                          IncludeAssets="runtime; build; native; contentfiles; analyzers" />
+        <AdditionalFiles Include="$(MSBuildThisFileDirectory)stylecop.json" Link="stylecop.json" />
+    </ItemGroup>
 
 </Project>
