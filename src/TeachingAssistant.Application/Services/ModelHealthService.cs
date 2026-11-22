@@ -25,11 +25,23 @@ public class ModelHealthService : IModelHealthService
         try
         {
             var reply = await _languageModel.CompleteAsync(TestPrompt, cancellationToken);
-            return new ModelHealthResponse(true, reply.Model, ElapsedMs(start), reply.Text, null);
+            return new ModelHealthResponse
+            {
+                Healthy = true,
+                Model = reply.Model,
+                LatencyMs = ElapsedMs(start),
+                Reply = reply.Text,
+            };
         }
         catch (LanguageModelUnavailableException ex)
         {
-            return new ModelHealthResponse(false, _languageModel.ModelId, ElapsedMs(start), null, ex.Message);
+            return new ModelHealthResponse
+            {
+                Healthy = false,
+                Model = _languageModel.ModelId,
+                LatencyMs = ElapsedMs(start),
+                Error = ex.Message,
+            };
         }
     }
 

@@ -39,14 +39,16 @@ public enum RunResultStatus
 }
 
 /// <summary>A mistake as a model found it in an evaluation run.</summary>
-public sealed record RunMistake(
-    string? File,
-    int? StartLine,
-    int? EndLine,
-    MistakeSeverity Severity,
-    MistakeCategory Category,
-    string Message,
-    double? Points);
+public sealed record RunMistake
+{
+    public string? File { get; init; }
+    public int? StartLine { get; init; }
+    public int? EndLine { get; init; }
+    public required MistakeSeverity Severity { get; init; }
+    public required MistakeCategory Category { get; init; }
+    public required string Message { get; init; }
+    public double? Points { get; init; }
+}
 
 /// <summary>One approved report graded again by one model in an evaluation run.</summary>
 public class EvaluationRunResult

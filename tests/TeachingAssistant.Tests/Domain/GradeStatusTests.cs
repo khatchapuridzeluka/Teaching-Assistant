@@ -13,7 +13,7 @@ public class GradeStatusTests
     [InlineData(null, false, 1, GradeStatus.NotDue)]
     public void GradeStatusAt_FollowsGradeThenTurnInThenDueDate(double? grade, bool turnedIn, int dueInDays, GradeStatus expected)
     {
-        var result = new AssignmentResult(100, Now.AddDays(dueInDays), grade, turnedIn);
+        var result = new AssignmentResult { MaxPoints = 100, DueAt = Now.AddDays(dueInDays), Grade = grade, TurnedIn = turnedIn };
 
         Assert.Equal(expected, result.GradeStatusAt(Now));
     }
@@ -21,7 +21,7 @@ public class GradeStatusTests
     [Fact]
     public void NoDueDate_AndNothingTurnedIn_IsNotSubmitted_NotMissing()
     {
-        var result = new AssignmentResult(100, null, null, false);
+        var result = new AssignmentResult { MaxPoints = 100, TurnedIn = false };
 
         Assert.Equal(GradeStatus.NotSubmitted, result.GradeStatusAt(Now));
     }

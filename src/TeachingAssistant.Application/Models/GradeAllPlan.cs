@@ -1,12 +1,19 @@
 namespace TeachingAssistant.Application.Models;
 
-public record GradeAllPlan(
-    IReadOnlyList<Guid> VersionIds,
-    int Students,
-    int AlreadyDrafted,
-    int NoWork,
-    IReadOnlyList<string> Problems,
-    IReadOnlyDictionary<Guid, string>? AssignmentIds = null,
-    int NotFetched = 0);
+public record GradeAllPlan
+{
+    public required IReadOnlyList<Guid> VersionIds { get; init; }
+    public required int Students { get; init; }
+    public required int AlreadyDrafted { get; init; }
+    public required int NoWork { get; init; }
+    public required IReadOnlyList<string> Problems { get; init; }
+    public IReadOnlyDictionary<Guid, string>? AssignmentIds { get; init; }
+    public int NotFetched { get; init; }
+}
 
-public record JobChildCount(Guid ParentId, Domain.Jobs.JobStatus Status, int Count);
+public record JobChildCount
+{
+    public required Guid ParentId { get; init; }
+    public required Domain.Jobs.JobStatus Status { get; init; }
+    public required int Count { get; init; }
+}

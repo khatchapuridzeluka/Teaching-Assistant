@@ -93,9 +93,16 @@ public class EvaluationRunService : IEvaluationRunService
         {
             var runResults = await _runs.GetResultsAsync(latestRun.Id, cancellationToken);
             await FailOrphanedAsync(latestRun, runResults, cancellationToken);
-            summary = new EvaluationRunSummary(latestRun.Id, latestRun.CreatedAt, latestRun.Models, runResults.Count,
-                runResults.Count(r => r.Status == RunResultStatus.Done), runResults.Count(r => r.Status == RunResultStatus.Failed),
-                runResults.Count(r => r.Status == RunResultStatus.Pending));
+            summary = new EvaluationRunSummary
+            {
+                Id = latestRun.Id,
+                CreatedAt = latestRun.CreatedAt,
+                Models = latestRun.Models,
+                Total = runResults.Count,
+                Done = runResults.Count(r => r.Status == RunResultStatus.Done),
+                Failed = runResults.Count(r => r.Status == RunResultStatus.Failed),
+                Pending = runResults.Count(r => r.Status == RunResultStatus.Pending),
+            };
         }
 
         // The newest finished result per report and model, for the reports that still count.
@@ -114,7 +121,14 @@ public class EvaluationRunService : IEvaluationRunService
             .OrderBy(r => AvailableModels.ToList().IndexOf(r.Model) is var i && i < 0 ? int.MaxValue : i)
             .ToList();
 
-        return new ModelComparisonResponse(AvailableModels, _languageModel.GradingModelId, approved.Count, summary, rows);
+        return new ModelComparisonResponse
+        {
+            AvailableModels = AvailableModels,
+            GradingModel = _languageModel.GradingModelId,
+            ApprovedReports = approved.Count,
+            LatestRun = summary,
+            Models = rows,
+        };
     }
 
     /// <summary>
@@ -154,19 +168,21 @@ public class EvaluationRunService : IEvaluationRunService
         var teacherMistakes = results.Sum(r => r.Comparison.TeacherMistakes);
         var found = results.Sum(r => r.Comparison.Found);
 
-        return new ModelComparisonRow(
-            model,
-            results.Count,
-            differences.Count,
-            meanGap is { } gap ? Math.Max(0, 100 - gap) : null,
-            differences.Count(d => Math.Abs(d) <= EvaluationService.TolerancePercent + 1e-9),
-            differences.Count == 0 ? null : differences.Average(),
-            teacherMistakes,
-            found,
-            teacherMistakes == 0 ? null : (double)found / teacherMistakes * 100,
-            results.Sum(r => r.Comparison.RepeatedFalseAlarms),
-            results.Sum(r => r.Comparison.Unreviewed),
-            durations.Count == 0 ? null : durations.Average() / 1000,
-            failed);
+        return new ModelComparisonRow
+        {
+            Model = model,
+            Graded = results.Count,
+            ScoresCompared = differences.Count,
+            Accuracy = meanGap is { } gap ? Math.Max(0, 100 - gap) : null,
+            WithinTolerance = differences.Count(d => Math.Abs(d) <= EvaluationService.TolerancePercent + 1e-9),
+            MeanDifference = differences.Count == 0 ? null : differences.Average(),
+            TeacherMistakes = teacherMistakes,
+            Found = found,
+            FoundPercent = teacherMistakes == 0 ? null : (double)found / teacherMistakes * 100,
+            RepeatedFalseAlarms = results.Sum(r => r.Comparison.RepeatedFalseAlarms),
+            Unreviewed = results.Sum(r => r.Comparison.Unreviewed),
+            AverageSeconds = durations.Count == 0 ? null : durations.Average() / 1000,
+            Failed = failed,
+        };
     }
 }

@@ -39,7 +39,11 @@ public class GradingGuidanceServiceTests
         _principles.Add(1, "First", "Read the code.");
         _principles.Add(4, "Gone", "Removed.").Delete(Now);
 
-        var added = await Service().AddPrincipleAsync(new GradingPrincipleRequest(" Check the output ", " Compare it with the example. "),
+        var added = await Service().AddPrincipleAsync(new GradingPrincipleRequest
+        {
+            Title = " Check the output ",
+            Detail = " Compare it with the example. ",
+        },
             TestContext.Current.CancellationToken);
 
         var stored = Assert.Single(_principles.All, p => p.Id == added.Id);
@@ -52,7 +56,11 @@ public class GradingGuidanceServiceTests
     [Fact]
     public async Task Add_WithoutATitleOrText_IsRefused_AndNothingIsStored()
     {
-        await Assert.ThrowsAsync<InvalidRequestException>(() => Service().AddPrincipleAsync(new GradingPrincipleRequest("Title", ""),
+        await Assert.ThrowsAsync<InvalidRequestException>(() => Service().AddPrincipleAsync(new GradingPrincipleRequest
+        {
+            Title = "Title",
+            Detail = "",
+        },
             TestContext.Current.CancellationToken));
 
         Assert.Empty(_principles.All);
@@ -61,14 +69,17 @@ public class GradingGuidanceServiceTests
     [Fact]
     public async Task CourseGuidance_IsSavedPerCourse_Trimmed_AndAnEmptyTextRemovesIt()
     {
-        var saved = await Service().SetCourseGuidanceAsync("course-1", new CourseGuidanceRequest("  Second-year students.  "),
+        var saved = await Service().SetCourseGuidanceAsync("course-1", new CourseGuidanceRequest
+        {
+            Text = "  Second-year students.  ",
+        },
             TestContext.Current.CancellationToken);
         var other = await Service().GetAsync("course-2", TestContext.Current.CancellationToken);
 
         Assert.Equal(("Second-year students.", (DateTimeOffset?)Now), (saved.CourseGuidance, saved.CourseGuidanceUpdatedAt));
         Assert.Null(other.CourseGuidance);
 
-        var cleared = await Service().SetCourseGuidanceAsync("course-1", new CourseGuidanceRequest(" "), TestContext.Current.CancellationToken);
+        var cleared = await Service().SetCourseGuidanceAsync("course-1", new CourseGuidanceRequest { Text = " " }, TestContext.Current.CancellationToken);
 
         Assert.Null(cleared.CourseGuidance);
         Assert.Empty(_courseGuidance.All);
@@ -78,7 +89,7 @@ public class GradingGuidanceServiceTests
     public async Task CourseGuidance_TooLong_IsRefused()
     {
         await Assert.ThrowsAsync<InvalidRequestException>(() => Service().SetCourseGuidanceAsync("course-1",
-            new CourseGuidanceRequest(new string('x', CourseGuidance.MaxTextLength + 1)), TestContext.Current.CancellationToken));
+            new CourseGuidanceRequest { Text = new string('x', CourseGuidance.MaxTextLength + 1) }, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -87,7 +98,15 @@ public class GradingGuidanceServiceTests
         _rules.Add(3, "Old", "Removed.").Delete(Now);
 
         var added = await Service().AddRuleAsync(
-            new PolicyRuleRequest(" Missing output ", PolicyEffect.NoDeduction, 5, "per line", " Printed text ", " No points for printing. "),
+            new PolicyRuleRequest
+            {
+                Title = " Missing output ",
+                Effect = PolicyEffect.NoDeduction,
+                Points = 5,
+                PointsPer = "per line",
+                Covers = " Printed text ",
+                Detail = " No points for printing. ",
+            },
             TestContext.Current.CancellationToken);
 
         var stored = Assert.Single(_rules.All, r => r.Id == added.Id);
@@ -104,7 +123,7 @@ public class GradingGuidanceServiceTests
     public async Task ADeductionWithoutValidPoints_IsRefused(PolicyEffect effect, double? points)
     {
         await Assert.ThrowsAsync<InvalidRequestException>(() => Service().AddRuleAsync(
-            new PolicyRuleRequest("Names", effect, points, null, "Names", "Deduct."), TestContext.Current.CancellationToken));
+            new PolicyRuleRequest { Title = "Names", Effect = effect, Points = points, Covers = "Names", Detail = "Deduct." }, TestContext.Current.CancellationToken));
 
         Assert.Empty(_rules.All);
     }
@@ -115,11 +134,27 @@ public class GradingGuidanceServiceTests
         var rule = _rules.Add(1, "Names", "Line one\n  line two");
 
         var updated = await Service().UpdateRuleAsync(rule.Id,
-            new PolicyRuleRequest("Names", PolicyEffect.Deduction, 2, "per name", "Class and method names", "Deduct 2 points per name."),
+            new PolicyRuleRequest
+            {
+                Title = "Names",
+                Effect = PolicyEffect.Deduction,
+                Points = 2,
+                PointsPer = "per name",
+                Covers = "Class and method names",
+                Detail = "Deduct 2 points per name.",
+            },
             TestContext.Current.CancellationToken);
         var saves = _rules.Saves;
         await Service().UpdateRuleAsync(rule.Id,
-            new PolicyRuleRequest("Names", PolicyEffect.Deduction, 2, "per name", "Class and method names", "Deduct 2 points per name."),
+            new PolicyRuleRequest
+            {
+                Title = "Names",
+                Effect = PolicyEffect.Deduction,
+                Points = 2,
+                PointsPer = "per name",
+                Covers = "Class and method names",
+                Detail = "Deduct 2 points per name.",
+            },
             TestContext.Current.CancellationToken);
 
         Assert.Equal((PolicyEffect.Deduction, (double?)2, "per name", "Class and method names", Now),
@@ -138,7 +173,7 @@ public class GradingGuidanceServiceTests
         Assert.Contains(rule, _rules.All);
         Assert.False(await Service().DeleteRuleAsync(rule.Id, TestContext.Current.CancellationToken));
         Assert.Null(await Service().UpdateRuleAsync(rule.Id,
-            new PolicyRuleRequest("A", PolicyEffect.NoDeduction, null, null, "B", "C"), TestContext.Current.CancellationToken));
+            new PolicyRuleRequest { Title = "A", Effect = PolicyEffect.NoDeduction, Covers = "B", Detail = "C" }, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -146,7 +181,11 @@ public class GradingGuidanceServiceTests
     {
         var principle = _principles.Add(1, "Old", "Old text.");
 
-        var updated = await Service().UpdatePrincipleAsync(principle.Id, new GradingPrincipleRequest("  New  ", " New text. "),
+        var updated = await Service().UpdatePrincipleAsync(principle.Id, new GradingPrincipleRequest
+        {
+            Title = "  New  ",
+            Detail = " New text. ",
+        },
             TestContext.Current.CancellationToken);
 
         Assert.Equal(("New", "New text.", Now), (updated!.Title, updated.Detail, updated.UpdatedAt));
@@ -159,7 +198,11 @@ public class GradingGuidanceServiceTests
     {
         var principle = _principles.Add(1, "Title", "Line one\n  line two");
 
-        await Service().UpdatePrincipleAsync(principle.Id, new GradingPrincipleRequest("Title", "Line one line two"),
+        await Service().UpdatePrincipleAsync(principle.Id, new GradingPrincipleRequest
+        {
+            Title = "Title",
+            Detail = "Line one line two",
+        },
             TestContext.Current.CancellationToken);
 
         Assert.Equal("Line one\n  line two", principle.Detail);
@@ -174,7 +217,7 @@ public class GradingGuidanceServiceTests
         var principle = _principles.Add(1, "Title", "Text");
 
         await Assert.ThrowsAsync<InvalidRequestException>(() => Service().UpdatePrincipleAsync(principle.Id,
-            new GradingPrincipleRequest(title, detail), TestContext.Current.CancellationToken));
+            new GradingPrincipleRequest { Title = title, Detail = detail }, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -187,9 +230,9 @@ public class GradingGuidanceServiceTests
         Assert.True(principle.IsDeleted);
         Assert.Contains(principle, _principles.All);
         Assert.False(await Service().DeletePrincipleAsync(principle.Id, TestContext.Current.CancellationToken));
-        Assert.Null(await Service().UpdatePrincipleAsync(principle.Id, new GradingPrincipleRequest("A", "B"),
+        Assert.Null(await Service().UpdatePrincipleAsync(principle.Id, new GradingPrincipleRequest { Title = "A", Detail = "B" },
             TestContext.Current.CancellationToken));
-        Assert.Null(await Service().UpdatePrincipleAsync(Guid.NewGuid(), new GradingPrincipleRequest("A", "B"),
+        Assert.Null(await Service().UpdatePrincipleAsync(Guid.NewGuid(), new GradingPrincipleRequest { Title = "A", Detail = "B" },
             TestContext.Current.CancellationToken));
     }
 

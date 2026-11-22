@@ -7,15 +7,16 @@ namespace TeachingAssistant.Domain.Grading;
 /// teacher kept was found; one that matches a mistake the teacher rejected repeats a false alarm; one that matches nothing
 /// was never reviewed, so it is counted apart rather than judged.
 /// </summary>
-public sealed record RunComparison(
-    double? ModelTotal,
-    double? TeacherTotal,
-    double? MaxScore,
-    int TeacherMistakes,
-    int Found,
-    int RepeatedFalseAlarms,
-    int Unreviewed)
+public sealed record RunComparison
 {
+    public double? ModelTotal { get; init; }
+    public double? TeacherTotal { get; init; }
+    public double? MaxScore { get; init; }
+    public required int TeacherMistakes { get; init; }
+    public required int Found { get; init; }
+    public required int RepeatedFalseAlarms { get; init; }
+    public required int Unreviewed { get; init; }
+
     private const int LineSlack = 1;
 
     /// <summary>The model's total minus the teacher's, in percent of the maximum: positive when the model was more lenient.</summary>
@@ -59,12 +60,26 @@ public sealed record RunComparison(
             if (Take(unmatchedKept, mistake) is { } keptMatch)
             {
                 found++;
-                decisions.Add(new MistakeComparison(mistake.Severity, mistake.Category, MistakeDecision.Kept, mistake.Points, keptMatch.Points));
+                decisions.Add(new MistakeComparison
+                {
+                    Severity = mistake.Severity,
+                    Category = mistake.Category,
+                    Decision = MistakeDecision.Kept,
+                    AiPoints = mistake.Points,
+                    TeacherPoints = keptMatch.Points,
+                });
             }
             else if (Take(unmatchedRejected, mistake) is not null)
             {
                 repeated++;
-                decisions.Add(new MistakeComparison(mistake.Severity, mistake.Category, MistakeDecision.Rejected, mistake.Points, 0));
+                decisions.Add(new MistakeComparison
+                {
+                    Severity = mistake.Severity,
+                    Category = mistake.Category,
+                    Decision = MistakeDecision.Rejected,
+                    AiPoints = mistake.Points,
+                    TeacherPoints = 0,
+                });
             }
             else
             {
@@ -72,17 +87,22 @@ public sealed record RunComparison(
             }
         }
 
-        return new RunComparison(
-            result.Score is { } score ? score + (result.Bonus ?? 0) : null,
-            report.Score is { } teacher ? teacher + (report.Bonus ?? 0) : null,
-            draftMaxScore ?? result.MaxScore,
-            kept.Count,
-            found,
-            repeated,
-            unreviewed)
+        return new RunComparison
         {
+            ModelTotal = result.Score is { } score ? score + (result.Bonus ?? 0) : null,
+            TeacherTotal = report.Score is { } teacher ? teacher + (report.Bonus ?? 0) : null,
+            MaxScore = draftMaxScore ?? result.MaxScore,
+            TeacherMistakes = kept.Count,
+            Found = found,
+            RepeatedFalseAlarms = repeated,
+            Unreviewed = unreviewed,
             Decisions = decisions,
-            TeacherResults = kept.Select(m => new TeacherMistakeResult(m.Category, m.Severity, !unmatchedKept.Contains(m))).ToList(),
+            TeacherResults = kept.Select(m => new TeacherMistakeResult
+            {
+                Category = m.Category,
+                Severity = m.Severity,
+                Found = !unmatchedKept.Contains(m),
+            }).ToList(),
         };
     }
 
@@ -127,4 +147,9 @@ public sealed record RunComparison(
 }
 
 /// <summary>One mistake the teacher kept, as the teacher filed it, and whether a model's fresh grading found it.</summary>
-public sealed record TeacherMistakeResult(MistakeCategory Category, MistakeSeverity Severity, bool Found);
+public sealed record TeacherMistakeResult
+{
+    public required MistakeCategory Category { get; init; }
+    public required MistakeSeverity Severity { get; init; }
+    public required bool Found { get; init; }
+}

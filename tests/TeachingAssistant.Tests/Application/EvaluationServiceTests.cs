@@ -7,7 +7,16 @@ namespace TeachingAssistant.Tests.Application;
 public class EvaluationServiceTests
 {
     private static DraftComparison Scores(double? ai, double? teacher, double max = 100, params MistakeComparison[] mistakes) =>
-        new(ai, teacher, max, mistakes, 0, 0, 0);
+        new()
+        {
+            AiTotal = ai,
+            TeacherTotal = teacher,
+            MaxScore = max,
+            Mistakes = mistakes,
+            StrengthsKept = 0,
+            StrengthsEdited = 0,
+            StrengthsRejected = 0,
+        };
 
     [Fact]
     public void Scores_CountAgreementWithin5Percent_TheAverageGap_AndWhichWayItLeans()
@@ -47,11 +56,39 @@ public class EvaluationServiceTests
         var mistakes = EvaluationService.Mistakes(
         [
             Scores(90, 80, 100,
-                new MistakeComparison(MistakeSeverity.Minor, MistakeCategory.Naming, MistakeDecision.Edited, 3, 1),
-                new MistakeComparison(MistakeSeverity.Major, MistakeCategory.Correctness, MistakeDecision.Rejected, 10, 0)),
+                new MistakeComparison
+                {
+                    Severity = MistakeSeverity.Minor,
+                    Category = MistakeCategory.Naming,
+                    Decision = MistakeDecision.Edited,
+                    AiPoints = 3,
+                    TeacherPoints = 1,
+                },
+                new MistakeComparison
+                {
+                    Severity = MistakeSeverity.Major,
+                    Category = MistakeCategory.Correctness,
+                    Decision = MistakeDecision.Rejected,
+                    AiPoints = 10,
+                    TeacherPoints = 0,
+                }),
             Scores(70, 70, 100,
-                new MistakeComparison(MistakeSeverity.Minor, MistakeCategory.Naming, MistakeDecision.Kept, 3, 3),
-                new MistakeComparison(MistakeSeverity.Style, MistakeCategory.Readability, MistakeDecision.Kept, 0, 0)),
+                new MistakeComparison
+                {
+                    Severity = MistakeSeverity.Minor,
+                    Category = MistakeCategory.Naming,
+                    Decision = MistakeDecision.Kept,
+                    AiPoints = 3,
+                    TeacherPoints = 3,
+                },
+                new MistakeComparison
+                {
+                    Severity = MistakeSeverity.Style,
+                    Category = MistakeCategory.Readability,
+                    Decision = MistakeDecision.Kept,
+                    AiPoints = 0,
+                    TeacherPoints = 0,
+                }),
         ]);
 
         Assert.Equal((4, 2, 1, 1), (mistakes.Total, mistakes.Kept, mistakes.Edited, mistakes.Rejected));
@@ -67,7 +104,25 @@ public class EvaluationServiceTests
     {
         var at = new DateTimeOffset(2026, 11, 18, 9, 0, 0, TimeSpan.Zero);
         DiscardedDraft Draft(DiscardReason? reason, string? note = null) =>
-            new(Guid.NewGuid(), "c-1", "a-1", "s-1", "Nini", "claude-opus-5-5", 70, 5, 100, 1, 2, 3, reason, note, at, at.AddHours(1), null);
+            new()
+            {
+                GradingId = Guid.NewGuid(),
+                CourseId = "c-1",
+                AssignmentId = "a-1",
+                StudentId = "s-1",
+                StudentName = "Nini",
+                Model = "claude-opus-5-5",
+                Score = 70,
+                Bonus = 5,
+                MaxScore = 100,
+                Major = 1,
+                Minor = 2,
+                Style = 3,
+                Reason = reason,
+                Note = note,
+                CreatedAt = at,
+                DiscardedAt = at.AddHours(1),
+            };
 
         var discards = EvaluationService.Discards(
             [Draft(DiscardReason.Superseded), Draft(DiscardReason.Superseded), Draft(DiscardReason.PoorGrading, "Ignored the rules."), Draft(null)],
@@ -84,17 +139,36 @@ public class EvaluationServiceTests
     [Fact]
     public void FoundForAModel_CountsYourMistakesFound_PerCategoryAndSeverity()
     {
-        var first = new RunComparison(80, 80, 100, 2, 1, 1, 2)
+        var first = new RunComparison
         {
+            ModelTotal = 80,
+            TeacherTotal = 80,
+            MaxScore = 100,
+            TeacherMistakes = 2,
+            Found = 1,
+            RepeatedFalseAlarms = 1,
+            Unreviewed = 2,
             TeacherResults =
             [
-                new TeacherMistakeResult(MistakeCategory.Naming, MistakeSeverity.Minor, true),
-                new TeacherMistakeResult(MistakeCategory.Design, MistakeSeverity.Major, false),
+                new TeacherMistakeResult { Category = MistakeCategory.Naming, Severity = MistakeSeverity.Minor, Found = true },
+                new TeacherMistakeResult { Category = MistakeCategory.Design, Severity = MistakeSeverity.Major, Found = false },
             ],
         };
-        var second = new RunComparison(70, 75, 100, 1, 1, 0, 1)
+        var second = new RunComparison
         {
-            TeacherResults = [new TeacherMistakeResult(MistakeCategory.Naming, MistakeSeverity.Minor, true)],
+            ModelTotal = 70,
+            TeacherTotal = 75,
+            MaxScore = 100,
+            TeacherMistakes = 1,
+            Found = 1,
+            RepeatedFalseAlarms = 0,
+            Unreviewed = 1,
+            TeacherResults = [new TeacherMistakeResult
+            {
+                Category = MistakeCategory.Naming,
+                Severity = MistakeSeverity.Minor,
+                Found = true,
+            }],
         };
 
         var found = EvaluationService.Found(5, [first, second]);
@@ -116,8 +190,26 @@ public class EvaluationServiceTests
 
         var row = EvaluationRunService.Row("claude-sonnet-5-5",
         [
-            (Result(30), new RunComparison(82, 80, 100, 4, 3, 1, 0)),
-            (Result(50), new RunComparison(70, 76, 100, 2, 2, 0, 1)),
+            (Result(30), new RunComparison
+            {
+                ModelTotal = 82,
+                TeacherTotal = 80,
+                MaxScore = 100,
+                TeacherMistakes = 4,
+                Found = 3,
+                RepeatedFalseAlarms = 1,
+                Unreviewed = 0,
+            }),
+            (Result(50), new RunComparison
+            {
+                ModelTotal = 70,
+                TeacherTotal = 76,
+                MaxScore = 100,
+                TeacherMistakes = 2,
+                Found = 2,
+                RepeatedFalseAlarms = 0,
+                Unreviewed = 1,
+            }),
         ], failed: 1);
 
         Assert.Equal((2, 2, 1, 1), (row.Graded, row.ScoresCompared, row.WithinTolerance, row.Failed));

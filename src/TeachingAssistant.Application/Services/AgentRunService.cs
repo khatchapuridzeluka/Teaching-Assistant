@@ -92,7 +92,7 @@ public class AgentRunService : IAgentRunService
         _chats.Add(message);
         await _chats.SaveChangesAsync(cancellationToken);
 
-        var job = new Job(JobType.AgentRun, JobPayloads.Write(new AgentRunPayload(run.Id)), now, dedupKey: $"agent-run:{run.Id}",
+        var job = new Job(JobType.AgentRun, JobPayloads.Write(new AgentRunPayload { RunId = run.Id }), now, dedupKey: $"agent-run:{run.Id}",
             courseId: run.CourseId, assignmentId: run.AssignmentId, maxAttempts: 1);
         await _jobs.AddOrGetActiveAsync(job, cancellationToken);
         run.AttachJob(job.Id);
@@ -118,7 +118,12 @@ public class AgentRunService : IAgentRunService
 
         var messages = await _chats.GetMessagesAsync(conversationId, cancellationToken);
         var active = await _chats.FindUnfinishedRunAsync(conversationId, cancellationToken);
-        return new AgentConversationResponse(conversation.Id, active?.Id, messages.Select(ToResponse).ToList());
+        return new AgentConversationResponse
+        {
+            Id = conversation.Id,
+            ActiveRunId = active?.Id,
+            Messages = messages.Select(ToResponse).ToList(),
+        };
     }
 
     public async Task ExecuteAsync(Guid runId, CancellationToken cancellationToken = default)
@@ -146,7 +151,11 @@ public class AgentRunService : IAgentRunService
         {
             var history = (await _chats.GetMessagesAsync(conversation.Id, cancellationToken)).Select(ToEntry).ToList();
             var system = AgentChatService.SystemPromptFor(run.Page, run.CourseId, run.AssignmentId);
-            var hooks = new AgentRunHooks(entry => SaveStepAsync(run, conversation, entry), () => _runContext.StopRequested);
+            var hooks = new AgentRunHooks
+            {
+                OnStep = entry => SaveStepAsync(run, conversation, entry),
+                ShouldStop = () => _runContext.StopRequested,
+            };
             var reply = await _languageModel.RunAgentAsync(
                 system, history, [_classroomTools, _studentTools, _gradingTools, _analysisTools, _agentTools], hooks, cancellationToken);
             Finish(run, reply);
@@ -251,13 +260,33 @@ public class AgentRunService : IAgentRunService
     private static AgentEntry ToEntry(AgentMessage message)
     {
         var calls = message.ToolCalls is null ? null : JsonSerializer.Deserialize<List<AgentToolCall>>(message.ToolCalls, JsonOptions);
-        return new AgentEntry(message.Role, message.Text, calls, message.ToolCallId, message.ToolName);
+        return new AgentEntry
+        {
+            Role = message.Role,
+            Text = message.Text,
+            ToolCalls = calls,
+            ToolCallId = message.ToolCallId,
+            ToolName = message.ToolName,
+        };
     }
 
     private static AgentRunResponse ToResponse(AgentRun run, IReadOnlyList<AgentMessage> messages)
     {
-        return new AgentRunResponse(run.Id, run.ConversationId, run.Status, run.Reply, run.Error, run.Steps, run.WaitingJobIds,
-            run.WaitUntil, run.CreatedAt, run.StartedAt, run.FinishedAt, messages.Select(ToResponse).ToList());
+        return new AgentRunResponse
+        {
+            Id = run.Id,
+            ConversationId = run.ConversationId,
+            Status = run.Status,
+            Reply = run.Reply,
+            Error = run.Error,
+            Steps = run.Steps,
+            WaitingJobIds = run.WaitingJobIds,
+            WaitUntil = run.WaitUntil,
+            CreatedAt = run.CreatedAt,
+            StartedAt = run.StartedAt,
+            FinishedAt = run.FinishedAt,
+            Messages = messages.Select(ToResponse).ToList(),
+        };
     }
 
     private static AgentMessageResponse ToResponse(AgentMessage message)
@@ -265,8 +294,20 @@ public class AgentRunService : IAgentRunService
         var calls = message.ToolCalls is null
             ? []
             : JsonSerializer.Deserialize<List<AgentToolCall>>(message.ToolCalls, JsonOptions)!.Select(c => c.Name).ToList();
-        return new AgentMessageResponse(message.Id, message.RunId, message.Sequence, message.Role, message.Text, calls, message.ToolName,
-            message.JobId, AgentLinks.Read(message.Links), message.Replies ?? [], message.CreatedAt);
+        return new AgentMessageResponse
+        {
+            Id = message.Id,
+            RunId = message.RunId,
+            Sequence = message.Sequence,
+            Role = message.Role,
+            Text = message.Text,
+            ToolCalls = calls,
+            ToolName = message.ToolName,
+            JobId = message.JobId,
+            Links = AgentLinks.Read(message.Links),
+            Replies = message.Replies ?? [],
+            CreatedAt = message.CreatedAt,
+        };
     }
 
     private static string? Blank(string? value)

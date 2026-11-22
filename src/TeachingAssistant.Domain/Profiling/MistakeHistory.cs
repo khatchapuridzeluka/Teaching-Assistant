@@ -9,16 +9,23 @@ public enum MistakeLabel
     Repeated,
 }
 
-public sealed record LabeledMistake(StudentMistake Mistake, MistakeLabel Label, string? FirstAssignmentId);
+public sealed record LabeledMistake
+{
+    public required StudentMistake Mistake { get; init; }
+    public required MistakeLabel Label { get; init; }
+    public string? FirstAssignmentId { get; init; }
+}
 
-public sealed record MistakeCategoryTrend(
-    MistakeCategory Category,
-    int Count,
-    int Assignments,
-    bool Repeated,
-    double PointsLost,
-    string FirstAssignmentId,
-    string LastAssignmentId);
+public sealed record MistakeCategoryTrend
+{
+    public required MistakeCategory Category { get; init; }
+    public required int Count { get; init; }
+    public required int Assignments { get; init; }
+    public required bool Repeated { get; init; }
+    public required double PointsLost { get; init; }
+    public required string FirstAssignmentId { get; init; }
+    public required string LastAssignmentId { get; init; }
+}
 
 public static class MistakeHistory
 {
@@ -35,7 +42,12 @@ public static class MistakeHistory
                     .Where(other => When(other, assignmentDate) < When(m, assignmentDate))
                     .Select(other => other.AssignmentId)
                     .FirstOrDefault();
-                return new LabeledMistake(m, earlier is null ? MistakeLabel.New : MistakeLabel.Repeated, earlier);
+                return new LabeledMistake
+                {
+                    Mistake = m,
+                    Label = earlier is null ? MistakeLabel.New : MistakeLabel.Repeated,
+                    FirstAssignmentId = earlier,
+                };
             })
             .ToList();
     }
@@ -50,8 +62,16 @@ public static class MistakeHistory
             .Select(g =>
             {
                 var assignments = g.Select(m => m.AssignmentId).Distinct().ToList();
-                return new MistakeCategoryTrend(g.Key, g.Count(), assignments.Count, assignments.Count > 1,
-                    g.Sum(m => m.Points ?? 0), assignments[0], assignments[^1]);
+                return new MistakeCategoryTrend
+                {
+                    Category = g.Key,
+                    Count = g.Count(),
+                    Assignments = assignments.Count,
+                    Repeated = assignments.Count > 1,
+                    PointsLost = g.Sum(m => m.Points ?? 0),
+                    FirstAssignmentId = assignments[0],
+                    LastAssignmentId = assignments[^1],
+                };
             })
             .OrderByDescending(t => t.PointsLost)
             .ThenByDescending(t => t.Count)

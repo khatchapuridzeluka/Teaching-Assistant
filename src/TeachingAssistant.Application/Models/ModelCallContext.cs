@@ -38,7 +38,7 @@ public class ModelCallContext
 
     public void DescribeCourse(string courseId)
     {
-        Subject = new ModelCallSubject(courseId, null, null);
+        Subject = new ModelCallSubject { CourseId = courseId };
     }
 
     public void MarkPartOfGradeAll()
@@ -48,11 +48,11 @@ public class ModelCallContext
 
     public void Describe(string courseId, string assignmentId, Guid versionId)
     {
-        Subject = new ModelCallSubject(courseId, assignmentId, versionId);
+        Subject = new ModelCallSubject { CourseId = courseId, AssignmentId = assignmentId, VersionId = versionId };
     }
 
     public void DescribeAssignment(string courseId, string assignmentId)
     {
-        Subject = new ModelCallSubject(courseId, assignmentId, null);
+        Subject = new ModelCallSubject { CourseId = courseId, AssignmentId = assignmentId };
     }
 }

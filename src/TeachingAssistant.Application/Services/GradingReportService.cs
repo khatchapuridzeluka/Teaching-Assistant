@@ -75,9 +75,23 @@ public class GradingReportService : IGradingReportService
             _reports.Add(report);
         }
 
-        var edits = request.Mistakes.Select(m => new ReportMistakeEdit(m.SourceMistakeId, m.Rejected, m.Severity, m.Category, m.Message, m.Points));
+        var edits = request.Mistakes.Select(m => new ReportMistakeEdit
+        {
+            SourceMistakeId = m.SourceMistakeId,
+            Rejected = m.Rejected,
+            Severity = m.Severity,
+            Category = m.Category,
+            Message = m.Message,
+            Points = m.Points,
+        });
         var strengthEdits = (request.Strengths ?? [])
-            .Select(s => new ReportStrengthEdit(s.SourceStrengthId, s.Rejected, s.Category, s.Message));
+            .Select(s => new ReportStrengthEdit
+            {
+                SourceStrengthId = s.SourceStrengthId,
+                Rejected = s.Rejected,
+                Category = s.Category,
+                Message = s.Message,
+            });
         report.Save(grading, request.Score, request.Bonus, request.Review.Trim(), edits, now, strengthEdits);
         await RemoveRecordsAsync(report.Id, cancellationToken);
 
@@ -165,15 +179,49 @@ public class GradingReportService : IGradingReportService
         }
     }
 
-    private static GradingReportResponse ToResponse(GradingReport report, AiGrading grading) => new(
-        report.Id, report.GradingId, report.VersionId, report.StudentId, report.CourseId, report.AssignmentId, report.Status, report.Score, grading.MaxScore, report.Bonus, report.Review,
-        report.Mistakes.OrderBy(m => m.Position)
-            .Select(m => new ReportMistakeResponse(m.Id, m.SourceMistakeId, m.File, m.StartLine, m.EndLine, m.Severity, m.Category,
-                m.Message, m.Points, m.Decision))
+    private static GradingReportResponse ToResponse(GradingReport report, AiGrading grading) => new()
+    {
+        Id = report.Id,
+        GradingId = report.GradingId,
+        VersionId = report.VersionId,
+        StudentId = report.StudentId,
+        CourseId = report.CourseId,
+        AssignmentId = report.AssignmentId,
+        Status = report.Status,
+        Score = report.Score,
+        MaxScore = grading.MaxScore,
+        Bonus = report.Bonus,
+        Review = report.Review,
+        Mistakes = report.Mistakes.OrderBy(m => m.Position)
+            .Select(m => new ReportMistakeResponse
+            {
+                Id = m.Id,
+                SourceMistakeId = m.SourceMistakeId,
+                File = m.File,
+                StartLine = m.StartLine,
+                EndLine = m.EndLine,
+                Severity = m.Severity,
+                Category = m.Category,
+                Message = m.Message,
+                Points = m.Points,
+                Decision = m.Decision,
+            })
             .ToList(),
-        report.Strengths.OrderBy(s => s.Position)
-            .Select(s => new ReportStrengthResponse(s.Id, s.SourceStrengthId, s.File, s.StartLine, s.EndLine, s.Category, s.Message,
-                s.Decision))
+        Strengths = report.Strengths.OrderBy(s => s.Position)
+            .Select(s => new ReportStrengthResponse
+            {
+                Id = s.Id,
+                SourceStrengthId = s.SourceStrengthId,
+                File = s.File,
+                StartLine = s.StartLine,
+                EndLine = s.EndLine,
+                Category = s.Category,
+                Message = s.Message,
+                Decision = s.Decision,
+            })
             .ToList(),
-        report.CreatedAt, report.UpdatedAt, report.ApprovedAt);
+        CreatedAt = report.CreatedAt,
+        UpdatedAt = report.UpdatedAt,
+        ApprovedAt = report.ApprovedAt,
+    };
 }

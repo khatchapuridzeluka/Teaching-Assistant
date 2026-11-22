@@ -18,7 +18,7 @@ public class ClaudeAgentTests
         var tools = new EchoTools();
 
         var reply = await ClaudeAgent.RunAsync(
-            model, "fake-model", "You are a test.", [new AgentEntry(AgentMessageRole.User, "say hi")], [tools], null,
+            model, "fake-model", "You are a test.", [new AgentEntry { Role = AgentMessageRole.User, Text = "say hi" }], [tools], null,
             TestContext.Current.CancellationToken);
 
         Assert.Equal(["hi"], tools.Words);
@@ -38,10 +38,20 @@ public class ClaudeAgentTests
         var model = new ScriptedModel(new ChatMessage(ChatRole.Assistant, "Done."));
         AgentEntry[] history =
         [
-            new(AgentMessageRole.User, "say hi"),
-            new(AgentMessageRole.Assistant, "", [new AgentToolCall("call-1", "echo", """{"word":"hi"}""")]),
-            new(AgentMessageRole.Tool, "echoed hi", ToolCallId: "call-1", ToolName: "echo"),
-            new(AgentMessageRole.Notice, "The background job finished."),
+            new() { Role = AgentMessageRole.User, Text = "say hi" },
+            new()
+            {
+                Role = AgentMessageRole.Assistant,
+                Text = "",
+                ToolCalls = [new AgentToolCall
+                {
+                    Id = "call-1",
+                    Name = "echo",
+                    Arguments = """{"word":"hi"}""",
+                }],
+            },
+            new() { Role = AgentMessageRole.Tool, Text = "echoed hi", ToolCallId = "call-1", ToolName = "echo" },
+            new() { Role = AgentMessageRole.Notice, Text = "The background job finished." },
         ];
 
         var reply = await ClaudeAgent.RunAsync(
@@ -60,16 +70,18 @@ public class ClaudeAgentTests
             new ChatMessage(ChatRole.Assistant, [new FunctionCallContent("call-1", "echo", new Dictionary<string, object?> { ["word"] = "hi" })]),
             new ChatMessage(ChatRole.Assistant, "Done."));
         var steps = new List<string>();
-        var hooks = new AgentRunHooks(
-            entry =>
+        var hooks = new AgentRunHooks
+        {
+            OnStep = entry =>
             {
                 steps.Add($"{entry.Role}:{entry.ToolName ?? entry.ToolCalls?.FirstOrDefault()?.Name ?? entry.Text}:{model.Calls}");
                 return Task.CompletedTask;
             },
-            () => false);
+            ShouldStop = () => false,
+        };
 
         await ClaudeAgent.RunAsync(
-            model, "fake-model", "You are a test.", [new AgentEntry(AgentMessageRole.User, "say hi")], [new EchoTools()], hooks,
+            model, "fake-model", "You are a test.", [new AgentEntry { Role = AgentMessageRole.User, Text = "say hi" }], [new EchoTools()], hooks,
             TestContext.Current.CancellationToken);
 
         Assert.Equal(["Assistant:echo:1", "Tool:echo:1", "Assistant:Done.:2"], steps); // the tool result is reported before the second call
@@ -82,10 +94,10 @@ public class ClaudeAgentTests
             new ChatMessage(ChatRole.Assistant, [new FunctionCallContent("call-1", "echo", new Dictionary<string, object?> { ["word"] = "wait" })]),
             new ChatMessage(ChatRole.Assistant, "Should not be asked for."));
         var tools = new EchoTools();
-        var hooks = new AgentRunHooks(_ => Task.CompletedTask, () => tools.Words.Contains("wait"));
+        var hooks = new AgentRunHooks { OnStep = _ => Task.CompletedTask, ShouldStop = () => tools.Words.Contains("wait") };
 
         var reply = await ClaudeAgent.RunAsync(
-            model, "fake-model", "You are a test.", [new AgentEntry(AgentMessageRole.User, "wait")], [tools], hooks,
+            model, "fake-model", "You are a test.", [new AgentEntry { Role = AgentMessageRole.User, Text = "wait" }], [tools], hooks,
             TestContext.Current.CancellationToken);
 
         Assert.Equal(1, model.Calls);
@@ -101,14 +113,18 @@ public class ClaudeAgentTests
             new ChatMessage(ChatRole.Assistant, [new FunctionCallContent("call-2", "echo", new Dictionary<string, object?> { ["word"] = "hi" })]),
             new ChatMessage(ChatRole.Assistant, "Done."));
         var steps = new List<AgentEntry>();
-        var hooks = new AgentRunHooks(entry =>
+        var hooks = new AgentRunHooks
         {
-            steps.Add(entry);
-            return Task.CompletedTask;
-        }, () => false);
+            OnStep = entry =>
+            {
+                steps.Add(entry);
+                return Task.CompletedTask;
+            },
+            ShouldStop = () => false,
+        };
 
         await ClaudeAgent.RunAsync(
-            model, "fake-model", "You are a test.", [new AgentEntry(AgentMessageRole.User, "say hi")], [new EchoTools()], hooks,
+            model, "fake-model", "You are a test.", [new AgentEntry { Role = AgentMessageRole.User, Text = "say hi" }], [new EchoTools()], hooks,
             TestContext.Current.CancellationToken);
 
         Assert.Equal(
@@ -131,14 +147,18 @@ public class ClaudeAgentTests
             new ChatMessage(ChatRole.Assistant, "Done."));
         var tools = new EchoTools();
         var steps = new List<AgentEntry>();
-        var hooks = new AgentRunHooks(entry =>
+        var hooks = new AgentRunHooks
         {
-            steps.Add(entry);
-            return Task.CompletedTask;
-        }, () => false);
+            OnStep = entry =>
+            {
+                steps.Add(entry);
+                return Task.CompletedTask;
+            },
+            ShouldStop = () => false,
+        };
 
         await ClaudeAgent.RunAsync(
-            model, "fake-model", "You are a test.", [new AgentEntry(AgentMessageRole.User, "say hi")], [tools], hooks,
+            model, "fake-model", "You are a test.", [new AgentEntry { Role = AgentMessageRole.User, Text = "say hi" }], [tools], hooks,
             TestContext.Current.CancellationToken);
 
         Assert.Empty(tools.Words);
@@ -152,18 +172,37 @@ public class ClaudeAgentTests
     {
         var model = new ScriptedModel(new ChatMessage(ChatRole.Assistant, "Done."));
         var steps = new List<AgentEntry>();
-        var hooks = new AgentRunHooks(entry =>
+        var hooks = new AgentRunHooks
         {
-            steps.Add(entry);
-            return Task.CompletedTask;
-        }, () => false);
+            OnStep = entry =>
+            {
+                steps.Add(entry);
+                return Task.CompletedTask;
+            },
+            ShouldStop = () => false,
+        };
         AgentEntry[] history =
         [
-            new(AgentMessageRole.User, "grade it"),
-            new(AgentMessageRole.Assistant, "", [new AgentToolCall("lost", "echo", """{"word":"x"}""")]),
-            new(AgentMessageRole.Assistant, "Again.", [new AgentToolCall("call-2", "echo", """{"word":"hi"}""")]),
-            new(AgentMessageRole.Tool, "echoed hi", ToolCallId: "call-2", ToolName: "echo"),
-            new(AgentMessageRole.Notice, "The grading finished."),
+            new() { Role = AgentMessageRole.User, Text = "grade it" },
+            new()
+            {
+                Role = AgentMessageRole.Assistant,
+                Text = "",
+                ToolCalls = [new AgentToolCall { Id = "lost", Name = "echo", Arguments = """{"word":"x"}""" }],
+            },
+            new()
+            {
+                Role = AgentMessageRole.Assistant,
+                Text = "Again.",
+                ToolCalls = [new AgentToolCall
+                {
+                    Id = "call-2",
+                    Name = "echo",
+                    Arguments = """{"word":"hi"}""",
+                }],
+            },
+            new() { Role = AgentMessageRole.Tool, Text = "echoed hi", ToolCallId = "call-2", ToolName = "echo" },
+            new() { Role = AgentMessageRole.Notice, Text = "The grading finished." },
         ];
 
         await ClaudeAgent.RunAsync(model, "fake-model", "You are a test.", history, [new EchoTools()], hooks,

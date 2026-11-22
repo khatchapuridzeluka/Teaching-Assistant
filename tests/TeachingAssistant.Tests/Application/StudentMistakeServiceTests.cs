@@ -62,9 +62,9 @@ public class StudentMistakeServiceTests
     [Fact]
     public async Task Filtering_NarrowsTheList_ButNeverChangesALabel()
     {
-        var onlyA2 = await Service().GetAsync("course", "student", new StudentMistakeFilter(AssignmentId: "a2"), TestContext.Current.CancellationToken);
-        var repeated = await Service().GetAsync("course", "student", new StudentMistakeFilter(Label: MistakeLabel.Repeated), TestContext.Current.CancellationToken);
-        var major = await Service().GetAsync("course", "student", new StudentMistakeFilter(Severity: MistakeSeverity.Major), TestContext.Current.CancellationToken);
+        var onlyA2 = await Service().GetAsync("course", "student", new StudentMistakeFilter { AssignmentId = "a2" }, TestContext.Current.CancellationToken);
+        var repeated = await Service().GetAsync("course", "student", new StudentMistakeFilter { Label = MistakeLabel.Repeated }, TestContext.Current.CancellationToken);
+        var major = await Service().GetAsync("course", "student", new StudentMistakeFilter { Severity = MistakeSeverity.Major }, TestContext.Current.CancellationToken);
 
         Assert.Equal((2, 4), (onlyA2.Total, onlyA2.Recorded));
         Assert.Equal(MistakeLabel.Repeated, onlyA2.Mistakes.Single(m => m.Category == MistakeCategory.Correctness).Label);
@@ -92,7 +92,7 @@ public class StudentMistakeServiceTests
             report.Save(grading, 88, null, "review", [], Now);
             report.Approve(Now);
             _mistakes.AddRange(StudentMistake.FromApprovedReport(report, submission));
-            _scores.Add(new ReportScore(report.Id, 88, null, 82, null, 100));
+            _scores.Add(new ReportScore { ReportId = report.Id, Score = 88, AiScore = 82, MaxScore = 100 });
         }
 
         public Task<IReadOnlyList<ReportScore>> GetScoresAsync(IReadOnlyCollection<Guid> reportIds, CancellationToken cancellationToken = default) =>

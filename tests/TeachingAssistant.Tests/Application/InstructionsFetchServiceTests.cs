@@ -25,7 +25,7 @@ public class InstructionsFetchServiceTests
         _files.Add("doc-1", "Homework_2.docx", DocxType, "md5-a");
         _files.Add("video-1", "addFirst.mp4", "video/mp4", "md5-v");
         var assignment = Assignment(Drive("doc-1"), Drive("video-1"),
-            new SubmissionAttachment(AttachmentKind.Link, "Java docs", "https://docs.oracle.com", null));
+            new SubmissionAttachment { Kind = AttachmentKind.Link, Title = "Java docs", Url = "https://docs.oracle.com" });
 
         var result = await FetchAsync(assignment);
 
@@ -119,9 +119,23 @@ public class InstructionsFetchServiceTests
     }
 
     private static AssignmentResponse Assignment(params SubmissionAttachment[] materials) =>
-        new("assignment-1", "course-1", "Homework 2", "Write a zoo.", "ASSIGNMENT", 100, null, null, null, materials);
+        new()
+        {
+            Id = "assignment-1",
+            CourseId = "course-1",
+            Title = "Homework 2",
+            Description = "Write a zoo.",
+            WorkType = "ASSIGNMENT",
+            MaxPoints = 100,
+            Materials = materials,
+        };
 
-    private static SubmissionAttachment Drive(string fileId) => new(AttachmentKind.DriveFile, fileId, null, fileId);
+    private static SubmissionAttachment Drive(string fileId) => new()
+    {
+        Kind = AttachmentKind.DriveFile,
+        Title = fileId,
+        FileId = fileId,
+    };
 
     private sealed class FakeStore : IInstructionsStore
     {
@@ -142,7 +156,17 @@ public class InstructionsFetchServiceTests
         public int Downloads { get; private set; }
 
         public void Add(string id, string name, string mimeType, string md5, long sizeBytes = 1000) =>
-            _files[id] = new RemoteFile(id, name, mimeType, sizeBytes, md5, null, name, mimeType, true);
+            _files[id] = new RemoteFile
+            {
+                Id = id,
+                Name = name,
+                MimeType = mimeType,
+                SizeBytes = sizeBytes,
+                Revision = md5,
+                DownloadName = name,
+                DownloadMimeType = mimeType,
+                IsDownloadable = true,
+            };
 
         public Task<RemoteFile> GetFileAsync(string fileId, CancellationToken cancellationToken = default) =>
             Task.FromResult(_files[fileId]);
@@ -214,6 +238,6 @@ public class InstructionsFetchServiceTests
     {
         public bool CanRead(string fileName, string? mediaType) => fileName.EndsWith(".docx", StringComparison.OrdinalIgnoreCase);
 
-        public ReadDocument? Read(byte[] content) => new("text", []);
+        public ReadDocument? Read(byte[] content) => new() { Text = "text", Images = [] };
     }
 }

@@ -35,7 +35,7 @@ public class GooglePhotoSource(HttpClient http, ILogger<GooglePhotoSource> logge
                 throw Failed(photoUrl, "The photo is too large.");
             }
 
-            return new DownloadedPhoto(bytes, contentType);
+            return new DownloadedPhoto { Bytes = bytes, ContentType = contentType };
         }
         catch (HttpRequestException ex)
         {

@@ -1,11 +1,13 @@
 namespace TeachingAssistant.Application.Models;
 
-public record JobSubject(
-    Guid VersionId,
-    int VersionNumber,
-    string CourseId,
-    string AssignmentId,
-    string? AssignmentTitle,
-    string SubmissionId,
-    string StudentId,
-    string StudentName);
+public record JobSubject
+{
+    public required Guid VersionId { get; init; }
+    public required int VersionNumber { get; init; }
+    public required string CourseId { get; init; }
+    public required string AssignmentId { get; init; }
+    public string? AssignmentTitle { get; init; }
+    public required string SubmissionId { get; init; }
+    public required string StudentId { get; init; }
+    public required string StudentName { get; init; }
+}

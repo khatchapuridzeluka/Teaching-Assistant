@@ -122,7 +122,17 @@ public class JobServiceTests
     public async Task Overview_CountsActiveAndRecentlyFinished_AndNamesTheStudent()
     {
         var versionId = _grading.AddGradable();
-        _store.Subjects.Add(new JobSubject(versionId, 2, "course-1", "assignment-1", "Assignment 2", "sub-1", "student-1", "Ana"));
+        _store.Subjects.Add(new JobSubject
+        {
+            VersionId = versionId,
+            VersionNumber = 2,
+            CourseId = "course-1",
+            AssignmentId = "assignment-1",
+            AssignmentTitle = "Assignment 2",
+            SubmissionId = "sub-1",
+            StudentId = "student-1",
+            StudentName = "Ana",
+        });
         await Service().QueueGradeVersionAsync(versionId, TestContext.Current.CancellationToken);
         var other = await Service().QueueGradeVersionAsync(_grading.AddGradable(), TestContext.Current.CancellationToken);
         await Service().CancelAsync(other!.Id, TestContext.Current.CancellationToken);
@@ -161,7 +171,7 @@ public class JobServiceTests
     {
         var ana = _grading.AddGradable();
         var beka = _grading.AddGradable();
-        _grading.Plan = new GradeAllPlan([ana, beka], 5, AlreadyDrafted: 2, NoWork: 1, Problems: []);
+        _grading.Plan = new GradeAllPlan { VersionIds = [ana, beka], Students = 5, AlreadyDrafted = 2, NoWork = 1, Problems = [] };
 
         var result = await Service().QueueGradeAssignmentAsync("course-1", "assignment-1", cancellationToken: TestContext.Current.CancellationToken);
 
@@ -186,7 +196,7 @@ public class JobServiceTests
     [Fact]
     public async Task GradeAll_WithNothingToGrade_QueuesNoJob()
     {
-        _grading.Plan = new GradeAllPlan([], 3, AlreadyDrafted: 3, NoWork: 0, Problems: []);
+        _grading.Plan = new GradeAllPlan { VersionIds = [], Students = 3, AlreadyDrafted = 3, NoWork = 0, Problems = [] };
 
         var result = await Service().QueueGradeAssignmentAsync("course-1", "assignment-1", cancellationToken: TestContext.Current.CancellationToken);
 
@@ -198,7 +208,14 @@ public class JobServiceTests
     [Fact]
     public async Task TheParentFinishes_WhenItsLastChildFinishes()
     {
-        _grading.Plan = new GradeAllPlan([_grading.AddGradable(), _grading.AddGradable()], 2, 0, 0, []);
+        _grading.Plan = new GradeAllPlan
+        {
+            VersionIds = [_grading.AddGradable(), _grading.AddGradable()],
+            Students = 2,
+            AlreadyDrafted = 0,
+            NoWork = 0,
+            Problems = [],
+        };
         await Service().QueueGradeAssignmentAsync("course-1", "assignment-1", cancellationToken: TestContext.Current.CancellationToken);
         var parent = _store.Jobs.Single(j => j.IsGroup);
 
@@ -215,7 +232,14 @@ public class JobServiceTests
     [Fact]
     public async Task CancelingTheParent_CancelsItsQueuedChildren_AndFinishesIt()
     {
-        _grading.Plan = new GradeAllPlan([_grading.AddGradable(), _grading.AddGradable()], 2, 0, 0, []);
+        _grading.Plan = new GradeAllPlan
+        {
+            VersionIds = [_grading.AddGradable(), _grading.AddGradable()],
+            Students = 2,
+            AlreadyDrafted = 0,
+            NoWork = 0,
+            Problems = [],
+        };
         var result = await Service().QueueGradeAssignmentAsync("course-1", "assignment-1", cancellationToken: TestContext.Current.CancellationToken);
 
         await Service().CancelAsync(result.Job!.Id, TestContext.Current.CancellationToken);
@@ -226,7 +250,14 @@ public class JobServiceTests
     [Fact]
     public async Task Reconcile_FinishesAParentWhoseChildrenAllFinished()
     {
-        _grading.Plan = new GradeAllPlan([_grading.AddGradable()], 1, 0, 0, []);
+        _grading.Plan = new GradeAllPlan
+        {
+            VersionIds = [_grading.AddGradable()],
+            Students = 1,
+            AlreadyDrafted = 0,
+            NoWork = 0,
+            Problems = [],
+        };
         await Service().QueueGradeAssignmentAsync("course-1", "assignment-1", cancellationToken: TestContext.Current.CancellationToken);
         var child = _store.Jobs.Single(j => !j.IsGroup);
         child.Start("w", DateTimeOffset.UtcNow, Lease);
@@ -261,8 +292,15 @@ public class JobServiceTests
         var parent = _store.Jobs.Single(j => j.IsGroup);
         var a1 = _grading.AddGradable();
         var a5 = _grading.AddGradable();
-        _grading.StudentPlan = new GradeAllPlan([a1, a5], 4, AlreadyDrafted: 1, NoWork: 1, Problems: ["Assignment 3: no instructions."],
-            AssignmentIds: new Dictionary<Guid, string> { [a1] = "assignment-1", [a5] = "assignment-5" });
+        _grading.StudentPlan = new GradeAllPlan
+        {
+            VersionIds = [a1, a5],
+            Students = 4,
+            AlreadyDrafted = 1,
+            NoWork = 1,
+            Problems = ["Assignment 3: no instructions."],
+            AssignmentIds = new Dictionary<Guid, string> { [a1] = "assignment-1", [a5] = "assignment-5" },
+        };
 
         var fetch = await Processor().ClaimNextAsync("w", Lease, TestContext.Current.CancellationToken);
         var result = await Service().QueueStudentGradingsAsync(parent.Id, "course-1", "ria", 3, [], cancellationToken: TestContext.Current.CancellationToken);
@@ -292,9 +330,23 @@ public class JobServiceTests
 
         public Guid LastGradingId { get; private set; }
 
-        public GradeAllPlan Plan { get; set; } = new([], 0, 0, 0, []);
+        public GradeAllPlan Plan { get; set; } = new()
+        {
+            VersionIds = [],
+            Students = 0,
+            AlreadyDrafted = 0,
+            NoWork = 0,
+            Problems = [],
+        };
 
-        public GradeAllPlan StudentPlan { get; set; } = new([], 0, 0, 0, []);
+        public GradeAllPlan StudentPlan { get; set; } = new()
+        {
+            VersionIds = [],
+            Students = 0,
+            AlreadyDrafted = 0,
+            NoWork = 0,
+            Problems = [],
+        };
 
         public Task<GradeAllPlan> PlanGradeStudentAsync(string courseId, string studentId, bool regrade = false, CancellationToken cancellationToken = default) =>
             Task.FromResult(StudentPlan);
@@ -330,14 +382,32 @@ public class JobServiceTests
                 throw new InvalidRequestException("This version has nothing the model can read.");
             }
 
-            return Task.FromResult(_gradable.Contains(versionId) ? new GradableVersion("course-1", "assignment-1") : null);
+            return Task.FromResult(_gradable.Contains(versionId) ? new GradableVersion
+            {
+                CourseId = "course-1",
+                AssignmentId = "assignment-1",
+            } : null);
         }
 
         public Task<GradingResponse?> GradeVersionAsync(Guid versionId, CancellationToken cancellationToken = default)
         {
             LastGradingId = Guid.NewGuid();
-            return Task.FromResult<GradingResponse?>(new GradingResponse(LastGradingId, versionId, GradingStatus.Draft, "model",
-                "review", 90, 100, null, [], 1, [], [], DateTimeOffset.UtcNow, []));
+            return Task.FromResult<GradingResponse?>(new GradingResponse
+            {
+                Id = LastGradingId,
+                VersionId = versionId,
+                Status = GradingStatus.Draft,
+                Model = "model",
+                Review = "review",
+                Score = 90,
+                MaxScore = 100,
+                Mistakes = [],
+                InstructionsVersion = 1,
+                SentFiles = [],
+                SkippedFiles = [],
+                CreatedAt = DateTimeOffset.UtcNow,
+                Strengths = [],
+            });
         }
     }
 
@@ -390,7 +460,7 @@ public class JobServiceTests
             Task.FromResult<IReadOnlyList<JobChildCount>>(Jobs
                 .Where(j => j.ParentId is { } parent && parentIds.Contains(parent))
                 .GroupBy(j => (j.ParentId!.Value, j.Status))
-                .Select(g => new JobChildCount(g.Key.Value, g.Key.Status, g.Count()))
+                .Select(g => new JobChildCount { ParentId = g.Key.Value, Status = g.Key.Status, Count = g.Count() })
                 .ToList());
 
         public Task<IReadOnlyList<Job>> GetOpenGroupsAsync(CancellationToken cancellationToken = default) =>

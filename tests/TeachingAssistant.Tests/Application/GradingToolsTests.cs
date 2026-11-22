@@ -63,7 +63,16 @@ public class GradingToolsTests
     [Fact]
     public async Task GradeAll_PointsToRegrade_WhenEveryoneAlreadyHasADraft()
     {
-        _fakes.Result = new GradeAllResponse(null, 0, 15, 15, 0, 0, 0, []);
+        _fakes.Result = new GradeAllResponse
+        {
+            Queued = 0,
+            Students = 15,
+            AlreadyDrafted = 15,
+            AlreadyQueued = 0,
+            NoWork = 0,
+            NotFetched = 0,
+            Problems = [],
+        };
 
         var result = await Tools().GradeAllStudentsAsync("course-1", "a-4", cancellationToken: TestContext.Current.CancellationToken);
 
@@ -89,7 +98,13 @@ public class GradingToolsTests
         Assert.Equal([("course-1", "a-4")], _fakes.Analyses);
         Assert.StartsWith($"Common mistakes analysis queued (job id {_fakes.AnalysisJob!.Id}).", result);
         Assert.Equal(_fakes.AnalysisJob.Id, _context.TakeQueuedJob());
-        Assert.Equal([new AgentLink(AgentLinkKind.CommonMistakes, "Common mistakes", "course-1", "a-4")], _context.TakeLinks());
+        Assert.Equal([new AgentLink
+        {
+            Kind = AgentLinkKind.CommonMistakes,
+            Label = "Common mistakes",
+            CourseId = "course-1",
+            AssignmentId = "a-4",
+        }], _context.TakeLinks());
     }
 
     [Fact]
@@ -147,8 +162,22 @@ public class GradingToolsTests
 
     private static GradeAllResponse Response(int queued, int alreadyDrafted)
     {
-        var job = Job.Group(JobType.GradeAssignment, JobPayloads.Write(new GradeAssignmentPayload("course-1", "a-4")), Now);
-        return new GradeAllResponse(JobPayloads.ToResponse(job), queued, 15, alreadyDrafted, 0, 0, 0, []);
+        var job = Job.Group(JobType.GradeAssignment, JobPayloads.Write(new GradeAssignmentPayload
+        {
+            CourseId = "course-1",
+            AssignmentId = "a-4",
+        }), Now);
+        return new GradeAllResponse
+        {
+            Job = JobPayloads.ToResponse(job),
+            Queued = queued,
+            Students = 15,
+            AlreadyDrafted = alreadyDrafted,
+            AlreadyQueued = 0,
+            NoWork = 0,
+            NotFetched = 0,
+            Problems = [],
+        };
     }
 
     private sealed class Fakes : ISubmissionFetchService, IJobService, IGradingStore
@@ -164,8 +193,24 @@ public class GradingToolsTests
         public Task<IReadOnlyList<GradingSummary>> GetSummariesAsync(
             SubmissionSource source, string courseId, string? assignmentId, string? studentId, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<GradingSummary>>(Drafts
-                .Select(status => new GradingSummary(Guid.NewGuid(), Guid.NewGuid(), 1, "a-4", "sub", "s-1", "Nino", status, 80, 100, null, 0, 0, 0,
-                    "model", Now, null))
+                .Select(status => new GradingSummary
+                {
+                    Id = Guid.NewGuid(),
+                    VersionId = Guid.NewGuid(),
+                    VersionNumber = 1,
+                    AssignmentId = "a-4",
+                    SubmissionId = "sub",
+                    StudentId = "s-1",
+                    StudentName = "Nino",
+                    Status = status,
+                    Score = 80,
+                    MaxScore = 100,
+                    Major = 0,
+                    Minor = 0,
+                    Style = 0,
+                    Model = "model",
+                    CreatedAt = Now,
+                })
                 .ToList());
 
         public Task<IReadOnlyList<AiGrading>> GetByVersionsAsync(IReadOnlyCollection<Guid> versionIds, CancellationToken cancellationToken = default) =>
@@ -187,12 +232,31 @@ public class GradingToolsTests
 
         public JobResponse? AnalysisJob { get; private set; }
 
-        public GradeAllResponse Result { get; set; } = new(null, 0, 0, 0, 0, 0, 0, []);
+        public GradeAllResponse Result { get; set; } = new()
+        {
+            Queued = 0,
+            Students = 0,
+            AlreadyDrafted = 0,
+            AlreadyQueued = 0,
+            NoWork = 0,
+            NotFetched = 0,
+            Problems = [],
+        };
 
         public Task<FetchSummary> FetchAsync(string courseId, string assignmentId, CancellationToken cancellationToken = default)
         {
             Fetches.Add((courseId, assignmentId));
-            return Task.FromResult(new FetchSummary(15, 0, 0, 15, 0, [], 1, false));
+            return Task.FromResult(new FetchSummary
+            {
+                Submissions = 15,
+                NewSubmissions = 0,
+                NewVersions = 0,
+                Unchanged = 15,
+                NotSubmitted = 0,
+                Problems = [],
+                InstructionsVersion = 1,
+                NewInstructions = false,
+            });
         }
 
         public Task<GradeAllResponse> QueueGradeAssignmentAsync(
@@ -232,7 +296,11 @@ public class GradingToolsTests
         public Task<JobResponse> QueueAnalyzeMistakesAsync(string courseId, string assignmentId, CancellationToken cancellationToken = default)
         {
             Analyses.Add((courseId, assignmentId));
-            var job = new Job(JobType.AnalyzeMistakes, JobPayloads.Write(new AnalyzeMistakesPayload(courseId, assignmentId)), AnalysisCreatedAt,
+            var job = new Job(JobType.AnalyzeMistakes, JobPayloads.Write(new AnalyzeMistakesPayload
+            {
+                CourseId = courseId,
+                AssignmentId = assignmentId,
+            }), AnalysisCreatedAt,
                 courseId: courseId, assignmentId: assignmentId);
             AnalysisJob = JobPayloads.ToResponse(job);
             return Task.FromResult(AnalysisJob);

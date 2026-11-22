@@ -5,23 +5,25 @@ namespace TeachingAssistant.Application.Contracts;
 /// maximum, and Difference is the AI's minus the teacher's in percent of the maximum (positive: the AI was more lenient), null
 /// when either total is missing. ClassroomGrade is the grade returned in Classroom for the same submission, if any.
 /// </summary>
-public record EvaluationRow(
-    Guid ReportId,
-    Guid GradingId,
-    string CourseId,
-    string AssignmentId,
-    string? AssignmentTitle,
-    string StudentId,
-    string? StudentName,
-    string Model,
-    double? AiScore,
-    double? TeacherScore,
-    double? MaxScore,
-    double? AiPercent,
-    double? TeacherPercent,
-    double? Difference,
-    int Mistakes,
-    int MistakesEdited,
-    int MistakesRejected,
-    double? ClassroomGrade,
-    DateTimeOffset? ApprovedAt);
+public record EvaluationRow
+{
+    public required Guid ReportId { get; init; }
+    public required Guid GradingId { get; init; }
+    public required string CourseId { get; init; }
+    public required string AssignmentId { get; init; }
+    public string? AssignmentTitle { get; init; }
+    public required string StudentId { get; init; }
+    public string? StudentName { get; init; }
+    public required string Model { get; init; }
+    public double? AiScore { get; init; }
+    public double? TeacherScore { get; init; }
+    public double? MaxScore { get; init; }
+    public double? AiPercent { get; init; }
+    public double? TeacherPercent { get; init; }
+    public double? Difference { get; init; }
+    public required int Mistakes { get; init; }
+    public required int MistakesEdited { get; init; }
+    public required int MistakesRejected { get; init; }
+    public double? ClassroomGrade { get; init; }
+    public DateTimeOffset? ApprovedAt { get; init; }
+}

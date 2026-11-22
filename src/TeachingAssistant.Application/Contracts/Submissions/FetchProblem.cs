@@ -1,3 +1,7 @@
 namespace TeachingAssistant.Application.Contracts;
 
-public record FetchProblem(string StudentName, string Detail);
+public record FetchProblem
+{
+    public required string StudentName { get; init; }
+    public required string Detail { get; init; }
+}

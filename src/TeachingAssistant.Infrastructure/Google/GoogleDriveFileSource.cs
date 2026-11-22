@@ -84,16 +84,18 @@ public class GoogleDriveFileSource : IRemoteFileSource
         var exportedAsPdf = ExportableAsPdf.Contains(file.MimeType);
         var isGoogleApp = file.MimeType.StartsWith(GoogleAppsPrefix, StringComparison.Ordinal);
 
-        return new RemoteFile(
-            file.Id,
-            file.Name,
-            file.MimeType,
-            file.Size,
-            file.Md5Checksum ?? $"version:{file.Version}",
-            file.ModifiedTimeDateTimeOffset,
-            exportedAsPdf && !file.Name.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) ? file.Name + ".pdf" : file.Name,
-            exportedAsPdf ? PdfMimeType : file.MimeType,
-            IsDownloadable: !isGoogleApp || exportedAsPdf);
+        return new RemoteFile
+        {
+            Id = file.Id,
+            Name = file.Name,
+            MimeType = file.MimeType,
+            SizeBytes = file.Size,
+            Revision = file.Md5Checksum ?? $"version:{file.Version}",
+            ModifiedAt = file.ModifiedTimeDateTimeOffset,
+            DownloadName = exportedAsPdf && !file.Name.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) ? file.Name + ".pdf" : file.Name,
+            DownloadMimeType = exportedAsPdf ? PdfMimeType : file.MimeType,
+            IsDownloadable = !isGoogleApp || exportedAsPdf,
+        };
     }
 
     private async Task<DriveService> GetDriveAsync(CancellationToken cancellationToken)
@@ -109,9 +111,13 @@ public class GoogleDriveFileSource : IRemoteFileSource
             HttpClientInitializer = credential,
             ApplicationName = GoogleAuthorization.ApplicationName,
         });
-        _client = new Client(credential, service);
+        _client = new Client { Credential = credential, Service = service };
         return service;
     }
 
-    private sealed record Client(UserCredential Credential, DriveService Service);
+    private sealed record Client
+    {
+        public required UserCredential Credential { get; init; }
+        public required DriveService Service { get; init; }
+    }
 }

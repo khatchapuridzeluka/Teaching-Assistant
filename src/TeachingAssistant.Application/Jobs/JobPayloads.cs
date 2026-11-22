@@ -5,41 +5,97 @@ using TeachingAssistant.Domain.Jobs;
 
 namespace TeachingAssistant.Application.Jobs;
 
-public record GradeVersionPayload(Guid VersionId, bool PartOfGradeAll = false);
+public record GradeVersionPayload
+{
+    public required Guid VersionId { get; init; }
+    public bool PartOfGradeAll { get; init; }
+}
 
-public record GradeVersionResult(Guid GradingId);
+public record GradeVersionResult
+{
+    public required Guid GradingId { get; init; }
+}
 
-public record GradeAssignmentPayload(string CourseId, string AssignmentId, bool Regrade = false);
+public record GradeAssignmentPayload
+{
+    public required string CourseId { get; init; }
+    public required string AssignmentId { get; init; }
+    public bool Regrade { get; init; }
+}
 
-public record GradeAssignmentResult(int Succeeded, int Failed, int Canceled);
+public record GradeAssignmentResult
+{
+    public required int Succeeded { get; init; }
+    public required int Failed { get; init; }
+    public required int Canceled { get; init; }
+}
 
-public record AnalyzeMistakesPayload(string CourseId, string AssignmentId);
+public record AnalyzeMistakesPayload
+{
+    public required string CourseId { get; init; }
+    public required string AssignmentId { get; init; }
+}
 
-public record AnalyzeStudentPayload(
-    string CourseId, string StudentId, string? StudentName = null, StudentAnalysisKind Kind = StudentAnalysisKind.Mistakes);
+public record AnalyzeStudentPayload
+{
+    public required string CourseId { get; init; }
+    public required string StudentId { get; init; }
+    public string? StudentName { get; init; }
+    public StudentAnalysisKind Kind { get; init; } = StudentAnalysisKind.Mistakes;
+}
 
-public record GradeStudentPayload(string CourseId, string StudentId, string? StudentName = null, bool Regrade = false);
+public record GradeStudentPayload
+{
+    public required string CourseId { get; init; }
+    public required string StudentId { get; init; }
+    public string? StudentName { get; init; }
+    public bool Regrade { get; init; }
+}
 
-public record FetchStudentWorkPayload(string CourseId, string StudentId, Guid ParentId, bool Regrade = false);
+public record FetchStudentWorkPayload
+{
+    public required string CourseId { get; init; }
+    public required string StudentId { get; init; }
+    public required Guid ParentId { get; init; }
+    public bool Regrade { get; init; }
+}
 
-public record FetchStudentWorkResult(
-    int Fetched,
-    int Queued,
-    int AlreadyDrafted,
-    int AlreadyQueued,
-    int NoWork,
-    int NotFetched,
-    IReadOnlyList<string> Problems);
+public record FetchStudentWorkResult
+{
+    public required int Fetched { get; init; }
+    public required int Queued { get; init; }
+    public required int AlreadyDrafted { get; init; }
+    public required int AlreadyQueued { get; init; }
+    public required int NoWork { get; init; }
+    public required int NotFetched { get; init; }
+    public required IReadOnlyList<string> Problems { get; init; }
+}
 
-public record AnalyzeMistakesResult(Guid AnalysisId);
+public record AnalyzeMistakesResult
+{
+    public required Guid AnalysisId { get; init; }
+}
 
-public record AnalyzeStudentResult(Guid AnalysisId);
+public record AnalyzeStudentResult
+{
+    public required Guid AnalysisId { get; init; }
+}
 
-public record AgentRunPayload(Guid RunId);
+public record AgentRunPayload
+{
+    public required Guid RunId { get; init; }
+}
 
-public record EvaluationRunPayload(Guid RunId, string? CourseId);
+public record EvaluationRunPayload
+{
+    public required Guid RunId { get; init; }
+    public string? CourseId { get; init; }
+}
 
-public record EvaluationGradePayload(Guid ResultId);
+public record EvaluationGradePayload
+{
+    public required Guid ResultId { get; init; }
+}
 
 internal static class JobPayloads
 {
@@ -55,9 +111,26 @@ internal static class JobPayloads
         Guid? versionId = job.Type == JobType.GradeVersion ? Read<GradeVersionPayload>(job.Payload).VersionId : null;
         Guid? gradingId = job is { Type: JobType.GradeVersion, Result: { } result } ? Read<GradeVersionResult>(result).GradingId : null;
 
-        return new JobResponse(job.Id, job.Type, job.Status, versionId, gradingId, job.ProgressDone, job.ProgressTotal,
-            job.Error, job.Attempts, job.MaxAttempts, job.CancelRequested, job.RunAfter, job.CreatedAt, job.StartedAt,
-            job.FinishedAt, job.ParentId, Summary(job));
+        return new JobResponse
+        {
+            Id = job.Id,
+            Type = job.Type,
+            Status = job.Status,
+            VersionId = versionId,
+            GradingId = gradingId,
+            ProgressDone = job.ProgressDone,
+            ProgressTotal = job.ProgressTotal,
+            Error = job.Error,
+            Attempts = job.Attempts,
+            MaxAttempts = job.MaxAttempts,
+            CancelRequested = job.CancelRequested,
+            RunAfter = job.RunAfter,
+            CreatedAt = job.CreatedAt,
+            StartedAt = job.StartedAt,
+            FinishedAt = job.FinishedAt,
+            ParentId = job.ParentId,
+            Summary = Summary(job),
+        };
     }
 
     private static string? Summary(Job job)

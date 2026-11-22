@@ -3,12 +3,21 @@ using System.Text.RegularExpressions;
 namespace TeachingAssistant.Domain.Sandbox;
 
 /// <summary>A Java source file of a submission: its path inside the submission and its text.</summary>
-public record JavaSourceFile(string Path, string Text);
+public record JavaSourceFile
+{
+    public required string Path { get; init; }
+    public required string Text { get; init; }
+}
 
 /// <summary>Files that are compiled together: one program, or one task of a submission that holds several.</summary>
-/// <param name="Root">The folder the program's packages start from, relative to the submission; "" for the top.</param>
-/// <param name="Files">The paths of its .java files, as in the submission.</param>
-public record JavaCompileUnit(string Root, IReadOnlyList<string> Files);
+public record JavaCompileUnit
+{
+    /// <summary>The folder the program's packages start from, relative to the submission; "" for the top.</summary>
+    public required string Root { get; init; }
+
+    /// <summary>The paths of its .java files, as in the submission.</summary>
+    public required IReadOnlyList<string> Files { get; init; }
+}
 
 /// <summary>
 /// Decides which of a submission's Java files are compiled together. Students often zip several tasks side by side, each
@@ -24,7 +33,11 @@ public static partial class JavaCompileUnits
             .Where(f => f.Path.EndsWith(".java", StringComparison.OrdinalIgnoreCase))
             .GroupBy(f => RootOf(f.Path, PackageOf(f.Text)), StringComparer.Ordinal)
             .OrderBy(g => g.Key, StringComparer.Ordinal)
-            .Select(g => new JavaCompileUnit(g.Key, g.Select(f => f.Path).Order(StringComparer.Ordinal).ToList()))
+            .Select(g => new JavaCompileUnit
+            {
+                Root = g.Key,
+                Files = g.Select(f => f.Path).Order(StringComparer.Ordinal).ToList(),
+            })
             .ToList();
     }
 

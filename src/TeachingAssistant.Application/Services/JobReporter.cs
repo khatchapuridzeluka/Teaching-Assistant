@@ -54,22 +54,45 @@ public class JobReporter
             if (job.Type == JobType.GradeVersion
                 && subjects.GetValueOrDefault(JobPayloads.Read<GradeVersionPayload>(job.Payload).VersionId) is { } s)
             {
-                links.Add(new AgentLink(AgentLinkKind.Submission, $"{s.StudentName}'s draft · {s.AssignmentTitle ?? "assignment"}",
-                    s.CourseId, s.AssignmentId, s.SubmissionId));
+                links.Add(new AgentLink
+                {
+                    Kind = AgentLinkKind.Submission,
+                    Label = $"{s.StudentName}'s draft · {s.AssignmentTitle ?? "assignment"}",
+                    CourseId = s.CourseId,
+                    AssignmentId = s.AssignmentId,
+                    SubmissionId = s.SubmissionId,
+                });
             }
             else if (job is { Type: JobType.GradeAssignment, CourseId: { } courseId, AssignmentId: { } assignmentId })
             {
-                links.Add(new AgentLink(AgentLinkKind.Assignment, "The assignment's drafts", courseId, assignmentId));
+                links.Add(new AgentLink
+                {
+                    Kind = AgentLinkKind.Assignment,
+                    Label = "The assignment's drafts",
+                    CourseId = courseId,
+                    AssignmentId = assignmentId,
+                });
             }
             else if (job is { Type: JobType.GradeStudent, CourseId: { } studentCourse })
             {
                 var student = JobPayloads.Read<GradeStudentPayload>(job.Payload);
-                links.Add(new AgentLink(AgentLinkKind.Student, $"{student.StudentName ?? "The student"}'s profile", studentCourse,
-                    StudentId: student.StudentId));
+                links.Add(new AgentLink
+                {
+                    Kind = AgentLinkKind.Student,
+                    Label = $"{student.StudentName ?? "The student"}'s profile",
+                    CourseId = studentCourse,
+                    StudentId = student.StudentId,
+                });
             }
             else if (job is { Type: JobType.AnalyzeMistakes, CourseId: { } mistakesCourse, AssignmentId: { } mistakesAssignment })
             {
-                links.Add(new AgentLink(AgentLinkKind.CommonMistakes, "Common mistakes", mistakesCourse, mistakesAssignment));
+                links.Add(new AgentLink
+                {
+                    Kind = AgentLinkKind.CommonMistakes,
+                    Label = "Common mistakes",
+                    CourseId = mistakesCourse,
+                    AssignmentId = mistakesAssignment,
+                });
             }
             else if (job.Type == JobType.AnalyzeStudent)
             {

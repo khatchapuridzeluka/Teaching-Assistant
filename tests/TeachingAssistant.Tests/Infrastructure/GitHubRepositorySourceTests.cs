@@ -52,7 +52,13 @@ public class GitHubRepositorySourceTests
 
         var snapshot = await Source().ResolveAsync("https://github.com/ana/library", TestContext.Current.CancellationToken);
 
-        Assert.Equal(new RepositorySnapshot("ana", "library", "1111111aaaa", "default branch"), snapshot);
+        Assert.Equal(new RepositorySnapshot
+        {
+            Owner = "ana",
+            Repository = "library",
+            CommitSha = "1111111aaaa",
+            Ref = "default branch",
+        }, snapshot);
         Assert.Equal("library-1111111.zip", snapshot.DownloadName);
         Assert.Null(_github.Authorization);
         Assert.Contains("TeachingAssistant", _github.UserAgent);
@@ -67,7 +73,13 @@ public class GitHubRepositorySourceTests
 
         var snapshot = await Source("token-1").ResolveAsync("https://github.com/teacher/course/pull/12", TestContext.Current.CancellationToken);
 
-        Assert.Equal(new RepositorySnapshot("ana", "course-fork", "2222222bbbb", "pull/12"), snapshot);
+        Assert.Equal(new RepositorySnapshot
+        {
+            Owner = "ana",
+            Repository = "course-fork",
+            CommitSha = "2222222bbbb",
+            Ref = "pull/12",
+        }, snapshot);
         Assert.Equal("Bearer token-1", _github.Authorization);
     }
 
@@ -99,7 +111,13 @@ public class GitHubRepositorySourceTests
         _github.Zips["/repos/ana/library/zipball/1111111aaaa"] = "PK-zip-bytes"u8.ToArray();
         using var destination = new MemoryStream();
 
-        await Source().DownloadAsync(new RepositorySnapshot("ana", "library", "1111111aaaa", "main"), destination,
+        await Source().DownloadAsync(new RepositorySnapshot
+        {
+            Owner = "ana",
+            Repository = "library",
+            CommitSha = "1111111aaaa",
+            Ref = "main",
+        }, destination,
             TestContext.Current.CancellationToken);
 
         Assert.Equal("PK-zip-bytes", Encoding.UTF8.GetString(destination.ToArray()));
@@ -112,7 +130,7 @@ public class GitHubRepositorySourceTests
         _github.DeclaredLength = 200L * 1024 * 1024;
 
         await Assert.ThrowsAsync<SubmissionSourceUnavailableException>(() => Source().DownloadAsync(
-            new RepositorySnapshot("ana", "huge", "3333333", "main"), new MemoryStream(), TestContext.Current.CancellationToken));
+            new RepositorySnapshot { Owner = "ana", Repository = "huge", CommitSha = "3333333", Ref = "main" }, new MemoryStream(), TestContext.Current.CancellationToken));
     }
 
     private sealed class FakeGitHub : HttpMessageHandler

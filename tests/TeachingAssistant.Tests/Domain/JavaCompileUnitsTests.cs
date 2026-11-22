@@ -9,9 +9,9 @@ public class JavaCompileUnitsTests
     {
         var units = JavaCompileUnits.Plan(
         [
-            new JavaSourceFile("src/shop/Main.java", "package shop;\nclass Main {}"),
-            new JavaSourceFile("src/shop/model/Item.java", "package shop.model;\nclass Item {}"),
-            new JavaSourceFile("README.md", "not code"),
+            new JavaSourceFile { Path = "src/shop/Main.java", Text = "package shop;\nclass Main {}" },
+            new JavaSourceFile { Path = "src/shop/model/Item.java", Text = "package shop.model;\nclass Item {}" },
+            new JavaSourceFile { Path = "README.md", Text = "not code" },
         ]);
 
         var unit = Assert.Single(units);
@@ -24,9 +24,9 @@ public class JavaCompileUnitsTests
     {
         var units = JavaCompileUnits.Plan(
         [
-            new JavaSourceFile("task1/Main.java", "public class Main {}"),
-            new JavaSourceFile("task1/Helper.java", "class Helper {}"),
-            new JavaSourceFile("task2/Main.java", "public class Main {}"),
+            new JavaSourceFile { Path = "task1/Main.java", Text = "public class Main {}" },
+            new JavaSourceFile { Path = "task1/Helper.java", Text = "class Helper {}" },
+            new JavaSourceFile { Path = "task2/Main.java", Text = "public class Main {}" },
         ]);
 
         Assert.Equal(["task1", "task2"], units.Select(u => u.Root));

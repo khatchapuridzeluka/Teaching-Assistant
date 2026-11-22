@@ -56,7 +56,7 @@ public class DockerSandboxRunner : ISandboxRunner
             var duration = Stopwatch.GetElapsedTime(started);
             _logger.LogInformation("Sandbox run in {Image} finished in {Duration} ms: {Outcomes}", request.Image,
                 (int)duration.TotalMilliseconds, string.Join(", ", steps.Select(s => $"{s.Name}={s.Outcome}")));
-            return new SandboxResult(steps, duration);
+            return new SandboxResult { Steps = steps, Duration = duration };
         }
         finally
         {
@@ -155,7 +155,15 @@ public class DockerSandboxRunner : ISandboxRunner
             var remaining = limits.TotalTimeout - Stopwatch.GetElapsedTime(started);
             if (skipRest || remaining < MinimumStepTime)
             {
-                results.Add(new SandboxStepResult(step.Name, SandboxStepOutcome.Skipped, null, "", "", false, TimeSpan.Zero));
+                results.Add(new SandboxStepResult
+                {
+                    Name = step.Name,
+                    Outcome = SandboxStepOutcome.Skipped,
+                    Stdout = "",
+                    Stderr = "",
+                    OutputTruncated = false,
+                    Duration = TimeSpan.Zero,
+                });
                 continue;
             }
 
@@ -196,8 +204,16 @@ public class DockerSandboxRunner : ISandboxRunner
             ? SandboxStepOutcome.TimedOut
             : result.ExitCode == 0 ? SandboxStepOutcome.Succeeded : SandboxStepOutcome.Failed;
 
-        return new SandboxStepResult(step.Name, outcome, timedOut ? null : result.ExitCode, result.Stdout, result.Stderr,
-            result.OutputTruncated, duration);
+        return new SandboxStepResult
+        {
+            Name = step.Name,
+            Outcome = outcome,
+            ExitCode = timedOut ? null : result.ExitCode,
+            Stdout = result.Stdout,
+            Stderr = result.Stderr,
+            OutputTruncated = result.OutputTruncated,
+            Duration = duration,
+        };
     }
 
     private async Task RemoveAsync(string containerId)
@@ -219,11 +235,13 @@ public class DockerSandboxRunner : ISandboxRunner
 
     private Limits Resolve(SandboxLimits? limits)
     {
-        return new Limits(
-            limits?.MemoryMb ?? _options.MemoryMb,
-            limits?.Cpus ?? _options.Cpus,
-            limits?.TotalTimeout ?? _options.TotalTimeout,
-            limits?.MaxOutputBytes ?? _options.MaxOutputBytes);
+        return new Limits
+        {
+            MemoryMb = limits?.MemoryMb ?? _options.MemoryMb,
+            Cpus = limits?.Cpus ?? _options.Cpus,
+            TotalTimeout = limits?.TotalTimeout ?? _options.TotalTimeout,
+            MaxOutputBytes = limits?.MaxOutputBytes ?? _options.MaxOutputBytes,
+        };
     }
 
     private static void Validate(SandboxRequest request)
@@ -279,5 +297,11 @@ public class DockerSandboxRunner : ISandboxRunner
         return line.Length == 0 ? "no details" : line;
     }
 
-    private sealed record Limits(int MemoryMb, double Cpus, TimeSpan TotalTimeout, int MaxOutputBytes);
+    private sealed record Limits
+    {
+        public required int MemoryMb { get; init; }
+        public required double Cpus { get; init; }
+        public required TimeSpan TotalTimeout { get; init; }
+        public required int MaxOutputBytes { get; init; }
+    }
 }

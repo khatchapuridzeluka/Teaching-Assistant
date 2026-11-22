@@ -1,7 +1,12 @@
 namespace TeachingAssistant.Domain.Profiling;
 
-public sealed record AssignmentResult(double? MaxPoints, DateTimeOffset? DueAt, double? Grade, bool TurnedIn)
+public sealed record AssignmentResult
 {
+    public double? MaxPoints { get; init; }
+    public DateTimeOffset? DueAt { get; init; }
+    public double? Grade { get; init; }
+    public required bool TurnedIn { get; init; }
+
     public bool IsMissing(DateTimeOffset now) =>
         MaxPoints is > 0 && Grade is null && !TurnedIn && DueAt is { } due && due <= now;
 
@@ -31,8 +36,12 @@ public sealed record AssignmentResult(double? MaxPoints, DateTimeOffset? DueAt, 
     }
 }
 
-public sealed record OverallScore(double Earned, double Possible, int Counted)
+public sealed record OverallScore
 {
+    public required double Earned { get; init; }
+    public required double Possible { get; init; }
+    public required int Counted { get; init; }
+
     public double? Percent => Possible > 0 ? Earned / Possible * 100 : null;
 
     public static OverallScore Compute(IEnumerable<AssignmentResult> assignments, DateTimeOffset now)
@@ -60,6 +69,6 @@ public sealed record OverallScore(double Earned, double Possible, int Counted)
             counted++;
         }
 
-        return new OverallScore(earned, possible, counted);
+        return new OverallScore { Earned = earned, Possible = possible, Counted = counted };
     }
 }

@@ -65,14 +65,15 @@ public class EvaluationService : IEvaluationService
             .ToList();
 
         var comparisons = compared.Select(c => c.Comparison).ToList();
-        return new EvaluationResponse(
-            compared.Count,
-            Scores(comparisons),
-            Mistakes(comparisons),
-            Strengths(comparisons),
-            Classroom(compared.Select(c => (c.Comparison.AiTotal, c.Comparison.TeacherTotal, c.Comparison.MaxScore,
+        return new EvaluationResponse
+        {
+            Reports = compared.Count,
+            Scores = Scores(comparisons),
+            Mistakes = Mistakes(comparisons),
+            Strengths = Strengths(comparisons),
+            Classroom = Classroom(compared.Select(c => (c.Comparison.AiTotal, c.Comparison.TeacherTotal, c.Comparison.MaxScore,
                 grades.GetValueOrDefault((c.Report.AssignmentId, c.Report.StudentId)))).ToList()),
-            compared.Select(c => c.Draft.Model)
+            Models = compared.Select(c => c.Draft.Model)
                 .Concat(discarded.Select(d => d.Model))
                 .Distinct()
                 .Select(model => Model(model,
@@ -80,8 +81,9 @@ public class EvaluationService : IEvaluationService
                     discarded.Count(d => d.Model == model && d.Reason == DiscardReason.PoorGrading)))
                 .OrderByDescending(m => m.Reports)
                 .ToList(),
-            Discards(discarded, titles),
-            rows);
+            Discards = Discards(discarded, titles),
+            Rows = rows,
+        };
     }
 
     /// <summary>
@@ -109,62 +111,73 @@ public class EvaluationService : IEvaluationService
             compared.Select(c => c.Report.CourseId), compared.Select(c => c.Report.StudentId), cancellationToken);
 
         var rows = compared
-            .Select(c => new EvaluationRow(
-                c.Report.Id,
-                c.Draft.Id,
-                c.Report.CourseId,
-                c.Report.AssignmentId,
-                titles.GetValueOrDefault((c.Report.CourseId, c.Report.AssignmentId)),
-                c.Report.StudentId,
-                names.GetValueOrDefault(c.Report.StudentId),
-                c.Result.Model,
-                c.Comparison.ModelTotal,
-                c.Comparison.TeacherTotal,
-                c.Comparison.MaxScore,
-                c.Comparison.ModelPercent,
-                c.Comparison.TeacherPercent,
-                c.Comparison.DifferencePercent,
-                c.Result.Mistakes.Count,
-                0,
-                c.Comparison.RepeatedFalseAlarms,
-                grades.GetValueOrDefault((c.Report.AssignmentId, c.Report.StudentId)),
-                c.Report.ApprovedAt))
+            .Select(c => new EvaluationRow
+            {
+                ReportId = c.Report.Id,
+                GradingId = c.Draft.Id,
+                CourseId = c.Report.CourseId,
+                AssignmentId = c.Report.AssignmentId,
+                AssignmentTitle = titles.GetValueOrDefault((c.Report.CourseId, c.Report.AssignmentId)),
+                StudentId = c.Report.StudentId,
+                StudentName = names.GetValueOrDefault(c.Report.StudentId),
+                Model = c.Result.Model,
+                AiScore = c.Comparison.ModelTotal,
+                TeacherScore = c.Comparison.TeacherTotal,
+                MaxScore = c.Comparison.MaxScore,
+                AiPercent = c.Comparison.ModelPercent,
+                TeacherPercent = c.Comparison.TeacherPercent,
+                Difference = c.Comparison.DifferencePercent,
+                Mistakes = c.Result.Mistakes.Count,
+                MistakesEdited = 0,
+                MistakesRejected = c.Comparison.RepeatedFalseAlarms,
+                ClassroomGrade = grades.GetValueOrDefault((c.Report.AssignmentId, c.Report.StudentId)),
+                ApprovedAt = c.Report.ApprovedAt,
+            })
             .OrderByDescending(r => r.Difference is { } d ? Math.Abs(d) : -1)
             .ThenByDescending(r => r.ApprovedAt)
             .ToList();
 
         var comparisons = compared.Select(c => c.Comparison).ToList();
-        return new EvaluationResponse(
-            compared.Count,
-            ScoresOf(comparisons.Select(c => c.DifferencePercent).OfType<double>().ToList()),
-            MistakesOf(comparisons.SelectMany(c => c.Decisions).ToList()),
-            new EvaluationStrengths(0, 0, 0, 0),
-            Classroom(compared.Select(c => (c.Comparison.ModelTotal, c.Comparison.TeacherTotal, c.Comparison.MaxScore,
+        return new EvaluationResponse
+        {
+            Reports = compared.Count,
+            Scores = ScoresOf(comparisons.Select(c => c.DifferencePercent).OfType<double>().ToList()),
+            Mistakes = MistakesOf(comparisons.SelectMany(c => c.Decisions).ToList()),
+            Strengths = new EvaluationStrengths { Total = 0, Kept = 0, Edited = 0, Rejected = 0 },
+            Classroom = Classroom(compared.Select(c => (c.Comparison.ModelTotal, c.Comparison.TeacherTotal, c.Comparison.MaxScore,
                 grades.GetValueOrDefault((c.Report.AssignmentId, c.Report.StudentId)))).ToList()),
-            [],
-            new EvaluationDiscards(0, 0, [], []),
-            rows,
-            model,
-            Found(approved.Count, comparisons));
+            Models = [],
+            Discards = new EvaluationDiscards { Total = 0, PoorGrading = 0, ByReason = [], Rows = [] },
+            Rows = rows,
+            Model = model,
+            Found = Found(approved.Count, comparisons),
+        };
     }
 
     internal static EvaluationFound Found(int approvedReports, IReadOnlyList<RunComparison> comparisons)
     {
         var results = comparisons.SelectMany(c => c.TeacherResults).ToList();
-        return new EvaluationFound(
-            approvedReports,
-            results.Count,
-            results.Count(r => r.Found),
-            comparisons.Sum(c => c.RepeatedFalseAlarms),
-            comparisons.Sum(c => c.Unreviewed),
-            results.GroupBy(r => r.Category)
-                .Select(g => new CategoryFound(g.Key, g.Count(), g.Count(r => r.Found)))
+        return new EvaluationFound
+        {
+            ApprovedReports = approvedReports,
+            TeacherMistakes = results.Count,
+            Found = results.Count(r => r.Found),
+            RepeatedFalseAlarms = comparisons.Sum(c => c.RepeatedFalseAlarms),
+            Unreviewed = comparisons.Sum(c => c.Unreviewed),
+            ByCategory = results.GroupBy(r => r.Category)
+                .Select(g => new CategoryFound { Category = g.Key, TeacherMistakes = g.Count(), Found = g.Count(r => r.Found) })
                 .OrderByDescending(c => c.TeacherMistakes)
                 .ToList(),
-            Enum.GetValues<MistakeSeverity>()
-                .Select(s => new SeverityFound(s, results.Count(r => r.Severity == s), results.Count(r => r.Severity == s && r.Found)))
+            BySeverity = Enum.GetValues<MistakeSeverity>()
+                .Select(s => new SeverityFound
+                {
+                    Severity = s,
+                    TeacherMistakes = results.Count(r => r.Severity == s),
+                    Found = results.Count(r => r.Severity == s && r.Found),
+                })
                 .Where(s => s.TeacherMistakes > 0)
-                .ToList());
+                .ToList(),
+        };
     }
 
     /// <summary>Assignment titles, returned Classroom grades and student names for the courses and students on the page.</summary>
@@ -209,21 +222,28 @@ public class EvaluationService : IEvaluationService
         }
 
         var buckets = counts
-            .Select((count, i) => new DifferenceBucket(-BucketLimit + i * BucketSize, -BucketLimit + (i + 1) * BucketSize, count))
+            .Select((count, i) => new DifferenceBucket
+            {
+                From = -BucketLimit + i * BucketSize,
+                To = -BucketLimit + (i + 1) * BucketSize,
+                Count = count,
+            })
             .ToList();
 
         double? meanGap = differences.Count == 0 ? null : differences.Average(Math.Abs);
-        return new EvaluationScores(
-            differences.Count,
-            meanGap is { } gap ? Math.Max(0, 100 - gap) : null,
-            TolerancePercent,
-            differences.Count(d => Math.Abs(d) <= TolerancePercent + 1e-9),
-            differences.Count(d => Math.Abs(d) < 1e-9),
-            differences.Count == 0 ? null : differences.Average(Math.Abs),
-            differences.Count == 0 ? null : differences.Average(),
-            differences.Count(d => d > 1e-9),
-            differences.Count(d => d < -1e-9),
-            buckets);
+        return new EvaluationScores
+        {
+            Compared = differences.Count,
+            Accuracy = meanGap is { } gap ? Math.Max(0, 100 - gap) : null,
+            TolerancePercent = TolerancePercent,
+            WithinTolerance = differences.Count(d => Math.Abs(d) <= TolerancePercent + 1e-9),
+            Exact = differences.Count(d => Math.Abs(d) < 1e-9),
+            MeanAbsoluteDifference = differences.Count == 0 ? null : differences.Average(Math.Abs),
+            MeanDifference = differences.Count == 0 ? null : differences.Average(),
+            AiHigher = differences.Count(d => d > 1e-9),
+            AiLower = differences.Count(d => d < -1e-9),
+            Buckets = buckets,
+        };
     }
 
     internal static EvaluationMistakes Mistakes(IReadOnlyList<DraftComparison> comparisons)
@@ -235,24 +255,36 @@ public class EvaluationService : IEvaluationService
     {
         var changed = mistakes.Where(m => m.PointsChanged).ToList();
 
-        return new EvaluationMistakes(
-            mistakes.Count,
-            mistakes.Count(m => m.Decision == MistakeDecision.Kept),
-            mistakes.Count(m => m.Decision == MistakeDecision.Edited),
-            mistakes.Count(m => m.Decision == MistakeDecision.Rejected),
-            changed.Count,
-            changed.Count == 0 ? null : changed.Average(m => Math.Abs((m.TeacherPoints ?? 0) - (m.AiPoints ?? 0))),
-            mistakes.GroupBy(m => m.Category)
-                .Select(g => new CategoryDecisions(g.Key, Count(g, MistakeDecision.Kept), Count(g, MistakeDecision.Edited),
-                    Count(g, MistakeDecision.Rejected)))
+        return new EvaluationMistakes
+        {
+            Total = mistakes.Count,
+            Kept = mistakes.Count(m => m.Decision == MistakeDecision.Kept),
+            Edited = mistakes.Count(m => m.Decision == MistakeDecision.Edited),
+            Rejected = mistakes.Count(m => m.Decision == MistakeDecision.Rejected),
+            PointsChanged = changed.Count,
+            MeanPointsChange = changed.Count == 0 ? null : changed.Average(m => Math.Abs((m.TeacherPoints ?? 0) - (m.AiPoints ?? 0))),
+            ByCategory = mistakes.GroupBy(m => m.Category)
+                .Select(g => new CategoryDecisions
+                {
+                    Category = g.Key,
+                    Kept = Count(g, MistakeDecision.Kept),
+                    Edited = Count(g, MistakeDecision.Edited),
+                    Rejected = Count(g, MistakeDecision.Rejected),
+                })
                 .OrderByDescending(c => c.Kept + c.Edited + c.Rejected)
                 .ToList(),
-            Enum.GetValues<MistakeSeverity>()
+            BySeverity = Enum.GetValues<MistakeSeverity>()
                 .Select(s => mistakes.Where(m => m.Severity == s).ToList())
                 .Where(g => g.Count > 0)
-                .Select(g => new SeverityDecisions(g[0].Severity, Count(g, MistakeDecision.Kept), Count(g, MistakeDecision.Edited),
-                    Count(g, MistakeDecision.Rejected)))
-                .ToList());
+                .Select(g => new SeverityDecisions
+                {
+                    Severity = g[0].Severity,
+                    Kept = Count(g, MistakeDecision.Kept),
+                    Edited = Count(g, MistakeDecision.Edited),
+                    Rejected = Count(g, MistakeDecision.Rejected),
+                })
+                .ToList(),
+        };
     }
 
     private static EvaluationStrengths Strengths(IReadOnlyList<DraftComparison> comparisons)
@@ -260,7 +292,7 @@ public class EvaluationService : IEvaluationService
         var kept = comparisons.Sum(c => c.StrengthsKept);
         var edited = comparisons.Sum(c => c.StrengthsEdited);
         var rejected = comparisons.Sum(c => c.StrengthsRejected);
-        return new EvaluationStrengths(kept + edited + rejected, kept, edited, rejected);
+        return new EvaluationStrengths { Total = kept + edited + rejected, Kept = kept, Edited = edited, Rejected = rejected };
     }
 
     private static EvaluationClassroom Classroom(
@@ -276,19 +308,31 @@ public class EvaluationService : IEvaluationService
             .Select(p => (p.TeacherTotal!.Value - p.Grade!.Value) / p.MaxScore!.Value * 100)
             .ToList();
 
-        return new EvaluationClassroom(
-            graded.Count,
-            aiDifferences.Count(d => Math.Abs(d) <= TolerancePercent + 1e-9),
-            aiDifferences.Count == 0 ? null : aiDifferences.Average(Math.Abs),
-            teacherDifferences.Count(d => Math.Abs(d) <= TolerancePercent + 1e-9));
+        return new EvaluationClassroom
+        {
+            Compared = graded.Count,
+            AiWithinTolerance = aiDifferences.Count(d => Math.Abs(d) <= TolerancePercent + 1e-9),
+            AiMeanAbsoluteDifference = aiDifferences.Count == 0 ? null : aiDifferences.Average(Math.Abs),
+            TeacherWithinTolerance = teacherDifferences.Count(d => Math.Abs(d) <= TolerancePercent + 1e-9),
+        };
     }
 
     private static EvaluationModel Model(string model, IReadOnlyList<DraftComparison> comparisons, int discardedPoorGrading)
     {
         var scores = Scores(comparisons);
         var mistakes = comparisons.SelectMany(c => c.Mistakes).ToList();
-        return new EvaluationModel(model, comparisons.Count, scores.Compared, scores.Accuracy, scores.WithinTolerance, scores.MeanAbsoluteDifference,
-            mistakes.Count, mistakes.Count(m => m.Decision == MistakeDecision.Rejected), discardedPoorGrading);
+        return new EvaluationModel
+        {
+            Model = model,
+            Reports = comparisons.Count,
+            ScoresCompared = scores.Compared,
+            Accuracy = scores.Accuracy,
+            WithinTolerance = scores.WithinTolerance,
+            MeanAbsoluteDifference = scores.MeanAbsoluteDifference,
+            Mistakes = mistakes.Count,
+            MistakesRejected = mistakes.Count(m => m.Decision == MistakeDecision.Rejected),
+            DiscardedPoorGrading = discardedPoorGrading,
+        };
     }
 
     internal static EvaluationDiscards Discards(
@@ -296,42 +340,67 @@ public class EvaluationService : IEvaluationService
     {
         var byReason = discarded
             .GroupBy(d => d.Reason)
-            .Select(g => new DiscardReasonCount(g.Key, g.Count()))
+            .Select(g => new DiscardReasonCount { Reason = g.Key, Count = g.Count() })
             .OrderByDescending(c => c.Reason == DiscardReason.PoorGrading)
             .ThenByDescending(c => c.Count)
             .ToList();
         var rows = discarded
-            .Select(d => new DiscardedRow(d.GradingId, d.CourseId, d.AssignmentId, titles.GetValueOrDefault((d.CourseId, d.AssignmentId)),
-                d.StudentId, d.StudentName, d.Model, d.Score is { } score ? score + (d.Bonus ?? 0) : null, d.MaxScore,
-                d.Major, d.Minor, d.Style, d.Reason, d.Note, d.CreatedAt, d.DiscardedAt, d.ReportStatus))
+            .Select(d => new DiscardedRow
+            {
+                GradingId = d.GradingId,
+                CourseId = d.CourseId,
+                AssignmentId = d.AssignmentId,
+                AssignmentTitle = titles.GetValueOrDefault((d.CourseId, d.AssignmentId)),
+                StudentId = d.StudentId,
+                StudentName = d.StudentName,
+                Model = d.Model,
+                AiScore = d.Score is { } score ? score + (d.Bonus ?? 0) : null,
+                MaxScore = d.MaxScore,
+                Major = d.Major,
+                Minor = d.Minor,
+                Style = d.Style,
+                Reason = d.Reason,
+                Note = d.Note,
+                CreatedAt = d.CreatedAt,
+                DiscardedAt = d.DiscardedAt,
+                ReportStatus = d.ReportStatus,
+            })
             .ToList();
-        return new EvaluationDiscards(discarded.Count, discarded.Count(d => d.Reason == DiscardReason.PoorGrading), byReason, rows);
+        return new EvaluationDiscards
+        {
+            Total = discarded.Count,
+            PoorGrading = discarded.Count(d => d.Reason == DiscardReason.PoorGrading),
+            ByReason = byReason,
+            Rows = rows,
+        };
     }
 
     private static EvaluationRow Row(
         GradingReport report, AiGrading draft, DraftComparison comparison, Dictionary<(string, string), string> titles,
         Dictionary<string, string> names, double? classroomGrade)
     {
-        return new EvaluationRow(
-            report.Id,
-            draft.Id,
-            report.CourseId,
-            report.AssignmentId,
-            titles.GetValueOrDefault((report.CourseId, report.AssignmentId)),
-            report.StudentId,
-            names.GetValueOrDefault(report.StudentId),
-            draft.Model,
-            comparison.AiTotal,
-            comparison.TeacherTotal,
-            comparison.MaxScore,
-            comparison.AiPercent,
-            comparison.TeacherPercent,
-            comparison.DifferencePercent,
-            comparison.Mistakes.Count,
-            comparison.Mistakes.Count(m => m.Decision == MistakeDecision.Edited),
-            comparison.Mistakes.Count(m => m.Decision == MistakeDecision.Rejected),
-            classroomGrade,
-            report.ApprovedAt);
+        return new EvaluationRow
+        {
+            ReportId = report.Id,
+            GradingId = draft.Id,
+            CourseId = report.CourseId,
+            AssignmentId = report.AssignmentId,
+            AssignmentTitle = titles.GetValueOrDefault((report.CourseId, report.AssignmentId)),
+            StudentId = report.StudentId,
+            StudentName = names.GetValueOrDefault(report.StudentId),
+            Model = draft.Model,
+            AiScore = comparison.AiTotal,
+            TeacherScore = comparison.TeacherTotal,
+            MaxScore = comparison.MaxScore,
+            AiPercent = comparison.AiPercent,
+            TeacherPercent = comparison.TeacherPercent,
+            Difference = comparison.DifferencePercent,
+            Mistakes = comparison.Mistakes.Count,
+            MistakesEdited = comparison.Mistakes.Count(m => m.Decision == MistakeDecision.Edited),
+            MistakesRejected = comparison.Mistakes.Count(m => m.Decision == MistakeDecision.Rejected),
+            ClassroomGrade = classroomGrade,
+            ApprovedAt = report.ApprovedAt,
+        };
     }
 
     private static int Count(IEnumerable<MistakeComparison> mistakes, MistakeDecision decision)

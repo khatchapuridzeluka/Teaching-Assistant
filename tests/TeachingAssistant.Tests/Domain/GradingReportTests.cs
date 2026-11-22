@@ -55,8 +55,22 @@ public class GradingReportTests
 
         report.Save(grading, 88, 5, "My review",
         [
-            new ReportMistakeEdit(naming.Id, false, MistakeSeverity.Major, naming.Category, naming.Message),
-            new ReportMistakeEdit(unused.Id, true, unused.Severity, unused.Category, unused.Message),
+            new ReportMistakeEdit
+            {
+                SourceMistakeId = naming.Id,
+                Rejected = false,
+                Severity = MistakeSeverity.Major,
+                Category = naming.Category,
+                Message = naming.Message,
+            },
+            new ReportMistakeEdit
+            {
+                SourceMistakeId = unused.Id,
+                Rejected = true,
+                Severity = unused.Severity,
+                Category = unused.Category,
+                Message = unused.Message,
+            },
         ], Now.AddMinutes(5));
 
         Assert.Equal([MistakeDecision.Edited, MistakeDecision.Rejected], report.Mistakes.Select(m => m.Decision));
@@ -77,7 +91,15 @@ public class GradingReportTests
         Assert.Equal(1, report.Mistakes[0].Points);
 
         report.Save(grading, 80, null, "Review",
-            [new ReportMistakeEdit(mistake.Id, false, mistake.Severity, mistake.Category, mistake.Message, 3)], Now);
+            [new ReportMistakeEdit
+            {
+                SourceMistakeId = mistake.Id,
+                Rejected = false,
+                Severity = mistake.Severity,
+                Category = mistake.Category,
+                Message = mistake.Message,
+                Points = 3,
+            }], Now);
         report.Approve(Now);
 
         Assert.Equal((MistakeDecision.Edited, (double?)3), (report.Mistakes[0].Decision, report.Mistakes[0].Points));
@@ -93,7 +115,15 @@ public class GradingReportTests
         var mistake = grading.Mistakes[0];
 
         Assert.Throws<ArgumentOutOfRangeException>(() => report.Save(grading, 80, null, "Review",
-            [new ReportMistakeEdit(mistake.Id, false, mistake.Severity, mistake.Category, mistake.Message, -2)], Now));
+            [new ReportMistakeEdit
+            {
+                SourceMistakeId = mistake.Id,
+                Rejected = false,
+                Severity = mistake.Severity,
+                Category = mistake.Category,
+                Message = mistake.Message,
+                Points = -2,
+            }], Now));
     }
 
     [Fact]
@@ -104,7 +134,14 @@ public class GradingReportTests
         var naming = grading.Mistakes[0];
 
         report.Save(grading, 82, 7, "AI review",
-            [new ReportMistakeEdit(naming.Id, false, naming.Severity, naming.Category, "  " + naming.Message + " ")], Now);
+            [new ReportMistakeEdit
+            {
+                SourceMistakeId = naming.Id,
+                Rejected = false,
+                Severity = naming.Severity,
+                Category = naming.Category,
+                Message = "  " + naming.Message + " ",
+            }], Now);
 
         Assert.Equal(MistakeDecision.Kept, report.Mistakes[0].Decision);
     }

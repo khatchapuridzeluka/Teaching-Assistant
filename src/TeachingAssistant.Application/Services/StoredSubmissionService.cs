@@ -27,16 +27,34 @@ public class StoredSubmissionService : IStoredSubmissionService
         return submissions
             .Where(s => s.Versions.Count > 0)
             .OrderBy(s => s.StudentName)
-            .Select(s => new StoredSubmissionResponse(
-                s.Id,
-                s.ExternalSubmissionId,
-                s.StudentName,
-                s.Versions.OrderByDescending(v => v.Number).Select(v => new StoredVersionResponse(
-                    v.Id, v.Number, v.Status, v.StatusDetail, v.ContentHash is not null, v.ExtractionDetail,
-                    v.FetchedAt, v.TurnedInAt,
-                    v.Contents.Select(c => new StoredFileResponse(
-                        c.Id, c.Name, c.Kind, c.MimeType, c.SizeBytes, c.Status, c.StoredName is not null)).ToList()))
-                    .ToList()))
+            .Select(s => new StoredSubmissionResponse
+            {
+                Id = s.Id,
+                ExternalSubmissionId = s.ExternalSubmissionId,
+                StudentName = s.StudentName,
+                Versions = s.Versions.OrderByDescending(v => v.Number).Select(v => new StoredVersionResponse
+                {
+                    Id = v.Id,
+                    Number = v.Number,
+                    Status = v.Status,
+                    StatusDetail = v.StatusDetail,
+                    HasCode = v.ContentHash is not null,
+                    ExtractionDetail = v.ExtractionDetail,
+                    FetchedAt = v.FetchedAt,
+                    TurnedInAt = v.TurnedInAt,
+                    Files = v.Contents.Select(c => new StoredFileResponse
+                    {
+                        Id = c.Id,
+                        Name = c.Name,
+                        Kind = c.Kind,
+                        MimeType = c.MimeType,
+                        SizeBytes = c.SizeBytes,
+                        Status = c.Status,
+                        Stored = c.StoredName is not null,
+                    }).ToList(),
+                })
+                    .ToList(),
+            })
             .ToList();
     }
 
@@ -51,7 +69,12 @@ public class StoredSubmissionService : IStoredSubmissionService
         var stream = _storage.OpenOriginal(location.VersionPath, location.StoredName);
         return stream is null
             ? null
-            : new StoredFileContent(stream, location.MimeType ?? FallbackContentType, location.Name);
+            : new StoredFileContent
+            {
+                Content = stream,
+                ContentType = location.MimeType ?? FallbackContentType,
+                FileName = location.Name,
+            };
     }
 
     public async Task<ExtractionSummary> ReExtractAsync(string assignmentId, CancellationToken cancellationToken = default)
@@ -66,7 +89,7 @@ public class StoredSubmissionService : IStoredSubmissionService
             {
                 var files = version.Contents
                     .Where(c => c.StoredName is not null)
-                    .Select(c => new ExtractableFile(c.StoredName!, c.Kind))
+                    .Select(c => new ExtractableFile { StoredName = c.StoredName!, Kind = c.Kind })
                     .ToList();
 
                 var extraction = await _storage.ReExtractAsync(version.StoragePath, files, cancellationToken);
@@ -79,12 +102,16 @@ public class StoredSubmissionService : IStoredSubmissionService
                     withCode++;
                 }
 
-                problems.AddRange(extraction.Problems.Select(p => new FetchProblem(submission.StudentName, $"v{version.Number}: {p}")));
+                problems.AddRange(extraction.Problems.Select(p => new FetchProblem
+                {
+                    StudentName = submission.StudentName,
+                    Detail = $"v{version.Number}: {p}",
+                }));
             }
         }
 
         await _store.SaveChangesAsync(cancellationToken);
-        return new ExtractionSummary(versions, withCode, problems);
+        return new ExtractionSummary { Versions = versions, VersionsWithCode = withCode, Problems = problems };
     }
 
     public async Task<IReadOnlyList<CodeFileResponse>?> ListCodeAsync(Guid versionId, CancellationToken cancellationToken = default)
@@ -92,7 +119,7 @@ public class StoredSubmissionService : IStoredSubmissionService
         var versionPath = await _store.FindVersionPathAsync(versionId, cancellationToken);
         return versionPath is null
             ? null
-            : _storage.ListCode(versionPath).Select(f => new CodeFileResponse(f.Path, f.SizeBytes)).ToList();
+            : _storage.ListCode(versionPath).Select(f => new CodeFileResponse { Path = f.Path, SizeBytes = f.SizeBytes }).ToList();
     }
 
     public async Task<Stream?> OpenCodeFileAsync(Guid versionId, string path, CancellationToken cancellationToken = default)

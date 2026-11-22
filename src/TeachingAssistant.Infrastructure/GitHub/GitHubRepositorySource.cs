@@ -53,7 +53,13 @@ public class GitHubRepositorySource : IRepositorySource
                 var (owner, repository) = head.TryGetProperty("repo", out var repo) && repo.ValueKind == JsonValueKind.Object
                     ? (repo.GetProperty("owner").GetProperty("login").GetString()!, repo.GetProperty("name").GetString()!)
                     : (link.Owner, link.Repository);
-                return new RepositorySnapshot(owner, repository, sha, $"pull/{link.Ref}");
+                return new RepositorySnapshot
+                {
+                    Owner = owner,
+                    Repository = repository,
+                    CommitSha = sha,
+                    Ref = $"pull/{link.Ref}",
+                };
             }
 
             default:
@@ -62,7 +68,13 @@ public class GitHubRepositorySource : IRepositorySource
                 using var commit = await GetJsonAsync(
                     $"repos/{link.Owner}/{link.Repository}/commits/{Uri.EscapeDataString(reference)}", name, cancellationToken);
                 var sha = commit.RootElement.GetProperty("sha").GetString()!;
-                return new RepositorySnapshot(link.Owner, link.Repository, sha, link.Ref ?? "default branch");
+                return new RepositorySnapshot
+                {
+                    Owner = link.Owner,
+                    Repository = link.Repository,
+                    CommitSha = sha,
+                    Ref = link.Ref ?? "default branch",
+                };
             }
         }
     }

@@ -1,23 +1,34 @@
 namespace TeachingAssistant.Application.Contracts;
 
-/// <param name="Compared">Reports where both totals and the maximum are known.</param>
-/// <param name="Accuracy">100 minus the average gap, in percent: 97.8 when the AI is off by 2.2 points per 100 on average.</param>
-/// <param name="TolerancePercent">How close counts as agreeing, in percent of the maximum (5 = 5 points out of 100).</param>
-/// <param name="WithinTolerance">How many of them agree within the tolerance.</param>
-/// <param name="Exact">How many have the very same total.</param>
-/// <param name="MeanAbsoluteDifference">Average size of the difference, in percent of the maximum.</param>
-/// <param name="MeanDifference">Average signed difference, in percent of the maximum: positive means the AI is more lenient.</param>
-/// <param name="AiHigher">How many times the AI gave more than the teacher.</param>
-/// <param name="AiLower">How many times the AI gave less than the teacher.</param>
-/// <param name="Buckets">How the differences spread, in 5-point steps of percent of the maximum.</param>
-public record EvaluationScores(
-    int Compared,
-    double? Accuracy,
-    double TolerancePercent,
-    int WithinTolerance,
-    int Exact,
-    double? MeanAbsoluteDifference,
-    double? MeanDifference,
-    int AiHigher,
-    int AiLower,
-    IReadOnlyList<DifferenceBucket> Buckets);
+public record EvaluationScores
+{
+    /// <summary>Reports where both totals and the maximum are known.</summary>
+    public required int Compared { get; init; }
+
+    /// <summary>100 minus the average gap, in percent: 97.8 when the AI is off by 2.2 points per 100 on average.</summary>
+    public double? Accuracy { get; init; }
+
+    /// <summary>How close counts as agreeing, in percent of the maximum (5 = 5 points out of 100).</summary>
+    public required double TolerancePercent { get; init; }
+
+    /// <summary>How many of them agree within the tolerance.</summary>
+    public required int WithinTolerance { get; init; }
+
+    /// <summary>How many have the very same total.</summary>
+    public required int Exact { get; init; }
+
+    /// <summary>Average size of the difference, in percent of the maximum.</summary>
+    public double? MeanAbsoluteDifference { get; init; }
+
+    /// <summary>Average signed difference, in percent of the maximum: positive means the AI is more lenient.</summary>
+    public double? MeanDifference { get; init; }
+
+    /// <summary>How many times the AI gave more than the teacher.</summary>
+    public required int AiHigher { get; init; }
+
+    /// <summary>How many times the AI gave less than the teacher.</summary>
+    public required int AiLower { get; init; }
+
+    /// <summary>How the differences spread, in 5-point steps of percent of the maximum.</summary>
+    public required IReadOnlyList<DifferenceBucket> Buckets { get; init; }
+}

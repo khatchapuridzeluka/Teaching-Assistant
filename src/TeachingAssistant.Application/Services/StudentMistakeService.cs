@@ -45,7 +45,13 @@ public class StudentMistakeService : IStudentMistakeService
         var labeled = MistakeHistory.Label(mistakes, DueAt);
         var options = labeled
             .GroupBy(l => l.Mistake.AssignmentId)
-            .Select(g => new MistakeAssignmentOption(g.Key, Title(g.Key), DueAt(g.Key), g.Count()))
+            .Select(g => new MistakeAssignmentOption
+            {
+                AssignmentId = g.Key,
+                Title = Title(g.Key),
+                DueAt = DueAt(g.Key),
+                Count = g.Count(),
+            })
             .ToList();
 
         var selected = labeled
@@ -59,15 +65,41 @@ public class StudentMistakeService : IStudentMistakeService
         var history = selected
             .AsEnumerable()
             .Reverse()
-            .Select(l => new StudentMistakeResponse(l.Mistake.Id, l.Mistake.AssignmentId, Title(l.Mistake.AssignmentId),
-                DueAt(l.Mistake.AssignmentId), l.Mistake.VersionId, ReportOf(l.Mistake.ReportId), l.Mistake.File, l.Mistake.StartLine,
-                l.Mistake.EndLine, l.Mistake.Severity, l.Mistake.Category, l.Mistake.Message, l.Mistake.Points, l.Mistake.Decision,
-                l.Label, Title(l.FirstAssignmentId), l.Mistake.ApprovedAt, records.SourceOf(l.Mistake.AssignmentId)))
+            .Select(l => new StudentMistakeResponse
+            {
+                Id = l.Mistake.Id,
+                AssignmentId = l.Mistake.AssignmentId,
+                AssignmentTitle = Title(l.Mistake.AssignmentId),
+                AssignmentDueAt = DueAt(l.Mistake.AssignmentId),
+                VersionId = l.Mistake.VersionId,
+                ReportId = ReportOf(l.Mistake.ReportId),
+                File = l.Mistake.File,
+                StartLine = l.Mistake.StartLine,
+                EndLine = l.Mistake.EndLine,
+                Severity = l.Mistake.Severity,
+                Category = l.Mistake.Category,
+                Message = l.Mistake.Message,
+                Points = l.Mistake.Points,
+                Decision = l.Mistake.Decision,
+                Label = l.Label,
+                RepeatedFromAssignmentTitle = Title(l.FirstAssignmentId),
+                ApprovedAt = l.Mistake.ApprovedAt,
+                Source = records.SourceOf(l.Mistake.AssignmentId),
+            })
             .ToList();
 
         var categories = MistakeHistory.Trends(selected.Select(l => l.Mistake), DueAt)
-            .Select(t => new MistakeCategoryResponse(t.Category, t.Count, Percent(t.Count, total), t.Assignments, t.Repeated,
-                t.PointsLost, Title(t.FirstAssignmentId), Title(t.LastAssignmentId)))
+            .Select(t => new MistakeCategoryResponse
+            {
+                Category = t.Category,
+                Count = t.Count,
+                Percent = Percent(t.Count, total),
+                Assignments = t.Assignments,
+                Repeated = t.Repeated,
+                PointsLost = t.PointsLost,
+                FirstAssignmentTitle = Title(t.FirstAssignmentId),
+                LastAssignmentTitle = Title(t.LastAssignmentId),
+            })
             .ToList();
 
         var severities = Enum.GetValues<MistakeSeverity>()
@@ -85,19 +117,25 @@ public class StudentMistakeService : IStudentMistakeService
                 var submission = classroom.GetValueOrDefault(g.Key);
                 var score = records.Assignments.GetValueOrDefault(g.Key)?.Score;
                 var maxPoints = assignments.GetValueOrDefault(g.Key)?.MaxPoints ?? score?.MaxScore;
-                return new MistakeAssignmentResponse(g.Key, Title(g.Key), DueAt(g.Key), g.Count(),
-                    g.Count(l => l.Mistake.Severity == MistakeSeverity.Major),
-                    g.Count(l => l.Mistake.Severity == MistakeSeverity.Minor),
-                    g.Count(l => l.Mistake.Severity == MistakeSeverity.Style),
-                    g.Count(l => l.Label == MistakeLabel.Repeated),
-                    g.Sum(l => l.Mistake.Points ?? 0),
-                    maxPoints,
-                    submission?.Grade,
-                    score?.Score,
-                    score?.Bonus,
-                    score?.AiScore,
-                    score?.AiBonus,
-                    records.SourceOf(g.Key));
+                return new MistakeAssignmentResponse
+                {
+                    AssignmentId = g.Key,
+                    Title = Title(g.Key),
+                    DueAt = DueAt(g.Key),
+                    Total = g.Count(),
+                    Major = g.Count(l => l.Mistake.Severity == MistakeSeverity.Major),
+                    Minor = g.Count(l => l.Mistake.Severity == MistakeSeverity.Minor),
+                    Style = g.Count(l => l.Mistake.Severity == MistakeSeverity.Style),
+                    Repeated = g.Count(l => l.Label == MistakeLabel.Repeated),
+                    PointsLost = g.Sum(l => l.Mistake.Points ?? 0),
+                    MaxPoints = maxPoints,
+                    ClassroomGrade = submission?.Grade,
+                    ReportScore = score?.Score,
+                    ReportBonus = score?.Bonus,
+                    AiScore = score?.AiScore,
+                    AiBonus = score?.AiBonus,
+                    Source = records.SourceOf(g.Key),
+                };
             })
             .ToList();
 
@@ -106,8 +144,20 @@ public class StudentMistakeService : IStudentMistakeService
             ? null
             : classroomGraded.Sum(a => Math.Max(0, a.MaxPoints!.Value - a.ClassroomGrade!.Value));
 
-        return new StudentMistakesResponse(total, mistakes.Count, selected.Sum(l => l.Mistake.Points ?? 0), classroomLost,
-            classroomGraded.Count, history, categories, severities, labels, byAssignment, options);
+        return new StudentMistakesResponse
+        {
+            Total = total,
+            Recorded = mistakes.Count,
+            PointsLost = selected.Sum(l => l.Mistake.Points ?? 0),
+            ClassroomPointsLost = classroomLost,
+            ClassroomGraded = classroomGraded.Count,
+            Mistakes = history,
+            Categories = categories,
+            Severities = severities,
+            Labels = labels,
+            Assignments = byAssignment,
+            AssignmentOptions = options,
+        };
     }
 
     internal static Guid? ReportOf(Guid reportId)
@@ -117,7 +167,7 @@ public class StudentMistakeService : IStudentMistakeService
 
     private static MistakeShare<T> Share<T>(T key, int count, int total)
     {
-        return new MistakeShare<T>(key, count, Percent(count, total));
+        return new MistakeShare<T> { Key = key, Count = count, Percent = Percent(count, total) };
     }
 
     private static double Percent(int count, int total)

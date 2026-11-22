@@ -15,9 +15,9 @@ public class MistakeAnalysisServiceTests
 
     private static readonly IReadOnlyList<MistakeAnalysisService.StudentScore> Scores =
     [
-        new("id-Ana", 82, 100, 5, 2),
-        new("id-Beka", 90, 100, null, 1),
-        new("id-Dato", null, 100, null, 1),
+        new() { StudentId = "id-Ana", Score = 82, MaxScore = 100, Bonus = 5, Mistakes = 2 },
+        new() { StudentId = "id-Beka", Score = 90, MaxScore = 100, Mistakes = 1 },
+        new() { StudentId = "id-Dato", MaxScore = 100, Mistakes = 1 },
     ];
 
     [Fact]
@@ -42,9 +42,9 @@ public class MistakeAnalysisServiceTests
     {
         var groups = new List<MistakeAnalysisService.ReplyGroup>
         {
-            new("Fields left public", "Make fields private.", [1, 2, 99]),
-            new("Same again", "Duplicate.", [2]),
-            new(" ", "No title.", [3]),
+            new() { Title = "Fields left public", Explanation = "Make fields private.", MistakeIds = [1, 2, 99] },
+            new() { Title = "Same again", Explanation = "Duplicate.", MistakeIds = [2] },
+            new() { Title = " ", Explanation = "No title.", MistakeIds = [3] },
         };
 
         var clusters = MistakeAnalysisService.Cluster(Mistakes, groups);

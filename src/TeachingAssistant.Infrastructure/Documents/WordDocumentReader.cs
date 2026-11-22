@@ -60,7 +60,7 @@ public class WordDocumentReader : IDocumentReader
                 }
             }
 
-            return new ReadDocument(walker.Text.ToString().Trim(), walker.Images);
+            return new ReadDocument { Text = walker.Text.ToString().Trim(), Images = walker.Images };
         }
         catch (Exception ex) when (ex is InvalidDataException or XmlException)
         {
@@ -208,7 +208,7 @@ public class WordDocumentReader : IDocumentReader
                 return "[an image that could not be included: too large]";
             }
 
-            Images.Add(new DocumentImage(Path.GetFileName(path), mediaType, content));
+            Images.Add(new DocumentImage { Name = Path.GetFileName(path), MediaType = mediaType, Content = content });
             _numbers[relationshipId] = Images.Count;
             return $"[image {Images.Count}]";
         }

@@ -1,15 +1,23 @@
 namespace TeachingAssistant.Application.Contracts;
 
-/// <param name="ApprovedReports">Approved reports that count; Reports says how many of them this model has graded.</param>
-/// <param name="TeacherMistakes">The mistakes you kept in the graded reports.</param>
-/// <param name="Found">How many of them the model found again (same file and overlapping lines, or the same category for a whole-submission mistake).</param>
-/// <param name="RepeatedFalseAlarms">The model's mistakes that repeat one you rejected.</param>
-/// <param name="Unreviewed">The model's mistakes that match nothing in your report, so nobody has judged them.</param>
-public record EvaluationFound(
-    int ApprovedReports,
-    int TeacherMistakes,
-    int Found,
-    int RepeatedFalseAlarms,
-    int Unreviewed,
-    IReadOnlyList<CategoryFound> ByCategory,
-    IReadOnlyList<SeverityFound> BySeverity);
+public record EvaluationFound
+{
+    /// <summary>Approved reports that count; Reports says how many of them this model has graded.</summary>
+    public required int ApprovedReports { get; init; }
+
+    /// <summary>The mistakes you kept in the graded reports.</summary>
+    public required int TeacherMistakes { get; init; }
+
+    /// <summary>How many of them the model found again (same file and overlapping lines, or the same category for a whole-submission mistake).</summary>
+    public required int Found { get; init; }
+
+    /// <summary>The model's mistakes that repeat one you rejected.</summary>
+    public required int RepeatedFalseAlarms { get; init; }
+
+    /// <summary>The model's mistakes that match nothing in your report, so nobody has judged them.</summary>
+    public required int Unreviewed { get; init; }
+
+    public required IReadOnlyList<CategoryFound> ByCategory { get; init; }
+
+    public required IReadOnlyList<SeverityFound> BySeverity { get; init; }
+}

@@ -123,5 +123,10 @@ public class SubmissionTests
         new(ContentOrigin.Drive, ContentKind.CodeArchive, fileId, "homework.zip", "application/zip", md5,
             null, 1024, "homework.zip", null, ContentStatus.Extracted);
 
-    private static ContentFingerprint Drive(string fileId, string md5) => new(ContentOrigin.Drive, fileId, md5);
+    private static ContentFingerprint Drive(string fileId, string md5) => new()
+    {
+        Origin = ContentOrigin.Drive,
+        ExternalId = fileId,
+        Fingerprint = md5,
+    };
 }

@@ -6,9 +6,20 @@ using TeachingAssistant.Application.Exceptions;
 namespace TeachingAssistant.Infrastructure.Sandbox;
 
 /// <summary>What one docker command did: its exit code and the start of what it printed.</summary>
-/// <param name="ExitCode">The exit code; -1 when it was stopped from the host for taking too long.</param>
-/// <param name="HostTimedOut">True when the host stopped the command because it took too long.</param>
-internal sealed record DockerCommandResult(int ExitCode, string Stdout, string Stderr, bool OutputTruncated, bool HostTimedOut);
+internal sealed record DockerCommandResult
+{
+    /// <summary>The exit code; -1 when it was stopped from the host for taking too long.</summary>
+    public required int ExitCode { get; init; }
+
+    public required string Stdout { get; init; }
+
+    public required string Stderr { get; init; }
+
+    public required bool OutputTruncated { get; init; }
+
+    /// <summary>True when the host stopped the command because it took too long.</summary>
+    public required bool HostTimedOut { get; init; }
+}
 
 /// <summary>
 /// Runs the docker command line program with arguments passed one by one (never through a shell, so nothing in them is
@@ -84,12 +95,14 @@ internal sealed class DockerCli
             // A child process still holds the pipe open; keep what was read so far.
         }
 
-        return new DockerCommandResult(
-            hostTimedOut ? -1 : process.ExitCode,
-            stdout.Text(),
-            stderr.Text(),
-            stdout.Truncated || stderr.Truncated,
-            hostTimedOut);
+        return new DockerCommandResult
+        {
+            ExitCode = hostTimedOut ? -1 : process.ExitCode,
+            Stdout = stdout.Text(),
+            Stderr = stderr.Text(),
+            OutputTruncated = stdout.Truncated || stderr.Truncated,
+            HostTimedOut = hostTimedOut,
+        };
     }
 
     private static async Task WriteInputAsync(Process process, byte[]? stdin, CancellationToken cancellationToken)

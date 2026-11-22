@@ -1,3 +1,8 @@
 namespace TeachingAssistant.Application.Models;
 
-public record RosterStudent(string Id, string Name, string? PhotoUrl = null);
+public record RosterStudent
+{
+    public required string Id { get; init; }
+    public required string Name { get; init; }
+    public string? PhotoUrl { get; init; }
+}

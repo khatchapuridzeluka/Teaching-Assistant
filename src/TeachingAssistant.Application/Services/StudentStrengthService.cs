@@ -39,7 +39,13 @@ public class StudentStrengthService : IStudentStrengthService
         var labeled = StrengthHistory.Label(strengths, mistakes, DueAt);
         var options = labeled
             .GroupBy(l => l.Strength.AssignmentId)
-            .Select(g => new MistakeAssignmentOption(g.Key, Title(g.Key), DueAt(g.Key), g.Count()))
+            .Select(g => new MistakeAssignmentOption
+            {
+                AssignmentId = g.Key,
+                Title = Title(g.Key),
+                DueAt = DueAt(g.Key),
+                Count = g.Count(),
+            })
             .ToList();
 
         var selected = labeled
@@ -52,20 +58,49 @@ public class StudentStrengthService : IStudentStrengthService
         var list = selected
             .AsEnumerable()
             .Reverse()
-            .Select(l => new StudentStrengthResponse(l.Strength.Id, l.Strength.AssignmentId, Title(l.Strength.AssignmentId),
-                DueAt(l.Strength.AssignmentId), l.Strength.VersionId, StudentMistakeService.ReportOf(l.Strength.ReportId), l.Strength.File,
-                l.Strength.StartLine, l.Strength.EndLine, l.Strength.Category, l.Strength.Message, l.Strength.Decision, l.Label,
-                Title(l.SinceAssignmentId), l.Strength.ApprovedAt, records.SourceOf(l.Strength.AssignmentId)))
+            .Select(l => new StudentStrengthResponse
+            {
+                Id = l.Strength.Id,
+                AssignmentId = l.Strength.AssignmentId,
+                AssignmentTitle = Title(l.Strength.AssignmentId),
+                AssignmentDueAt = DueAt(l.Strength.AssignmentId),
+                VersionId = l.Strength.VersionId,
+                ReportId = StudentMistakeService.ReportOf(l.Strength.ReportId),
+                File = l.Strength.File,
+                StartLine = l.Strength.StartLine,
+                EndLine = l.Strength.EndLine,
+                Category = l.Strength.Category,
+                Message = l.Strength.Message,
+                Decision = l.Strength.Decision,
+                Label = l.Label,
+                SinceAssignmentTitle = Title(l.SinceAssignmentId),
+                ApprovedAt = l.Strength.ApprovedAt,
+                Source = records.SourceOf(l.Strength.AssignmentId),
+            })
             .ToList();
 
         var categories = StrengthHistory.Trends(selected.Select(l => l.Strength), mistakes, DueAt)
-            .Select(t => new StrengthCategoryResponse(t.Category, t.Count, Percent(t.Count, total), t.Assignments, t.Consistent,
-                t.Mistakes, Title(t.ImprovedSinceAssignmentId), Title(t.FirstAssignmentId), Title(t.LastAssignmentId)))
+            .Select(t => new StrengthCategoryResponse
+            {
+                Category = t.Category,
+                Count = t.Count,
+                Percent = Percent(t.Count, total),
+                Assignments = t.Assignments,
+                Consistent = t.Consistent,
+                Mistakes = t.Mistakes,
+                ImprovedSinceAssignmentTitle = Title(t.ImprovedSinceAssignmentId),
+                FirstAssignmentTitle = Title(t.FirstAssignmentId),
+                LastAssignmentTitle = Title(t.LastAssignmentId),
+            })
             .ToList();
 
         var labels = Enum.GetValues<StrengthLabel>()
-            .Select(label => new MistakeShare<StrengthLabel>(label, selected.Count(l => l.Label == label),
-                Percent(selected.Count(l => l.Label == label), total)))
+            .Select(label => new MistakeShare<StrengthLabel>
+            {
+                Key = label,
+                Count = selected.Count(l => l.Label == label),
+                Percent = Percent(selected.Count(l => l.Label == label), total),
+            })
             .ToList();
 
         var shownMistakes = mistakes
@@ -77,11 +112,27 @@ public class StudentStrengthService : IStudentStrengthService
             .Distinct()
             .OrderBy(id => DueAt(id) ?? DateTimeOffset.MaxValue)
             .ThenBy(id => id, StringComparer.Ordinal)
-            .Select(id => new StrengthAssignmentResponse(id, Title(id), DueAt(id),
-                selected.Count(l => l.Strength.AssignmentId == id), shownMistakes.Count(m => m.AssignmentId == id)))
+            .Select(id => new StrengthAssignmentResponse
+            {
+                AssignmentId = id,
+                Title = Title(id),
+                DueAt = DueAt(id),
+                Strengths = selected.Count(l => l.Strength.AssignmentId == id),
+                Mistakes = shownMistakes.Count(m => m.AssignmentId == id),
+            })
             .ToList();
 
-        return new StudentStrengthsResponse(total, strengths.Count, mistakes.Count, list, categories, labels, byAssignment, options);
+        return new StudentStrengthsResponse
+        {
+            Total = total,
+            Recorded = strengths.Count,
+            RecordedMistakes = mistakes.Count,
+            Strengths = list,
+            Categories = categories,
+            Labels = labels,
+            Assignments = byAssignment,
+            AssignmentOptions = options,
+        };
     }
 
     private static double Percent(int count, int total)

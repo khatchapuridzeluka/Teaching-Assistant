@@ -76,16 +76,46 @@ public class ReviewQueueServiceTests
         public Guid AddLatest(string student, string state, VersionStatus status = VersionStatus.Ready)
         {
             var id = Guid.NewGuid();
-            _latest.Add(new LatestVersionRow(id, 1, status, Start.AddMinutes(_latest.Count), "course", "assignment", "Assignment",
-                $"sub-{student}", student, student, state, false));
+            _latest.Add(new LatestVersionRow
+            {
+                VersionId = id,
+                VersionNumber = 1,
+                VersionStatus = status,
+                FetchedAt = Start.AddMinutes(_latest.Count),
+                CourseId = "course",
+                AssignmentId = "assignment",
+                AssignmentTitle = "Assignment",
+                SubmissionId = $"sub-{student}",
+                StudentId = student,
+                StudentName = student,
+                State = state,
+                Late = false,
+            });
             return id;
         }
 
         public Guid AddDraft(Guid versionId, DateTimeOffset createdAt, ReportStatus? report = null)
         {
             var id = Guid.NewGuid();
-            _drafts.Add(new DraftRow(id, versionId, 1, "course", "assignment", "Assignment", "sub", "student", "Student",
-                80, 100, null, 1, 2, 3, createdAt, report));
+            _drafts.Add(new DraftRow
+            {
+                GradingId = id,
+                VersionId = versionId,
+                VersionNumber = 1,
+                CourseId = "course",
+                AssignmentId = "assignment",
+                AssignmentTitle = "Assignment",
+                SubmissionId = "sub",
+                StudentId = "student",
+                StudentName = "Student",
+                Score = 80,
+                MaxScore = 100,
+                Major = 1,
+                Minor = 2,
+                Style = 3,
+                CreatedAt = createdAt,
+                ReportStatus = report,
+            });
             return id;
         }
 

@@ -29,7 +29,13 @@ public class SubmissionStore(AppDbContext db) : ISubmissionStore
         db.VersionContents
             .Where(c => c.Id == contentId && c.StoredName != null)
             .Join(db.SubmissionVersions, c => c.VersionId, v => v.Id,
-                (c, v) => new StoredFileLocation(v.StoragePath, c.StoredName!, c.Name, c.MimeType))
+                (c, v) => new StoredFileLocation
+                {
+                    VersionPath = v.StoragePath,
+                    StoredName = c.StoredName!,
+                    Name = c.Name,
+                    MimeType = c.MimeType,
+                })
             .SingleOrDefaultAsync(cancellationToken);
 
     public Task<Submission?> FindByVersionAsync(Guid versionId, CancellationToken cancellationToken = default) =>

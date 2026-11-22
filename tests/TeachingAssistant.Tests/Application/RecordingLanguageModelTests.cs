@@ -125,7 +125,12 @@ public class RecordingLanguageModelTests
             CancellationToken cancellationToken = default)
         {
             var reply = await Reply("chat-model");
-            return new AgentReply(reply.Model, [new AgentEntry(AgentMessageRole.Assistant, reply.Text)], reply.Usage);
+            return new AgentReply
+            {
+                Model = reply.Model,
+                Entries = [new AgentEntry { Role = AgentMessageRole.Assistant, Text = reply.Text }],
+                Usage = reply.Usage,
+            };
         }
 
         public Task<LanguageModelReply> AnalyzeAsync(
@@ -148,7 +153,18 @@ public class RecordingLanguageModelTests
                 throw Failure;
             }
 
-            return Task.FromResult(new LanguageModelReply(model, "answer", new LanguageModelUsage(1200, 300, 900, 50)));
+            return Task.FromResult(new LanguageModelReply
+            {
+                Model = model,
+                Text = "answer",
+                Usage = new LanguageModelUsage
+                {
+                    InputTokens = 1200,
+                    OutputTokens = 300,
+                    CacheReadTokens = 900,
+                    CacheWriteTokens = 50,
+                },
+            });
         }
     }
 

@@ -11,17 +11,24 @@ public enum StrengthLabel
     Improved,
 }
 
-public sealed record LabeledStrength(StudentStrength Strength, StrengthLabel Label, string? SinceAssignmentId);
+public sealed record LabeledStrength
+{
+    public required StudentStrength Strength { get; init; }
+    public required StrengthLabel Label { get; init; }
+    public string? SinceAssignmentId { get; init; }
+}
 
-public sealed record StrengthCategoryTrend(
-    MistakeCategory Category,
-    int Count,
-    int Assignments,
-    bool Consistent,
-    int Mistakes,
-    string? ImprovedSinceAssignmentId,
-    string FirstAssignmentId,
-    string LastAssignmentId);
+public sealed record StrengthCategoryTrend
+{
+    public required MistakeCategory Category { get; init; }
+    public required int Count { get; init; }
+    public required int Assignments { get; init; }
+    public required bool Consistent { get; init; }
+    public required int Mistakes { get; init; }
+    public string? ImprovedSinceAssignmentId { get; init; }
+    public required string FirstAssignmentId { get; init; }
+    public required string LastAssignmentId { get; init; }
+}
 
 public static class StrengthHistory
 {
@@ -42,13 +49,18 @@ public static class StrengthHistory
                     .FirstOrDefault();
                 if (earlierStrength is not null)
                 {
-                    return new LabeledStrength(s, StrengthLabel.Consistent, earlierStrength);
+                    return new LabeledStrength
+                    {
+                        Strength = s,
+                        Label = StrengthLabel.Consistent,
+                        SinceAssignmentId = earlierStrength,
+                    };
                 }
 
                 var earlierMistake = EarliestMistakeBefore(mistakeList, s.Category, s.AssignmentId, when, assignmentDate);
                 return earlierMistake is null
-                    ? new LabeledStrength(s, StrengthLabel.New, null)
-                    : new LabeledStrength(s, StrengthLabel.Improved, earlierMistake);
+                    ? new LabeledStrength { Strength = s, Label = StrengthLabel.New }
+                    : new LabeledStrength { Strength = s, Label = StrengthLabel.Improved, SinceAssignmentId = earlierMistake };
             })
             .ToList();
     }
@@ -67,8 +79,17 @@ public static class StrengthHistory
                 var first = g.First();
                 var improvedSince = EarliestMistakeBefore(mistakeList, g.Key, first.AssignmentId,
                     When(first.AssignmentId, first.ApprovedAt, assignmentDate), assignmentDate);
-                return new StrengthCategoryTrend(g.Key, g.Count(), assignments.Count, assignments.Count > 1,
-                    mistakeList.Count(m => m.Category == g.Key), improvedSince, assignments[0], assignments[^1]);
+                return new StrengthCategoryTrend
+                {
+                    Category = g.Key,
+                    Count = g.Count(),
+                    Assignments = assignments.Count,
+                    Consistent = assignments.Count > 1,
+                    Mistakes = mistakeList.Count(m => m.Category == g.Key),
+                    ImprovedSinceAssignmentId = improvedSince,
+                    FirstAssignmentId = assignments[0],
+                    LastAssignmentId = assignments[^1],
+                };
             })
             .OrderByDescending(t => t.Assignments)
             .ThenByDescending(t => t.Count)

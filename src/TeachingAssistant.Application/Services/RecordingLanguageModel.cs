@@ -41,7 +41,7 @@ public class RecordingLanguageModel : ILanguageModel
         await RecordAsync(ModelCallPurpose.Chat, _inner.ModelId, async () =>
         {
             agentReply = await _inner.RunAgentAsync(systemPrompt, history, tools, hooks, cancellationToken);
-            return new LanguageModelReply(agentReply.Model, agentReply.Text, agentReply.Usage);
+            return new LanguageModelReply { Model = agentReply.Model, Text = agentReply.Text, Usage = agentReply.Usage };
         });
         return agentReply!;
     }
@@ -76,7 +76,13 @@ public class RecordingLanguageModel : ILanguageModel
         {
             var reply = await call();
             var tokens = reply.Usage is { } usage
-                ? new ModelCallTokens(usage.InputTokens, usage.OutputTokens, usage.CacheReadTokens, usage.CacheWriteTokens)
+                ? new ModelCallTokens
+                {
+                    Input = usage.InputTokens,
+                    Output = usage.OutputTokens,
+                    CacheRead = usage.CacheReadTokens,
+                    CacheWrite = usage.CacheWriteTokens,
+                }
                 : null;
             await _calls.RecordAsync(
                 ModelCall.Success(purpose, requestedModel, reply.Model, tokens, startedAt, _timeProvider.GetElapsedTime(started), _context.Subject),

@@ -20,15 +20,43 @@ public class ModelUsageServiceTests
     public async Task Totals_AveragePerAnsweredCall_AndCacheHitRateIsCachedShareOfThePrompt()
     {
         var versionId = Guid.NewGuid();
-        _subjects.Subjects.Add(new JobSubject(versionId, 1, "course", "assignment", "Assignment 2", "sub-1", "student-1", "Ana"));
-        var subject = new ModelCallSubject("course", "assignment", versionId);
-        _calls.Calls.Add(ModelCall.Success(ModelCallPurpose.Grading, "opus", "opus", new ModelCallTokens(2000, 1000, 6000, 2000), Now.AddHours(-1),
+        _subjects.Subjects.Add(new JobSubject
+        {
+            VersionId = versionId,
+            VersionNumber = 1,
+            CourseId = "course",
+            AssignmentId = "assignment",
+            AssignmentTitle = "Assignment 2",
+            SubmissionId = "sub-1",
+            StudentId = "student-1",
+            StudentName = "Ana",
+        });
+        var subject = new ModelCallSubject { CourseId = "course", AssignmentId = "assignment", VersionId = versionId };
+        _calls.Calls.Add(ModelCall.Success(ModelCallPurpose.Grading, "opus", "opus", new ModelCallTokens
+        {
+            Input = 2000,
+            Output = 1000,
+            CacheRead = 6000,
+            CacheWrite = 2000,
+        }, Now.AddHours(-1),
             TimeSpan.FromSeconds(20), subject));
-        _calls.Calls.Add(ModelCall.Success(ModelCallPurpose.Grading, "opus", "opus", new ModelCallTokens(2000, 3000, 8000, 0), Now.AddDays(-1),
+        _calls.Calls.Add(ModelCall.Success(ModelCallPurpose.Grading, "opus", "opus", new ModelCallTokens
+        {
+            Input = 2000,
+            Output = 3000,
+            CacheRead = 8000,
+            CacheWrite = 0,
+        }, Now.AddDays(-1),
             TimeSpan.FromSeconds(40), subject));
         _calls.Calls.Add(ModelCall.Failure(ModelCallPurpose.Grading, "opus", "Rate limited", Now.AddDays(-1), TimeSpan.FromSeconds(3), subject));
 
-        _calls.Calls.Add(ModelCall.Success(ModelCallPurpose.Chat, "haiku", "haiku", new ModelCallTokens(500, 100, 0, 0), Now.AddHours(-2),
+        _calls.Calls.Add(ModelCall.Success(ModelCallPurpose.Chat, "haiku", "haiku", new ModelCallTokens
+        {
+            Input = 500,
+            Output = 100,
+            CacheRead = 0,
+            CacheWrite = 0,
+        }, Now.AddHours(-2),
             TimeSpan.FromSeconds(2), null));
 
         var usage = await Service().GetAsync(7, ModelCallPurpose.Grading, TestContext.Current.CancellationToken);

@@ -9,23 +9,32 @@ using TeachingAssistant.Domain.Sandbox;
 namespace TeachingAssistant.Application.Services;
 
 /// <summary>What the compile check found: its status and the compiler's messages (or why it did not run).</summary>
-/// <param name="Status">Whether it compiled, failed, timed out, had nothing to compile or could not run.</param>
-/// <param name="Output">The compiler's messages, cut to a few thousand characters; for Skipped and Unavailable, the reason.</param>
-/// <param name="Programs">How many programs (compile units) were compiled.</param>
-/// <param name="Warnings">How many compiler warnings there were.</param>
-/// <param name="StyleFindings">How many Checkstyle findings there were; null when Checkstyle did not run.</param>
-/// <param name="StyleOutput">Checkstyle's findings, one per line with the submission's paths, or why it could not finish.</param>
-/// <param name="PmdFindings">How many PMD findings there were; null when PMD did not run.</param>
-/// <param name="PmdOutput">PMD's findings, one per line with the submission's paths, or why it could not finish.</param>
-public record BuildCheckOutcome(
-    BuildStatus Status,
-    string Output,
-    int Programs = 0,
-    int Warnings = 0,
-    int? StyleFindings = null,
-    string StyleOutput = "",
-    int? PmdFindings = null,
-    string PmdOutput = "");
+public record BuildCheckOutcome
+{
+    /// <summary>Whether it compiled, failed, timed out, had nothing to compile or could not run.</summary>
+    public required BuildStatus Status { get; init; }
+
+    /// <summary>The compiler's messages, cut to a few thousand characters; for Skipped and Unavailable, the reason.</summary>
+    public required string Output { get; init; }
+
+    /// <summary>How many programs (compile units) were compiled.</summary>
+    public int Programs { get; init; }
+
+    /// <summary>How many compiler warnings there were.</summary>
+    public int Warnings { get; init; }
+
+    /// <summary>How many Checkstyle findings there were; null when Checkstyle did not run.</summary>
+    public int? StyleFindings { get; init; }
+
+    /// <summary>Checkstyle's findings, one per line with the submission's paths, or why it could not finish.</summary>
+    public string StyleOutput { get; init; } = "";
+
+    /// <summary>How many PMD findings there were; null when PMD did not run.</summary>
+    public int? PmdFindings { get; init; }
+
+    /// <summary>PMD's findings, one per line with the submission's paths, or why it could not finish.</summary>
+    public string PmdOutput { get; init; } = "";
+}
 
 /// <summary>
 /// Compiles a submission's Java files in the sandbox before it is graded, so the grader gets "it compiles" or the
@@ -80,47 +89,62 @@ public class JavaBuildCheck
     public async Task<BuildCheckOutcome> CheckAsync(SubmissionVersion version, CancellationToken cancellationToken = default)
     {
         var sources = ReadSources(version);
-        var units = JavaCompileUnits.Plan(sources.Select(s => new JavaSourceFile(s.Path, s.Text)));
+        var units = JavaCompileUnits.Plan(sources.Select(s => new JavaSourceFile { Path = s.Path, Text = s.Text }));
         if (units.Count == 0)
         {
-            return new BuildCheckOutcome(BuildStatus.Skipped, "The submission has no Java source files.");
+            return new BuildCheckOutcome { Status = BuildStatus.Skipped, Output = "The submission has no Java source files." };
         }
 
-        var files = sources.Select(s => new SandboxFile(s.Path, s.Bytes)).ToList();
+        var files = sources.Select(s => new SandboxFile { Path = s.Path, Content = s.Bytes }).ToList();
         var steps = new List<SandboxStep>();
         for (var i = 0; i < units.Count; i++)
         {
             // An argument file keeps the command short however many files there are; javac reads it with @.
             var argumentFile = $"__ta_sources_{i + 1}.txt";
-            files.Add(new SandboxFile(argumentFile,
-                new UTF8Encoding(false).GetBytes(string.Join("\n", units[i].Files.Select(f => $"\"{f}\"")) + "\n")));
-            steps.Add(new SandboxStep(Label(units[i]),
-            [
-                "javac", "-encoding", "UTF-8", Warnings, "-Xmaxerrs", "50", "-Xmaxwarns", "50",
-                "-d", $"/tmp/classes-{i + 1}", "@" + argumentFile,
-            ]));
+            files.Add(new SandboxFile
+            {
+                Path = argumentFile,
+                Content = new UTF8Encoding(false).GetBytes(string.Join("\n", units[i].Files.Select(f => $"\"{f}\"")) + "\n"),
+            });
+            steps.Add(new SandboxStep
+            {
+                Name = Label(units[i]),
+                Command = [
+                    "javac", "-encoding", "UTF-8", Warnings, "-Xmaxerrs", "50", "-Xmaxwarns", "50",
+                    "-d", $"/tmp/classes-{i + 1}", "@" + argumentFile,
+                ],
+            });
         }
 
         // Checkstyle reads source, so it runs whatever the compiler said; "." is the working folder with the student's files.
-        files.Add(new SandboxFile(CheckstyleConfig, CheckstyleRules.Value));
-        steps.Add(new SandboxStep(CheckstyleStep, ["checkstyle", "-c", CheckstyleConfig, "."]));
+        files.Add(new SandboxFile { Path = CheckstyleConfig, Content = CheckstyleRules.Value });
+        steps.Add(new SandboxStep { Name = CheckstyleStep, Command = ["checkstyle", "-c", CheckstyleConfig, "."] });
 
         // PMD reads source too. The compiled classes, where compiling worked, let it resolve types (for example that a
         // variable is a Scanner); a missing class folder is only a warning to PMD.
-        files.Add(new SandboxFile(PmdConfig, PmdRuleSet.Value));
+        files.Add(new SandboxFile { Path = PmdConfig, Content = PmdRuleSet.Value });
         var classes = string.Join(":", Enumerable.Range(1, units.Count).Select(i => $"/tmp/classes-{i}"));
-        steps.Add(new SandboxStep(PmdStep,
-            ["pmd", "check", "--no-progress", "--no-cache", "-d", ".", "-R", PmdConfig, "-f", "text", "--aux-classpath", classes]));
+        steps.Add(new SandboxStep
+        {
+            Name = PmdStep,
+            Command = ["pmd", "check", "--no-progress", "--no-cache", "-d", ".", "-R", PmdConfig, "-f", "text", "--aux-classpath", classes],
+        });
 
         SandboxResult result;
         try
         {
             result = await _sandbox.RunAsync(
-                new SandboxRequest(Image, files, steps, new SandboxLimits(TotalTimeout: TotalTimeout)), cancellationToken);
+                new SandboxRequest
+                {
+                    Image = Image,
+                    Files = files,
+                    Steps = steps,
+                    Limits = new SandboxLimits { TotalTimeout = TotalTimeout },
+                }, cancellationToken);
         }
         catch (SandboxUnavailableException ex)
         {
-            return new BuildCheckOutcome(BuildStatus.Unavailable, ex.Message, units.Count);
+            return new BuildCheckOutcome { Status = BuildStatus.Unavailable, Output = ex.Message, Programs = units.Count };
         }
 
         return Summarize(units, result);
@@ -240,7 +264,17 @@ public class JavaBuildCheck
         }
 
         var warnings = steps.Sum(s => CountWarnings(s.Stderr));
-        return new BuildCheckOutcome(status, text, units.Count, warnings, styleFindings, styleOutput, pmdFindings, pmdOutput);
+        return new BuildCheckOutcome
+        {
+            Status = status,
+            Output = text,
+            Programs = units.Count,
+            Warnings = warnings,
+            StyleFindings = styleFindings,
+            StyleOutput = styleOutput,
+            PmdFindings = pmdFindings,
+            PmdOutput = pmdOutput,
+        };
     }
 
     /// <summary>

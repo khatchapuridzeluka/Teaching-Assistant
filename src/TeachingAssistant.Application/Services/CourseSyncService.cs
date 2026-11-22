@@ -85,8 +85,18 @@ public class CourseSyncService : ICourseSyncService
         }
 
         await _submissions.SaveChangesAsync(cancellationToken);
-        return new CourseSyncSummary(roster.Count, newStudents, leftStudents, assignments.Count, checkedCount, newSubmissions, graded,
-            photos.Updated, photos.Failed);
+        return new CourseSyncSummary
+        {
+            Students = roster.Count,
+            NewStudents = newStudents,
+            LeftStudents = leftStudents,
+            Assignments = assignments.Count,
+            Submissions = checkedCount,
+            NewSubmissions = newSubmissions,
+            Graded = graded,
+            PhotosUpdated = photos.Updated,
+            PhotosFailed = photos.Failed,
+        };
     }
 
     private async Task SyncAssignmentsAsync(

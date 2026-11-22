@@ -1,8 +1,10 @@
 namespace TeachingAssistant.Application.Contracts;
 
-public record ModelHealthResponse(
-    bool Healthy,
-    string Model,
-    long LatencyMs,
-    string? Reply,
-    string? Error);
+public record ModelHealthResponse
+{
+    public required bool Healthy { get; init; }
+    public required string Model { get; init; }
+    public required long LatencyMs { get; init; }
+    public string? Reply { get; init; }
+    public string? Error { get; init; }
+}

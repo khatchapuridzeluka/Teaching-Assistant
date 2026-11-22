@@ -24,11 +24,16 @@ public class FetchStudentWorkJobHandlerTests
         _submissions.Add("assignment-4", "ria", "CREATED");
         _submissions.Add("assignment-1", "someone-else", "TURNED_IN");
         _fetch.Failing.Add("assignment-2");
-        _fetch.ProblemFor["assignment-3"] = new FetchProblem("Ria", "the archive could not be opened");
+        _fetch.ProblemFor["assignment-3"] = new FetchProblem { StudentName = "Ria", Detail = "the archive could not be opened" };
         var parentId = Guid.NewGuid();
 
         var result = await new FetchStudentWorkJobHandler(_submissions, _fetch, _jobs)
-            .RunAsync(JobPayloads.Write(new FetchStudentWorkPayload("course-1", "ria", parentId)), TestContext.Current.CancellationToken);
+            .RunAsync(JobPayloads.Write(new FetchStudentWorkPayload
+            {
+                CourseId = "course-1",
+                StudentId = "ria",
+                ParentId = parentId,
+            }), TestContext.Current.CancellationToken);
 
         Assert.Equal(["assignment-1", "assignment-2", "assignment-3"], _fetch.Fetched);
         Assert.Equal((parentId, 2), (_jobs.ParentId, _jobs.Fetched));
@@ -45,7 +50,13 @@ public class FetchStudentWorkJobHandlerTests
         var parentId = Guid.NewGuid();
 
         await new FetchStudentWorkJobHandler(_submissions, _fetch, _jobs)
-            .RunAsync(JobPayloads.Write(new FetchStudentWorkPayload("course-1", "ria", parentId, Regrade: true)),
+            .RunAsync(JobPayloads.Write(new FetchStudentWorkPayload
+            {
+                CourseId = "course-1",
+                StudentId = "ria",
+                ParentId = parentId,
+                Regrade = true,
+            }),
                 TestContext.Current.CancellationToken);
 
         Assert.True(_jobs.Regrade);
@@ -98,7 +109,17 @@ public class FetchStudentWorkJobHandlerTests
             }
 
             var problems = ProblemFor.TryGetValue(assignmentId, out var problem) ? new[] { problem } : [];
-            return Task.FromResult(new FetchSummary(1, 0, 1, 0, 0, problems, 1, false));
+            return Task.FromResult(new FetchSummary
+            {
+                Submissions = 1,
+                NewSubmissions = 0,
+                NewVersions = 1,
+                Unchanged = 0,
+                NotSubmitted = 0,
+                Problems = problems,
+                InstructionsVersion = 1,
+                NewInstructions = false,
+            });
         }
     }
 
@@ -120,7 +141,16 @@ public class FetchStudentWorkJobHandlerTests
             Fetched = fetched;
             Regrade = regrade;
             Problems.AddRange(fetchProblems);
-            return Task.FromResult(new FetchStudentWorkResult(fetched, 0, 0, 0, 0, 0, fetchProblems));
+            return Task.FromResult(new FetchStudentWorkResult
+            {
+                Fetched = fetched,
+                Queued = 0,
+                AlreadyDrafted = 0,
+                AlreadyQueued = 0,
+                NoWork = 0,
+                NotFetched = 0,
+                Problems = fetchProblems,
+            });
         }
 
         public Task<JobResponse?> QueueGradeVersionAsync(Guid versionId, CancellationToken cancellationToken = default) => throw new NotSupportedException();

@@ -94,6 +94,17 @@ public class ModelCall
     }
 }
 
-public sealed record ModelCallTokens(long Input, long Output, long CacheRead, long CacheWrite);
+public sealed record ModelCallTokens
+{
+    public required long Input { get; init; }
+    public required long Output { get; init; }
+    public required long CacheRead { get; init; }
+    public required long CacheWrite { get; init; }
+}
 
-public sealed record ModelCallSubject(string? CourseId, string? AssignmentId, Guid? VersionId);
+public sealed record ModelCallSubject
+{
+    public string? CourseId { get; init; }
+    public string? AssignmentId { get; init; }
+    public Guid? VersionId { get; init; }
+}

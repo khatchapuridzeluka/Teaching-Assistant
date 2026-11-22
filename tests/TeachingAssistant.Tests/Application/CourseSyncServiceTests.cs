@@ -104,7 +104,18 @@ public class CourseSyncServiceTests
 
         var summary = await SyncAsync();
 
-        Assert.Equal(new CourseSyncSummary(2, 2, 0, 2, 3, 3, 1, 0, 0), summary);
+        Assert.Equal(new CourseSyncSummary
+        {
+            Students = 2,
+            NewStudents = 2,
+            LeftStudents = 0,
+            Assignments = 2,
+            Submissions = 3,
+            NewSubmissions = 3,
+            Graded = 1,
+            PhotosUpdated = 0,
+            PhotosFailed = 0,
+        }, summary);
         Assert.All(_students.Students, s => Assert.True(s.IsEnrolledIn("course-1")));
         Assert.Equal([100.0, 50.0], _assignments.Assignments.Select(a => a.MaxPoints!.Value));
 
@@ -215,7 +226,13 @@ public class CourseSyncServiceTests
         Assert.False(ana.Results[2].Missing);
     }
 
-    private static GradeChange Assigned(double points, DateTimeOffset at) => new(GradeEventKind.AssignedGrade, points, 100, at);
+    private static GradeChange Assigned(double points, DateTimeOffset at) => new()
+    {
+        Kind = GradeEventKind.AssignedGrade,
+        PointsEarned = points,
+        MaxPoints = 100,
+        At = at,
+    };
 
     private sealed class FakeSource : ISubmissionSource
     {
@@ -224,13 +241,37 @@ public class CourseSyncServiceTests
         private readonly List<SubmissionResponse> _submissions = [];
 
         public void Assignment(string id, string title, double maxPoints, DateTimeOffset? dueAt = null) =>
-            _assignments.Add(new AssignmentResponse(id, "course-1", title, null, "ASSIGNMENT", maxPoints, dueAt, null, null, []));
+            _assignments.Add(new AssignmentResponse
+            {
+                Id = id,
+                CourseId = "course-1",
+                Title = title,
+                WorkType = "ASSIGNMENT",
+                MaxPoints = maxPoints,
+                DueAt = dueAt,
+                Materials = [],
+            });
 
-        public void Student(string id, string name, string? photoUrl = null) => _roster.Add(new RosterStudent(id, name, photoUrl));
+        public void Student(string id, string name, string? photoUrl = null) => _roster.Add(new RosterStudent
+        {
+            Id = id,
+            Name = name,
+            PhotoUrl = photoUrl,
+        });
 
         public void Submission(string id, string assignmentId, string userId, string state, double? grade, params GradeChange[] history) =>
-            _submissions.Add(new SubmissionResponse(id, assignmentId, userId, _roster.FirstOrDefault(r => r.Id == userId)?.Name ?? userId,
-                state, false, null, null, [], null, grade, history));
+            _submissions.Add(new SubmissionResponse
+            {
+                Id = id,
+                AssignmentId = assignmentId,
+                StudentId = userId,
+                StudentName = _roster.FirstOrDefault(r => r.Id == userId)?.Name ?? userId,
+                State = state,
+                Late = false,
+                Attachments = [],
+                AssignedGrade = grade,
+                GradeHistory = history,
+            });
 
         public void Clear()
         {
@@ -240,7 +281,7 @@ public class CourseSyncServiceTests
         }
 
         public Task<CourseResponse> GetCourseAsync(string courseId, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new CourseResponse(courseId, "Java II", null, "ACTIVE", null));
+            Task.FromResult(new CourseResponse { Id = courseId, Name = "Java II", State = "ACTIVE" });
 
         public Task<IReadOnlyList<AssignmentResponse>> GetAssignmentsAsync(string courseId, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<AssignmentResponse>>(_assignments.ToList());
@@ -334,7 +375,11 @@ public class CourseSyncServiceTests
 
             return Failing.Contains(photoUrl)
                 ? Task.FromException<DownloadedPhoto>(new TeachingAssistant.Application.Exceptions.SubmissionSourceUnavailableException("404"))
-                : Task.FromResult(new DownloadedPhoto(Bytes.GetValueOrDefault(photoUrl, [1, 2, 3]), "image/jpeg"));
+                : Task.FromResult(new DownloadedPhoto
+                {
+                    Bytes = Bytes.GetValueOrDefault(photoUrl, [1, 2, 3]),
+                    ContentType = "image/jpeg",
+                });
         }
 
         public Task<string> SaveAsync(string externalUserId, DownloadedPhoto photo, CancellationToken cancellationToken = default)

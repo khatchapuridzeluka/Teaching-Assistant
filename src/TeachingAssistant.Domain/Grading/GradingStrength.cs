@@ -39,7 +39,13 @@ public class GradingStrength
     }
 }
 
-public sealed record ReportStrengthEdit(Guid SourceStrengthId, bool Rejected, MistakeCategory Category, string Message);
+public sealed record ReportStrengthEdit
+{
+    public required Guid SourceStrengthId { get; init; }
+    public required bool Rejected { get; init; }
+    public required MistakeCategory Category { get; init; }
+    public required string Message { get; init; }
+}
 
 public class ReportStrength
 {

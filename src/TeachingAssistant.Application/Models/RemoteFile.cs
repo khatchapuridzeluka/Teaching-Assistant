@@ -1,12 +1,14 @@
 namespace TeachingAssistant.Application.Models;
 
-public record RemoteFile(
-    string Id,
-    string Name,
-    string MimeType,
-    long? SizeBytes,
-    string Revision,
-    DateTimeOffset? ModifiedAt,
-    string DownloadName,
-    string DownloadMimeType,
-    bool IsDownloadable);
+public record RemoteFile
+{
+    public required string Id { get; init; }
+    public required string Name { get; init; }
+    public required string MimeType { get; init; }
+    public long? SizeBytes { get; init; }
+    public required string Revision { get; init; }
+    public DateTimeOffset? ModifiedAt { get; init; }
+    public required string DownloadName { get; init; }
+    public required string DownloadMimeType { get; init; }
+    public required bool IsDownloadable { get; init; }
+}

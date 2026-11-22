@@ -25,7 +25,11 @@ public class GradingDraftServiceTests
         var second = Grade(versionId, 86, Start.AddMinutes(5));
         var third = Grade(versionId, 40, Start.AddMinutes(9));
 
-        await Service().DiscardAsync(third.Id, new DiscardGradingRequest(DiscardReason.PoorGrading, "  Missed the task 2 rules.  "),
+        await Service().DiscardAsync(third.Id, new DiscardGradingRequest
+        {
+            Reason = DiscardReason.PoorGrading,
+            Note = "  Missed the task 2 rules.  ",
+        },
             TestContext.Current.CancellationToken);
         var current = await Service().GetCurrentAsync(versionId, TestContext.Current.CancellationToken);
 
@@ -43,9 +47,9 @@ public class GradingDraftServiceTests
         var grading = Grade(Guid.NewGuid(), 70, Start);
 
         await Assert.ThrowsAsync<InvalidRequestException>(() => Service().DiscardAsync(grading.Id,
-            new DiscardGradingRequest(DiscardReason.Superseded), TestContext.Current.CancellationToken));
+            new DiscardGradingRequest { Reason = DiscardReason.Superseded }, TestContext.Current.CancellationToken));
         await Assert.ThrowsAsync<InvalidRequestException>(() => Service().DiscardAsync(grading.Id,
-            new DiscardGradingRequest(DiscardReason.Other, new string('x', AiGrading.MaxDiscardNoteLength + 1)),
+            new DiscardGradingRequest { Reason = DiscardReason.Other, Note = new string('x', AiGrading.MaxDiscardNoteLength + 1) },
             TestContext.Current.CancellationToken));
         Assert.Equal(GradingStatus.Draft, grading.Status);
     }
@@ -200,13 +204,25 @@ public class GradingDraftServiceTests
                 .Where(x => assignmentId is null || x.Version.AssignmentId == assignmentId)
                 .Where(x => studentId is null || $"user-{x.Version.StudentName}" == studentId)
                 .OrderByDescending(x => x.Grading.CreatedAt)
-                .Select(x => new GradingSummary(x.Grading.Id, x.Grading.VersionId, x.Version.Number, x.Version.AssignmentId,
-                    x.Version.SubmissionId, $"user-{x.Version.StudentName}", x.Version.StudentName, x.Grading.Status, x.Grading.Score, x.Grading.MaxScore,
-                    x.Grading.Bonus,
-                    x.Grading.Mistakes.Count(m => m.Severity == MistakeSeverity.Major),
-                    x.Grading.Mistakes.Count(m => m.Severity == MistakeSeverity.Minor),
-                    x.Grading.Mistakes.Count(m => m.Severity == MistakeSeverity.Style),
-                    x.Grading.Model, x.Grading.CreatedAt, null))
+                .Select(x => new GradingSummary
+                {
+                    Id = x.Grading.Id,
+                    VersionId = x.Grading.VersionId,
+                    VersionNumber = x.Version.Number,
+                    AssignmentId = x.Version.AssignmentId,
+                    SubmissionId = x.Version.SubmissionId,
+                    StudentId = $"user-{x.Version.StudentName}",
+                    StudentName = x.Version.StudentName,
+                    Status = x.Grading.Status,
+                    Score = x.Grading.Score,
+                    MaxScore = x.Grading.MaxScore,
+                    Bonus = x.Grading.Bonus,
+                    Major = x.Grading.Mistakes.Count(m => m.Severity == MistakeSeverity.Major),
+                    Minor = x.Grading.Mistakes.Count(m => m.Severity == MistakeSeverity.Minor),
+                    Style = x.Grading.Mistakes.Count(m => m.Severity == MistakeSeverity.Style),
+                    Model = x.Grading.Model,
+                    CreatedAt = x.Grading.CreatedAt,
+                })
                 .ToList());
 
         public Task<IReadOnlyList<AiGrading>> GetByVersionsAsync(IReadOnlyCollection<Guid> versionIds, CancellationToken cancellationToken = default) =>

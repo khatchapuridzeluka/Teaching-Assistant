@@ -18,13 +18,15 @@ public enum MistakeDecision
     Rejected,
 }
 
-public sealed record ReportMistakeEdit(
-    Guid SourceMistakeId,
-    bool Rejected,
-    MistakeSeverity Severity,
-    MistakeCategory Category,
-    string Message,
-    double? Points = null);
+public sealed record ReportMistakeEdit
+{
+    public required Guid SourceMistakeId { get; init; }
+    public required bool Rejected { get; init; }
+    public required MistakeSeverity Severity { get; init; }
+    public required MistakeCategory Category { get; init; }
+    public required string Message { get; init; }
+    public double? Points { get; init; }
+}
 
 public class GradingReport
 {

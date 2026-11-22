@@ -69,19 +69,50 @@ public class GoogleClassroomSource : ISubmissionSource
         return ToAssignment(courseWork);
     }
 
-    private static CourseResponse ToCourse(Course c) => new(c.Id, c.Name, c.Section, c.CourseState, c.AlternateLink);
+    private static CourseResponse ToCourse(Course c) => new()
+    {
+        Id = c.Id,
+        Name = c.Name,
+        Section = c.Section,
+        State = c.CourseState,
+        Link = c.AlternateLink,
+    };
 
-    private static AssignmentResponse ToAssignment(CourseWork w) => new(
-        w.Id, w.CourseId, w.Title, w.Description, w.WorkType, w.MaxPoints,
-        DueAt(w.DueDate, w.DueTime), w.CreationTimeDateTimeOffset, w.AlternateLink, Materials(w));
+    private static AssignmentResponse ToAssignment(CourseWork w) => new()
+    {
+        Id = w.Id,
+        CourseId = w.CourseId,
+        Title = w.Title,
+        Description = w.Description,
+        WorkType = w.WorkType,
+        MaxPoints = w.MaxPoints,
+        DueAt = DueAt(w.DueDate, w.DueTime),
+        CreatedAt = w.CreationTimeDateTimeOffset,
+        Link = w.AlternateLink,
+        Materials = Materials(w),
+    };
 
     private static List<SubmissionAttachment> Materials(CourseWork courseWork) =>
         (courseWork.Materials ?? []).Select(m => m switch
         {
-            { DriveFile.DriveFile: { } file } => new SubmissionAttachment(AttachmentKind.DriveFile, file.Title, file.AlternateLink, file.Id),
-            { Link: { } link } => new SubmissionAttachment(AttachmentKind.Link, link.Title ?? link.Url, link.Url, null),
-            _ => new SubmissionAttachment(AttachmentKind.Other,
-                m.YoutubeVideo?.Title ?? m.Form?.Title ?? "Unsupported material", null, null),
+            { DriveFile.DriveFile: { } file } => new SubmissionAttachment
+            {
+                Kind = AttachmentKind.DriveFile,
+                Title = file.Title,
+                Url = file.AlternateLink,
+                FileId = file.Id,
+            },
+            { Link: { } link } => new SubmissionAttachment
+            {
+                Kind = AttachmentKind.Link,
+                Title = link.Title ?? link.Url,
+                Url = link.Url,
+            },
+            _ => new SubmissionAttachment
+            {
+                Kind = AttachmentKind.Other,
+                Title = m.YoutubeVideo?.Title ?? m.Form?.Title ?? "Unsupported material",
+            },
         }).ToList();
 
     public async Task<IReadOnlyList<SubmissionResponse>> GetSubmissionsAsync(string courseId, string assignmentId, CancellationToken cancellationToken = default)
@@ -121,7 +152,12 @@ public class GoogleClassroomSource : ISubmissionSource
             (ListStudentsResponse page) => (page.Students, page.NextPageToken), cancellationToken);
 
         return students
-            .Select(s => new RosterStudent(s.UserId, s.Profile?.Name?.FullName ?? s.UserId, PhotoUrl(s.Profile?.PhotoUrl)))
+            .Select(s => new RosterStudent
+            {
+                Id = s.UserId,
+                Name = s.Profile?.Name?.FullName ?? s.UserId,
+                PhotoUrl = PhotoUrl(s.Profile?.PhotoUrl),
+            })
             .ToList();
     }
 
@@ -154,15 +190,33 @@ public class GoogleClassroomSource : ISubmissionSource
             (ListStudentSubmissionsResponse page) => (page.StudentSubmissions, page.NextPageToken), cancellationToken);
     }
 
-    private static SubmissionResponse ToSubmission(StudentSubmission s, Dictionary<string, string> names) => new(
-        s.Id, s.CourseWorkId, s.UserId, names.GetValueOrDefault(s.UserId, "Unknown student"), s.State, s.Late ?? false,
-        LastTurnedInAt(s), s.UpdateTimeDateTimeOffset, Attachments(s), s.AlternateLink, s.AssignedGrade, GradeHistory(s));
+    private static SubmissionResponse ToSubmission(StudentSubmission s, Dictionary<string, string> names) => new()
+    {
+        Id = s.Id,
+        AssignmentId = s.CourseWorkId,
+        StudentId = s.UserId,
+        StudentName = names.GetValueOrDefault(s.UserId, "Unknown student"),
+        State = s.State,
+        Late = s.Late ?? false,
+        TurnedInAt = LastTurnedInAt(s),
+        UpdatedAt = s.UpdateTimeDateTimeOffset,
+        Attachments = Attachments(s),
+        Link = s.AlternateLink,
+        AssignedGrade = s.AssignedGrade,
+        GradeHistory = GradeHistory(s),
+    };
 
     private static List<GradeChange> GradeHistory(StudentSubmission submission) =>
         (submission.SubmissionHistory ?? [])
             .Select(h => h.GradeHistory)
             .Where(g => g?.GradeTimestampDateTimeOffset is not null)
-            .Select(g => new GradeChange(GradeKind(g!.GradeChangeType), g.PointsEarned, g.MaxPoints, g.GradeTimestampDateTimeOffset!.Value))
+            .Select(g => new GradeChange
+            {
+                Kind = GradeKind(g!.GradeChangeType),
+                PointsEarned = g.PointsEarned,
+                MaxPoints = g.MaxPoints,
+                At = g.GradeTimestampDateTimeOffset!.Value,
+            })
             .OrderBy(g => g.At)
             .ToList();
 
@@ -210,10 +264,24 @@ public class GoogleClassroomSource : ISubmissionSource
     private static List<SubmissionAttachment> Attachments(StudentSubmission submission) =>
         (submission.AssignmentSubmission?.Attachments ?? []).Select(a => a switch
         {
-            { DriveFile: { } file } => new SubmissionAttachment(AttachmentKind.DriveFile, file.Title, file.AlternateLink, file.Id),
-            { Link: { } link } => new SubmissionAttachment(AttachmentKind.Link, link.Title ?? link.Url, link.Url, null),
-            _ => new SubmissionAttachment(AttachmentKind.Other,
-                a.YouTubeVideo?.Title ?? a.Form?.Title ?? "Unsupported attachment", null, null),
+            { DriveFile: { } file } => new SubmissionAttachment
+            {
+                Kind = AttachmentKind.DriveFile,
+                Title = file.Title,
+                Url = file.AlternateLink,
+                FileId = file.Id,
+            },
+            { Link: { } link } => new SubmissionAttachment
+            {
+                Kind = AttachmentKind.Link,
+                Title = link.Title ?? link.Url,
+                Url = link.Url,
+            },
+            _ => new SubmissionAttachment
+            {
+                Kind = AttachmentKind.Other,
+                Title = a.YouTubeVideo?.Title ?? a.Form?.Title ?? "Unsupported attachment",
+            },
         }).ToList();
 
     private static DateTimeOffset? DueAt(Date? date, TimeOfDay? time) =>
@@ -234,9 +302,13 @@ public class GoogleClassroomSource : ISubmissionSource
             HttpClientInitializer = credential,
             ApplicationName = GoogleAuthorization.ApplicationName,
         });
-        _client = new Client(credential, service);
+        _client = new Client { Credential = credential, Service = service };
         return service;
     }
 
-    private sealed record Client(UserCredential Credential, ClassroomService Service);
+    private sealed record Client
+    {
+        public required UserCredential Credential { get; init; }
+        public required ClassroomService Service { get; init; }
+    }
 }

@@ -38,7 +38,15 @@ public class GradingExportServiceTests
         var report = _fakes.Review(grading);
         var rejected = grading.Mistakes.Single(m => m.Message == "Name differs");
         report.Save(grading, 90, null, "Teacher review",
-            [new ReportMistakeEdit(rejected.Id, true, rejected.Severity, rejected.Category, rejected.Message, rejected.Points)], Now);
+            [new ReportMistakeEdit
+            {
+                SourceMistakeId = rejected.Id,
+                Rejected = true,
+                Severity = rejected.Severity,
+                Category = rejected.Category,
+                Message = rejected.Message,
+                Points = rejected.Points,
+            }], Now);
         report.Approve(Now);
 
         await Service().ExportPdfAsync(grading.Id, TestContext.Current.CancellationToken);

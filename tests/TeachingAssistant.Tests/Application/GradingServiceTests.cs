@@ -218,9 +218,20 @@ public class GradingServiceTests
         var versionId = _store.AddVersion(Content(ContentKind.CodeArchive, "zoo.zip", "application/zip"));
         _storage.Code["Zoo.java"] = "class Zoo { int n = \"x\"; }";
         _sandbox.Unavailable = null;
-        _sandbox.Result = new SandboxResult(
-            [new SandboxStepResult("compile", SandboxStepOutcome.Failed, 1, "", "Zoo.java:1: error: incompatible types\n1 error\n", false, TimeSpan.Zero)],
-            TimeSpan.Zero);
+        _sandbox.Result = new SandboxResult
+        {
+            Steps = [new SandboxStepResult
+            {
+                Name = "compile",
+                Outcome = SandboxStepOutcome.Failed,
+                ExitCode = 1,
+                Stdout = "",
+                Stderr = "Zoo.java:1: error: incompatible types\n1 error\n",
+                OutputTruncated = false,
+                Duration = TimeSpan.Zero,
+            }],
+            Duration = TimeSpan.Zero,
+        };
 
         await Service().GradeVersionAsync(versionId, TestContext.Current.CancellationToken);
 
@@ -388,14 +399,48 @@ public class GradingServiceTests
         Assert.Equal(
         [
             // As given, trimmed.
-            new CodeMistake("src/Zoo.java", 2, 2, MistakeSeverity.Major, MistakeCategory.Encapsulation, "Field is public.", Points: 5),
+            new CodeMistake
+            {
+                File = "src/Zoo.java",
+                StartLine = 2,
+                EndLine = 2,
+                Severity = MistakeSeverity.Major,
+                Category = MistakeCategory.Encapsulation,
+                Message = "Field is public.",
+                Points = 5,
+            },
             // The file name alone matches the one file with that name; the end line is kept inside the file (4 lines).
-            new CodeMistake("src/Zoo.java", 3, 4, MistakeSeverity.Minor, MistakeCategory.Naming, "Unclear name.", Points: 3),
+            new CodeMistake
+            {
+                File = "src/Zoo.java",
+                StartLine = 3,
+                EndLine = 4,
+                Severity = MistakeSeverity.Minor,
+                Category = MistakeCategory.Naming,
+                Message = "Unclear name.",
+                Points = 3,
+            },
             // Lines outside the file are dropped, the file is kept.
-            new CodeMistake("src/Zoo.java", null, null, MistakeSeverity.Style, MistakeCategory.Readability, "Lines that do not exist."),
+            new CodeMistake
+            {
+                File = "src/Zoo.java",
+                Severity = MistakeSeverity.Style,
+                Category = MistakeCategory.Readability,
+                Message = "Lines that do not exist.",
+            },
             // A file that was not sent is dropped with its lines: the mistake stays, about the submission as a whole.
-            new CodeMistake(null, null, null, MistakeSeverity.Major, MistakeCategory.Correctness, "A file that was not sent."),
-            new CodeMistake(null, null, null, MistakeSeverity.Major, MistakeCategory.MissingRequirement, "Task 3 is missing."),
+            new CodeMistake
+            {
+                Severity = MistakeSeverity.Major,
+                Category = MistakeCategory.Correctness,
+                Message = "A file that was not sent.",
+            },
+            new CodeMistake
+            {
+                Severity = MistakeSeverity.Major,
+                Category = MistakeCategory.MissingRequirement,
+                Message = "Task 3 is missing.",
+            },
         ], result.Mistakes.Select(m => m with { Id = null }));
         Assert.All(result.Mistakes, m => Assert.NotNull(m.Id));
     }
@@ -433,8 +478,8 @@ public class GradingServiceTests
     {
         // Instructions often paste the code as IDE screenshots; without them the model cannot check the drawings.
         _instructions.Store(null, Stored("Homework_1.docx", DocxType, Encoding.UTF8.GetBytes("Task 1\n[image 1]\nTask 2\n[image 2]")));
-        _wordReader.Images.Add(new DocumentImage("image1.png", "image/png", [1]));
-        _wordReader.Images.Add(new DocumentImage("image2.png", "image/png", [2]));
+        _wordReader.Images.Add(new DocumentImage { Name = "image1.png", MediaType = "image/png", Content = [1] });
+        _wordReader.Images.Add(new DocumentImage { Name = "image2.png", MediaType = "image/png", Content = [2] });
         var versionId = _store.AddVersion(Content(ContentKind.CodeArchive, "hw.zip", "application/zip"));
         _storage.Code["Main.java"] = "class Main {}";
 
@@ -616,7 +661,7 @@ public class GradingServiceTests
         public Dictionary<string, byte[]> Originals { get; } = [];
 
         public IReadOnlyList<CodeFile> ListCode(string versionPath) =>
-            Code.OrderBy(c => c.Key).Select(c => new CodeFile(c.Key, Encoding.UTF8.GetByteCount(c.Value))).ToList();
+            Code.OrderBy(c => c.Key).Select(c => new CodeFile { Path = c.Key, SizeBytes = Encoding.UTF8.GetByteCount(c.Value) }).ToList();
 
         public Stream? OpenCode(string versionPath, string relativePath) =>
             Code.TryGetValue(relativePath, out var text) ? new MemoryStream(Encoding.UTF8.GetBytes(text)) : null;
@@ -649,7 +694,7 @@ public class GradingServiceTests
 
         public bool CanRead(string fileName, string? mediaType) => fileName.EndsWith(".docx", StringComparison.OrdinalIgnoreCase);
 
-        public ReadDocument? Read(byte[] content) => new(Encoding.UTF8.GetString(content), Images);
+        public ReadDocument? Read(byte[] content) => new() { Text = Encoding.UTF8.GetString(content), Images = Images };
     }
 
     private sealed class FakeGradingStore : IGradingStore
@@ -699,7 +744,7 @@ public class GradingServiceTests
             System = systemPrompt;
             Parts = parts.ToList();
             Schema = outputSchema;
-            return Task.FromResult(new LanguageModelReply("fake-grader", Reply));
+            return Task.FromResult(new LanguageModelReply { Model = "fake-grader", Text = Reply });
         }
 
         public Task<LanguageModelReply> CompleteAsync(string prompt, CancellationToken cancellationToken = default) =>

@@ -7,17 +7,19 @@ namespace TeachingAssistant.Application.Contracts;
 /// flagged that the teacher had rejected; Unreviewed are mistakes it flagged that match nothing in the report, so nobody has
 /// judged them. AverageSeconds is the time per grading, compile check included.
 /// </summary>
-public record ModelComparisonRow(
-    string Model,
-    int Graded,
-    int ScoresCompared,
-    double? Accuracy,
-    int WithinTolerance,
-    double? MeanDifference,
-    int TeacherMistakes,
-    int Found,
-    double? FoundPercent,
-    int RepeatedFalseAlarms,
-    int Unreviewed,
-    double? AverageSeconds,
-    int Failed);
+public record ModelComparisonRow
+{
+    public required string Model { get; init; }
+    public required int Graded { get; init; }
+    public required int ScoresCompared { get; init; }
+    public double? Accuracy { get; init; }
+    public required int WithinTolerance { get; init; }
+    public double? MeanDifference { get; init; }
+    public required int TeacherMistakes { get; init; }
+    public required int Found { get; init; }
+    public double? FoundPercent { get; init; }
+    public required int RepeatedFalseAlarms { get; init; }
+    public required int Unreviewed { get; init; }
+    public double? AverageSeconds { get; init; }
+    public required int Failed { get; init; }
+}

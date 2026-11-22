@@ -38,9 +38,16 @@ public partial class GradingGuidanceService : IGradingGuidanceService
         var rules = (await _rules.GetActiveAsync(cancellationToken)).Select(ToResponse).ToList();
         var guidance = await _courseGuidance.FindAsync(courseId, cancellationToken);
         var notes = (await _notes.CountByAssignmentAsync(courseId, cancellationToken))
-            .Select(n => new AssignmentNoteCount(n.Key, n.Value))
+            .Select(n => new AssignmentNoteCount { AssignmentId = n.Key, Count = n.Value })
             .ToList();
-        return new GradingGuidanceResponse(guidance?.Text, guidance?.UpdatedAt, approach, rules, notes);
+        return new GradingGuidanceResponse
+        {
+            CourseGuidance = guidance?.Text,
+            CourseGuidanceUpdatedAt = guidance?.UpdatedAt,
+            Approach = approach,
+            Rules = rules,
+            Notes = notes,
+        };
     }
 
     public async Task<GradingGuidanceResponse> SetCourseGuidanceAsync(
@@ -193,13 +200,30 @@ public partial class GradingGuidanceService : IGradingGuidanceService
 
         var deduction = request.Effect == PolicyEffect.Deduction;
         var per = deduction && !string.IsNullOrWhiteSpace(request.PointsPer) ? request.PointsPer.Trim() : null;
-        return new PolicyRuleRequest(title, request.Effect, deduction ? request.Points : null, per, covers, detail);
+        return new PolicyRuleRequest
+        {
+            Title = title,
+            Effect = request.Effect,
+            Points = deduction ? request.Points : null,
+            PointsPer = per,
+            Covers = covers,
+            Detail = detail,
+        };
     }
 
     private static PolicyRuleResponse ToResponse(PolicyRule rule)
     {
-        return new PolicyRuleResponse(rule.Id, rule.Title, rule.Effect, rule.Points, rule.PointsPer, rule.Covers, OneLine(rule.Detail),
-            rule.UpdatedAt);
+        return new PolicyRuleResponse
+        {
+            Id = rule.Id,
+            Title = rule.Title,
+            Effect = rule.Effect,
+            Points = rule.Points,
+            PointsPer = rule.PointsPer,
+            Covers = rule.Covers,
+            Detail = OneLine(rule.Detail),
+            UpdatedAt = rule.UpdatedAt,
+        };
     }
 
     private static (string Title, string Detail) Validate(GradingPrincipleRequest request)
@@ -222,7 +246,13 @@ public partial class GradingGuidanceService : IGradingGuidanceService
 
     private static GradingPrincipleResponse ToResponse(GradingPrinciple principle)
     {
-        return new GradingPrincipleResponse(principle.Id, principle.Title, OneLine(principle.Detail), principle.UpdatedAt);
+        return new GradingPrincipleResponse
+        {
+            Id = principle.Id,
+            Title = principle.Title,
+            Detail = OneLine(principle.Detail),
+            UpdatedAt = principle.UpdatedAt,
+        };
     }
 
     // The prompt text is wrapped for the model; the page shows it as one paragraph.

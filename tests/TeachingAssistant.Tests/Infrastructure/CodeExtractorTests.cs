@@ -48,7 +48,7 @@ public sealed class CodeExtractorTests : IDisposable
     {
         Zip("library-1111111.zip", ("ana-library-1111111/src/Main.java", "class Main {}"), ("ana-library-1111111/.git/config", "x"));
 
-        var result = Extract(new ExtractableFile("library-1111111.zip", ContentKind.Repository));
+        var result = Extract(new ExtractableFile { StoredName = "library-1111111.zip", Kind = ContentKind.Repository });
 
         Assert.Equal(["ana-library-1111111/src/Main.java"], Files());
         Assert.Equal(["library-1111111.zip"], result.ExtractedStoredNames);
@@ -96,7 +96,11 @@ public sealed class CodeExtractorTests : IDisposable
         File.WriteAllText(Path.Combine(Original, "Main.java"), "class Main {}");
         File.WriteAllText(Path.Combine(Original, "report.pdf"), "%PDF");
 
-        var result = Extract(new ExtractableFile("Main.java", ContentKind.SourceFile), new ExtractableFile("report.pdf", ContentKind.Document));
+        var result = Extract(new ExtractableFile { StoredName = "Main.java", Kind = ContentKind.SourceFile }, new ExtractableFile
+        {
+            StoredName = "report.pdf",
+            Kind = ContentKind.Document,
+        });
 
         Assert.Equal(["Main.java"], Files());
         Assert.Equal(1, result.FileCount);
@@ -129,7 +133,7 @@ public sealed class CodeExtractorTests : IDisposable
     private CodeExtraction Extract(params ExtractableFile[] files) =>
         CodeExtractor.Extract(Original, Code, files, TestContext.Current.CancellationToken);
 
-    private static ExtractableFile Archive(string name) => new(name, ContentKind.CodeArchive);
+    private static ExtractableFile Archive(string name) => new() { StoredName = name, Kind = ContentKind.CodeArchive };
 
     private List<string> Files() => CodeExtractor.List(Code).Select(f => f.Path).ToList();
 

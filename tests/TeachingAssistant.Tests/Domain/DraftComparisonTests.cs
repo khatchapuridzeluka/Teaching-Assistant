@@ -23,10 +23,40 @@ public class DraftComparisonTests
         // keeps the style remark as it is, rejects the strength, and gives 80 with no bonus.
         report.Save(draft, 80, null, "My review",
         [
-            new ReportMistakeEdit(naming.Id, false, MistakeSeverity.Minor, MistakeCategory.Encapsulation, "Name 'count'.", 1),
-            new ReportMistakeEdit(loop.Id, true, loop.Severity, loop.Category, loop.Message, loop.Points),
-            new ReportMistakeEdit(comments.Id, false, comments.Severity, comments.Category, comments.Message, comments.Points),
-        ], Now, [new ReportStrengthEdit(strength.Id, true, strength.Category, strength.Message)]);
+            new ReportMistakeEdit
+            {
+                SourceMistakeId = naming.Id,
+                Rejected = false,
+                Severity = MistakeSeverity.Minor,
+                Category = MistakeCategory.Encapsulation,
+                Message = "Name 'count'.",
+                Points = 1,
+            },
+            new ReportMistakeEdit
+            {
+                SourceMistakeId = loop.Id,
+                Rejected = true,
+                Severity = loop.Severity,
+                Category = loop.Category,
+                Message = loop.Message,
+                Points = loop.Points,
+            },
+            new ReportMistakeEdit
+            {
+                SourceMistakeId = comments.Id,
+                Rejected = false,
+                Severity = comments.Severity,
+                Category = comments.Category,
+                Message = comments.Message,
+                Points = comments.Points,
+            },
+        ], Now, [new ReportStrengthEdit
+        {
+            SourceStrengthId = strength.Id,
+            Rejected = true,
+            Category = strength.Category,
+            Message = strength.Message,
+        }]);
         report.Approve(Now);
 
         var comparison = DraftComparison.Of(draft, report);
@@ -36,9 +66,30 @@ public class DraftComparisonTests
         Assert.Equal((false, true), (comparison.Agrees(5), comparison.Agrees(10)));
         Assert.Equal(
             [
-                new MistakeComparison(MistakeSeverity.Minor, MistakeCategory.Naming, MistakeDecision.Edited, 3, 1),
-                new MistakeComparison(MistakeSeverity.Major, MistakeCategory.Correctness, MistakeDecision.Rejected, 10, 0),
-                new MistakeComparison(MistakeSeverity.Style, MistakeCategory.Readability, MistakeDecision.Kept, 0, 0),
+                new MistakeComparison
+                {
+                    Severity = MistakeSeverity.Minor,
+                    Category = MistakeCategory.Naming,
+                    Decision = MistakeDecision.Edited,
+                    AiPoints = 3,
+                    TeacherPoints = 1,
+                },
+                new MistakeComparison
+                {
+                    Severity = MistakeSeverity.Major,
+                    Category = MistakeCategory.Correctness,
+                    Decision = MistakeDecision.Rejected,
+                    AiPoints = 10,
+                    TeacherPoints = 0,
+                },
+                new MistakeComparison
+                {
+                    Severity = MistakeSeverity.Style,
+                    Category = MistakeCategory.Readability,
+                    Decision = MistakeDecision.Kept,
+                    AiPoints = 0,
+                    TeacherPoints = 0,
+                },
             ],
             comparison.Mistakes);
         Assert.Equal([true, false, false], comparison.Mistakes.Select(m => m.PointsChanged));

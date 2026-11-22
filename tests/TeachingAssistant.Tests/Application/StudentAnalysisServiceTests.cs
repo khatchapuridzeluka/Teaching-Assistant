@@ -293,9 +293,26 @@ public class StudentAnalysisServiceTests
                 {
                     var submission = _submissions.Single(s => s.Versions.Any(v => v.Id == g.VersionId));
                     var number = submission.Versions.Single(v => v.Id == g.VersionId).Number;
-                    return new GradingSummary(g.Id, g.VersionId, number, submission.AssignmentId, submission.ExternalSubmissionId,
-                        submission.StudentId, submission.StudentName, g.Status, g.Score, g.MaxScore, g.Bonus, 0, 0, 0, g.Model, g.CreatedAt,
-                        _reports.FirstOrDefault(r => r.GradingId == g.Id)?.Status);
+                    return new GradingSummary
+                    {
+                        Id = g.Id,
+                        VersionId = g.VersionId,
+                        VersionNumber = number,
+                        AssignmentId = submission.AssignmentId,
+                        SubmissionId = submission.ExternalSubmissionId,
+                        StudentId = submission.StudentId,
+                        StudentName = submission.StudentName,
+                        Status = g.Status,
+                        Score = g.Score,
+                        MaxScore = g.MaxScore,
+                        Bonus = g.Bonus,
+                        Major = 0,
+                        Minor = 0,
+                        Style = 0,
+                        Model = g.Model,
+                        CreatedAt = g.CreatedAt,
+                        ReportStatus = _reports.FirstOrDefault(r => r.GradingId == g.Id)?.Status,
+                    };
                 })
                 .ToList());
 
@@ -373,7 +390,7 @@ public class StudentAnalysisServiceTests
             string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default)
         {
             Prompt = string.Join("\n", parts.OfType<TextPart>().Select(p => p.Text));
-            return Task.FromResult(new LanguageModelReply("model", Reply));
+            return Task.FromResult(new LanguageModelReply { Model = "model", Text = Reply });
         }
 
         public Task<LanguageModelReply> CompleteAsync(string prompt, CancellationToken cancellationToken = default) => throw new NotSupportedException();

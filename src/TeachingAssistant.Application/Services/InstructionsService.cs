@@ -29,13 +29,30 @@ public class InstructionsService : IInstructionsService
         }
 
         var files = latest.Contents
-            .Select(c => new InstructionsFileResponse(
-                c.Id, c.Name, c.Origin, c.MimeType, c.SizeBytes, c.Status, c.StoredName is not null,
-                c.Origin == ContentOrigin.Drive ? null : c.ExternalId))
+            .Select(c => new InstructionsFileResponse
+            {
+                Id = c.Id,
+                Name = c.Name,
+                Origin = c.Origin,
+                MimeType = c.MimeType,
+                SizeBytes = c.SizeBytes,
+                Status = c.Status,
+                Stored = c.StoredName is not null,
+                Url = c.Origin == ContentOrigin.Drive ? null : c.ExternalId,
+            })
             .ToList();
 
-        return new StoredInstructionsResponse(latest.Id, latest.Number, instructions.Versions.Count, latest.Title,
-            latest.Description, latest.MaxPoints, latest.FetchedAt, files);
+        return new StoredInstructionsResponse
+        {
+            VersionId = latest.Id,
+            Number = latest.Number,
+            VersionCount = instructions.Versions.Count,
+            Title = latest.Title,
+            Description = latest.Description,
+            MaxPoints = latest.MaxPoints,
+            FetchedAt = latest.FetchedAt,
+            Files = files,
+        };
     }
 
     public async Task<StoredFileContent?> OpenFileAsync(string assignmentId, Guid contentId, CancellationToken cancellationToken = default)
@@ -52,7 +69,12 @@ public class InstructionsService : IInstructionsService
             var stream = _storage.OpenOriginal(version.StoragePath, content.StoredName!);
             return stream is null
                 ? null
-                : new StoredFileContent(stream, content.MimeType ?? FallbackContentType, content.Name);
+                : new StoredFileContent
+                {
+                    Content = stream,
+                    ContentType = content.MimeType ?? FallbackContentType,
+                    FileName = content.Name,
+                };
         }
 
         return null;

@@ -63,8 +63,16 @@ public class JavaBuildCheckTests
     public async Task ACompileError_IsCompileFailed_WithTheCompilersMessagesForTheGrader()
     {
         _storage.Files["Main.java"] = Encoding.UTF8.GetBytes("class Main { int x = \"a\"; }");
-        _sandbox.Result = Steps(new SandboxStepResult("compile", SandboxStepOutcome.Failed, 1, "",
-            "Main.java:1: error: incompatible types: String cannot be converted to int\n1 error\n", false, TimeSpan.FromSeconds(1)));
+        _sandbox.Result = Steps(new SandboxStepResult
+        {
+            Name = "compile",
+            Outcome = SandboxStepOutcome.Failed,
+            ExitCode = 1,
+            Stdout = "",
+            Stderr = "Main.java:1: error: incompatible types: String cannot be converted to int\n1 error\n",
+            OutputTruncated = false,
+            Duration = TimeSpan.FromSeconds(1),
+        });
 
         var outcome = await Check().CheckAsync(Version(), TestContext.Current.CancellationToken);
 
@@ -80,14 +88,30 @@ public class JavaBuildCheckTests
     public async Task Warnings_AreCounted_AndATimeoutIsReportedAsUnknown()
     {
         _storage.Files["Main.java"] = Encoding.UTF8.GetBytes("class Main {}");
-        _sandbox.Result = Steps(new SandboxStepResult("compile", SandboxStepOutcome.Succeeded, 0, "",
-            "Main.java:3: warning: [unchecked] unchecked call\nMain.java:5: warning: [deprecation] old\n2 warnings\n", false, TimeSpan.Zero));
+        _sandbox.Result = Steps(new SandboxStepResult
+        {
+            Name = "compile",
+            Outcome = SandboxStepOutcome.Succeeded,
+            ExitCode = 0,
+            Stdout = "",
+            Stderr = "Main.java:3: warning: [unchecked] unchecked call\nMain.java:5: warning: [deprecation] old\n2 warnings\n",
+            OutputTruncated = false,
+            Duration = TimeSpan.Zero,
+        });
 
         var compiled = await Check().CheckAsync(Version(), TestContext.Current.CancellationToken);
         Assert.Equal((BuildStatus.Compiled, 2), (compiled.Status, compiled.Warnings));
         Assert.Contains("Result: it compiled without errors, with 2 compiler warnings.", JavaBuildCheck.PromptSection(compiled));
 
-        _sandbox.Result = Steps(new SandboxStepResult("compile", SandboxStepOutcome.TimedOut, null, "", "", false, TimeSpan.FromSeconds(30)));
+        _sandbox.Result = Steps(new SandboxStepResult
+        {
+            Name = "compile",
+            Outcome = SandboxStepOutcome.TimedOut,
+            Stdout = "",
+            Stderr = "",
+            OutputTruncated = false,
+            Duration = TimeSpan.FromSeconds(30),
+        });
         var timedOut = await Check().CheckAsync(Version(), TestContext.Current.CancellationToken);
         Assert.Equal(BuildStatus.TimedOut, timedOut.Status);
         Assert.Contains("was stopped, so whether it compiles is unknown", JavaBuildCheck.PromptSection(timedOut));
@@ -108,8 +132,16 @@ public class JavaBuildCheckTests
     [Fact]
     public void ReadCheckstyle_KeepsTheFindingsWithTheSubmissionsPaths_AndCountsUnreadableFiles()
     {
-        var step = new SandboxStepResult("checkstyle", SandboxStepOutcome.Failed, 1,
-            "Starting audit...\n[WARN] /work/./src/Zoo.java:3:16: Name 'Count' must match pattern. [MemberName]\n[WARN] /work/./src/Zoo.java:9:9: 'if' construct must use '{}'s. [NeedBraces]\n[ERROR] /work/./broken/Broken.java:1: Got an exception - parse error\nAudit done.\n", "", false, TimeSpan.Zero);
+        var step = new SandboxStepResult
+        {
+            Name = "checkstyle",
+            Outcome = SandboxStepOutcome.Failed,
+            ExitCode = 1,
+            Stdout = "Starting audit...\n[WARN] /work/./src/Zoo.java:3:16: Name 'Count' must match pattern. [MemberName]\n[WARN] /work/./src/Zoo.java:9:9: 'if' construct must use '{}'s. [NeedBraces]\n[ERROR] /work/./broken/Broken.java:1: Got an exception - parse error\nAudit done.\n",
+            Stderr = "",
+            OutputTruncated = false,
+            Duration = TimeSpan.Zero,
+        };
 
         var (findings, output) = JavaBuildCheck.ReadCheckstyle(step);
 
@@ -122,17 +154,41 @@ public class JavaBuildCheckTests
     {
         Assert.Null(JavaBuildCheck.ReadCheckstyle(null).Findings);
         Assert.Equal((null, "it took too long and was stopped"), JavaBuildCheck.ReadCheckstyle(
-            new SandboxStepResult("checkstyle", SandboxStepOutcome.TimedOut, null, "", "", false, TimeSpan.Zero)));
+            new SandboxStepResult
+            {
+                Name = "checkstyle",
+                Outcome = SandboxStepOutcome.TimedOut,
+                Stdout = "",
+                Stderr = "",
+                OutputTruncated = false,
+                Duration = TimeSpan.Zero,
+            }));
         Assert.Null(JavaBuildCheck.ReadCheckstyle(
-            new SandboxStepResult("checkstyle", SandboxStepOutcome.Failed, 254, "", "Exception in thread main", false, TimeSpan.Zero)).Findings);
+            new SandboxStepResult
+            {
+                Name = "checkstyle",
+                Outcome = SandboxStepOutcome.Failed,
+                ExitCode = 254,
+                Stdout = "",
+                Stderr = "Exception in thread main",
+                OutputTruncated = false,
+                Duration = TimeSpan.Zero,
+            }).Findings);
     }
 
     [Fact]
     public void ReadPmd_KeepsTheFindingsWithTheSubmissionsPaths_AndCountsUnparsableFiles()
     {
-        var step = new SandboxStepResult("pmd", SandboxStepOutcome.Failed, 5,
-            "./src/Main.java:10:\tCloseResource:\tEnsure that resources like this Scanner object are closed after use\n./src/Main.java:13:\tCompareObjectsWithEquals:\tUse equals() to compare object references.\n./broken/Broken.java\t-\tParseException: Parse exception in file\nWas expecting:\n    \")\" ...\n",
-            "[INFO] An error occurred while executing PMD.", false, TimeSpan.Zero);
+        var step = new SandboxStepResult
+        {
+            Name = "pmd",
+            Outcome = SandboxStepOutcome.Failed,
+            ExitCode = 5,
+            Stdout = "./src/Main.java:10:\tCloseResource:\tEnsure that resources like this Scanner object are closed after use\n./src/Main.java:13:\tCompareObjectsWithEquals:\tUse equals() to compare object references.\n./broken/Broken.java\t-\tParseException: Parse exception in file\nWas expecting:\n    \")\" ...\n",
+            Stderr = "[INFO] An error occurred while executing PMD.",
+            OutputTruncated = false,
+            Duration = TimeSpan.Zero,
+        };
 
         var (findings, output) = JavaBuildCheck.ReadPmd(step);
 
@@ -143,31 +199,86 @@ public class JavaBuildCheckTests
     [Fact]
     public void ReadPmd_WithNothingFound_OrAnUnexpectedExit()
     {
-        Assert.Equal((0, ""), JavaBuildCheck.ReadPmd(new SandboxStepResult("pmd", SandboxStepOutcome.Succeeded, 0, "", "", false, TimeSpan.Zero)));
-        Assert.Equal((null, "[ERROR] Cannot load ruleset __ta_pmd.xml"), JavaBuildCheck.ReadPmd(new SandboxStepResult("pmd",
-            SandboxStepOutcome.Failed, 1, "", "[WARN] x\n[ERROR] Cannot load ruleset __ta_pmd.xml\n", false, TimeSpan.Zero)));
+        Assert.Equal((0, ""), JavaBuildCheck.ReadPmd(new SandboxStepResult
+        {
+            Name = "pmd",
+            Outcome = SandboxStepOutcome.Succeeded,
+            ExitCode = 0,
+            Stdout = "",
+            Stderr = "",
+            OutputTruncated = false,
+            Duration = TimeSpan.Zero,
+        }));
+        Assert.Equal((null, "[ERROR] Cannot load ruleset __ta_pmd.xml"), JavaBuildCheck.ReadPmd(new SandboxStepResult
+        {
+            Name = "pmd",
+            Outcome = SandboxStepOutcome.Failed,
+            ExitCode = 1,
+            Stdout = "",
+            Stderr = "[WARN] x\n[ERROR] Cannot load ruleset __ta_pmd.xml\n",
+            OutputTruncated = false,
+            Duration = TimeSpan.Zero,
+        }));
     }
 
     [Fact]
     public void ThePromptSection_ListsTheCheckstyleFindings_AfterTheCompileResult()
     {
-        var section = JavaBuildCheck.PromptSection(new BuildCheckOutcome(BuildStatus.Compiled, "", 1, 0, 1,
-            "src/Zoo.java:3:16: Name 'Count' must match pattern. [MemberName]"))!;
+        var section = JavaBuildCheck.PromptSection(new BuildCheckOutcome
+        {
+            Status = BuildStatus.Compiled,
+            Output = "",
+            Programs = 1,
+            Warnings = 0,
+            StyleFindings = 1,
+            StyleOutput = "src/Zoo.java:3:16: Name 'Count' must match pattern. [MemberName]",
+        })!;
 
         Assert.Contains("Result: it compiled without errors.\nCheckstyle (a style checker with the teacher's short list: naming conventions,",
             section);
         Assert.Contains("found 1 issue (file:line:column: message [rule]):\nsrc/Zoo.java:3:16: Name 'Count'", section);
-        Assert.Contains("found nothing.", JavaBuildCheck.PromptSection(new BuildCheckOutcome(BuildStatus.Compiled, "", 1, 0, 0, "")));
+        Assert.Contains("found nothing.", JavaBuildCheck.PromptSection(new BuildCheckOutcome
+        {
+            Status = BuildStatus.Compiled,
+            Output = "",
+            Programs = 1,
+            Warnings = 0,
+            StyleFindings = 0,
+            StyleOutput = "",
+        }));
         Assert.Contains("PMD (a code checker with the teacher's short list: resources such as a Scanner", section);
         Assert.Contains("PMD (a code checker", section[section.IndexOf("Checkstyle", StringComparison.Ordinal)..]);
         Assert.Contains("found 1 issue (file:line: message [rule]):\nsrc/A.java:2: Use equals()", JavaBuildCheck.PromptSection(
-            new BuildCheckOutcome(BuildStatus.Compiled, "", 1, 0, 0, "", 1, "src/A.java:2: Use equals() [CompareObjectsWithEquals]")));
+            new BuildCheckOutcome
+            {
+                Status = BuildStatus.Compiled,
+                Output = "",
+                Programs = 1,
+                Warnings = 0,
+                StyleFindings = 0,
+                StyleOutput = "",
+                PmdFindings = 1,
+                PmdOutput = "src/A.java:2: Use equals() [CompareObjectsWithEquals]",
+            }));
     }
 
-    private static SandboxResult Steps(params SandboxStepResult[] steps) => new(steps, TimeSpan.FromSeconds(2));
+    private static SandboxResult Steps(params SandboxStepResult[] steps) => new()
+    {
+        Steps = steps,
+        Duration = TimeSpan.FromSeconds(2),
+    };
 
     private static SandboxStepResult Succeeded(string name) =>
-        new(name, SandboxStepOutcome.Succeeded, 0, "", "", false, TimeSpan.FromSeconds(1));
+        new()
+        {
+            Name = name,
+            Outcome = SandboxStepOutcome.Succeeded,
+            ExitCode = 0,
+            Stdout = "",
+            Stderr = "",
+            OutputTruncated = false,
+            Duration = TimeSpan.FromSeconds(1),
+        };
 
     private static string Text(SandboxRequest request, string path) =>
         Encoding.UTF8.GetString(request.Files.Single(f => f.Path == path).Content);
@@ -190,9 +301,20 @@ internal sealed class FakeSandbox : ISandboxRunner
             throw new SandboxUnavailableException(Unavailable);
         }
 
-        return Task.FromResult(Result ?? new SandboxResult(
-            request.Steps.Select(s => new SandboxStepResult(s.Name, SandboxStepOutcome.Succeeded, 0, "", "", false, TimeSpan.Zero)).ToList(),
-            TimeSpan.Zero));
+        return Task.FromResult(Result ?? new SandboxResult
+        {
+            Steps = request.Steps.Select(s => new SandboxStepResult
+            {
+                Name = s.Name,
+                Outcome = SandboxStepOutcome.Succeeded,
+                ExitCode = 0,
+                Stdout = "",
+                Stderr = "",
+                OutputTruncated = false,
+                Duration = TimeSpan.Zero,
+            }).ToList(),
+            Duration = TimeSpan.Zero,
+        });
     }
 }
 
@@ -202,7 +324,7 @@ internal sealed class FakeCodeStorage : ISnapshotStorage
     public Dictionary<string, byte[]> Files { get; } = [];
 
     public IReadOnlyList<CodeFile> ListCode(string versionPath) =>
-        Files.OrderBy(f => f.Key).Select(f => new CodeFile(f.Key, f.Value.Length)).ToList();
+        Files.OrderBy(f => f.Key).Select(f => new CodeFile { Path = f.Key, SizeBytes = f.Value.Length }).ToList();
 
     public Stream? OpenCode(string versionPath, string relativePath) =>
         Files.TryGetValue(relativePath, out var bytes) ? new MemoryStream(bytes) : null;
