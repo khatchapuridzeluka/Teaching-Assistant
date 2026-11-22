@@ -4,7 +4,7 @@ import type { Course, ReviewDraft } from "../api/client";
 import { useAssignments, useCourses, useJobOverview, useReviewQueue } from "../api/hooks";
 import { Score, SeverityDots } from "../components/bits";
 import { CourseTile } from "../components/Layout";
-import { Avatar, buttonClass, Card, CardHeader, Chip, EmptyState, ErrorPanel, Spinner, Stat, StatStrip } from "../components/ui";
+import { Avatar, buttonClass, Card, CardHeader, Chip, EmptyState, ErrorPanel, SkeletonCards, SkeletonRows, Stat, StatStrip } from "../components/ui";
 import { formatAge, formatDay, greeting, initials } from "../format";
 import { coursePath } from "../navigation";
 
@@ -92,7 +92,7 @@ export function HomePage() {
             <h2 className="font-display text-[19px] font-semibold">Your courses</h2>
             <span className="text-xs text-ink-muted">from Google Classroom · read-only</span>
           </div>
-          {courses.isLoading && <Spinner />}
+          {courses.isLoading && <SkeletonCards count={2} />}
           {courses.isError && <ErrorPanel error={courses.error} />}
           {courses.data?.length === 0 && (
             <Card>
@@ -121,11 +121,7 @@ export function HomePage() {
               )
             }
           />
-          {queue.isLoading && (
-            <div className="px-[18px] py-4">
-              <Spinner />
-            </div>
-          )}
+          {queue.isLoading && <SkeletonRows rows={3} avatar />}
           {queue.isError && (
             <div className="p-3">
               <ErrorPanel error={queue.error} />

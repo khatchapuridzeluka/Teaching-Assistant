@@ -2,7 +2,7 @@ import { createContext, type ReactNode, useContext, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import type { JobOverviewItem, JobStatus, JobType } from "../api/client";
 import { useCourses, useJobAction, useJobChildren, useJobOverview } from "../api/hooks";
-import { Avatar, Button, Card, EmptyState, ErrorPanel, PageHeader, Spinner, Stat, StatStrip, Tabs } from "../components/ui";
+import { Avatar, Button, Card, EmptyState, ErrorPanel, PageHeader, SkeletonPage, SkeletonRows, Stat, StatStrip, Tabs } from "../components/ui";
 import { FilterChips } from "../components/FilterChips";
 import { JobDetailsModal, JobIcon, JobStatusChip } from "../components/JobDetails";
 import { Ban, CircleCheck, CircleX, Clock, Cpu, ListChecks, Play } from "lucide-react";
@@ -103,7 +103,7 @@ function QueueView() {
 
       {overview.isError && <ErrorPanel error={overview.error} />}
       {action.isError && <ErrorPanel error={action.error} />}
-      {overview.isLoading && <Spinner />}
+      {overview.isLoading && <SkeletonPage stats={5} rows={6} />}
 
       {counts && (
         <StatStrip columns={5}>
@@ -246,8 +246,8 @@ function ChildJobs({ parentId, courseName }: { parentId: string; courseName: str
 
   if (children.isLoading) {
     return (
-      <li className="bg-paper/60 px-[18px] py-2 pl-12">
-        <Spinner label="Loading the gradings…" />
+      <li className="bg-paper/60 pl-8">
+        <SkeletonRows rows={2} />
       </li>
     );
   }

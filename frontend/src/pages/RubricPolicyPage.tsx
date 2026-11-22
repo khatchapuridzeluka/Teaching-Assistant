@@ -10,7 +10,7 @@ import { RubricGuidance } from "../components/RubricGuidance";
 import { RubricOverview } from "../components/RubricOverview";
 import { RubricRules } from "../components/RubricRules";
 import { rubricPath, type RubricTab } from "../components/RubricShared";
-import { Button, ErrorPanel, PageHeader, Spinner, Tabs } from "../components/ui";
+import { Button, ErrorPanel, PageHeader, SkeletonPage, Tabs } from "../components/ui";
 
 const tabs: RubricTab[] = ["overview", "approach", "guidance", "rules", "assignments"];
 
@@ -70,7 +70,7 @@ export function RubricPolicyPage() {
 
       {guidance.isError && <ErrorPanel error={guidance.error} />}
       {assignments.isError && <ErrorPanel error={assignments.error} />}
-      {(guidance.isLoading || assignments.isLoading) && <Spinner />}
+      {(guidance.isLoading || assignments.isLoading) && <SkeletonPage stats={0} rows={5} />}
 
       {data && list && (
         <div key={tab} className="flex animate-fade flex-col gap-4">

@@ -296,6 +296,176 @@ export function Spinner({ label = "Loading…" }: { label?: string }) {
   );
 }
 
+function useShowAfter(delayMs: number) {
+  const [show, setShow] = useState(false);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setShow(true), delayMs);
+    return () => window.clearTimeout(timer);
+  }, [delayMs]);
+
+  return show;
+}
+
+const lineWidths = ["w-11/12", "w-9/12", "w-10/12", "w-7/12", "w-8/12"];
+
+export function Skeleton({ className = "" }: { className?: string }) {
+  return <span className={`skeleton block ${className}`} aria-hidden />;
+}
+
+function SkeletonFrame({ children, className = "" }: { children: ReactNode; className?: string }) {
+  const show = useShowAfter(200);
+  if (!show) {
+    return null;
+  }
+
+  return (
+    <div role="status" aria-busy="true" className={`animate-fade ${className}`}>
+      <span className="sr-only">Loading…</span>
+      {children}
+    </div>
+  );
+}
+
+export function SkeletonLines({ lines = 3, className = "" }: { lines?: number; className?: string }) {
+  return (
+    <SkeletonFrame className={`flex flex-col gap-2.5 ${className}`}>
+      {Array.from({ length: lines }, (_, i) => (
+        <Skeleton key={i} className={`h-3 ${lineWidths[i % lineWidths.length]}`} />
+      ))}
+    </SkeletonFrame>
+  );
+}
+
+function SkeletonRow({ index, avatar }: { index: number; avatar?: boolean }) {
+  return (
+    <div className="flex items-center gap-3 px-[18px] py-3">
+      {avatar && <Skeleton className="h-[30px] w-[30px] shrink-0 rounded-full" />}
+      <div className="flex min-w-0 flex-1 flex-col gap-2">
+        <Skeleton className={`h-3 ${index % 2 === 0 ? "w-5/12" : "w-4/12"}`} />
+        <Skeleton className={`h-2.5 ${index % 3 === 0 ? "w-7/12" : "w-6/12"}`} />
+      </div>
+      <Skeleton className="h-[21px] w-14 shrink-0 rounded-[5px]" />
+    </div>
+  );
+}
+
+export function SkeletonRows({ rows = 4, avatar, className = "" }: { rows?: number; avatar?: boolean; className?: string }) {
+  return (
+    <SkeletonFrame className={`divide-y divide-paper-dark ${className}`}>
+      {Array.from({ length: rows }, (_, i) => (
+        <SkeletonRow key={i} index={i} avatar={avatar} />
+      ))}
+    </SkeletonFrame>
+  );
+}
+
+function ListBody({ rows, avatar, header }: { rows: number; avatar?: boolean; header: boolean }) {
+  return (
+    <div className="surface min-w-0 overflow-hidden">
+      {header && (
+        <div className="flex items-center justify-between gap-4 border-b border-line px-[18px] py-3.5">
+          <Skeleton className="h-3.5 w-40" />
+          <Skeleton className="h-7 w-48 rounded-[7px]" />
+        </div>
+      )}
+      <div className="divide-y divide-paper-dark">
+        {Array.from({ length: rows }, (_, i) => (
+          <SkeletonRow key={i} index={i} avatar={avatar} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TableBody({ rows, columns }: { rows: number; columns: number }) {
+  const grid = { gridTemplateColumns: `minmax(140px, 2fr) repeat(${columns - 1}, minmax(0, 1fr))` };
+  return (
+    <div className="surface min-w-0 overflow-hidden">
+      <div className="grid gap-4 border-b border-line bg-paper/60 px-[18px] py-3" style={grid}>
+        {Array.from({ length: columns }, (_, i) => (
+          <Skeleton key={i} className={`h-2.5 ${i === 0 ? "w-20" : "w-10"}`} />
+        ))}
+      </div>
+      {Array.from({ length: rows }, (_, row) => (
+        <div key={row} className="grid items-center gap-4 border-b border-paper-dark px-[18px] py-3 last:border-b-0" style={grid}>
+          <div className="flex items-center gap-2.5">
+            <Skeleton className="h-6 w-6 shrink-0 rounded-full" />
+            <Skeleton className={`h-3 ${row % 2 === 0 ? "w-28" : "w-20"}`} />
+          </div>
+          {Array.from({ length: columns - 1 }, (_, i) => (
+            <Skeleton key={i} className="h-3 w-8" />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function SkeletonList({ rows = 6, avatar, header = true }: { rows?: number; avatar?: boolean; header?: boolean }) {
+  return (
+    <SkeletonFrame>
+      <ListBody rows={rows} avatar={avatar} header={header} />
+    </SkeletonFrame>
+  );
+}
+
+export function SkeletonCards({ count = 2, className = "grid grid-cols-1 gap-4 md:grid-cols-2" }: { count?: number; className?: string }) {
+  return (
+    <SkeletonFrame className={className}>
+      {Array.from({ length: count }, (_, i) => (
+        <div key={i} className="surface flex flex-col gap-3 px-[18px] py-4">
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-9 w-9 shrink-0 rounded-lg" />
+            <div className="flex flex-1 flex-col gap-2">
+              <Skeleton className="h-3.5 w-7/12" />
+              <Skeleton className="h-2.5 w-4/12" />
+            </div>
+          </div>
+          <Skeleton className="h-1.5 w-full rounded-full" />
+          <div className="flex gap-2">
+            <Skeleton className="h-[21px] w-16 rounded-[5px]" />
+            <Skeleton className="h-[21px] w-20 rounded-[5px]" />
+          </div>
+        </div>
+      ))}
+    </SkeletonFrame>
+  );
+}
+
+function StatsBody({ count }: { count: 3 | 4 | 5 | 6 }) {
+  return (
+    <div className={`grid shrink-0 grid-cols-2 gap-px overflow-hidden rounded-[10px] border border-line bg-line shadow-card ${stripColumns[count]}`}>
+      {Array.from({ length: count }, (_, i) => (
+        <div key={i} className="flex flex-col gap-2.5 bg-white px-4 py-3.5">
+          <Skeleton className="h-2.5 w-16" />
+          <Skeleton className="h-6 w-12" />
+          <Skeleton className="h-2.5 w-24" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function SkeletonPage({
+  stats = 4,
+  rows = 6,
+  avatar,
+  table,
+}: {
+  stats?: 0 | 3 | 4 | 5 | 6;
+  rows?: number;
+  avatar?: boolean;
+  table?: { columns: number };
+}) {
+  return (
+    <SkeletonFrame className="flex flex-col gap-4">
+      {stats !== 0 && <StatsBody count={stats} />}
+      {table ? <TableBody rows={rows} columns={table.columns} /> : <ListBody rows={rows} avatar={avatar} header />}
+    </SkeletonFrame>
+  );
+}
+
 export function EmptyState({ children, icon }: { children: ReactNode; icon?: ReactNode }) {
   return (
     <div className="flex flex-col items-center px-[18px] py-10 text-center text-ink-muted">

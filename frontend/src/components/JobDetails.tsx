@@ -4,7 +4,7 @@ import type { JobOverviewItem, JobType } from "../api/client";
 import { useJob, useJobAction, useJobChildren } from "../api/hooks";
 import { formatDate, initials } from "../format";
 import { Ban, CircleCheck, CircleX, Clock, X } from "lucide-react";
-import { Avatar, Button, Chip, Spinner } from "./ui";
+import { Avatar, Button, Chip, SkeletonRows } from "./ui";
 
 export const jobTypeInfo: Record<JobType, { label: string; description: string }> = {
   GradeVersion: {
@@ -287,7 +287,7 @@ export function JobDetailsModal({
                 {job.progressTotal ? ` · ${job.progressDone ?? 0} of ${job.progressTotal} done` : ""}
               </SectionTitle>
               {children.isLoading ? (
-                <Spinner label="Loading…" />
+                <SkeletonRows rows={3} className="surface overflow-hidden" />
               ) : (
                 <ul className="surface divide-y divide-paper-dark overflow-hidden">
                   {(children.data ?? []).map((child) => (

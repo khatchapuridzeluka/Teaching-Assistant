@@ -8,7 +8,7 @@ import { CourseName } from "../components/Layout";
 import { StudentPageNav } from "../components/StudentPageNav";
 import { StudentOverviewCard } from "../components/StudentOverview";
 import { categoryLabels, SourceChip } from "../components/StudentMistakes";
-import { Avatar, Card, CardHeader, EmptyState, ErrorPanel, PageHeader, Spinner, Stat, StatStrip } from "../components/ui";
+import { Avatar, Card, CardHeader, EmptyState, ErrorPanel, PageHeader, SkeletonPage, Stat, StatStrip } from "../components/ui";
 import { formatDay, formatPoints, initials } from "../format";
 
 const mistakeColor = "#9a3412";
@@ -40,7 +40,7 @@ export function StudentOverviewPage() {
       />
 
       {overview.isError && <ErrorPanel error={overview.error} />}
-      {overview.isLoading && <Spinner />}
+      {overview.isLoading && <SkeletonPage stats={0} rows={5} />}
 
       {data && data.gradedAssignments === 0 && (
         <Card>

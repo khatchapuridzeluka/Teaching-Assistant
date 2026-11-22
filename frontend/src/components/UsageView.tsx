@@ -5,7 +5,7 @@ import type { ModelCallItem, ModelCallPurpose, ModelUsageTotal } from "../api/cl
 import { FilterChips } from "./FilterChips";
 import { useModelUsage } from "../api/hooks";
 import { formatDate, formatDay } from "../format";
-import { Card, CardHeader, Chip, EmptyState, ErrorPanel, Spinner, Stat, StatStrip } from "./ui";
+import { Card, CardHeader, Chip, EmptyState, ErrorPanel, SkeletonPage, Stat, StatStrip } from "./ui";
 
 const series = [
   { key: "uncached", label: "Prompt, not cached", color: "#1857d6" },
@@ -78,7 +78,7 @@ export function UsageView() {
       </div>
 
       {usage.isError && <ErrorPanel error={usage.error} />}
-      {usage.isLoading && <Spinner />}
+      {usage.isLoading && <SkeletonPage stats={5} rows={5} />}
 
       {data && !hasCalls && (
         <Card>

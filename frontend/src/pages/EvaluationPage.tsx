@@ -19,7 +19,7 @@ import { useCourses, useEvaluation, useModelComparison, useStartEvaluationRun } 
 import { CourseName } from "../components/Layout";
 import { discardReasonLabel } from "../components/DiscardDraftButton";
 import { categoryLabels } from "../components/StudentMistakes";
-import { Button, Card, CardHeader, Chip, EmptyState, ErrorPanel, Meter, Modal, PageHeader, Segmented, Spinner, Stat, StatStrip } from "../components/ui";
+import { Button, Card, CardHeader, Chip, EmptyState, ErrorPanel, Meter, Modal, PageHeader, Segmented, SkeletonPage, Stat, StatStrip } from "../components/ui";
 import { formatDate } from "../format";
 import { chartText, palette, severityColor } from "../theme";
 
@@ -107,7 +107,7 @@ export function EvaluationPage() {
       )}
 
       {evaluation.isError && <ErrorPanel error={evaluation.error} />}
-      {evaluation.isLoading && <Spinner />}
+      {evaluation.isLoading && <SkeletonPage stats={4} rows={5} />}
 
       {data && data.reports === 0 && data.model != null && (
         <Card>

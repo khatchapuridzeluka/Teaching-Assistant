@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { UseQueryResult } from "@tanstack/react-query";
 import type { StoredFile } from "../api/client";
 import { useStoredFileBlob } from "../api/hooks";
-import { ErrorPanel, Spinner } from "./ui";
+import { ErrorPanel, SkeletonLines } from "./ui";
 
 export function DocxPreview({ file }: { file: StoredFile }) {
   return <DocxView blob={useStoredFileBlob(file.id)} />;
@@ -71,7 +71,7 @@ export function DocxView({ blob, className = "max-h-[720px]" }: { blob: UseQuery
     <div className={`overflow-auto surface ${className}`}>
       {blob.isLoading && (
         <div className="px-4 py-3">
-          <Spinner label="Loading document…" />
+          <SkeletonLines lines={5} />
         </div>
       )}
       {failed && (

@@ -11,7 +11,7 @@ import { BuildCheck } from "../components/BuildCheck";
 import { CourseName } from "../components/Layout";
 import { keptMistakes, keptStrengths, ReportChip, ReportEditor } from "../components/ReportEditor";
 import { MistakeList, StrengthList } from "../components/SubmissionDetail";
-import { Avatar, Button, Card, Chip, EmptyState, ErrorPanel, PageHeader, Spinner, Stat, StatStrip } from "../components/ui";
+import { Avatar, Button, Card, Chip, EmptyState, ErrorPanel, PageHeader, SkeletonLines, SkeletonPage, SkeletonRows, Stat, StatStrip } from "../components/ui";
 import { formatDate, initials } from "../format";
 import { ArrowLeft, ChevronRight, ClipboardList, ExternalLink, Gauge, Pencil, Sparkles, Users } from "lucide-react";
 import { severityColor } from "../theme";
@@ -98,7 +98,7 @@ export function DraftsPage() {
       />
 
       {everything.isError && <ErrorPanel error={everything.error} />}
-      {everything.isLoading && <Spinner />}
+      {everything.isLoading && <SkeletonPage stats={4} rows={6} avatar />}
 
       {everything.data && allDrafts.length === 0 && (
         <Card className="flex flex-1 items-center justify-center">
@@ -198,9 +198,7 @@ export function DraftsPage() {
               </div>
 
               {list.isLoading ? (
-                <div className="p-4">
-                  <Spinner />
-                </div>
+                <SkeletonRows rows={6} avatar />
               ) : rows.length === 0 ? (
                 <div className="px-4 py-8 text-center text-xs text-ink-muted">No drafts match these filters.</div>
               ) : (
@@ -537,7 +535,7 @@ function DraftDetail({
       </header>
 
       {history.isLoading || !grading ? (
-        <div className="p-5">{history.isError ? <ErrorPanel error={history.error} /> : <Spinner label="Loading the draft…" />}</div>
+        <div className="p-5">{history.isError ? <ErrorPanel error={history.error} /> : <SkeletonLines lines={6} />}</div>
       ) : (
         <div className="flex min-h-0 flex-1 flex-col @4xl:flex-row">
           <nav className="flex shrink-0 gap-1 border-b border-line bg-white px-4 sm:px-5 @4xl:hidden" aria-label="Review or code">

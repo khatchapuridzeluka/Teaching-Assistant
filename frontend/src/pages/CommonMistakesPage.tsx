@@ -7,7 +7,7 @@ import { severityColor } from "../components/CodeBrowser";
 import { useTrackJob } from "../components/JobToasts";
 import { CourseName } from "../components/Layout";
 import { categoryLabels } from "../components/StudentMistakes";
-import { Button, Card, CardHeader, Chip, EmptyState, ErrorPanel, PageHeader, Spinner, Stat, StatStrip } from "../components/ui";
+import { Button, Card, CardHeader, Chip, EmptyState, ErrorPanel, PageHeader, SkeletonList, Spinner, Stat, StatStrip } from "../components/ui";
 import { formatAge } from "../format";
 import { ChartColumn, Lightbulb, Sparkles } from "lucide-react";
 
@@ -82,7 +82,7 @@ export function CommonMistakesPage() {
           <Spinner label="Analyzing… the AI is grouping this assignment's mistakes; you can leave this page." />
         </Card>
       )}
-      {analysis.isLoading && <Spinner />}
+      {analysis.isLoading && <SkeletonList rows={5} />}
 
       {analysis.data === null && !running && (
         <Card>

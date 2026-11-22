@@ -3,7 +3,7 @@ import { ClipboardList } from "lucide-react";
 import { useAssignments, useCourseGradings, useGradebook } from "../api/hooks";
 import { AssignmentTable } from "../components/AssignmentTable";
 import { CourseName } from "../components/Layout";
-import { Card, EmptyState, ErrorPanel, PageHeader, Spinner } from "../components/ui";
+import { Card, EmptyState, ErrorPanel, PageHeader, SkeletonList } from "../components/ui";
 
 export function AssignmentsPage() {
   const { courseId = "" } = useParams();
@@ -22,7 +22,7 @@ export function AssignmentsPage() {
         }
       />
 
-      {assignments.isLoading && <Spinner />}
+      {assignments.isLoading && <SkeletonList rows={6} header={false} />}
       {assignments.isError && <ErrorPanel error={assignments.error} />}
 
       {assignments.data && (

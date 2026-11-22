@@ -4,7 +4,7 @@ import type { GradebookColumn, StudentAssignmentResult } from "../api/client";
 import { useGradebook, useSyncCourse } from "../api/hooks";
 import { CourseName } from "../components/Layout";
 import { Download, RefreshCw } from "lucide-react";
-import { Avatar, Button, buttonClass, Card, EmptyState, ErrorPanel, PageHeader, Spinner, Stat, StatStrip } from "../components/ui";
+import { Avatar, Button, buttonClass, Card, EmptyState, ErrorPanel, PageHeader, SkeletonPage, Stat, StatStrip } from "../components/ui";
 import { formatDate, formatDay, initials } from "../format";
 
 type SortKey = "name" | "best" | "worst";
@@ -64,7 +64,7 @@ export function GradebookPage() {
 
       {gradebook.isError && <ErrorPanel error={gradebook.error} />}
       {sync.isError && <ErrorPanel error={sync.error} />}
-      {gradebook.isLoading && <Spinner />}
+      {gradebook.isLoading && <SkeletonPage stats={4} rows={8} table={{ columns: 7 }} />}
 
       {data && !synced && (
         <Card>

@@ -4,7 +4,7 @@ import { useAssignments, useCourseGradings, useCourses, useGradebook } from "../
 import { AssignmentTable } from "../components/AssignmentTable";
 import { Score, SeverityDots } from "../components/bits";
 import { CourseName, CourseTile } from "../components/Layout";
-import { Avatar, Button, Card, CardHeader, EmptyState, ErrorPanel, PageHeader, Spinner, Stat, StatStrip } from "../components/ui";
+import { Avatar, Button, Card, CardHeader, EmptyState, ErrorPanel, PageHeader, SkeletonRows, Stat, StatStrip } from "../components/ui";
 import { formatDate, initials } from "../format";
 import { coursePath } from "../navigation";
 
@@ -76,11 +76,7 @@ export function CourseOverviewPage() {
               </Link>
             }
           />
-          {assignments.isLoading && (
-            <div className="px-[18px] py-3">
-              <Spinner />
-            </div>
-          )}
+          {assignments.isLoading && <SkeletonRows rows={5} />}
           {assignments.data?.length === 0 && <EmptyState icon={<ClipboardList />}>This course has no published assignments.</EmptyState>}
           {assignments.data && (
             <AssignmentTable
@@ -107,11 +103,7 @@ export function CourseOverviewPage() {
                 )
               }
             />
-            {gradings.isLoading && (
-              <div className="px-[18px] py-3">
-                <Spinner />
-              </div>
-            )}
+            {gradings.isLoading && <SkeletonRows rows={3} avatar />}
             {gradings.data && waiting.length === 0 && (
               <EmptyState icon={<PartyPopper />}>
                 <div className="font-semibold text-ink">Nothing to review</div>

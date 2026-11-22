@@ -30,7 +30,7 @@ import { useTrackJob } from "../components/JobToasts";
 import { PreviewPanel } from "../components/PreviewPanel";
 import { SubmissionBoard } from "../components/SubmissionBoard";
 import { hasWork, stateChip, SubmissionDetail } from "../components/SubmissionDetail";
-import { Avatar, Button, Card, Chip, CountTabs, ErrorPanel, Menu, Modal, Notice, PageHeader, SearchField, Segmented, Spinner, Stat, StatStrip } from "../components/ui";
+import { Avatar, Button, Card, Chip, CountTabs, ErrorPanel, Menu, Modal, Notice, PageHeader, SearchField, Segmented, SkeletonList, Spinner, Stat, StatStrip } from "../components/ui";
 import { formatDate, formatDay, initials } from "../format";
 import { severityColor } from "../theme";
 import { CircleCheck, CircleDashed, CloudDownload, Ellipsis, ExternalLink, Files, LayoutList, PackageOpen, Send, Sparkles, SquareKanban, Undo2, UserX } from "lucide-react";
@@ -298,7 +298,7 @@ export function AssignmentPage() {
       {extract.isError && <ErrorPanel error={extract.error} />}
       {extract.data && <ExtractBanner summary={extract.data} onDismiss={() => extract.reset()} />}
 
-      {submissions.isLoading && <Spinner />}
+      {submissions.isLoading && <SkeletonList rows={8} avatar />}
       {submissions.isError && <ErrorPanel error={submissions.error} />}
       {submissions.data && view === "board" && (
         <SubmissionBoard

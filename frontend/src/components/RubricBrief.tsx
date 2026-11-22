@@ -5,7 +5,7 @@ import { useAssignmentNotes } from "../api/hooks";
 import { InstructionsStatus, useInstructionMaterials } from "./InstructionsCard";
 import { FileChips } from "./RubricAssignments";
 import { type LayerKey, plural, rubricLayers, ScopeChip, Step } from "./RubricShared";
-import { ErrorPanel, Modal, Spinner } from "./ui";
+import { ErrorPanel, Modal, SkeletonLines } from "./ui";
 
 export function BriefModal({
   courseId,
@@ -104,7 +104,7 @@ function AssignmentLayers({ courseId, assignment }: { courseId: string; assignme
       </BriefLayer>
 
       <BriefLayer layerKey="notes" count={notes.data ? plural(notes.data.length, "note") : assignment.title}>
-        {notes.isLoading && <Spinner />}
+        {notes.isLoading && <SkeletonLines lines={3} />}
         {notes.isError && <ErrorPanel error={notes.error} />}
         {notes.data && <BriefEntries entries={notes.data} empty="No notes: this assignment is graded with the layers above as they are." />}
       </BriefLayer>

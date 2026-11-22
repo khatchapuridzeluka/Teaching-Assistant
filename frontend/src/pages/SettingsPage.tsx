@@ -3,7 +3,7 @@ import { useConnectGoogle, useDisconnectGoogle, useGoogleStatus, useModelHealth 
 import type { GoogleStatus } from "../api/client";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Cpu, Lock, Plug } from "lucide-react";
-import { Button, Card, CardHeader, Chip, type ChipTone, ErrorPanel, PageHeader, Spinner } from "../components/ui";
+import { Button, Card, CardHeader, Chip, type ChipTone, ErrorPanel, PageHeader, SkeletonLines, Spinner } from "../components/ui";
 
 export function SettingsPage() {
   return (
@@ -48,7 +48,7 @@ function GoogleConnection() {
         actions={state && <Chip tone={stateChip[state].tone}>{stateChip[state].label}</Chip>}
       />
       <div className="flex flex-col gap-3 px-[18px] py-3.5">
-        {status.isLoading && <Spinner />}
+        {status.isLoading && <SkeletonLines lines={3} />}
         {status.isError && <ErrorPanel error={status.error} />}
         {status.data?.message && <div className="text-ink-muted">{status.data.message}</div>}
 

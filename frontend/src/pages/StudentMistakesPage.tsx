@@ -8,7 +8,7 @@ import { CourseName } from "../components/Layout";
 import { StudentPageNav } from "../components/StudentPageNav";
 import { StudentOverviewCard } from "../components/StudentOverview";
 import { categoryLabels, MistakeRow, SourceChip } from "../components/StudentMistakes";
-import { Avatar, Card, CardHeader, EmptyState, ErrorPanel, PageHeader, Spinner, Stat, StatStrip } from "../components/ui";
+import { Avatar, Card, CardHeader, EmptyState, ErrorPanel, PageHeader, SkeletonPage, Stat, StatStrip } from "../components/ui";
 import { formatDay, initials } from "../format";
 
 const severityShades: Record<MistakeSeverity, string> = {
@@ -74,7 +74,7 @@ export function StudentMistakesPage() {
       />
 
       {mistakes.isError && <ErrorPanel error={mistakes.error} />}
-      {mistakes.isLoading && <Spinner />}
+      {mistakes.isLoading && <SkeletonPage stats={0} rows={5} />}
 
       {data && data.recorded === 0 && (
         <Card>

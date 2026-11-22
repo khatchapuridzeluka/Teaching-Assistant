@@ -9,7 +9,7 @@ import { MistakeCategoriesCard, MistakeHistoryCard } from "../components/Student
 import { StrengthsCard } from "../components/StudentStrengths";
 import { StudentOverviewCard } from "../components/StudentOverview";
 import { stateChip } from "../components/SubmissionDetail";
-import { Avatar, Button, buttonClass, Card, Chip, CountTabs, EmptyState, ErrorPanel, Meter, Modal, Notice, PageHeader, SearchField, Spinner, Stat, StatStrip } from "../components/ui";
+import { Avatar, Button, buttonClass, Card, Chip, CountTabs, EmptyState, ErrorPanel, Meter, Modal, Notice, PageHeader, SearchField, SkeletonPage, Spinner, Stat, StatStrip } from "../components/ui";
 import { ArrowLeft, ArrowRight, Award, CalendarX, CircleAlert, Clock, GraduationCap, LayoutDashboard, RefreshCw, Send, Sparkles, Table2, Users } from "lucide-react";
 import { formatDate, formatDay, initials } from "../format";
 
@@ -88,7 +88,7 @@ export function StudentsPage() {
       {sync.isError && <ErrorPanel error={sync.error} />}
       {sync.data && <SyncBanner summary={sync.data} onDismiss={() => sync.reset()} />}
 
-      {students.isLoading && <Spinner />}
+      {students.isLoading && <SkeletonPage stats={3} rows={8} avatar />}
       {students.isError && <ErrorPanel error={students.error} />}
 
       {data && !synced && !sync.isPending && (

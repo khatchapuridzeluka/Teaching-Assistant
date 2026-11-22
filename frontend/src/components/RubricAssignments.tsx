@@ -9,7 +9,7 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { instructionsPath, InstructionsNotes, InstructionsStatus, useInstructionMaterials } from "./InstructionsCard";
 import { hasInstructions } from "./RubricOverview";
 import { Bullet, EntryList, EntryRow, matchesSearch, plural, rubricPath, type RubricTab, TitleTextModal, useOpenRows } from "./RubricShared";
-import { Button, buttonClass, Card, Chip, CountTabs, EmptyState, ErrorPanel, SearchField, Spinner } from "./ui";
+import { Button, buttonClass, Card, Chip, CountTabs, EmptyState, ErrorPanel, SearchField, SkeletonLines } from "./ui";
 
 type Filter = "all" | "notes" | "missing";
 
@@ -284,7 +284,7 @@ function AssignmentDetail({
       >
         {notes.isLoading && (
           <div className="px-[18px] pb-4">
-            <Spinner />
+            <SkeletonLines lines={3} />
           </div>
         )}
         {notes.isError && (

@@ -5,7 +5,7 @@ import { FlaskConical, X } from "lucide-react";
 import type { GradingResult } from "../api/client";
 import { useGradingModels, useTryModel } from "../api/hooks";
 import { BuildCheck } from "./BuildCheck";
-import { Button, Chip, ErrorPanel, Modal, Spinner } from "./ui";
+import { Button, Chip, ErrorPanel, Modal, SkeletonLines, Spinner } from "./ui";
 
 /** Picks a model and grades the version once with it; the answer is handed back, never saved. */
 export function TryModelDialog({
@@ -52,7 +52,7 @@ export function TryModelDialog({
       }
     >
       <div className="flex flex-col gap-2 px-5 py-4">
-        {!models && <Spinner label="Loading models…" />}
+        {!models && <SkeletonLines lines={2} />}
         {models?.available.map((m) => (
           <label
             key={m}

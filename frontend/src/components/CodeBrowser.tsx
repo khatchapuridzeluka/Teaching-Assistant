@@ -4,7 +4,7 @@ import { type CodeFile, type CodeMistake, type CodeStrength, codeFileUrl } from 
 import { useCodeFileText, useCodeFiles } from "../api/hooks";
 import { severityColor, strengthColor } from "../theme";
 import { FileCode2 } from "lucide-react";
-import { ErrorPanel, Spinner } from "./ui";
+import { ErrorPanel, SkeletonLines } from "./ui";
 
 const languages: Record<string, string> = {
   java: "java", kt: "kotlin", c: "c", h: "cpp", cpp: "cpp", cc: "cpp", hpp: "cpp", cs: "csharp",
@@ -58,7 +58,7 @@ export function CodeBrowser({
   }, [focus]);
 
   if (files.isLoading) {
-    return <Spinner label="Loading code…" />;
+    return <SkeletonLines lines={8} className="surface p-4" />;
   }
   if (files.isError) {
     return <ErrorPanel error={files.error} />;
@@ -225,7 +225,7 @@ function FileView({
           <img src={codeFileUrl(versionId, path)} alt={path} className="max-h-full max-w-full object-contain" />
         </div>
       ) : text.isLoading ? (
-        <div className="p-4"><Spinner /></div>
+        <SkeletonLines lines={10} className="p-4" />
       ) : text.isError ? (
         <div className="p-4"><ErrorPanel error={text.error} /></div>
       ) : (

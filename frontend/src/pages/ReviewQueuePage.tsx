@@ -5,7 +5,7 @@ import type { ReviewDraft, UngradedSubmission } from "../api/client";
 import { useCourses, useReviewQueue } from "../api/hooks";
 import { Score, SeverityDots } from "../components/bits";
 import { CourseTile } from "../components/Layout";
-import { Avatar, Card, Chip, EmptyState, ErrorPanel, PageHeader, Segmented, Spinner, Stat, StatStrip, Tabs } from "../components/ui";
+import { Avatar, Card, Chip, EmptyState, ErrorPanel, PageHeader, Segmented, SkeletonPage, Stat, StatStrip, Tabs } from "../components/ui";
 import { formatAge, formatDate, initials } from "../format";
 
 export function ReviewQueuePage() {
@@ -45,7 +45,7 @@ export function ReviewQueuePage() {
       <PageHeader title="Review queue" subtitle="Across all courses · AI drafts waiting for your decision, and turned-in work that has no draft yet" />
 
       {queue.isError && <ErrorPanel error={queue.error} />}
-      {queue.isLoading && <Spinner />}
+      {queue.isLoading && <SkeletonPage stats={4} rows={6} avatar />}
 
       {queue.data && (
         <>

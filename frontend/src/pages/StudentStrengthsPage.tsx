@@ -11,7 +11,7 @@ import { StudentOverviewCard } from "../components/StudentOverview";
 import { categoryLabels } from "../components/StudentMistakes";
 import { SourceChip } from "../components/StudentMistakes";
 import { StrengthRow, summarize } from "../components/StudentStrengths";
-import { Avatar, Card, CardHeader, EmptyState, ErrorPanel, PageHeader, Spinner, Stat, StatStrip } from "../components/ui";
+import { Avatar, Card, CardHeader, EmptyState, ErrorPanel, PageHeader, SkeletonPage, Stat, StatStrip } from "../components/ui";
 import { formatDay, initials } from "../format";
 
 const mistakeColor = "#9a3412";
@@ -70,7 +70,7 @@ export function StudentStrengthsPage() {
       />
 
       {strengths.isError && <ErrorPanel error={strengths.error} />}
-      {strengths.isLoading && <Spinner />}
+      {strengths.isLoading && <SkeletonPage stats={0} rows={5} />}
 
       {data && data.recorded === 0 && (
         <Card>

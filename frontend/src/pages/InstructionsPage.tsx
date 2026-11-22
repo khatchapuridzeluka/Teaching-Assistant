@@ -1,7 +1,7 @@
 import { useParams } from "react-router";
 import { useAssignments } from "../api/hooks";
 import { InstructionsNotes, InstructionsStatus, InstructionsViewer, useInstructionMaterials } from "../components/InstructionsCard";
-import { Card, PageHeader, Spinner } from "../components/ui";
+import { Card, PageHeader, SkeletonPage } from "../components/ui";
 import { formatDate } from "../format";
 
 export function InstructionsPage() {
@@ -10,7 +10,7 @@ export function InstructionsPage() {
   const state = useInstructionMaterials(courseId, assignment);
 
   if (!assignment) {
-    return <Spinner />;
+    return <SkeletonPage stats={0} rows={4} />;
   }
 
   return (
