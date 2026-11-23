@@ -1,4 +1,4 @@
-ig# The deployed stack. On the VM, from the deploy folder: docker compose up -d --build
+# The deployed stack. On the VM, from the deploy folder: docker compose up -d --build
 # Settings come from deploy/.env (git-ignored); see deploy/.env.example.
 name: teaching-assistant
 
