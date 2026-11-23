@@ -102,6 +102,8 @@ frontend/                                React app (Vite)
   src/theme.ts                           colours for charts, code marks and avatars, kept in step with index.css
   src/navigation.ts                      the course and workspace sections with their icons (navigation and routes read it)
   src/pages/                             Home, Course overview, Assignments, Assignment (list + board), Instructions, Students, AI drafts, Gradebook, Common mistakes, Review queue, System, Settings, planned sections
+deploy/                                  deployment (in progress): Caddyfile and the image that builds the frontend and serves it
+                                         with Caddy, which also passes /api/* to the API with the prefix stripped (as Vite does locally)
 ```
 
 ## Getting started
@@ -157,7 +159,7 @@ docker build -t ta-java:27 sandbox/java
 
 Without it, or with Docker stopped, grading still works and each draft says the code was not compiled.
 
-In Development the API creates the database and applies pending migrations when it starts, so there is no separate step. Outside Development, apply them deliberately with `dotnet ef database update --project src/TeachingAssistant.Infrastructure --startup-project src/TeachingAssistant.WebAPI`.
+In Development the API creates the database and applies pending migrations when it starts, so there is no separate step. Outside Development, apply them deliberately: either with `dotnet ef database update --project src/TeachingAssistant.Infrastructure --startup-project src/TeachingAssistant.WebAPI`, or by starting the published API once with `--migrate` (`dotnet TeachingAssistant.WebAPI.dll --migrate`), which applies pending migrations and exits without starting the web server or the job worker. Behind a reverse proxy (Caddy on the deployed VM) the API reads the forwarded headers, so it must not be reachable except through the proxy.
 
 Data lives in a Docker volume, outside the repository. Submission files are stored under `%LOCALAPPDATA%\TeachingAssistant` (configurable as `Storage:Root`), outside the repository and outside synced folders such as OneDrive, as `submissions\{course}\{assignment}\{student} ({id})\v{n}\` with `original\` (exactly as submitted) and `code\` (archives unpacked, IDE folders and compiled files left out). Assignment instructions are stored next to them as `instructions\{course}\{assignment} ({id})\v{n}\original\`. After changing the entity model, add a migration with `dotnet ef migrations add <Name> --project src/TeachingAssistant.Infrastructure --startup-project src/TeachingAssistant.WebAPI --output-dir Persistence/Migrations`.
 
