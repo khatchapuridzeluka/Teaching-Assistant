@@ -910,7 +910,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Opens Google sign-in in the browser on the machine running the API and waits up to 5 minutes for approval. Local development only. */
+        /** Returns Google's consent page for the browser to open; after approval Google redirects to the callback. */
         post: {
             parameters: {
                 query?: never;
@@ -920,16 +920,16 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Connected (or was already connected) */
+                /** @description Consent page URL to open, or no URL when already connected */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["GoogleConnectionStatus"];
+                        "application/json": components["schemas"]["GoogleConnectResponse"];
                     };
                 };
-                /** @description Not connected: client not configured, access denied, or no approval in time */
+                /** @description Google access is not configured (client ID, client secret or redirect URI missing) */
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -938,6 +938,51 @@ export interface paths {
                 };
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/google/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Receives Google's redirect after the consent page, stores the authorization and sends the browser back to Settings. */
+        get: {
+            parameters: {
+                query?: {
+                    code?: string;
+                    state?: string;
+                    error?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Back to the Settings page, with the outcome in the query string */
+                302: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3975,6 +4020,12 @@ export interface components {
             /** Format: int32 */
             instructionsVersion?: number | null;
             newInstructions: boolean;
+        };
+        GoogleConnectResponse: {
+            state: components["schemas"]["GoogleConnectionState"];
+            /** @description Google's consent page to send the browser to; missing when already connected or not configured. */
+            authorizationUrl?: string | null;
+            message?: string | null;
         };
         /** @enum {string} */
         GoogleConnectionState: "NotConfigured" | "NotConnected" | "Connected" | "ReconnectRequired";

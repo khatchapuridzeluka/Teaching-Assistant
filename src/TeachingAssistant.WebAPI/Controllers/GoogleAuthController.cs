@@ -27,15 +27,32 @@ public class GoogleAuthController : ControllerBase
     }
 
     /// <summary>
-    /// Opens Google sign-in in the browser on the machine running the API and waits up to 5 minutes for approval. Local development only.
+    /// Returns Google's consent page for the browser to open; after approval Google redirects to the callback.
     /// </summary>
-    /// <response code="200">Connected (or was already connected)</response>
-    /// <response code="400">Not connected: client not configured, access denied, or no approval in time</response>
+    /// <response code="200">Consent page URL to open, or no URL when already connected</response>
+    /// <response code="400">Google access is not configured (client ID, client secret or redirect URI missing)</response>
     [HttpPost("connect")]
-    public async Task<ActionResult<GoogleConnectionStatus>> ConnectAsync(CancellationToken cancellationToken)
+    public async Task<ActionResult<GoogleConnectResponse>> ConnectAsync(CancellationToken cancellationToken)
     {
-        var result = await _googleConnectionService.ConnectAsync(cancellationToken);
-        return result.State == GoogleConnectionState.Connected ? Ok(result) : BadRequest(result);
+        var result = await _googleConnectionService.StartConnectAsync(cancellationToken);
+        return result.State == GoogleConnectionState.NotConfigured ? BadRequest(result) : Ok(result);
+    }
+
+    /// <summary>
+    /// Receives Google's redirect after the consent page, stores the authorization and sends the browser back to Settings.
+    /// </summary>
+    /// <response code="302">Back to the Settings page, with the outcome in the query string</response>
+    [HttpGet("callback")]
+    public async Task<IActionResult> CallbackAsync(
+        [FromQuery] string? code, [FromQuery] string? state, [FromQuery] string? error, CancellationToken cancellationToken)
+    {
+        var result = await _googleConnectionService.CompleteConnectAsync(code, state, error, cancellationToken);
+        if (result.State == GoogleConnectionState.Connected)
+        {
+            return Redirect("/settings?google=connected");
+        }
+
+        return Redirect($"/settings?google=failed&message={Uri.EscapeDataString(result.Message ?? "Google authorization failed.")}");
     }
 
     /// <summary>

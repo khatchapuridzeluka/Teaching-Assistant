@@ -166,9 +166,11 @@ Data lives in a Docker volume, outside the repository. Submission files are stor
 1. Create a project in the [Google Cloud Console](https://console.cloud.google.com/).
 2. Enable the **Google Classroom API** and the **Google Drive API**.
 3. Configure the OAuth consent screen: audience **External**, publishing status **Testing**, and add your Google account as a test user.
-4. Create an OAuth client ID of type **Desktop app** and store its ID and secret as shown above.
+4. Create an OAuth client ID of type **Web application** with the authorized redirect URI `http://localhost:5173/api/auth/google/callback`, and store its ID and secret as shown above. The redirect URI is the `Google:RedirectUri` setting (set for Development in `appsettings.Development.json`); a deployed copy registers its own address (`https://<host>/api/auth/google/callback`) on the same client and sets `Google:RedirectUri` to it.
 
-> In Testing mode, Google refresh tokens expire after about 7 days. Reconnect with `POST /auth/google/connect` when the status shows `ReconnectRequired`.
+The token Google returns is stored as a file in the folder named by `Google:TokenStoreFolder` (a relative name is placed under the user's application data folder; an absolute path, such as a mounted volume, is used as it is).
+
+> In Testing mode, Google refresh tokens expire after about 7 days. Reconnect from the **Settings** page when the status shows `ReconnectRequired`.
 
 ### 5. Run
 
@@ -176,7 +178,7 @@ Data lives in a Docker volume, outside the repository. Submission files are stor
 dotnet run --project src/TeachingAssistant.WebAPI --launch-profile https
 ```
 
-Swagger UI opens at `https://localhost:7107/swagger`. To connect Classroom, call `POST /auth/google/connect` — a browser window opens for Google sign-in and consent.
+Swagger UI opens at `https://localhost:7107/swagger`. To connect Classroom, open **Settings** in the frontend and click **Connect**: the browser goes to Google's consent page and comes back to Settings once access is granted.
 
 ### 6. Run the frontend
 
@@ -197,7 +199,8 @@ Open `http://localhost:5173`. The Vite dev server forwards `/api/*` to the API, 
 | `GET` | `/health` | API liveness check |
 | `GET` | `/health/model` | Sends a test prompt to Claude; returns model, latency and reply |
 | `GET` | `/auth/google/status` | Google connection state: `NotConfigured`, `NotConnected`, `Connected` or `ReconnectRequired` |
-| `POST` | `/auth/google/connect` | Opens Google sign-in on the local machine and stores the authorization |
+| `POST` | `/auth/google/connect` | Returns Google's consent page URL for the browser to open |
+| `GET` | `/auth/google/callback` | Google redirects here after consent; stores the authorization and redirects to Settings |
 | `POST` | `/auth/google/disconnect` | Revokes access at Google and deletes the stored token |
 | `GET` | `/courses` | Courses the teacher teaches in Google Classroom |
 | `POST` | `/courses/{courseId}/sync` | Copies the course's roster, assignments and every student's state and Classroom grade history into the database (no files, nothing written to Classroom) |

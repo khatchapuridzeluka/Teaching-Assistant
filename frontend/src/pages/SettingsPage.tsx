@@ -1,9 +1,10 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router";
 import { useConnectGoogle, useDisconnectGoogle, useGoogleStatus, useModelHealth } from "../api/hooks";
 import type { GoogleStatus } from "../api/client";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Cpu, Lock, Plug } from "lucide-react";
-import { Button, Card, CardHeader, Chip, type ChipTone, ErrorPanel, PageHeader, SkeletonLines, Spinner } from "../components/ui";
+import { Button, Card, CardHeader, Chip, type ChipTone, ErrorPanel, Notice, PageHeader, SkeletonLines, Spinner } from "../components/ui";
 
 export function SettingsPage() {
   return (
@@ -37,7 +38,25 @@ function GoogleConnection() {
   const connect = useConnectGoogle();
   const disconnect = useDisconnectGoogle();
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const outcome = searchParams.get("google");
+  const outcomeMessage = searchParams.get("message");
   const state = status.data?.state;
+
+  const dismissOutcome = () => {
+    setSearchParams({}, { replace: true });
+  };
+
+  const startConnect = () => {
+    dismissOutcome();
+    connect.mutate(undefined, {
+      onSuccess: (result) => {
+        if (result.authorizationUrl) {
+          window.location.assign(result.authorizationUrl);
+        }
+      },
+    });
+  };
 
   return (
     <Card>
@@ -66,13 +85,23 @@ function GoogleConnection() {
           </ul>
         )}
 
-        {connect.isPending && <Spinner label="Waiting for you to approve in the browser window that opened…" />}
+        {outcome === "connected" && (
+          <Notice tone="success" title="Connected." onDismiss={dismissOutcome}>
+            Google Classroom access was granted.
+          </Notice>
+        )}
+        {outcome === "failed" && (
+          <Notice tone="danger" title="Not connected." onDismiss={dismissOutcome}>
+            {outcomeMessage ?? "Google authorization failed."}
+          </Notice>
+        )}
+        {(connect.isPending || connect.data?.authorizationUrl) && <Spinner label="Opening Google sign-in…" />}
         {connect.isError && <ErrorPanel error={connect.error} />}
         {disconnect.isError && <ErrorPanel error={disconnect.error} />}
 
         <div className="flex gap-2">
           {state !== "Connected" && (
-            <Button variant="primary" small onClick={() => connect.mutate()} disabled={connect.isPending || state === "NotConfigured"}>
+            <Button variant="primary" small onClick={startConnect} disabled={connect.isPending || !!connect.data?.authorizationUrl || state === "NotConfigured"}>
               {state === "ReconnectRequired" ? "Reconnect" : "Connect"}
             </Button>
           )}

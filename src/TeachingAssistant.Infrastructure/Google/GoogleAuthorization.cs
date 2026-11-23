@@ -30,7 +30,7 @@ public class GoogleAuthorization
     public GoogleAuthorization(IOptions<GoogleOptions> options)
     {
         _options = options.Value;
-        TokenStore = new FileDataStore(_options.TokenStoreFolder);
+        TokenStore = new FileDataStore(_options.TokenStoreFolder, Path.IsPathRooted(_options.TokenStoreFolder));
         _flow = new Lazy<GoogleAuthorizationCodeFlow>(() => new GoogleAuthorizationCodeFlow(
             new GoogleAuthorizationCodeFlow.Initializer
             {
@@ -43,6 +43,8 @@ public class GoogleAuthorization
     public FileDataStore TokenStore { get; }
 
     public ClientSecrets ClientSecrets => new() { ClientId = _options.ClientId, ClientSecret = _options.ClientSecret };
+
+    public string? RedirectUri => string.IsNullOrWhiteSpace(_options.RedirectUri) ? null : _options.RedirectUri.Trim();
 
     public bool TryGetFlow([NotNullWhen(true)] out GoogleAuthorizationCodeFlow? flow)
     {
