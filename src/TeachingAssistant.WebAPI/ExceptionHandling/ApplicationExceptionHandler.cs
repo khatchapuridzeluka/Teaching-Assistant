@@ -19,6 +19,7 @@ public class ApplicationExceptionHandler : IExceptionHandler
         {
             InvalidRequestException => (StatusCodes.Status400BadRequest, "Invalid request"),
             LanguageModelUnavailableException => (StatusCodes.Status503ServiceUnavailable, "Model unavailable"),
+            LanguageModelResponseException => (StatusCodes.Status502BadGateway, "Model answer unusable"),
             SubmissionSourceNotConnectedException => (StatusCodes.Status409Conflict, "Source not connected"),
             SubmissionSourceNotFoundException => (StatusCodes.Status404NotFound, "Not found"),
             SubmissionSourceUnavailableException => (StatusCodes.Status502BadGateway, "Source unavailable"),

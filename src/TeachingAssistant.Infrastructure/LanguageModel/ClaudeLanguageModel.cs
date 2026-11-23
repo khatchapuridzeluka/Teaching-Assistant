@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using Anthropic;
 using Anthropic.Exceptions;
@@ -89,7 +90,7 @@ public class ClaudeLanguageModel : ILanguageModel
         string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, string? model = null,
         CancellationToken cancellationToken = default)
     {
-        return StructuredAsync(systemPrompt, parts, outputSchema, Beta.Effort.High, "The model declined to grade this submission.",
+        return StructuredAsync(systemPrompt, parts, outputSchema, Beta.Effort.Medium, "The model declined to grade this submission.",
             cancellationToken, model);
     }
 
@@ -143,26 +144,66 @@ public class ClaudeLanguageModel : ILanguageModel
                     Messages = [new Beta.BetaUserMessageParam { Content = parts.Select(ToBlock).ToList() }],
                 };
 
-            var response = await _client.Beta.Messages.Create(request, cancellationToken);
+            var reply = await StreamAsync(request, cancellationToken);
 
-            if (response.StopReason == "refusal")
+            if (reply.StopReason == "refusal")
             {
-                throw new LanguageModelUnavailableException(refusal);
+                throw new LanguageModelResponseException(refusal);
             }
 
-            if (response.StopReason == "max_tokens")
+            if (reply.StopReason == "max_tokens")
             {
-                throw new LanguageModelUnavailableException(
-                    "The review was cut off at the length limit. Raise Anthropic:GradingMaxTokens and grade again.");
+                throw new LanguageModelResponseException(
+                    "The answer was cut off at the length limit (Anthropic:GradingMaxTokens), so it could not be read. "
+                    + "Trying again gives the same result; raise the limit first.");
             }
 
-            var text = string.Concat(response.Content.Select(b => b.Value).OfType<Beta.BetaTextBlock>().Select(t => t.Text)).Trim();
-            return new LanguageModelReply { Model = response.Model, Text = text, Usage = ToUsage(response.Usage) };
+            return new LanguageModelReply { Model = reply.Model, Text = reply.Text.Trim(), Usage = reply.Usage };
         }
         catch (Exception ex) when (Translate(ex, chosen) is { } translated)
         {
             throw translated;
         }
+    }
+
+    private async Task<StreamedReply> StreamAsync(Beta.MessageCreateParams request, CancellationToken cancellationToken)
+    {
+        var text = new StringBuilder();
+        string model = request.Model;
+        string? stopReason = null;
+        LanguageModelUsage usage = new() { InputTokens = 0, OutputTokens = 0, CacheReadTokens = 0, CacheWriteTokens = 0 };
+
+        await foreach (var streamEvent in _client.Beta.Messages.CreateStreaming(request, cancellationToken))
+        {
+            if (streamEvent.TryPickStart(out var start))
+            {
+                model = start.Message.Model;
+                usage = ToUsage(start.Message.Usage);
+            }
+            else if (streamEvent.TryPickContentBlockDelta(out var blockDelta) && blockDelta.Delta.TryPickText(out var textDelta))
+            {
+                text.Append(textDelta.Text);
+            }
+            else if (streamEvent.TryPickDelta(out var messageDelta))
+            {
+                if (messageDelta.Delta.StopReason is { } reason)
+                {
+                    stopReason = reason;
+                }
+
+                usage = usage with { OutputTokens = messageDelta.Usage.OutputTokens };
+            }
+        }
+
+        return new StreamedReply { Model = model, Text = text.ToString(), StopReason = stopReason, Usage = usage };
+    }
+
+    private sealed record StreamedReply
+    {
+        public required string Model { get; init; }
+        public required string Text { get; init; }
+        public string? StopReason { get; init; }
+        public required LanguageModelUsage Usage { get; init; }
     }
 
     private static Beta.BetaContentBlockParam ToBlock(PromptPart part) => part switch

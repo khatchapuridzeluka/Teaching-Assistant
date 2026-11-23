@@ -12,5 +12,5 @@ public class AnthropicOptions
 
     public string GradingModel { get; set; } = "claude-opus-5-5";
 
-    public int GradingMaxTokens { get; set; } = 16000;
+    public int GradingMaxTokens { get; set; } = 64000;
 }
