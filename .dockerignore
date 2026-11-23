@@ -1,6 +1,12 @@
 *
-!deploy/
+!.editorconfig
+!Directory.Build.props
+!stylecop.json
+!deploy/Caddyfile
 !frontend/
+!src/
 frontend/node_modules/
 frontend/dist/
 frontend/tsconfig.tsbuildinfo
+**/bin/
+**/obj/

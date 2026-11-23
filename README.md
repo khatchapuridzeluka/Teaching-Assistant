@@ -102,8 +102,8 @@ frontend/                                React app (Vite)
   src/theme.ts                           colours for charts, code marks and avatars, kept in step with index.css
   src/navigation.ts                      the course and workspace sections with their icons (navigation and routes read it)
   src/pages/                             Home, Course overview, Assignments, Assignment (list + board), Instructions, Students, AI drafts, Gradebook, Common mistakes, Review queue, System, Settings, planned sections
-deploy/                                  deployment (in progress): Caddyfile and the image that builds the frontend and serves it
-                                         with Caddy, which also passes /api/* to the API with the prefix stripped (as Vite does locally)
+deploy/                                  deployment on one VM: docker-compose.yml (Caddy, API, one-off migration, Postgres),
+                                         the API image, the frontend image (built React app served by Caddy) and the Caddyfile
 ```
 
 ## Getting started
@@ -193,6 +193,32 @@ npm run dev
 ```
 
 Open `http://localhost:5173`. The Vite dev server forwards `/api/*` to the API, so no CORS setup is needed. After changing API contracts, regenerate the TypeScript types with `npm run gen:api` (the API must be running). To point the dev server at an API on another port, set `API_URL` (e.g. `API_URL=http://localhost:5299`).
+
+## Deployment
+
+The app is deployed on one Linux VM with Docker Compose; everything is in `deploy/`:
+
+| Service | Image | Role |
+|---|---|---|
+| `caddy` | `deploy/frontend.Dockerfile` | The only public service (ports 80 and 443). Gets the HTTPS certificate for the domain, serves the built React app (falling back to `index.html` for its routes) and passes `/api/*` to the API with the prefix stripped, as Vite does locally. |
+| `app` | `deploy/api.Dockerfile` | The API on port 8080, reachable only from Caddy. Runs as a non-root user; gets the VM's Docker socket to start sandboxes, and keeps submission files and the Google token on the `app-data` volume. |
+| `migrate` | same as `app` | Runs once before `app` with `--migrate`: applies pending migrations and exits. |
+| `postgres` | `pgvector/pgvector:pg18` | The database, on the `postgres-data` volume, not published. |
+
+Before the first start:
+
+1. A VM with Docker (about 2 vCPU and 4 GB of memory) and a domain pointing at its IP address. Google accepts only HTTPS redirect addresses outside localhost, and Caddy needs the domain for the certificate.
+2. On the Web application OAuth client, add `https://<domain>/api/auth/google/callback` as an authorized redirect URI.
+3. On the VM, build the sandbox images, which the API starts through the VM's Docker: `docker build -t ta-java:27 sandbox/java` and `docker build -t ta-java:21 --build-arg JDK_VERSION=21 sandbox/java`.
+4. Copy `deploy/.env.example` to `deploy/.env` and fill it in (domain, the docker group id, Postgres password, Anthropic key, Google client ID and secret, optional GitHub token).
+
+Then, from `deploy/`:
+
+```bash
+docker compose up -d --build
+```
+
+Open `https://<domain>`, go to **Settings** and connect Google. To update, pull the new code and run the same command again; to stop, `docker compose stop`. The deployed copy runs in Production: no Swagger, no automatic migrations on start (the `migrate` service does that), and the configuration comes only from `deploy/.env`.
 
 ## API
 
@@ -310,6 +336,7 @@ when Docker is not running or the image is not built.
 - **Teacher in control.** The AI produces drafts only; nothing is final until the teacher approves it.
 - **Student code is isolated.** Submissions run only inside Docker sandboxes, never on the host.
 - **Privacy.** Real student data is approved for the MVP and Demo Day. The model receives only what grading needs (instructions, code and the student's files), never names, emails or photos. Photos are stored locally and served by the app itself. For later scale: a local model or anonymization before anything reaches an LLM.
+- **The deployed copy has no login.** Anyone who opens its address sees the data and can start gradings, which cost money; the VM is meant to run only during the test stage. Only Caddy is published; the API trusts the forwarded headers Caddy sends, so it must never be reachable directly.
 - **Secrets stay local.** API keys and OAuth client secrets live in user-secrets or environment variables; OAuth tokens are stored outside the repository.
 - **Student work stays on the machine.** Fetched submissions are stored in a local folder outside the repository and outside cloud-synced folders.
 

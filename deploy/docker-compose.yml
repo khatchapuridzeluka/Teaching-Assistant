@@ -1,0 +1,81 @@
+ig# The deployed stack. On the VM, from the deploy folder: docker compose up -d --build
+# Settings come from deploy/.env (git-ignored); see deploy/.env.example.
+name: teaching-assistant
+
+x-api: &api
+  build:
+    context: ..
+    dockerfile: deploy/api.Dockerfile
+  image: teaching-assistant-api
+  environment: &api-environment
+    ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=teaching_assistant;Username=teaching_assistant;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/.env};GSS Encryption Mode=Disable
+    Anthropic__ApiKey: ${ANTHROPIC_API_KEY:?Set ANTHROPIC_API_KEY in deploy/.env}
+    Google__ClientId: ${GOOGLE_CLIENT_ID:?Set GOOGLE_CLIENT_ID in deploy/.env}
+    Google__ClientSecret: ${GOOGLE_CLIENT_SECRET:?Set GOOGLE_CLIENT_SECRET in deploy/.env}
+    Google__RedirectUri: https://${DOMAIN:?Set DOMAIN in deploy/.env}/api/auth/google/callback
+    Google__TokenStoreFolder: /data/google
+    GitHub__Token: ${GITHUB_TOKEN:-}
+    Storage__Root: /data/files
+    Serilog__MinimumLevel__Override__Microsoft.EntityFrameworkCore.Database.Command: Warning
+
+services:
+  caddy:
+    build:
+      context: ..
+      dockerfile: deploy/frontend.Dockerfile
+    image: teaching-assistant-frontend
+    environment:
+      SITE_ADDRESS: ${DOMAIN:?Set DOMAIN in deploy/.env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - app
+    restart: unless-stopped
+
+  app:
+    <<: *api
+    group_add:
+      - "${DOCKER_GID:?Set DOCKER_GID in deploy/.env}"
+    volumes:
+      - app-data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  migrate:
+    <<: *api
+    command: ["--migrate"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  postgres:
+    image: pgvector/pgvector:pg18
+    environment:
+      POSTGRES_DB: teaching_assistant
+      POSTGRES_USER: teaching_assistant
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/.env}
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U teaching_assistant -d teaching_assistant"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+volumes:
+  app-data:
+  caddy-config:
+  caddy-data:
+  postgres-data:

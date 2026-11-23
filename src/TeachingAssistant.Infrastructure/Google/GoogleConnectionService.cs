@@ -40,7 +40,7 @@ public class GoogleConnectionService : IGoogleConnectionService
             {
                 State = GoogleConnectionState.NotConnected,
                 GrantedScopes = [],
-                Message = "Not connected. Call POST /auth/google/connect.",
+                Message = "Not connected. Click Connect on the Settings page.",
             };
         }
 

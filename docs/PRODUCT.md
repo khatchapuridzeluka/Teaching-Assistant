@@ -68,13 +68,16 @@ Previously graded homework exists (Claude-drafted, teacher-corrected). Use it as
 - **The course's Python stack, translated:** the program teaches LangChain/LangGraph. Here tools become `[AgentTool]` methods, LangGraph becomes the background agent run (`AgentRun` jobs with `wait_for_jobs`, see README), and retrievers become pgvector behind a port.
 - **Not used yet:** Polly for retries and OpenTelemetry were in the original plan. Today the job queue retries failed work itself, and logging is Serilog.
 
-## Deployment (planned)
+## Deployment
 
-Not deployed yet: the app runs locally for one teacher. The plan for GCP:
+One VM with Docker Compose (`deploy/`, described in the README), switched on during the test stage:
 
-- Cloud Run for the web app and the API, Vertex AI for Claude.
-- One container: ASP.NET serves the API and the built React app.
-- Cloud Run can't run Docker inside itself, so the sandboxes would run as Cloud Run Jobs or on a small Compute Engine VM. That is why the sandbox runner has been a separate component behind `ISandboxRunner` from the start: it is the only part that becomes its own deployable.
+- **Caddy** is the only public service: HTTPS, the built React app as static files, and `/api/*` passed to the API with the prefix stripped (the same split as Vite in development).
+- **The API** runs in its own container and starts sandboxes through the VM's Docker socket, so `DockerSandboxRunner` works as it does locally. A one-off `migrate` container applies migrations before it starts.
+- **Postgres** runs in a container with a volume.
+- **No app login** for the test stage: the teacher connects their own Google account once (web redirect flow, token on a volume), and everyone who opens the address sees that data.
+- **Why not Cloud Run:** it can't run Docker inside itself (the sandboxes), and it stops or throttles containers between requests, which would break the background job worker. For one teacher, a VM is simpler and cheaper.
+- **Later:** an app login with owner and viewer roles before the app is open for longer than a test window; sandboxes on a separate small VM if the API container's access to the Docker socket becomes a concern.
 
 ## Open questions
 
