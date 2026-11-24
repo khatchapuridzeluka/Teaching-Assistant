@@ -37,6 +37,9 @@ public interface IJobService
 
     Task<JobResponse> QueueAnalyzeMistakesAsync(string courseId, string assignmentId, CancellationToken cancellationToken = default);
 
+    Task<JobResponse> QueueGenerateTestsAsync(
+        string courseId, string assignmentId, GenerateTestsRequest request, CancellationToken cancellationToken = default);
+
     Task<JobResponse> QueueAnalyzeStudentAsync(
         string courseId, string studentId, StudentAnalysisKind kind, CancellationToken cancellationToken = default);
 }

@@ -32,6 +32,54 @@ Java only, starting with class design and design patterns, then SQL/Maven/Gradle
 - No build file → the runner must find all `.java` files, respect `package` declarations, locate `main`, and ignore junk (`__MACOSX`, `.idea`, `out/`, `.class` files, nested zips).
 - Later: cached Maven/Gradle dependencies in the sandbox; Postgres container for SQL/Spring Boot; concurrency tests run multiple times + SpotBugs concurrency checks.
 
+## Automated tests (planned)
+
+First step built: **generating** a draft test set (the form, the background job and the read-only draft on the assignment's Tests view). Editing, running on the reference solution, approving, adapters and results in grading are next. The layout is mocked up in [design/tests-tab-mockup.html](design/tests-tab-mockup.html).
+
+**The idea: what is tested is the same for every student; how it reaches each student's code is per submission.** Students name classes and methods freely, so tests can't call their code directly. Instead:
+
+- **Console tasks** (a program that reads input and prints output): the sandbox runs the student's `main` with each test's input on stdin and compares stdout leniently (spacing, case and extra labels such as "Result:" don't count, as in the grading policy). Names never matter.
+- **Class-design tasks**: the tests are written once against a **neutral interface** that belongs to the test set (`interface Account { void deposit(int); void withdraw(int); int balance(); }`). For each submission, a small **adapter** maps that interface onto the student's own classes (`deposit` → `Wallet.addMoney`). Every student meets exactly the same cases and expected results; only the adapter differs.
+- **Fixed names** stay an option per assignment: a task that names its classes and methods needs no adapter and can use plain hidden JUnit tests.
+
+**Expected results never come from the model's guess.** They come from running the teacher's reference solution through the same tests in the sandbox, or the teacher writes or confirms them while reviewing.
+
+**What is made when, and what it costs:**
+
+| Part | When | Paid model calls |
+|---|---|---|
+| Test set (requirements, interface, cases) | once per assignment, when the teacher asks | one call (Opus), plus one per "Ask Claude for more" |
+| Adapter | once per submission version, the first time tests run for it; stored with the version | one small call (a cheaper model) per new version, or when the interface changes |
+| Running the tests | whenever needed: during grading, on "Run tests", after an edit | none (sandbox only) |
+
+A regrade reuses the stored adapter, and editing cases reruns all adapters for free. Tests are never written fresh inside each grading: that would cost more every time and measure students against different checks.
+
+**The generation request** (the "Create test cases" form): test style (console or class design); what to cover (normal cases, boundaries, invalid input and exceptions, large inputs, concurrency); how many (about 3 per category, a total, or as few as cover every requirement); a free-text focus; "don't test" (prefilled from the grading policy: wording of messages, names, input prompts); and an optional reference solution. The model also gets the stored instructions and the rubric layers, and answers as structured output:
+
+1. the **requirements** it found (R1, R2, …);
+2. the **neutral interface** (class-design style);
+3. the **test cases**: id, description, category, the requirement it checks, steps (an input, or a sequence of calls), and the expected result or "from the reference solution";
+4. what it **couldn't test**, and why (for example clean code, which the grader judges from the code).
+
+Simple cases are stored as structured data the teacher can read and edit without Java. Cases that need real code (threads, timing, long call sequences) come later as JUnit the model writes and the teacher sees.
+
+**Coverage**, checked by the system rather than claimed by the model: every requirement needs at least one test (gaps show in red while reviewing); later, code coverage of the reference solution with JaCoCo in the sandbox, so an unreached branch points at a missing case.
+
+**Adapter guardrails:** an adapter that can't map something says "not implemented" instead of guessing (a missing feature, not a crash); an adapter that doesn't compile is a "harness problem" and never counts as a failed test; the teacher can see each adapter next to the results.
+
+**The Tests tab** (its own tab on the assignment page, next to Submissions, Board and Instructions):
+
+1. **No tests yet:** an explanation, **Create test cases**, and an option to write cases by hand.
+2. **Create form:** the request above, with a note that it is one paid call; it runs as a background job like gradings.
+3. **Draft to review** (fully editable, not used in grading until approved): requirements with coverage, the interface in the code editor, and the cases table with inline editing, add, duplicate and delete. **Run on reference solution** fills in expected results and flags any case the reference fails (the case or the reference is wrong). **Ask Claude for more** adds cases marked *proposed*, which the teacher keeps or removes; the teacher's edits are never overwritten. **Approve** switches the tests on for the assignment.
+4. **Approved:** a students × cases matrix (passed, failed, not implemented, harness problem) with summary numbers and the hardest case; a cell opens the failure in plain words and that student's adapter. **Run tests on all submissions** reruns them. Editing an approved set makes a **new version**, like instructions, and every grading records which test version it used.
+
+**In grading:** when an assignment has an approved test set, grading compiles the submission, runs the tests and puts the results in the prompt's `<build_and_test_results>` section next to the compile and style checks. Claude still writes the review and the score; a failed test becomes evidence ("withdraw allows a negative balance: T4"). Assignments without approved tests grade as they do today.
+
+**Per-submission exploration** (later): an agent tool that tries extra inputs on one submission when the teacher suspects something. Its findings are evidence for the grader, never pass or fail, because the model picks both the inputs and what counts as correct.
+
+**Build order:** console tests first (no adapter); then the interface and adapters for class-design tasks; then JaCoCo coverage, code-based cases and concurrency.
+
 ## Rubric and grading policy
 
 Layered, all in the teacher's files:
@@ -81,5 +129,4 @@ One VM with Docker Compose (`deploy/`, described in the README), switched on dur
 
 ## Open questions
 
-- **Automated tests vs. free naming:** task statements don't always fix class/method names. Options: fix names in future tasks (enables hidden JUnit tests), test only console input → output, or rely on LLM review. Decide per assignment type.
 - **Base rubric:** write it together with the teacher — categories, point weights, policy rules.

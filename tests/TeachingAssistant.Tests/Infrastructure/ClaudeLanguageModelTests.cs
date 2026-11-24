@@ -26,8 +26,8 @@ public class ClaudeLanguageModelTests
 
         Assert.Equal("{\"score\":7.5}", reply.Text);
         Assert.Equal("claude-opus-5-5", reply.Model);
-        Assert.Equal(120, reply.Usage.InputTokens);
-        Assert.Equal(42, reply.Usage.OutputTokens);
+        Assert.Equal(120, reply.Usage!.InputTokens);
+        Assert.Equal(42, reply.Usage!.OutputTokens);
 
         using var request = JsonDocument.Parse(api.RequestBody!);
         Assert.True(request.RootElement.GetProperty("stream").GetBoolean());

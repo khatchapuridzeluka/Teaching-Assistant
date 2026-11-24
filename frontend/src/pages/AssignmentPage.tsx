@@ -25,6 +25,7 @@ import {
   useSubmissions,
 } from "../api/hooks";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { AssignmentTests } from "../components/AssignmentTests";
 import { InstructionsBar } from "../components/InstructionsCard";
 import { useTrackJob } from "../components/JobToasts";
 import { PreviewPanel } from "../components/PreviewPanel";
@@ -33,7 +34,7 @@ import { hasWork, stateChip, SubmissionDetail } from "../components/SubmissionDe
 import { Avatar, Button, Card, Chip, CountTabs, ErrorPanel, Menu, Modal, Notice, PageHeader, SearchField, Segmented, SkeletonList, Spinner, Stat, StatStrip } from "../components/ui";
 import { formatDate, formatDay, initials } from "../format";
 import { severityColor } from "../theme";
-import { CircleCheck, CircleDashed, CloudDownload, Ellipsis, ExternalLink, Files, LayoutList, PackageOpen, Send, Sparkles, SquareKanban, Undo2, UserX } from "lucide-react";
+import { CircleCheck, CircleDashed, CloudDownload, Ellipsis, ExternalLink, Files, FlaskConical, LayoutList, PackageOpen, Send, Sparkles, SquareKanban, Undo2, UserX } from "lucide-react";
 
 export function AssignmentPage() {
   const { courseId = "", assignmentId = "" } = useParams();
@@ -76,12 +77,13 @@ export function AssignmentPage() {
   const [pickedVersions, setPickedVersions] = useState<Record<string, string>>({});
   const [searchParams, setSearchParams] = useSearchParams();
   const [showDetail, setShowDetail] = useState(false);
-  const view = searchParams.get("view") === "board" ? "board" : "list";
+  const requested = searchParams.get("view");
+  const view = requested === "board" || requested === "tests" ? requested : "list";
 
-  function setView(next: "list" | "board") {
+  function setView(next: "list" | "board" | "tests") {
     setSearchParams((params) => {
-      if (next === "board") {
-        params.set("view", "board");
+      if (next !== "list") {
+        params.set("view", next);
       } else {
         params.delete("view");
       }
@@ -174,6 +176,14 @@ export function AssignmentPage() {
                   label: (
                     <span className="flex items-center gap-1.5">
                       <SquareKanban className="h-3.5 w-3.5" /> Board
+                    </span>
+                  ),
+                },
+                {
+                  value: "tests",
+                  label: (
+                    <span className="flex items-center gap-1.5">
+                      <FlaskConical className="h-3.5 w-3.5" /> Tests
                     </span>
                   ),
                 },
@@ -298,8 +308,13 @@ export function AssignmentPage() {
       {extract.isError && <ErrorPanel error={extract.error} />}
       {extract.data && <ExtractBanner summary={extract.data} onDismiss={() => extract.reset()} />}
 
-      {submissions.isLoading && <SkeletonList rows={8} avatar />}
+      {submissions.isLoading && view !== "tests" && <SkeletonList rows={8} avatar />}
       {submissions.isError && <ErrorPanel error={submissions.error} />}
+      {view === "tests" && (
+        <div className="min-h-0 lg:flex-1 lg:overflow-y-auto">
+          <AssignmentTests courseId={courseId} assignmentId={assignmentId} assignmentTitle={assignment?.title ?? "Assignment"} />
+        </div>
+      )}
       {submissions.data && view === "board" && (
         <SubmissionBoard
           submissions={all}

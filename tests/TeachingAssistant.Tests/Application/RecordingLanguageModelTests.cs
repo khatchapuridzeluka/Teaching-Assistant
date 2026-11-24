@@ -137,6 +137,10 @@ public class RecordingLanguageModelTests
             string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default) =>
             Reply("grading-model");
 
+        public Task<LanguageModelReply> DesignTestsAsync(
+            string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default) =>
+            Reply("grading-model");
+
         public string? RequestedGradingModel { get; private set; }
 
         public Task<LanguageModelReply> GradeAsync(

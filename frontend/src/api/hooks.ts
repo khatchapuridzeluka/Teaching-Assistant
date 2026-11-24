@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, type DiscardReason, type JobStatus, type PolicyRuleRequest, type JobType, type ModelCallPurpose, type SaveReportRequest, type StudentMistakeFilter,
+import { api, type DiscardReason, type GenerateTests, type JobStatus, type PolicyRuleRequest, type JobType, type ModelCallPurpose, type SaveReportRequest, type StudentMistakeFilter,
   type StudentStrengthFilter, type StudentAnalysisKind, unwrap } from "./client";
 import { forgetMissingPhotos } from "../components/ui";
 
@@ -408,6 +408,32 @@ export const useAnalyzeMistakes = (courseId: string, assignmentId: string) => {
       ),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["courses", courseId, "assignments", assignmentId, "jobs"] });
+    },
+  });
+};
+
+export const useTestSet = (courseId: string, assignmentId: string) =>
+  useQuery({
+    queryKey: ["courses", courseId, "assignments", assignmentId, "tests"],
+    queryFn: async () =>
+      (await unwrap(api.GET("/courses/{courseId}/assignments/{assignmentId}/tests", { params: { path: { courseId, assignmentId } } }))) ??
+      null,
+    enabled: assignmentId !== "",
+  });
+
+export const useGenerateTests = (courseId: string, assignmentId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: GenerateTests) =>
+      unwrap(
+        api.POST("/courses/{courseId}/assignments/{assignmentId}/tests/generate", {
+          params: { path: { courseId, assignmentId } },
+          body,
+        }),
+      ),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["courses", courseId, "assignments", assignmentId, "jobs"] });
+      void queryClient.invalidateQueries({ queryKey: ["jobs"] });
     },
   });
 };

@@ -101,6 +101,13 @@ public class ClaudeLanguageModel : ILanguageModel
             cancellationToken);
     }
 
+    public Task<LanguageModelReply> DesignTestsAsync(
+        string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default)
+    {
+        return StructuredAsync(systemPrompt, parts, outputSchema, Beta.Effort.Medium, "The model declined to design tests for this assignment.",
+            cancellationToken);
+    }
+
     private async Task<LanguageModelReply> StructuredAsync(
         string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, Beta.Effort effort, string refusal,
         CancellationToken cancellationToken, string? model = null)

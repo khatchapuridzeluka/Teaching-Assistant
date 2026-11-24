@@ -20,6 +20,7 @@ const purposeLabels: Record<string, string> = {
   StudentAnalysis: "Student analysis",
   Evaluation: "Evaluation run",
   Try: "Try with model",
+  TestDesign: "Test cases",
   Chat: "Ask agent",
   HealthCheck: "Model check",
 };

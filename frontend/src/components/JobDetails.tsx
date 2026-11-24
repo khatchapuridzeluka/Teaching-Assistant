@@ -52,6 +52,11 @@ export const jobTypeInfo: Record<JobType, { label: string; description: string }
     description:
       "An analysis of one assignment's mistakes. It sends the instructions, the draft scores (as S1, S2, …) and every mistake (no names) to the model in one call, which writes the class overview and groups the mistakes; the result is shown on the Common mistakes page.",
   },
+  GenerateTests: {
+    label: "Test cases",
+    description:
+      "Designs test cases for one assignment in one AI call. It sends the stored instructions, your settings from the Create test cases form, your grading policy and the optional reference solution (never student work or names); the result is a new draft test set on the assignment's Tests view.",
+  },
   FetchAssignment: {
     label: "Fetch",
     description: "Downloads an assignment's new and changed submissions from Google Classroom (planned on the queue).",
@@ -146,6 +151,12 @@ const iconPaths: Record<JobType, ReactNode> = {
       <path d="M10 20V4" />
       <path d="M16 20v-7" />
       <path d="M22 20H2" />
+    </>
+  ),
+  GenerateTests: (
+    <>
+      <path d="M9 11l3 3L22 4" />
+      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
     </>
   ),
   FetchAssignment: (

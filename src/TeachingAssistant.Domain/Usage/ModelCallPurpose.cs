@@ -17,4 +17,6 @@ public enum ModelCallPurpose
     Evaluation,
 
     Try,
+
+    TestDesign,
 }

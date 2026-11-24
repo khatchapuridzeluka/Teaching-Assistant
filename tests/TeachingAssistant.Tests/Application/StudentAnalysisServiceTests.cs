@@ -393,6 +393,10 @@ public class StudentAnalysisServiceTests
             return Task.FromResult(new LanguageModelReply { Model = "model", Text = Reply });
         }
 
+        public Task<LanguageModelReply> DesignTestsAsync(
+            string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public Task<LanguageModelReply> CompleteAsync(string prompt, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
         public Task<LanguageModelReply> ChatAsync(string systemPrompt, IReadOnlyList<ChatMessage> messages, CancellationToken cancellationToken = default) =>

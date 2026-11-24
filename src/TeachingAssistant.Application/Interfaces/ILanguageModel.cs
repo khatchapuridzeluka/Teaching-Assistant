@@ -25,4 +25,7 @@ public interface ILanguageModel
 
     Task<LanguageModelReply> AnalyzeAsync(
         string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default);
+
+    Task<LanguageModelReply> DesignTestsAsync(
+        string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default);
 }

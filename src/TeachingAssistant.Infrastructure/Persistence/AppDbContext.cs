@@ -4,6 +4,7 @@ using TeachingAssistant.Domain.Grading;
 using TeachingAssistant.Domain.Ingestion;
 using TeachingAssistant.Domain.Jobs;
 using TeachingAssistant.Domain.Profiling;
+using TeachingAssistant.Domain.Testing;
 using TeachingAssistant.Domain.Usage;
 
 namespace TeachingAssistant.Infrastructure.Persistence;
@@ -31,6 +32,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<StudentAnalysis> StudentAnalyses => Set<StudentAnalysis>();
     public DbSet<ModelCall> ModelCalls => Set<ModelCall>();
     public DbSet<MistakeAnalysis> MistakeAnalyses => Set<MistakeAnalysis>();
+
+    public DbSet<TestSet> TestSets => Set<TestSet>();
     public DbSet<GradingPrinciple> GradingPrinciples => Set<GradingPrinciple>();
     public DbSet<CourseGuidance> CourseGuidance => Set<CourseGuidance>();
     public DbSet<PolicyRule> PolicyRules => Set<PolicyRule>();

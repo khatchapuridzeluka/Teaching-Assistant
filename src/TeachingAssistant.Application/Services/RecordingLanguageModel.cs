@@ -66,6 +66,13 @@ public class RecordingLanguageModel : ILanguageModel
             () => _inner.AnalyzeAsync(systemPrompt, parts, outputSchema, cancellationToken));
     }
 
+    public Task<LanguageModelReply> DesignTestsAsync(
+        string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default)
+    {
+        return RecordAsync(ModelCallPurpose.TestDesign, _inner.GradingModelId,
+            () => _inner.DesignTestsAsync(systemPrompt, parts, outputSchema, cancellationToken));
+    }
+
     public string GradingModelId => _inner.GradingModelId;
 
     private async Task<LanguageModelReply> RecordAsync(ModelCallPurpose purpose, string requestedModel, Func<Task<LanguageModelReply>> call)

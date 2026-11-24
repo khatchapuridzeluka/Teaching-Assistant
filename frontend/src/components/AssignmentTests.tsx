@@ -1,0 +1,418 @@
+import { type ChangeEvent, useEffect, useState } from "react";
+import type { GenerateTests, TestCase, TestCategory, TestRequirement, TestSet } from "../api/client";
+import { useAssignmentJobs, useGenerateTests, useTestSet } from "../api/hooks";
+import { formatDate } from "../format";
+import { FileCode2, FlaskConical, ListChecks, RefreshCw, Sparkles, X } from "lucide-react";
+import { useTrackJob } from "./JobToasts";
+import { Button, Card, CardHeader, Chip, type ChipTone, EmptyState, ErrorPanel, Modal, Notice, Segmented, SkeletonCards, Spinner } from "./ui";
+
+const categoryInfo: Record<TestCategory, { label: string; formLabel: string; tone: ChipTone }> = {
+  Normal: { label: "Normal", formLabel: "Normal cases", tone: "info" },
+  Boundary: { label: "Boundary", formLabel: "Boundaries (0, empty, max)", tone: "warn" },
+  Invalid: { label: "Invalid", formLabel: "Invalid input and exceptions", tone: "danger" },
+  LargeInput: { label: "Large input", formLabel: "Large inputs", tone: "muted" },
+  Concurrency: { label: "Concurrency", formLabel: "Concurrency", tone: "mark" },
+};
+
+const amountOptions: { value: GenerateTests["amount"]; label: string }[] = [
+  { value: "AboutThreePerCategory", label: "About 3 per category" },
+  { value: "AboutTenInTotal", label: "About 10 in total" },
+  { value: "FewestThatCoverEveryRequirement", label: "As few as cover every requirement" },
+];
+
+const defaultRequest: GenerateTests = {
+  style: "ClassDesign",
+  categories: ["Normal", "Boundary", "Invalid"],
+  amount: "AboutThreePerCategory",
+  focus: "",
+  dontTest: "Exact wording of printed messages, class and method names, input prompts.",
+  referenceFiles: [],
+};
+
+export function AssignmentTests({ courseId, assignmentId, assignmentTitle }: { courseId: string; assignmentId: string; assignmentTitle: string }) {
+  const testSet = useTestSet(courseId, assignmentId);
+  const jobs = useAssignmentJobs(courseId, assignmentId);
+  const generate = useGenerateTests(courseId, assignmentId);
+  const trackJob = useTrackJob();
+  const [formOpen, setFormOpen] = useState(false);
+
+  const latestJob = (jobs.data ?? []).find((job) => job.type === "GenerateTests");
+  const running = latestJob && (latestJob.status === "Queued" || latestJob.status === "Running") ? latestJob : undefined;
+  const current = testSet.data ?? null;
+  const failed =
+    latestJob?.status === "Failed" && (!current || new Date(current.createdAt).getTime() < new Date(latestJob.createdAt).getTime())
+      ? latestJob
+      : undefined;
+  const refetchTestSet = testSet.refetch;
+
+  useEffect(() => {
+    if (latestJob?.status === "Succeeded") {
+      void refetchTestSet();
+    }
+  }, [latestJob?.id, latestJob?.status, refetchTestSet]);
+
+  function submit(request: GenerateTests) {
+    generate.mutate(request, {
+      onSuccess: (job) => {
+        setFormOpen(false);
+        trackJob(job, { label: `${assignmentTitle} · test cases`, to: `/courses/${courseId}/assignments/${assignmentId}?view=tests` });
+      },
+    });
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      {running && (
+        <Notice>
+          <Spinner label="Designing test cases… Claude is reading the instructions and your settings; this usually takes under a minute." />
+        </Notice>
+      )}
+      {failed && (
+        <Notice tone="danger" title="Generating test cases failed.">
+          {failed.error ?? "Unknown error."}
+        </Notice>
+      )}
+
+      {testSet.isLoading && <SkeletonCards count={2} />}
+      {testSet.isError && <ErrorPanel error={testSet.error} />}
+
+      {testSet.isSuccess && !current && !running && (
+        <Card>
+          <EmptyState icon={<FlaskConical />}>
+            <div className="text-[15px] font-bold text-ink">Check every submission against the same test cases</div>
+            <p className="mt-1">
+              Claude proposes test cases from the stored instructions and your settings; you review them before they're used. Later, approved
+              tests run in the sandbox for every grading and their results go to the grader as evidence.
+            </p>
+            <Button variant="primary" className="mt-4" icon={<Sparkles />} onClick={() => setFormOpen(true)}>
+              Create test cases
+            </Button>
+          </EmptyState>
+        </Card>
+      )}
+
+      {current && <TestSetDraft testSet={current} busy={!!running} onRegenerate={() => setFormOpen(true)} />}
+
+      {formOpen && (
+        <GenerateForm
+          initial={current?.request ?? defaultRequest}
+          regenerating={!!current}
+          pending={generate.isPending}
+          error={generate.error}
+          onSubmit={submit}
+          onClose={() => {
+            setFormOpen(false);
+            generate.reset();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function TestSetDraft({ testSet, busy, onRegenerate }: { testSet: TestSet; busy: boolean; onRegenerate: () => void }) {
+  const testable = testSet.requirements.filter((r) => r.testable);
+  const covered = testable.filter((r) => (r.testCount ?? 0) > 0).length;
+  const hasReference = testSet.request.referenceFiles.length > 0;
+
+  return (
+    <>
+      <Notice
+        tone="warn"
+        title={`Draft, version ${testSet.version}.`}
+        action={
+          <Button small icon={<RefreshCw />} onClick={onRegenerate} disabled={busy}>
+            Generate again
+          </Button>
+        }
+      >
+        Not used in grading. Generated {formatDate(testSet.createdAt)} by {testSet.model} as{" "}
+        {testSet.style === "Console" ? "console tests" : "class-design tests"}
+        {hasReference ? `, with your reference solution (${testSet.request.referenceFiles.map((f) => f.name).join(", ")})` : ""}. Editing,
+        running on the reference solution and approving come next.
+      </Notice>
+
+      <div className="grid grid-cols-1 gap-3 xl:grid-cols-[340px_minmax(0,1fr)]">
+        <div className="flex flex-col gap-3">
+          <Card>
+            <CardHeader
+              icon={<ListChecks />}
+              title="Requirements"
+              subtitle={`${covered} of ${testable.length} testable ${testable.length === 1 ? "requirement has" : "requirements have"} a test`}
+            />
+            <ul className="divide-y divide-paper-dark">
+              {testSet.requirements.map((requirement) => (
+                <RequirementRow key={requirement.id} requirement={requirement} />
+              ))}
+            </ul>
+          </Card>
+
+          {testSet.interface && (
+            <Card>
+              <CardHeader icon={<FileCode2 />} title="Interface" subtitle="The tests call only these methods" />
+              <pre className="overflow-x-auto px-[18px] py-3 font-mono text-[11.5px] leading-relaxed text-ink-soft">{testSet.interface}</pre>
+              <div className="border-t border-paper-dark px-[18px] py-2.5 text-xs text-ink-muted">
+                Each student gets a small adapter that maps these methods onto their own classes, so their class and method names don't matter.
+              </div>
+            </Card>
+          )}
+        </div>
+
+        <Card className="min-w-0">
+          <CardHeader icon={<FlaskConical />} title="Test cases" subtitle={`${testSet.cases.length} ${testSet.cases.length === 1 ? "case" : "cases"}`} />
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-left">
+              <thead>
+                <tr className="border-b border-line bg-paper">
+                  <th className="eyebrow px-3 py-2">#</th>
+                  <th className="eyebrow px-3 py-2">Case</th>
+                  <th className="eyebrow px-3 py-2">{testSet.style === "Console" ? "Input" : "Steps"}</th>
+                  <th className="eyebrow px-3 py-2">Expected</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-paper-dark">
+                {testSet.cases.map((testCase) => (
+                  <CaseRow key={testCase.id} testCase={testCase} hasReference={hasReference} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      </div>
+    </>
+  );
+}
+
+function RequirementRow({ requirement }: { requirement: TestRequirement }) {
+  const count = requirement.testCount ?? 0;
+  const missing = requirement.testable && count === 0;
+  return (
+    <li className={`flex items-start justify-between gap-2 px-[18px] py-2 ${missing ? "bg-danger-tint/40" : ""}`}>
+      <div className="min-w-0">
+        <span className="mr-1.5 font-semibold text-ink-muted">{requirement.id}</span>
+        {requirement.text}
+        {!requirement.testable && requirement.reason && <div className="mt-0.5 text-xs text-ink-muted">{requirement.reason}</div>}
+      </div>
+      {!requirement.testable ? (
+        <Chip tone="muted">Grader judges</Chip>
+      ) : missing ? (
+        <Chip tone="danger">No test</Chip>
+      ) : (
+        <Chip tone="success">
+          {count} {count === 1 ? "test" : "tests"}
+        </Chip>
+      )}
+    </li>
+  );
+}
+
+function CaseRow({ testCase, hasReference }: { testCase: TestCase; hasReference: boolean }) {
+  const category = categoryInfo[testCase.category];
+  return (
+    <tr className="align-top">
+      <td className="px-3 py-2.5 text-ink-muted">{testCase.id}</td>
+      <td className="px-3 py-2.5">
+        <div className="font-semibold">{testCase.title}</div>
+        <div className="mt-1 flex flex-wrap gap-1">
+          <Chip tone={category.tone}>{category.label}</Chip>
+          {testCase.requirementIds.map((id) => (
+            <Chip key={id} tone="muted">
+              {id}
+            </Chip>
+          ))}
+        </div>
+      </td>
+      <td className="px-3 py-2.5">
+        <pre className="whitespace-pre-wrap font-mono text-[11.5px] leading-relaxed text-ink-soft">{testCase.steps}</pre>
+      </td>
+      <td className="px-3 py-2.5">
+        {testCase.expected ? (
+          <pre className="whitespace-pre-wrap font-mono text-[11.5px] leading-relaxed text-ink-soft">{testCase.expected}</pre>
+        ) : hasReference ? (
+          <span className="text-xs text-ink-muted">From the reference solution</span>
+        ) : (
+          <Chip tone="warn">Needs an expected result</Chip>
+        )}
+      </td>
+    </tr>
+  );
+}
+
+function GenerateForm({
+  initial,
+  regenerating,
+  pending,
+  error,
+  onSubmit,
+  onClose,
+}: {
+  initial: GenerateTests;
+  regenerating: boolean;
+  pending: boolean;
+  error: unknown;
+  onSubmit: (request: GenerateTests) => void;
+  onClose: () => void;
+}) {
+  const [request, setRequest] = useState<GenerateTests>(initial);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  function update(change: Partial<GenerateTests>) {
+    setRequest((current) => ({ ...current, ...change }));
+    setProblem(null);
+  }
+
+  function toggle(category: TestCategory) {
+    const has = request.categories.includes(category);
+    update({ categories: has ? request.categories.filter((c) => c !== category) : [...request.categories, category] });
+  }
+
+  async function addFiles(event: ChangeEvent<HTMLInputElement>) {
+    const picked = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    const notJava = picked.find((file) => !file.name.toLowerCase().endsWith(".java"));
+    if (notJava) {
+      setProblem(`"${notJava.name}" isn't a .java file. Add only the reference solution's .java files.`);
+      return;
+    }
+
+    const read = await Promise.all(picked.map(async (file) => ({ name: file.name, content: await file.text() })));
+    const kept = request.referenceFiles.filter((existing) => !read.some((file) => file.name === existing.name));
+    update({ referenceFiles: [...kept, ...read] });
+  }
+
+  function submit() {
+    if (request.categories.length === 0) {
+      setProblem("Choose at least one kind of test case to cover.");
+      return;
+    }
+
+    onSubmit({ ...request, focus: request.focus?.trim() || null, dontTest: request.dontTest?.trim() || null });
+  }
+
+  return (
+    <Modal
+      title={regenerating ? "Generate test cases again" : "Create test cases"}
+      subtitle={regenerating ? "The result is a new draft version; the current one stays in the history." : undefined}
+      onClose={onClose}
+      busy={pending}
+      footer={
+        <div className="flex w-full items-center justify-between gap-3">
+          <span className="text-xs text-ink-muted">One paid AI call. It runs in the background; you can leave this page.</span>
+          <div className="flex gap-2">
+            <Button onClick={onClose} disabled={pending}>
+              Cancel
+            </Button>
+            <Button variant="primary" icon={<Sparkles />} onClick={submit} disabled={pending}>
+              {pending ? "Queuing…" : "Generate test cases"}
+            </Button>
+          </div>
+        </div>
+      }
+    >
+      <div className="flex flex-col gap-4 px-5 py-4">
+        <section>
+          <div className="mb-1.5 font-semibold">Test style</div>
+          <Segmented
+            label="Test style"
+            value={request.style}
+            onChange={(style) => update({ style })}
+            options={[
+              { value: "Console", label: "Console: input → output" },
+              { value: "ClassDesign", label: "Class design: neutral interface" },
+            ]}
+          />
+          <p className="mt-1 text-xs text-ink-muted">
+            {request.style === "Console"
+              ? "The program's main is run with each case's input and its printed results are compared, so names never matter."
+              : "Tests call a neutral interface; each student's classes are connected to it by a small adapter, so their own class and method names don't matter."}
+          </p>
+        </section>
+
+        <section>
+          <div className="mb-1.5 font-semibold">What to cover</div>
+          <div className="flex flex-wrap gap-2">
+            {(Object.keys(categoryInfo) as TestCategory[]).map((category) => {
+              const on = request.categories.includes(category);
+              return (
+                <label
+                  key={category}
+                  className={`flex cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[13px] ${
+                    on ? "border-accent bg-accent-tint font-semibold text-accent-strong" : "border-line text-ink-soft"
+                  }`}
+                >
+                  <input type="checkbox" checked={on} onChange={() => toggle(category)} className="accent-accent" />
+                  {categoryInfo[category].formLabel}
+                </label>
+              );
+            })}
+          </div>
+        </section>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <section>
+            <div className="mb-1.5 font-semibold">How many</div>
+            <select
+              value={request.amount}
+              onChange={(e) => update({ amount: e.target.value as GenerateTests["amount"] })}
+              className="h-[34px] w-full rounded-[7px] border border-line bg-white px-2.5 text-[13px]"
+            >
+              {amountOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </section>
+          <section>
+            <div className="mb-1.5 font-semibold">
+              Reference solution <span className="font-normal text-ink-faint">optional</span>
+            </div>
+            <label className="flex h-[34px] cursor-pointer items-center justify-center rounded-[7px] border border-dashed border-ink-faint px-2.5 text-[13px] text-ink-muted hover:bg-paper">
+              Add .java files
+              <input type="file" accept=".java" multiple onChange={addFiles} className="hidden" />
+            </label>
+          </section>
+        </div>
+
+        {request.referenceFiles.length > 0 && (
+          <ul className="-mt-2 flex flex-wrap gap-1.5">
+            {request.referenceFiles.map((file) => (
+              <li key={file.name} className="flex items-center gap-1 rounded-md border border-line bg-paper px-2 py-0.5 font-mono text-xs">
+                {file.name}
+                <button
+                  aria-label={`Remove ${file.name}`}
+                  onClick={() => update({ referenceFiles: request.referenceFiles.filter((f) => f.name !== file.name) })}
+                  className="rounded p-0.5 text-ink-faint hover:bg-paper-dark hover:text-ink"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <section>
+          <div className="mb-1.5 font-semibold">Focus</div>
+          <textarea
+            value={request.focus ?? ""}
+            onChange={(e) => update({ focus: e.target.value })}
+            placeholder="Withdraw must never make the balance negative."
+            className="h-[64px] w-full rounded-[7px] border border-line px-2.5 py-2 text-[13px]"
+          />
+        </section>
+
+        <section>
+          <div className="mb-1.5 font-semibold">Don't test</div>
+          <textarea
+            value={request.dontTest ?? ""}
+            onChange={(e) => update({ dontTest: e.target.value })}
+            className="h-[52px] w-full rounded-[7px] border border-line px-2.5 py-2 text-[13px]"
+          />
+        </section>
+
+        {problem && <div className="text-[13px] text-danger-ink">{problem}</div>}
+        {error != null && <ErrorPanel error={error} />}
+      </div>
+    </Modal>
+  );
+}

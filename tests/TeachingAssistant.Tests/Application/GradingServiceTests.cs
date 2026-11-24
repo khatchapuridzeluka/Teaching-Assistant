@@ -738,6 +738,10 @@ public class GradingServiceTests
             string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
+        public Task<LanguageModelReply> DesignTestsAsync(
+            string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public Task<LanguageModelReply> GradeAsync(
             string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, string? model, CancellationToken cancellationToken = default)
         {

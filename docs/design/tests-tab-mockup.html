@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tests tab mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: { sans: ["Fira Sans", "Segoe UI", "system-ui", "sans-serif"], mono: ["JetBrains Mono", "Consolas", "monospace"] },
+        colors: {
+          ink: { DEFAULT: "#16203a", soft: "#2b3757", muted: "#5d6985", faint: "#8f99b1" },
+          paper: { DEFAULT: "#f4f5f9", dark: "#e9ecf3" },
+          line: "#dcdfea",
+          accent: { DEFAULT: "#1857d6", strong: "#1146b4", tint: "#e7eeff" },
+          navy: { DEFAULT: "#0f1a36", soft: "#1c2a4f", line: "#2a3960" },
+          danger: { DEFAULT: "#cf3a2b", tint: "#ffe7e2", ink: "#9c2318" },
+          success: { DEFAULT: "#1c8a4e", tint: "#dcf5e6", ink: "#0f5d33" },
+          warn: { DEFAULT: "#d98200", tint: "#ffefcc", ink: "#7a4a00" },
+        },
+        boxShadow: { card: "0 1px 2px rgb(22 32 58 / 0.05)", pop: "0 24px 60px -16px rgb(15 26 54 / 0.38), 0 4px 12px rgb(15 26 54 / 0.1)" },
+      },
+    },
+  };
+</script>
+<style>
+  body { font-size: 13px; }
+  .chip { display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; padding: 1px 8px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .btn { white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; border-radius: 8px; padding: 6px 12px; font-weight: 600; font-size: 12.5px; border: 1px solid #dcdfea; background: #fff; color: #16203a; }
+  .btn:hover { background: #f4f5f9; }
+  .btn-primary { background: #1857d6; border-color: #1857d6; color: #fff; }
+  .btn-primary:hover { background: #1146b4; }
+  .cell { width: 26px; height: 22px; border-radius: 5px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; cursor: pointer; }
+  .state { display: none; }
+  .state.on { display: block; }
+  .seg button { padding: 4px 10px; border-radius: 6px; font-weight: 600; color: #5d6985; }
+  .seg button.on { background: #fff; color: #16203a; box-shadow: 0 1px 2px rgb(22 32 58 / 0.12); }
+  td, th { vertical-align: top; }
+</style>
+</head>
+<body class="bg-paper font-sans text-ink">
+
+<div class="sticky top-0 z-20 flex items-center gap-3 border-b border-navy-line bg-navy px-5 py-2 text-[12px] text-white/80">
+  <span class="font-semibold text-white">Mockup only</span>
+  <span>State:</span>
+  <div class="seg flex gap-1 rounded-lg bg-white/10 p-1" id="switcher">
+    <button data-s="empty" class="on">1. No tests yet</button>
+    <button data-s="form">2. Create form</button>
+    <button data-s="draft">3. Draft to review</button>
+    <button data-s="approved">4. Approved, results</button>
+  </div>
+</div>
+
+<main class="mx-auto max-w-[1180px] px-6 pb-16 pt-5">
+  <div class="text-[12px] text-ink-muted">Java II N2 <span class="mx-1 text-ink-faint">/</span> Assignments</div>
+  <div class="mt-1 flex items-end justify-between">
+    <div>
+      <h1 class="text-[22px] font-bold tracking-tight">Homework 4: Bank account</h1>
+      <div class="mt-0.5 text-ink-muted">Due Nov 20 · 28 students · 24 turned in</div>
+    </div>
+  </div>
+
+  <div class="mt-4 flex gap-5 border-b border-line text-[13px] font-semibold text-ink-muted">
+    <span class="pb-2">Submissions</span>
+    <span class="pb-2">Board</span>
+    <span class="pb-2">Instructions</span>
+    <span class="-mb-px border-b-2 border-accent pb-2 text-ink">Tests</span>
+  </div>
+
+  <!-- 1. EMPTY -->
+  <section class="state on mt-6" data-state="empty">
+    <div class="rounded-xl border border-line bg-white p-10 text-center shadow-card">
+      <div class="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-accent-tint text-accent text-xl">✓</div>
+      <h2 class="mt-3 text-[16px] font-bold">Check every submission against the same test cases</h2>
+      <p class="mx-auto mt-1 max-w-[520px] text-ink-muted">Claude proposes test cases from the instructions; you review and approve them. Approved tests run in the sandbox for every grading, and their results go to the grader as evidence.</p>
+      <div class="mt-5 flex justify-center gap-2">
+        <button class="btn btn-primary" onclick="show('form')">Create test cases</button>
+        <button class="btn">Write them yourself</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. FORM -->
+  <section class="state mt-6" data-state="form">
+    <div class="flex min-h-[640px] items-start justify-center rounded-xl bg-navy/40 p-8">
+      <div class="w-[620px] rounded-xl bg-white shadow-pop">
+        <div class="flex items-center justify-between border-b border-line px-5 py-3.5">
+          <div class="text-[15px] font-bold">Create test cases</div>
+          <span class="text-ink-faint">✕</span>
+        </div>
+        <div class="space-y-4 px-5 py-4">
+          <div>
+            <div class="mb-1.5 font-semibold">Test style</div>
+            <div class="seg inline-flex gap-1 rounded-lg bg-paper-dark p-1">
+              <button>Console: input → output</button>
+              <button class="on">Class design: neutral interface</button>
+            </div>
+            <div class="mt-1 text-[12px] text-ink-muted">Each student's classes are connected to the shared tests by a small adapter, so their own class and method names don't matter.</div>
+          </div>
+          <div>
+            <div class="mb-1.5 font-semibold">What to cover</div>
+            <div class="flex flex-wrap gap-2">
+              <label class="flex items-center gap-1.5 rounded-lg border border-accent bg-accent-tint px-2.5 py-1.5 font-semibold text-accent-strong"><input type="checkbox" checked /> Normal cases</label>
+              <label class="flex items-center gap-1.5 rounded-lg border border-accent bg-accent-tint px-2.5 py-1.5 font-semibold text-accent-strong"><input type="checkbox" checked /> Boundaries (0, empty, max)</label>
+              <label class="flex items-center gap-1.5 rounded-lg border border-accent bg-accent-tint px-2.5 py-1.5 font-semibold text-accent-strong"><input type="checkbox" checked /> Invalid input and exceptions</label>
+              <label class="flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5"><input type="checkbox" /> Large inputs</label>
+              <label class="flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5"><input type="checkbox" /> Concurrency</label>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <div class="mb-1.5 font-semibold">How many</div>
+              <select class="w-full rounded-lg border border-line px-2.5 py-2"><option>About 3 per category</option><option>About 10 in total</option><option>As few as cover every requirement</option></select>
+            </div>
+            <div>
+              <div class="mb-1.5 font-semibold">Reference solution <span class="font-normal text-ink-faint">optional</span></div>
+              <div class="flex items-center justify-between rounded-lg border border-dashed border-line px-2.5 py-1.5">
+                <span class="font-mono text-[12px]">BankAccount.java</span><span class="text-[12px] text-ink-muted">Replace</span>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="mb-1.5 font-semibold">Focus</div>
+            <textarea class="h-[62px] w-full rounded-lg border border-line px-2.5 py-2">Withdraw must never make the balance negative. Transfers between two accounts must keep the total the same.</textarea>
+          </div>
+          <div>
+            <div class="mb-1.5 font-semibold">Don't test <span class="font-normal text-ink-faint">from your grading policy</span></div>
+            <textarea class="h-[46px] w-full rounded-lg border border-line px-2.5 py-2 text-ink-muted">Exact wording of printed messages, method and class names, input prompts.</textarea>
+          </div>
+        </div>
+        <div class="flex items-center justify-between rounded-b-xl border-t border-line bg-paper px-5 py-3">
+          <span class="text-[12px] text-ink-muted">One paid call to Claude Opus 5.5. Runs in the background.</span>
+          <div class="flex gap-2"><button class="btn">Cancel</button><button class="btn btn-primary" onclick="show('draft')">Generate test cases</button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. DRAFT -->
+  <section class="state mt-5" data-state="draft">
+    <div class="flex items-center justify-between rounded-[10px] border border-warn/40 bg-warn-tint/60 px-3.5 py-2.5">
+      <div><b>Draft, version 1.</b> <span class="text-ink-soft">Not used in grading until you approve it. Expected results marked "reference" come from running your reference solution.</span></div>
+      <div class="flex gap-2">
+        <button class="btn">Ask Claude for more</button>
+        <button class="btn">Run on reference solution</button>
+        <button class="btn btn-primary" onclick="show('approved')">Approve</button>
+      </div>
+    </div>
+
+    <div class="mt-4 grid grid-cols-[340px_minmax(0,1fr)] gap-4">
+      <div class="space-y-4">
+        <div class="rounded-xl border border-line bg-white shadow-card">
+          <div class="flex items-center justify-between border-b border-line px-4 py-2.5"><b>Requirements</b><span class="text-[12px] text-ink-muted">4 of 5 tested</span></div>
+          <ul class="divide-y divide-line">
+            <li class="flex items-start justify-between gap-2 px-4 py-2"><span><b class="text-ink-muted">R1</b> Deposit increases the balance</span><span class="chip bg-success-tint text-success-ink">3 tests</span></li>
+            <li class="flex items-start justify-between gap-2 px-4 py-2"><span><b class="text-ink-muted">R2</b> Withdrawing more than the balance throws</span><span class="chip bg-success-tint text-success-ink">2 tests</span></li>
+            <li class="flex items-start justify-between gap-2 px-4 py-2"><span><b class="text-ink-muted">R3</b> Negative amounts are rejected</span><span class="chip bg-success-tint text-success-ink">2 tests</span></li>
+            <li class="flex items-start justify-between gap-2 bg-danger-tint/40 px-4 py-2"><span><b class="text-ink-muted">R4</b> Transfer keeps the total the same</span><span class="chip bg-danger-tint text-danger-ink">No test</span></li>
+            <li class="flex items-start justify-between gap-2 px-4 py-2"><span><b class="text-ink-muted">R5</b> Fields are private, clean names</span><span class="chip bg-paper-dark text-ink-muted">Grader judges</span></li>
+          </ul>
+          <div class="border-t border-line px-4 py-2 text-[12px] text-accent font-semibold">+ Add requirement</div>
+        </div>
+
+        <div class="rounded-xl border border-line bg-white shadow-card">
+          <div class="flex items-center justify-between border-b border-line px-4 py-2.5"><b>Interface</b><span class="text-[12px] text-accent font-semibold">Edit</span></div>
+          <pre class="overflow-x-auto px-4 py-3 font-mono text-[11.5px] leading-[1.6] text-ink-soft">interface Account {
+    void deposit(int amount);
+    void withdraw(int amount);
+    int balance();
+    void transferTo(Account other,
+                    int amount);
+}</pre>
+          <div class="border-t border-line px-4 py-2 text-[12px] text-ink-muted">Tests call only these methods. Each student gets an adapter that maps them onto their own classes.</div>
+        </div>
+      </div>
+
+      <div class="rounded-xl border border-line bg-white shadow-card">
+        <div class="flex items-center justify-between border-b border-line px-4 py-2.5">
+          <div><b>Test cases</b> <span class="ml-1 text-ink-muted">8 cases · reference passes 7</span></div>
+          <button class="btn">+ Add case</button>
+        </div>
+        <table class="w-full text-left">
+          <thead class="bg-paper text-[11px] uppercase tracking-wide text-ink-muted">
+            <tr><th class="px-3 py-2 font-semibold">#</th><th class="px-3 py-2 font-semibold">Case</th><th class="px-3 py-2 font-semibold">Steps</th><th class="px-3 py-2 font-semibold">Expected</th><th class="px-3 py-2 font-semibold">On reference</th><th></th></tr>
+          </thead>
+          <tbody class="divide-y divide-line">
+            <tr><td class="px-3 py-2.5 text-ink-muted">T1</td><td class="px-3 py-2.5"><div class="font-semibold">Single deposit</div><div class="mt-0.5 flex gap-1"><span class="chip bg-accent-tint text-accent-strong">Normal</span><span class="chip bg-paper-dark text-ink-muted">R1</span></div></td><td class="px-3 py-2.5 font-mono text-[11.5px]">deposit(100)<br/>balance()</td><td class="px-3 py-2.5 font-mono text-[11.5px]">100 <span class="font-sans text-[11px] text-ink-faint">reference</span></td><td class="px-3 py-2.5"><span class="chip bg-success-tint text-success-ink">✓ passes</span></td><td class="px-3 py-2.5 text-ink-faint">⋯</td></tr>
+            <tr><td class="px-3 py-2.5 text-ink-muted">T2</td><td class="px-3 py-2.5"><div class="font-semibold">Deposit then withdraw</div><div class="mt-0.5 flex gap-1"><span class="chip bg-accent-tint text-accent-strong">Normal</span><span class="chip bg-paper-dark text-ink-muted">R1</span></div></td><td class="px-3 py-2.5 font-mono text-[11.5px]">deposit(100)<br/>withdraw(30)<br/>balance()</td><td class="px-3 py-2.5 font-mono text-[11.5px]">70 <span class="font-sans text-[11px] text-ink-faint">reference</span></td><td class="px-3 py-2.5"><span class="chip bg-success-tint text-success-ink">✓ passes</span></td><td class="px-3 py-2.5 text-ink-faint">⋯</td></tr>
+            <tr><td class="px-3 py-2.5 text-ink-muted">T3</td><td class="px-3 py-2.5"><div class="font-semibold">Withdraw the exact balance</div><div class="mt-0.5 flex gap-1"><span class="chip bg-warn-tint text-warn-ink">Boundary</span><span class="chip bg-paper-dark text-ink-muted">R2</span></div></td><td class="px-3 py-2.5 font-mono text-[11.5px]">deposit(50)<br/>withdraw(50)<br/>balance()</td><td class="px-3 py-2.5 font-mono text-[11.5px]">0 <span class="font-sans text-[11px] text-ink-faint">reference</span></td><td class="px-3 py-2.5"><span class="chip bg-success-tint text-success-ink">✓ passes</span></td><td class="px-3 py-2.5 text-ink-faint">⋯</td></tr>
+            <tr class="bg-accent-tint/30"><td class="px-3 py-2.5 text-ink-muted">T4</td><td class="px-3 py-2.5"><div class="font-semibold">Overdraft is refused</div><div class="mt-0.5 flex gap-1"><span class="chip bg-danger-tint text-danger-ink">Invalid</span><span class="chip bg-paper-dark text-ink-muted">R2</span></div></td><td class="px-3 py-2.5"><textarea class="h-[60px] w-full rounded-md border border-accent px-2 py-1 font-mono text-[11.5px]">deposit(70)
+withdraw(100)</textarea></td><td class="px-3 py-2.5"><select class="w-[150px] rounded-md border border-accent px-1.5 py-1 text-[12px]"><option>Throws an exception</option><option>Returns a value</option><option>Prints output</option></select><div class="mt-1 font-mono text-[11px] text-ink-muted">balance stays 70</div></td><td class="px-3 py-2.5"><span class="chip bg-success-tint text-success-ink">✓ passes</span></td><td class="px-3 py-2.5"><div class="flex flex-col gap-1"><button class="btn px-2 py-0.5 text-[11px]">Save</button><span class="text-center text-[11px] text-ink-muted">Cancel</span></div></td></tr>
+            <tr><td class="px-3 py-2.5 text-ink-muted">T5</td><td class="px-3 py-2.5"><div class="font-semibold">Negative deposit</div><div class="mt-0.5 flex gap-1"><span class="chip bg-danger-tint text-danger-ink">Invalid</span><span class="chip bg-paper-dark text-ink-muted">R3</span></div></td><td class="px-3 py-2.5 font-mono text-[11.5px]">deposit(-20)</td><td class="px-3 py-2.5 text-[12px]">Throws an exception</td><td class="px-3 py-2.5"><span class="chip bg-warn-tint text-warn-ink">✕ fails</span><div class="mt-1 text-[11px] text-warn-ink">Your reference accepts it. Fix the case or the reference.</div></td><td class="px-3 py-2.5 text-ink-faint">⋯</td></tr>
+            <tr><td class="px-3 py-2.5 text-ink-muted">T6</td><td class="px-3 py-2.5"><div class="font-semibold">Zero amount</div><div class="mt-0.5 flex gap-1"><span class="chip bg-warn-tint text-warn-ink">Boundary</span><span class="chip bg-paper-dark text-ink-muted">R3</span></div></td><td class="px-3 py-2.5 font-mono text-[11.5px]">withdraw(0)<br/>balance()</td><td class="px-3 py-2.5 font-mono text-[11.5px]">0 <span class="font-sans text-[11px] text-ink-faint">reference</span></td><td class="px-3 py-2.5"><span class="chip bg-success-tint text-success-ink">✓ passes</span></td><td class="px-3 py-2.5 text-ink-faint">⋯</td></tr>
+            <tr class="bg-paper/70"><td class="px-3 py-2.5 text-ink-muted">T7</td><td class="px-3 py-2.5"><div class="font-semibold">Transfer moves money <span class="chip ml-1 bg-accent text-white">Proposed</span></div><div class="mt-0.5 flex gap-1"><span class="chip bg-accent-tint text-accent-strong">Normal</span><span class="chip bg-paper-dark text-ink-muted">R4</span></div></td><td class="px-3 py-2.5 font-mono text-[11.5px]">a.deposit(100)<br/>a.transferTo(b, 40)<br/>a.balance(), b.balance()</td><td class="px-3 py-2.5 font-mono text-[11.5px]">60, 40</td><td class="px-3 py-2.5 text-[12px] text-ink-muted">not run yet</td><td class="px-3 py-2.5"><div class="flex flex-col gap-1"><button class="btn px-2 py-0.5 text-[11px]">Keep</button><span class="text-center text-[11px] text-ink-muted">Remove</span></div></td></tr>
+            <tr><td class="px-3 py-2.5 text-ink-muted">T8</td><td class="px-3 py-2.5"><div class="font-semibold">Many small deposits</div><div class="mt-0.5 flex gap-1"><span class="chip bg-accent-tint text-accent-strong">Normal</span><span class="chip bg-paper-dark text-ink-muted">R1</span></div></td><td class="px-3 py-2.5 font-mono text-[11.5px]">deposit(1) × 1000<br/>balance()</td><td class="px-3 py-2.5 font-mono text-[11.5px]">1000 <span class="font-sans text-[11px] text-ink-faint">reference</span></td><td class="px-3 py-2.5"><span class="chip bg-success-tint text-success-ink">✓ passes</span></td><td class="px-3 py-2.5 text-ink-faint">⋯</td></tr>
+          </tbody>
+        </table>
+        <div class="border-t border-line px-4 py-2.5 text-[12px] text-ink-muted">Not testable automatically: <b>R5</b> (clean names, private fields). The grader reviews it from the code.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. APPROVED -->
+  <section class="state mt-5" data-state="approved">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-2"><span class="chip bg-success-tint text-success-ink">Approved · version 2</span><span class="text-ink-muted">8 cases · used in every grading of this assignment since Nov 24</span></div>
+      <div class="flex gap-2"><button class="btn">Edit test set (makes version 3)</button><button class="btn btn-primary">Run tests on all submissions</button></div>
+    </div>
+
+    <div class="mt-4 grid grid-cols-5 gap-3">
+      <div class="rounded-xl border border-line bg-white px-4 py-3 shadow-card"><div class="text-[12px] text-ink-muted">Tested</div><div class="text-[22px] font-bold">24</div></div>
+      <div class="rounded-xl border border-line bg-white px-4 py-3 shadow-card"><div class="text-[12px] text-ink-muted">All passed</div><div class="text-[22px] font-bold text-success">11</div></div>
+      <div class="rounded-xl border border-line bg-white px-4 py-3 shadow-card"><div class="text-[12px] text-ink-muted">Some failing</div><div class="text-[22px] font-bold text-danger">11</div></div>
+      <div class="rounded-xl border border-line bg-white px-4 py-3 shadow-card"><div class="text-[12px] text-ink-muted">Harness problem</div><div class="text-[22px] font-bold text-warn">1</div></div>
+      <div class="rounded-xl border border-line bg-white px-4 py-3 shadow-card"><div class="text-[12px] text-ink-muted">Hardest case</div><div class="text-[15px] font-bold">T4 Overdraft</div><div class="text-[12px] text-ink-muted">9 students fail</div></div>
+    </div>
+
+    <div class="mt-4 grid grid-cols-[minmax(0,1fr)_400px] gap-4">
+      <div class="rounded-xl border border-line bg-white shadow-card">
+        <div class="flex items-center justify-between border-b border-line px-4 py-2.5">
+          <b>Results</b>
+          <div class="flex gap-3 text-[11.5px] text-ink-muted">
+            <span><span class="cell bg-success-tint text-success-ink" style="width:16px;height:14px">✓</span> passed</span>
+            <span><span class="cell bg-danger-tint text-danger-ink" style="width:16px;height:14px">✕</span> failed</span>
+            <span><span class="cell bg-paper-dark text-ink-muted" style="width:16px;height:14px">–</span> not implemented</span>
+            <span><span class="cell bg-warn-tint text-warn-ink" style="width:16px;height:14px">!</span> harness problem</span>
+          </div>
+        </div>
+        <table class="w-full text-left">
+          <thead class="text-[11px] text-ink-muted"><tr id="matrixHead"><th class="px-4 py-2 font-semibold">Student</th></tr></thead>
+          <tbody id="matrix" class="divide-y divide-line"></tbody>
+        </table>
+      </div>
+
+      <div class="rounded-xl border border-line bg-white shadow-card" id="detail">
+        <div class="border-b border-line px-4 py-2.5"><b id="dName">Luka T.</b> <span class="text-ink-muted" id="dSum">· 6 of 8 passed · version 2 of their work</span></div>
+        <div class="px-4 py-3">
+          <div class="font-semibold" id="dCase">T4 · Overdraft is refused</div>
+          <div class="mt-1 rounded-lg bg-danger-tint/50 px-3 py-2 text-[12px] text-danger-ink" id="dWhy">Expected an exception; withdraw(100) on a balance of 70 returned normally and the balance became -30.</div>
+          <div class="mt-3 flex items-center justify-between"><span class="font-semibold">Adapter for this submission</span><span class="text-[12px] text-ink-muted">written by Claude Sonnet · Nov 24</span></div>
+          <pre class="mt-1.5 overflow-x-auto rounded-lg bg-paper px-3 py-2 font-mono text-[11px] leading-[1.6] text-ink-soft">class StudentAccount implements Account {
+    private final Wallet w = new Wallet();
+    public void deposit(int a)  { w.addMoney(a); }
+    public void withdraw(int a) { w.takeMoney(a); }
+    public int balance()        { return w.getBalance(); }
+    public void transferTo(Account o, int a) {
+        throw new NotImplemented("no transfer method");
+    }
+}</pre>
+          <div class="mt-3 text-[12px] text-ink-muted">These results go to the grader with the code, so the review can say "withdraw allows a negative balance (T4)" with evidence.</div>
+          <div class="mt-3 flex gap-2"><button class="btn">Open submission</button><button class="btn">Rerun tests</button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+  function show(s) {
+    document.querySelectorAll(".state").forEach((el) => el.classList.toggle("on", el.dataset.state === s));
+    document.querySelectorAll("#switcher button").forEach((b) => b.classList.toggle("on", b.dataset.s === s));
+    window.scrollTo(0, 0);
+  }
+  document.querySelectorAll("#switcher button").forEach((b) => b.addEventListener("click", () => show(b.dataset.s)));
+  if (location.hash) { show(location.hash.slice(1)); }
+
+  const cases = ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8"];
+  const rows = [
+    ["Ana K.", "PPPPPPPP"], ["Luka T.", "PPPFPPNP"], ["Nino G.", "PPPFFPNP"], ["Giorgi M.", "PPPPPPPP"],
+    ["Mariam B.", "PPPPFPPP"], ["Davit S.", "HHHHHHHH"], ["Elene R.", "PPPFPPPP"], ["Saba J.", "PPFFFPNP"],
+    ["Tamar L.", "PPPPPPPP"], ["Irakli N.", "PPPFPPPF"],
+  ];
+  const look = {
+    P: ["bg-success-tint text-success-ink", "✓"], F: ["bg-danger-tint text-danger-ink", "✕"],
+    N: ["bg-paper-dark text-ink-muted", "–"], H: ["bg-warn-tint text-warn-ink", "!"],
+  };
+  const head = document.getElementById("matrixHead");
+  cases.forEach((c) => { const th = document.createElement("th"); th.className = "px-1 py-2 text-center font-semibold"; th.textContent = c; head.appendChild(th); });
+  const extra = document.createElement("th"); extra.className = "px-3 py-2 text-right font-semibold"; extra.textContent = "Passed"; head.appendChild(extra);
+  const body = document.getElementById("matrix");
+  rows.forEach(([name, r]) => {
+    const tr = document.createElement("tr");
+    const passed = [...r].filter((x) => x === "P").length;
+    tr.innerHTML = `<td class="px-4 py-1.5 font-semibold">${name}</td>` +
+      [...r].map((x, i) => `<td class="px-1 py-1.5 text-center"><span class="cell ${look[x][0]}" data-n="${name}" data-c="${i}" data-x="${x}">${look[x][1]}</span></td>`).join("") +
+      `<td class="px-3 py-1.5 text-right ${r.includes("H") ? "text-warn-ink" : "text-ink-muted"}">${r.includes("H") ? "harness failed" : passed + " / 8"}</td>`;
+    body.appendChild(tr);
+  });
+  const reasons = {
+    P: "Passed.",
+    F: "Expected an exception; the call returned normally and the balance became negative.",
+    N: "Not implemented: the adapter found no method for this in the submission.",
+    H: "The adapter did not compile against this submission, so no result counts against the student. Regenerate the adapter or check it by hand.",
+  };
+  body.addEventListener("click", (e) => {
+    const cell = e.target.closest(".cell");
+    if (!cell) { return; }
+    const titles = ["Single deposit", "Deposit then withdraw", "Withdraw the exact balance", "Overdraft is refused", "Negative deposit", "Zero amount", "Transfer moves money", "Many small deposits"];
+    const i = Number(cell.dataset.c);
+    document.getElementById("dName").textContent = cell.dataset.n;
+    document.getElementById("dCase").textContent = `${cases[i]} · ${titles[i]}`;
+    const why = document.getElementById("dWhy");
+    why.textContent = reasons[cell.dataset.x];
+    why.className = "mt-1 rounded-lg px-3 py-2 text-[12px] " + ({ P: "bg-success-tint/60 text-success-ink", F: "bg-danger-tint/50 text-danger-ink", N: "bg-paper text-ink-muted", H: "bg-warn-tint/60 text-warn-ink" })[cell.dataset.x];
+  });
+</script>
+</body>
+</html>

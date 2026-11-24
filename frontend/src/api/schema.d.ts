@@ -476,6 +476,106 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/courses/{courseId}/assignments/{assignmentId}/tests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Returns the assignment's latest test set: its requirements with how many cases check each, the neutral interface and the test cases. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    courseId: string;
+                    assignmentId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Test set retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["TestSetResponse"];
+                    };
+                };
+                /** @description The assignment has no test set yet */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/courses/{courseId}/assignments/{assignmentId}/tests/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Queues one paid model call that designs test cases from the stored instructions, the teacher's settings and the optional reference solution; the result is a new draft version. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    courseId: string;
+                    assignmentId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["GenerateTestsRequest"];
+                    "text/json": components["schemas"]["GenerateTestsRequest"];
+                    "application/*+json": components["schemas"]["GenerateTestsRequest"];
+                };
+            };
+            responses: {
+                /** @description Generation queued (or the running one is returned); follow it with GET /jobs/{jobId} */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["JobResponse"];
+                    };
+                };
+                /** @description The settings are invalid, such as no kind of case chosen or a reference file that is not .java */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/courses/{courseId}/assignments/{assignmentId}/common-mistakes": {
         parameters: {
             query?: never;
@@ -4021,6 +4121,18 @@ export interface components {
             instructionsVersion?: number | null;
             newInstructions: boolean;
         };
+        GenerateTestsRequest: {
+            style: components["schemas"]["TestStyle"];
+            /** @description The kinds of cases to write; at least one. */
+            categories: components["schemas"]["TestCategory"][];
+            amount: components["schemas"]["TestAmount"];
+            /** @description What the teacher wants checked in particular, in their own words. */
+            focus?: string | null;
+            /** @description What the tests must not check, such as the exact wording of printed messages. */
+            dontTest?: string | null;
+            /** @description The teacher's reference solution as .java files; empty when there is none. */
+            referenceFiles: components["schemas"]["ReferenceFile"][];
+        };
         GoogleConnectResponse: {
             state: components["schemas"]["GoogleConnectionState"];
             /** @description Google's consent page to send the browser to; missing when already connected or not configured. */
@@ -4273,7 +4385,7 @@ export interface components {
         /** @enum {string} */
         JobStatus: "Queued" | "Running" | "Succeeded" | "Failed" | "Canceled";
         /** @enum {string} */
-        JobType: "GradeVersion" | "GradeAssignment" | "FetchAssignment" | "SyncCourse" | "ReExtract" | "AnalyzeMistakes" | "GradeStudent" | "FetchStudentWork" | "AnalyzeStudent" | "AgentRun" | "EvaluationRun" | "EvaluationGrade";
+        JobType: "GradeVersion" | "GradeAssignment" | "FetchAssignment" | "SyncCourse" | "ReExtract" | "AnalyzeMistakes" | "GradeStudent" | "FetchStudentWork" | "AnalyzeStudent" | "AgentRun" | "EvaluationRun" | "EvaluationGrade" | "GenerateTests";
         MistakeAssignmentOption: {
             assignmentId: string;
             title?: string | null;
@@ -4377,7 +4489,7 @@ export interface components {
             percent: number;
         };
         /** @enum {string} */
-        ModelCallPurpose: "Grading" | "GradeAll" | "Chat" | "HealthCheck" | "MistakeAnalysis" | "StudentAnalysis" | "Evaluation" | "Try";
+        ModelCallPurpose: "Grading" | "GradeAll" | "Chat" | "HealthCheck" | "MistakeAnalysis" | "StudentAnalysis" | "Evaluation" | "Try" | "TestDesign";
         ModelCallResponse: {
             /** Format: uuid */
             id: string;
@@ -4606,6 +4718,10 @@ export interface components {
             instance?: string | null;
         } & {
             [key: string]: unknown;
+        };
+        ReferenceFile: {
+            name: string;
+            content: string;
         };
         ReportMistakeInput: {
             /** Format: uuid */
@@ -4995,6 +5111,55 @@ export interface components {
             assignedGrade?: number | null;
             gradeHistory: components["schemas"]["GradeChange"][];
         };
+        /** @enum {string} */
+        TestAmount: "AboutThreePerCategory" | "AboutTenInTotal" | "FewestThatCoverEveryRequirement";
+        TestCase: {
+            /** @description T1, T2, …. */
+            id: string;
+            title: string;
+            category: components["schemas"]["TestCategory"];
+            /** @description The requirements this case checks (R1, R2, …). */
+            requirementIds: string[];
+            /** @description The input on standard input (console style) or the calls in order, one per line (class-design style). */
+            steps: string;
+            /** @description The expected output, value or exception; null when it should come from running the reference solution. */
+            expected?: string | null;
+        };
+        /** @enum {string} */
+        TestCategory: "Normal" | "Boundary" | "Invalid" | "LargeInput" | "Concurrency";
+        TestRequirement: {
+            /** @description R1, R2, … in the order the instructions state them. */
+            id: string;
+            text: string;
+            /** @description False for what only a reader can judge, such as clean code; Reason says why. */
+            testable: boolean;
+            reason?: string | null;
+            /**
+             * Format: int32
+             * @description How many test cases check this requirement, counted in code.
+             */
+            testCount: number;
+        };
+        TestSetResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: int32 */
+            version: number;
+            status: components["schemas"]["TestSetStatus"];
+            style: components["schemas"]["TestStyle"];
+            request: components["schemas"]["GenerateTestsRequest"];
+            requirements: components["schemas"]["TestRequirement"][];
+            /** @description The neutral Java interface the class-design tests call; null for console tests. */
+            interface?: string | null;
+            cases: components["schemas"]["TestCase"][];
+            model: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        /** @enum {string} */
+        TestSetStatus: "Draft" | "Approved";
+        /** @enum {string} */
+        TestStyle: "Console" | "ClassDesign";
         /** @description Grade a version once with this model; the answer is shown, never saved. */
         TryModelRequest: {
             model: string;

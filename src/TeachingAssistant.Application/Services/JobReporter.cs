@@ -151,7 +151,12 @@ public class JobReporter
         }
 
         var error = job.Status == JobStatus.Failed ? $": {job.Error ?? "unknown error"}" : "";
-        var name = job.Type == JobType.AnalyzeMistakes ? "Common mistakes analysis" : $"{job.Type} job";
+        var name = job.Type switch
+        {
+            JobType.AnalyzeMistakes => "Common mistakes analysis",
+            JobType.GenerateTests => "Test case generation",
+            _ => $"{job.Type} job",
+        };
         return $"{name} {job.Status.ToString().ToLowerInvariant()}{error}";
     }
 

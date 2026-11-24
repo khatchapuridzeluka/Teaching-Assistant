@@ -28,6 +28,9 @@ public static class PromptLibrary
     /// <summary>One student's overall picture (Prompts/student-overview.md).</summary>
     public static string StudentOverview => Get("student-overview");
 
+    /// <summary>Designing an assignment's test cases (Prompts/tests.md).</summary>
+    public static string Tests => Get("tests");
+
     /// <summary>
     /// The grading system prompt (Prompts/grading.md) with the teacher's rubric layers in its <c>{{rubric}}</c> slot.
     /// </summary>

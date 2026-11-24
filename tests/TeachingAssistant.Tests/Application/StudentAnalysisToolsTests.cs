@@ -211,6 +211,10 @@ public class StudentAnalysisToolsTests
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
+        public Task<JobResponse> QueueGenerateTestsAsync(
+            string courseId, string assignmentId, GenerateTestsRequest request, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public Task<JobResponse> QueueAnalyzeMistakesAsync(string courseId, string assignmentId, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
     }

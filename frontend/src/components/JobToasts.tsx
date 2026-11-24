@@ -169,6 +169,10 @@ function messageFor(entry: TrackedJob, job: JobInfo): ToastMessage | null {
     return analysisMessage(entry, job, "Student analysis ready");
   }
 
+  if (job.type === "GenerateTests") {
+    return analysisMessage(entry, job, "Test cases ready", "Test case generation");
+  }
+
   switch (job.status) {
     case "Queued":
       if (job.attempts > 0) {
@@ -226,20 +230,20 @@ function groupMessage(entry: TrackedJob, job: JobInfo): ToastMessage {
   }
 }
 
-function analysisMessage(entry: TrackedJob, job: JobInfo, readyTitle = "Common mistakes ready"): ToastMessage | null {
+function analysisMessage(entry: TrackedJob, job: JobInfo, readyTitle = "Common mistakes ready", noun = "Analysis"): ToastMessage | null {
   switch (job.status) {
     case "Queued":
       return job.attempts > 0
-        ? { tone: "error", title: "Analysis will retry", detail: `${entry.label}${job.error ? `: ${job.error}` : ""}` }
-        : { tone: "info", title: "Analysis queued", detail: entry.label };
+        ? { tone: "error", title: `${noun} will retry`, detail: `${entry.label}${job.error ? `: ${job.error}` : ""}` }
+        : { tone: "info", title: `${noun} queued`, detail: entry.label };
     case "Running":
       return null;
     case "Succeeded":
       return { tone: "success", title: readyTitle, detail: entry.label, link: { to: entry.to, label: "Open" } };
     case "Failed":
-      return { tone: "error", title: "Analysis failed", detail: `${entry.label}: ${job.error ?? "unknown error"}` };
+      return { tone: "error", title: `${noun} failed`, detail: `${entry.label}: ${job.error ?? "unknown error"}` };
     case "Canceled":
-      return { tone: "info", title: "Analysis canceled", detail: entry.label };
+      return { tone: "info", title: `${noun} canceled`, detail: entry.label };
   }
 }
 

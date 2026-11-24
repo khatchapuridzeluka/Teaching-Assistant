@@ -2039,6 +2039,65 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
                     b.ToTable("student_strengths", (string)null);
                 });
 
+            modelBuilder.Entity("TeachingAssistant.Domain.Testing.TestSet", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AssignmentId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("assignment_id");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("content");
+
+                    b.Property<string>("CourseId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("course_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("model");
+
+                    b.Property<string>("Request")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("request");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Style")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("style");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_test_sets");
+
+                    b.HasIndex("AssignmentId", "Version")
+                        .IsUnique()
+                        .HasDatabaseName("ix_test_sets_assignment_id_version");
+
+                    b.ToTable("test_sets", (string)null);
+                });
+
             modelBuilder.Entity("TeachingAssistant.Domain.Usage.ModelCall", b =>
                 {
                     b.Property<Guid>("Id")
