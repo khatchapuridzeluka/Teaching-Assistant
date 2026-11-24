@@ -125,6 +125,93 @@ public class TestDesignServiceTests
             Request() with { ReferenceFiles = [new ReferenceFile { Name = "notes.txt", Content = "x" }] }));
     }
 
+    [Fact]
+    public async Task Save_Draft_EditsInPlace_RenumbersEverything_AndKeepsReferencesPointingAtTheSameRequirements()
+    {
+        var draft = await GenerateAsync();
+
+        var saved = (await Service().SaveAsync("assignment", draft.Id, new SaveTestSetRequest
+        {
+            Requirements = [draft.Requirements[1] with { Text = "  Overdraft is refused  " }, draft.Requirements[2]],
+            Interface = draft.Interface,
+            Cases =
+            [
+                draft.Cases[1] with { Expected = "throws an exception" },
+                new TestCase { Id = "new", Title = "Deposit twice", Category = TestCategory.Normal, RequirementIds = ["R2", "R1"],
+                    Steps = "deposit(1)\ndeposit(2)\nbalance()", Expected = "3" },
+            ],
+        }, TestContext.Current.CancellationToken))!;
+
+        Assert.Equal((draft.Id, 1, TestSetStatus.Draft), (saved.Id, saved.Version, saved.Status));
+        Assert.Single(_testSets.All);
+        Assert.Equal(["R1", "R2"], saved.Requirements.Select(r => r.Id));
+        Assert.Equal("Overdraft is refused", saved.Requirements[0].Text);
+        Assert.Equal(["T1", "T2"], saved.Cases.Select(c => c.Id));
+        Assert.Equal(["R1"], saved.Cases[0].RequirementIds);
+        Assert.Equal(["R1"], saved.Cases[1].RequirementIds);
+        Assert.Equal("throws an exception", saved.Cases[0].Expected);
+        Assert.Equal([2, 0], saved.Requirements.Select(r => r.TestCount));
+    }
+
+    [Fact]
+    public async Task Approve_ThenSave_MakesANewDraftVersion_WhileTheApprovedOneStaysInUse()
+    {
+        var draft = await GenerateAsync();
+
+        var approved = (await Service().ApproveAsync("assignment", draft.Id, TestContext.Current.CancellationToken))!;
+        var edited = (await Service().SaveAsync("assignment", draft.Id, Unchanged(draft), TestContext.Current.CancellationToken))!;
+
+        Assert.Equal((TestSetStatus.Approved, 1), (approved.Status, approved.ApprovedVersion));
+        Assert.Equal((2, TestSetStatus.Draft, 1), (edited.Version, edited.Status, edited.ApprovedVersion));
+        Assert.NotEqual(draft.Id, edited.Id);
+        Assert.Equal([TestSetStatus.Approved, TestSetStatus.Draft], _testSets.All.Select(t => t.Status));
+    }
+
+    [Fact]
+    public async Task Save_AnOlderVersion_IsRejected()
+    {
+        var first = await GenerateAsync();
+        await GenerateAsync();
+
+        await Assert.ThrowsAsync<InvalidRequestException>(() =>
+            Service().SaveAsync("assignment", first.Id, Unchanged(first), TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<InvalidRequestException>(() =>
+            Service().ApproveAsync("assignment", first.Id, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task Save_RejectsACaseWithoutSteps_AndASetWithoutCases()
+    {
+        var draft = await GenerateAsync();
+
+        await Assert.ThrowsAsync<InvalidRequestException>(() => Service().SaveAsync("assignment", draft.Id,
+            Unchanged(draft) with { Cases = [draft.Cases[0] with { Steps = " " }] }, TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<InvalidRequestException>(() => Service().SaveAsync("assignment", draft.Id,
+            Unchanged(draft) with { Cases = [] }, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task SaveAndApprove_ForAnotherAssignmentOrAnUnknownId_FindNothing()
+    {
+        var draft = await GenerateAsync();
+
+        Assert.Null(await Service().SaveAsync("other", draft.Id, Unchanged(draft), TestContext.Current.CancellationToken));
+        Assert.Null(await Service().ApproveAsync("assignment", Guid.NewGuid(), TestContext.Current.CancellationToken));
+    }
+
+    private static SaveTestSetRequest Unchanged(TestSetResponse testSet) => new()
+    {
+        Requirements = testSet.Requirements,
+        Interface = testSet.Interface,
+        Cases = testSet.Cases,
+    };
+
+    private async Task<TestSetResponse> GenerateAsync()
+    {
+        await Service().GenerateAsync("course", "assignment", Request(), TestContext.Current.CancellationToken);
+        return (await Service().GetLatestAsync("assignment", TestContext.Current.CancellationToken))!;
+    }
+
     private static GenerateTestsRequest Request() => new()
     {
         Style = TestStyle.ClassDesign,
@@ -186,6 +273,13 @@ public class TestDesignServiceTests
 
         public Task<TestSet?> GetLatestAsync(string assignmentId, CancellationToken cancellationToken = default) =>
             Task.FromResult(All.Where(t => t.AssignmentId == assignmentId).OrderByDescending(t => t.Version).FirstOrDefault());
+
+        public Task<TestSet?> GetLatestApprovedAsync(string assignmentId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(All.Where(t => t.AssignmentId == assignmentId && t.Status == TestSetStatus.Approved)
+                .OrderByDescending(t => t.Version).FirstOrDefault());
+
+        public Task<TestSet?> FindAsync(Guid id, CancellationToken cancellationToken = default) =>
+            Task.FromResult(All.FirstOrDefault(t => t.Id == id));
 
         public void Add(TestSet testSet) => All.Add(testSet);
 

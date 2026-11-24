@@ -16,6 +16,8 @@ public class TestDesignService : ITestDesignService
     internal const int MaxReferenceFiles = 30;
     internal const int MaxReferenceCharacters = 200_000;
     internal const int MaxNoteCharacters = 2_000;
+    internal const int MaxCases = 200;
+    internal const int MaxFieldCharacters = 10_000;
 
     private const string Schema =
         """
@@ -116,7 +118,49 @@ public class TestDesignService : ITestDesignService
     public async Task<TestSetResponse?> GetLatestAsync(string assignmentId, CancellationToken cancellationToken = default)
     {
         var testSet = await _testSets.GetLatestAsync(assignmentId, cancellationToken);
-        return testSet is null ? null : ToResponse(testSet);
+        return testSet is null ? null : await RespondAsync(testSet, cancellationToken);
+    }
+
+    public async Task<TestSetResponse?> SaveAsync(
+        string assignmentId, Guid testSetId, SaveTestSetRequest request, CancellationToken cancellationToken = default)
+    {
+        var testSet = await FindLatestAsync(assignmentId, testSetId, cancellationToken);
+        if (testSet is null)
+        {
+            return null;
+        }
+
+        var content = JsonSerializer.Serialize(Normalize(request, testSet.Style), JsonOptions);
+        if (testSet.Status == TestSetStatus.Draft)
+        {
+            testSet.Edit(content);
+        }
+        else
+        {
+            testSet = new TestSet(testSet.CourseId, testSet.AssignmentId, testSet.Version + 1, testSet.Style, testSet.Request, content,
+                testSet.Model, _timeProvider.GetUtcNow());
+            _testSets.Add(testSet);
+        }
+
+        await _testSets.SaveChangesAsync(cancellationToken);
+        return await RespondAsync(testSet, cancellationToken);
+    }
+
+    public async Task<TestSetResponse?> ApproveAsync(string assignmentId, Guid testSetId, CancellationToken cancellationToken = default)
+    {
+        var testSet = await FindLatestAsync(assignmentId, testSetId, cancellationToken);
+        if (testSet is null)
+        {
+            return null;
+        }
+
+        if (testSet.Status == TestSetStatus.Draft)
+        {
+            testSet.Approve();
+            await _testSets.SaveChangesAsync(cancellationToken);
+        }
+
+        return await RespondAsync(testSet, cancellationToken);
     }
 
     public static void Validate(GenerateTestsRequest request)
@@ -145,6 +189,62 @@ public class TestDesignService : ITestDesignService
         {
             throw new InvalidRequestException("The reference solution is too large; send only the .java files the tests need.");
         }
+    }
+
+    internal static TestSetContent Normalize(SaveTestSetRequest request, TestStyle style)
+    {
+        if (request.Cases.Count == 0)
+        {
+            throw new InvalidRequestException("A test set needs at least one case.");
+        }
+
+        if (request.Cases.Count > MaxCases || request.Requirements.Count > MaxCases)
+        {
+            throw new InvalidRequestException($"A test set can have at most {MaxCases} cases and {MaxCases} requirements.");
+        }
+
+        var ids = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var requirements = new List<TestRequirement>();
+        foreach (var requirement in request.Requirements)
+        {
+            if (string.IsNullOrWhiteSpace(requirement.Text))
+            {
+                throw new InvalidRequestException($"Requirement {requirements.Count + 1} has no text. Write it or delete it.");
+            }
+
+            var id = $"R{requirements.Count + 1}";
+            ids.TryAdd(requirement.Id.Trim(), id);
+            requirements.Add(new TestRequirement
+            {
+                Id = id,
+                Text = Limit(requirement.Text),
+                Testable = requirement.Testable,
+                Reason = requirement.Testable || string.IsNullOrWhiteSpace(requirement.Reason) ? null : Limit(requirement.Reason),
+            });
+        }
+
+        var cases = new List<TestCase>();
+        foreach (var testCase in request.Cases)
+        {
+            var number = cases.Count + 1;
+            if (string.IsNullOrWhiteSpace(testCase.Title) || string.IsNullOrWhiteSpace(testCase.Steps))
+            {
+                throw new InvalidRequestException($"Case {number} needs a title and steps.");
+            }
+
+            cases.Add(new TestCase
+            {
+                Id = $"T{number}",
+                Title = Limit(testCase.Title),
+                Category = testCase.Category,
+                RequirementIds = testCase.RequirementIds.Select(r => ids.GetValueOrDefault(r.Trim())).OfType<string>().Distinct().ToList(),
+                Steps = Limit(testCase.Steps),
+                Expected = string.IsNullOrWhiteSpace(testCase.Expected) ? null : Limit(testCase.Expected),
+            });
+        }
+
+        var contract = style == TestStyle.ClassDesign && !string.IsNullOrWhiteSpace(request.Interface) ? Limit(request.Interface) : null;
+        return new TestSetContent { Requirements = requirements, Interface = contract, Cases = cases };
     }
 
     internal static string Prompt(GenerateTestsRequest request, string policy)
@@ -266,7 +366,7 @@ public class TestDesignService : ITestDesignService
         return new TestSetContent { Requirements = requirements, Interface = contract, Cases = cases };
     }
 
-    internal static TestSetResponse ToResponse(TestSet testSet)
+    internal static TestSetResponse ToResponse(TestSet testSet, int? approvedVersion)
     {
         var content = JsonSerializer.Deserialize<TestSetContent>(testSet.Content, JsonOptions)
                       ?? throw new InvalidOperationException($"Test set {testSet.Id} has no content.");
@@ -285,9 +385,45 @@ public class TestDesignService : ITestDesignService
                 .ToList(),
             Interface = content.Interface,
             Cases = content.Cases,
+            ApprovedVersion = approvedVersion,
             Model = testSet.Model,
             CreatedAt = testSet.CreatedAt,
         };
+    }
+
+    private static string Limit(string text)
+    {
+        var trimmed = text.Trim();
+        if (trimmed.Length > MaxFieldCharacters)
+        {
+            throw new InvalidRequestException($"Keep each text under {MaxFieldCharacters} characters.");
+        }
+
+        return trimmed;
+    }
+
+    private async Task<TestSet?> FindLatestAsync(string assignmentId, Guid testSetId, CancellationToken cancellationToken)
+    {
+        var testSet = await _testSets.FindAsync(testSetId, cancellationToken);
+        if (testSet is null || testSet.AssignmentId != assignmentId)
+        {
+            return null;
+        }
+
+        var latest = await _testSets.GetLatestAsync(assignmentId, cancellationToken);
+        if (latest is not null && latest.Id != testSet.Id)
+        {
+            throw new InvalidRequestException(
+                $"Version {latest.Version} is newer than version {testSet.Version}. Reload the page and work on the newest version.");
+        }
+
+        return testSet;
+    }
+
+    private async Task<TestSetResponse> RespondAsync(TestSet testSet, CancellationToken cancellationToken)
+    {
+        var approved = await _testSets.GetLatestApprovedAsync(testSet.AssignmentId, cancellationToken);
+        return ToResponse(testSet, approved?.Version);
     }
 
     private static string Describe(TestCategory category) => category switch

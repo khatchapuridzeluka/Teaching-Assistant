@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, type DiscardReason, type GenerateTests, type JobStatus, type PolicyRuleRequest, type JobType, type ModelCallPurpose, type SaveReportRequest, type StudentMistakeFilter,
+import { api, type DiscardReason, type GenerateTests, type SaveTestSet, type JobStatus, type PolicyRuleRequest, type JobType, type ModelCallPurpose, type SaveReportRequest, type StudentMistakeFilter,
   type StudentStrengthFilter, type StudentAnalysisKind, unwrap } from "./client";
 import { forgetMissingPhotos } from "../components/ui";
 
@@ -434,6 +434,37 @@ export const useGenerateTests = (courseId: string, assignmentId: string) => {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["courses", courseId, "assignments", assignmentId, "jobs"] });
       void queryClient.invalidateQueries({ queryKey: ["jobs"] });
+    },
+  });
+};
+
+export const useSaveTestSet = (courseId: string, assignmentId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ testSetId, body }: { testSetId: string; body: SaveTestSet }) =>
+      unwrap(
+        api.PUT("/courses/{courseId}/assignments/{assignmentId}/tests/{testSetId}", {
+          params: { path: { courseId, assignmentId, testSetId } },
+          body,
+        }),
+      ),
+    onSuccess: (testSet) => {
+      queryClient.setQueryData(["courses", courseId, "assignments", assignmentId, "tests"], testSet);
+    },
+  });
+};
+
+export const useApproveTestSet = (courseId: string, assignmentId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (testSetId: string) =>
+      unwrap(
+        api.POST("/courses/{courseId}/assignments/{assignmentId}/tests/{testSetId}/approve", {
+          params: { path: { courseId, assignmentId, testSetId } },
+        }),
+      ),
+    onSuccess: (testSet) => {
+      queryClient.setQueryData(["courses", courseId, "assignments", assignmentId, "tests"], testSet);
     },
   });
 };

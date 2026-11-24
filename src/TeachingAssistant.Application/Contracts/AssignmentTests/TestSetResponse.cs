@@ -18,6 +18,10 @@ public record TestSetResponse
     public string? Interface { get; init; }
 
     public required IReadOnlyList<TestCase> Cases { get; init; }
+
+    /// <summary>The newest approved version of this assignment's tests, the one gradings will use; null when none is approved.</summary>
+    public int? ApprovedVersion { get; init; }
+
     public required string Model { get; init; }
     public required DateTimeOffset CreatedAt { get; init; }
 }

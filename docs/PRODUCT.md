@@ -34,7 +34,7 @@ Java only, starting with class design and design patterns, then SQL/Maven/Gradle
 
 ## Automated tests (planned)
 
-First step built: **generating** a draft test set (the form, the background job and the read-only draft on the assignment's Tests view). Editing, running on the reference solution, approving, adapters and results in grading are next. The layout is mocked up in [design/tests-tab-mockup.html](design/tests-tab-mockup.html).
+Built so far: **generating** a draft test set (the form, the background job and the draft on the assignment's Tests view) and **editing and approving** it. Next: turning approved cases into JUnit against the interface (one call per approved version, the code shown to the teacher), adapters per submission, running in the sandbox, and results in grading. The layout is mocked up in [design/tests-tab-mockup.html](design/tests-tab-mockup.html).
 
 **The idea: what is tested is the same for every student; how it reaches each student's code is per submission.** Students name classes and methods freely, so tests can't call their code directly. Instead:
 

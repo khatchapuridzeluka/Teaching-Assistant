@@ -46,4 +46,19 @@ public class TestSet
     public string Model { get; private set; } = null!;
 
     public DateTimeOffset CreatedAt { get; private set; }
+
+    public void Edit(string content)
+    {
+        if (Status != TestSetStatus.Draft)
+        {
+            throw new InvalidOperationException("An approved test set is not edited in place; editing it makes a new version.");
+        }
+
+        Content = content;
+    }
+
+    public void Approve()
+    {
+        Status = TestSetStatus.Approved;
+    }
 }

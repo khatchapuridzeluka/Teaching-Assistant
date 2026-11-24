@@ -576,6 +576,128 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/courses/{courseId}/assignments/{assignmentId}/tests/{testSetId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Saves your edits to a test set: a draft is changed in place, an approved one becomes a new draft version. Requirements and cases are renumbered in the order given. */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    courseId: string;
+                    assignmentId: string;
+                    testSetId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SaveTestSetRequest"];
+                    "text/json": components["schemas"]["SaveTestSetRequest"];
+                    "application/*+json": components["schemas"]["SaveTestSetRequest"];
+                };
+            };
+            responses: {
+                /** @description Saved; returns the draft that holds the edits */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["TestSetResponse"];
+                    };
+                };
+                /** @description A case without title or steps, a requirement without text, no cases at all, or a newer version exists */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description No test set with this ID for this assignment */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/courses/{courseId}/assignments/{assignmentId}/tests/{testSetId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approves the newest version of the assignment's tests; from then on it is the version gradings use. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    courseId: string;
+                    assignmentId: string;
+                    testSetId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Approved (or already approved); returns the test set */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["TestSetResponse"];
+                    };
+                };
+                /** @description A newer version exists */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description No test set with this ID for this assignment */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/courses/{courseId}/assignments/{assignmentId}/common-mistakes": {
         parameters: {
             query?: never;
@@ -4816,6 +4938,13 @@ export interface components {
             mistakes: components["schemas"]["ReportMistakeInput"][];
             strengths?: components["schemas"]["ReportStrengthInput"][] | null;
         };
+        SaveTestSetRequest: {
+            /** @description The requirements in order; they are renumbered R1, R2, … and the cases' references follow. */
+            requirements: components["schemas"]["TestRequirement"][];
+            interface?: string | null;
+            /** @description The cases in order; they are renumbered T1, T2, …. */
+            cases: components["schemas"]["TestCase"][];
+        };
         SeverityDecisions: {
             severity: components["schemas"]["MistakeSeverity"];
             /** Format: int32 */
@@ -5152,6 +5281,11 @@ export interface components {
             /** @description The neutral Java interface the class-design tests call; null for console tests. */
             interface?: string | null;
             cases: components["schemas"]["TestCase"][];
+            /**
+             * Format: int32
+             * @description The newest approved version of this assignment's tests, the one gradings will use; null when none is approved.
+             */
+            approvedVersion?: number | null;
             model: string;
             /** Format: date-time */
             createdAt: string;

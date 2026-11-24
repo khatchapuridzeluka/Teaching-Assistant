@@ -50,4 +50,48 @@ public class AssignmentTestsController : ControllerBase
         var job = await _jobService.QueueGenerateTestsAsync(courseId, assignmentId, request, cancellationToken);
         return Accepted($"/jobs/{job.Id}", job);
     }
+
+    /// <summary>
+    /// Saves your edits to a test set: a draft is changed in place, an approved one becomes a new draft version. Requirements and cases are renumbered in the order given.
+    /// </summary>
+    /// <response code="200">Saved; returns the draft that holds the edits</response>
+    /// <response code="400">A case without title or steps, a requirement without text, no cases at all, or a newer version exists</response>
+    /// <response code="404">No test set with this ID for this assignment</response>
+    [HttpPut("courses/{courseId}/assignments/{assignmentId}/tests/{testSetId:guid}")]
+    [ProducesResponseType(typeof(TestSetResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<TestSetResponse>> SaveAsync(
+        string courseId, string assignmentId, Guid testSetId, SaveTestSetRequest request, CancellationToken cancellationToken)
+    {
+        var testSet = await _testDesignService.SaveAsync(assignmentId, testSetId, request, cancellationToken);
+        if (testSet is null)
+        {
+            return NotFound();
+        }
+
+        return Ok(testSet);
+    }
+
+    /// <summary>
+    /// Approves the newest version of the assignment's tests; from then on it is the version gradings use.
+    /// </summary>
+    /// <response code="200">Approved (or already approved); returns the test set</response>
+    /// <response code="400">A newer version exists</response>
+    /// <response code="404">No test set with this ID for this assignment</response>
+    [HttpPost("courses/{courseId}/assignments/{assignmentId}/tests/{testSetId:guid}/approve")]
+    [ProducesResponseType(typeof(TestSetResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<TestSetResponse>> ApproveAsync(
+        string courseId, string assignmentId, Guid testSetId, CancellationToken cancellationToken)
+    {
+        var testSet = await _testDesignService.ApproveAsync(assignmentId, testSetId, cancellationToken);
+        if (testSet is null)
+        {
+            return NotFound();
+        }
+
+        return Ok(testSet);
+    }
 }

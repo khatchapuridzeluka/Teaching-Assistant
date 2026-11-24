@@ -1,18 +1,10 @@
 import { type ChangeEvent, useEffect, useState } from "react";
-import type { GenerateTests, TestCase, TestCategory, TestRequirement, TestSet } from "../api/client";
+import type { GenerateTests, TestCategory } from "../api/client";
 import { useAssignmentJobs, useGenerateTests, useTestSet } from "../api/hooks";
-import { formatDate } from "../format";
-import { FileCode2, FlaskConical, ListChecks, RefreshCw, Sparkles, X } from "lucide-react";
+import { FlaskConical, Sparkles, X } from "lucide-react";
 import { useTrackJob } from "./JobToasts";
-import { Button, Card, CardHeader, Chip, type ChipTone, EmptyState, ErrorPanel, Modal, Notice, Segmented, SkeletonCards, Spinner } from "./ui";
-
-const categoryInfo: Record<TestCategory, { label: string; formLabel: string; tone: ChipTone }> = {
-  Normal: { label: "Normal", formLabel: "Normal cases", tone: "info" },
-  Boundary: { label: "Boundary", formLabel: "Boundaries (0, empty, max)", tone: "warn" },
-  Invalid: { label: "Invalid", formLabel: "Invalid input and exceptions", tone: "danger" },
-  LargeInput: { label: "Large input", formLabel: "Large inputs", tone: "muted" },
-  Concurrency: { label: "Concurrency", formLabel: "Concurrency", tone: "mark" },
-};
+import { categoryInfo, TestSetView } from "./TestSetView";
+import { Button, Card, EmptyState, ErrorPanel, Modal, Notice, Segmented, SkeletonCards, Spinner } from "./ui";
 
 const amountOptions: { value: GenerateTests["amount"]; label: string }[] = [
   { value: "AboutThreePerCategory", label: "About 3 per category" },
@@ -91,7 +83,9 @@ export function AssignmentTests({ courseId, assignmentId, assignmentTitle }: { c
         </Card>
       )}
 
-      {current && <TestSetDraft testSet={current} busy={!!running} onRegenerate={() => setFormOpen(true)} />}
+      {current && (
+        <TestSetView testSet={current} courseId={courseId} assignmentId={assignmentId} busy={!!running} onRegenerate={() => setFormOpen(true)} />
+      )}
 
       {formOpen && (
         <GenerateForm
@@ -107,134 +101,6 @@ export function AssignmentTests({ courseId, assignmentId, assignmentTitle }: { c
         />
       )}
     </div>
-  );
-}
-
-function TestSetDraft({ testSet, busy, onRegenerate }: { testSet: TestSet; busy: boolean; onRegenerate: () => void }) {
-  const testable = testSet.requirements.filter((r) => r.testable);
-  const covered = testable.filter((r) => (r.testCount ?? 0) > 0).length;
-  const hasReference = testSet.request.referenceFiles.length > 0;
-
-  return (
-    <>
-      <Notice
-        tone="warn"
-        title={`Draft, version ${testSet.version}.`}
-        action={
-          <Button small icon={<RefreshCw />} onClick={onRegenerate} disabled={busy}>
-            Generate again
-          </Button>
-        }
-      >
-        Not used in grading. Generated {formatDate(testSet.createdAt)} by {testSet.model} as{" "}
-        {testSet.style === "Console" ? "console tests" : "class-design tests"}
-        {hasReference ? `, with your reference solution (${testSet.request.referenceFiles.map((f) => f.name).join(", ")})` : ""}. Editing,
-        running on the reference solution and approving come next.
-      </Notice>
-
-      <div className="grid grid-cols-1 gap-3 xl:grid-cols-[340px_minmax(0,1fr)]">
-        <div className="flex flex-col gap-3">
-          <Card>
-            <CardHeader
-              icon={<ListChecks />}
-              title="Requirements"
-              subtitle={`${covered} of ${testable.length} testable ${testable.length === 1 ? "requirement has" : "requirements have"} a test`}
-            />
-            <ul className="divide-y divide-paper-dark">
-              {testSet.requirements.map((requirement) => (
-                <RequirementRow key={requirement.id} requirement={requirement} />
-              ))}
-            </ul>
-          </Card>
-
-          {testSet.interface && (
-            <Card>
-              <CardHeader icon={<FileCode2 />} title="Interface" subtitle="The tests call only these methods" />
-              <pre className="overflow-x-auto px-[18px] py-3 font-mono text-[11.5px] leading-relaxed text-ink-soft">{testSet.interface}</pre>
-              <div className="border-t border-paper-dark px-[18px] py-2.5 text-xs text-ink-muted">
-                Each student gets a small adapter that maps these methods onto their own classes, so their class and method names don't matter.
-              </div>
-            </Card>
-          )}
-        </div>
-
-        <Card className="min-w-0">
-          <CardHeader icon={<FlaskConical />} title="Test cases" subtitle={`${testSet.cases.length} ${testSet.cases.length === 1 ? "case" : "cases"}`} />
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-left">
-              <thead>
-                <tr className="border-b border-line bg-paper">
-                  <th className="eyebrow px-3 py-2">#</th>
-                  <th className="eyebrow px-3 py-2">Case</th>
-                  <th className="eyebrow px-3 py-2">{testSet.style === "Console" ? "Input" : "Steps"}</th>
-                  <th className="eyebrow px-3 py-2">Expected</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-paper-dark">
-                {testSet.cases.map((testCase) => (
-                  <CaseRow key={testCase.id} testCase={testCase} hasReference={hasReference} />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      </div>
-    </>
-  );
-}
-
-function RequirementRow({ requirement }: { requirement: TestRequirement }) {
-  const count = requirement.testCount ?? 0;
-  const missing = requirement.testable && count === 0;
-  return (
-    <li className={`flex items-start justify-between gap-2 px-[18px] py-2 ${missing ? "bg-danger-tint/40" : ""}`}>
-      <div className="min-w-0">
-        <span className="mr-1.5 font-semibold text-ink-muted">{requirement.id}</span>
-        {requirement.text}
-        {!requirement.testable && requirement.reason && <div className="mt-0.5 text-xs text-ink-muted">{requirement.reason}</div>}
-      </div>
-      {!requirement.testable ? (
-        <Chip tone="muted">Grader judges</Chip>
-      ) : missing ? (
-        <Chip tone="danger">No test</Chip>
-      ) : (
-        <Chip tone="success">
-          {count} {count === 1 ? "test" : "tests"}
-        </Chip>
-      )}
-    </li>
-  );
-}
-
-function CaseRow({ testCase, hasReference }: { testCase: TestCase; hasReference: boolean }) {
-  const category = categoryInfo[testCase.category];
-  return (
-    <tr className="align-top">
-      <td className="px-3 py-2.5 text-ink-muted">{testCase.id}</td>
-      <td className="px-3 py-2.5">
-        <div className="font-semibold">{testCase.title}</div>
-        <div className="mt-1 flex flex-wrap gap-1">
-          <Chip tone={category.tone}>{category.label}</Chip>
-          {testCase.requirementIds.map((id) => (
-            <Chip key={id} tone="muted">
-              {id}
-            </Chip>
-          ))}
-        </div>
-      </td>
-      <td className="px-3 py-2.5">
-        <pre className="whitespace-pre-wrap font-mono text-[11.5px] leading-relaxed text-ink-soft">{testCase.steps}</pre>
-      </td>
-      <td className="px-3 py-2.5">
-        {testCase.expected ? (
-          <pre className="whitespace-pre-wrap font-mono text-[11.5px] leading-relaxed text-ink-soft">{testCase.expected}</pre>
-        ) : hasReference ? (
-          <span className="text-xs text-ink-muted">From the reference solution</span>
-        ) : (
-          <Chip tone="warn">Needs an expected result</Chip>
-        )}
-      </td>
-    </tr>
   );
 }
 
