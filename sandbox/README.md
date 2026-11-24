@@ -6,7 +6,7 @@ network, a read-only file system, memory, CPU and process limits, and an unprivi
 
 ## ta-java
 
-`java/Dockerfile`: a Temurin JDK plus Checkstyle 14.4.0, PMD 7.29.0 and SpotBugs 4.10.5 (downloaded at build time,
+`java/Dockerfile`: a Temurin JDK plus Checkstyle 14.4.0, PMD 7.29.0, SpotBugs 4.10.5 and the JUnit 6.1.3 console runner (downloaded at build time,
 checked against pinned SHA-256 sums). Student code is compiled with the newest JDK first; the older one is the fallback
 for the rare submission that only compiles there (old preview features, removed APIs).
 
@@ -29,6 +29,7 @@ Inside the image:
 | `checkstyle` | `java -jar /opt/checkstyle/checkstyle.jar`; grading runs `checkstyle -c __ta_checkstyle.xml .` with the short list from `src/TeachingAssistant.Application/Checks/checkstyle.xml` |
 | `pmd` | PMD 7; grading runs `pmd check --no-progress --no-cache -d . -R __ta_pmd.xml -f text --aux-classpath /tmp/classes-1:…` with the short list from `src/TeachingAssistant.Application/Checks/pmd.xml` |
 | `spotbugs` | SpotBugs, e.g. `spotbugs -textui out` on compiled classes |
+| `/opt/junit/junit.jar` | JUnit Platform console standalone (Jupiter included): generated tests compile with `javac -cp /opt/junit/junit.jar …` and run with `java -jar /opt/junit/junit.jar execute --class-path out --select-class AssignmentTests` |
 
 The container's default command is `sleep infinity`: the runner starts it, copies files in, runs each step with
 `docker exec` (compile, console tests, analysis) and removes it afterwards. Started like this, which is what the runner

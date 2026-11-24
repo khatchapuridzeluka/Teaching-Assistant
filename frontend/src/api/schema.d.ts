@@ -698,6 +698,64 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/courses/{courseId}/assignments/{assignmentId}/tests/{testSetId}/code/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Queues one paid model call that writes the JUnit test code for an approved class-design test set and compiles it in the sandbox; it also runs on its own when you approve. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    courseId: string;
+                    assignmentId: string;
+                    testSetId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Code generation queued (or the running one is returned); follow it with GET /jobs/{jobId} */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["JobResponse"];
+                    };
+                };
+                /** @description The test set is not approved, is console style, or a newer version exists */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description No test set with this ID for this assignment */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/courses/{courseId}/assignments/{assignmentId}/common-mistakes": {
         parameters: {
             query?: never;
@@ -4507,7 +4565,7 @@ export interface components {
         /** @enum {string} */
         JobStatus: "Queued" | "Running" | "Succeeded" | "Failed" | "Canceled";
         /** @enum {string} */
-        JobType: "GradeVersion" | "GradeAssignment" | "FetchAssignment" | "SyncCourse" | "ReExtract" | "AnalyzeMistakes" | "GradeStudent" | "FetchStudentWork" | "AnalyzeStudent" | "AgentRun" | "EvaluationRun" | "EvaluationGrade" | "GenerateTests";
+        JobType: "GradeVersion" | "GradeAssignment" | "FetchAssignment" | "SyncCourse" | "ReExtract" | "AnalyzeMistakes" | "GradeStudent" | "FetchStudentWork" | "AnalyzeStudent" | "AgentRun" | "EvaluationRun" | "EvaluationGrade" | "GenerateTests" | "GenerateTestCode";
         MistakeAssignmentOption: {
             assignmentId: string;
             title?: string | null;
@@ -5256,6 +5314,22 @@ export interface components {
         };
         /** @enum {string} */
         TestCategory: "Normal" | "Boundary" | "Invalid" | "LargeInput" | "Concurrency";
+        TestCode: {
+            /** @description The file the neutral interface is compiled from, for example LinkedListHomework.java. */
+            interfaceFile: string;
+            /** @description The JUnit test class (AssignmentTests) that calls only the interface, through new StudentAdapter(). */
+            testClass: string;
+            /** @description A placeholder StudentAdapter whose methods only throw, so the tests can be compiled before any student's adapter exists. */
+            stubAdapter: string;
+            status: components["schemas"]["TestCodeStatus"];
+            /** @description The compiler's errors, or why the check could not run. */
+            compileOutput?: string | null;
+            model: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        /** @enum {string} */
+        TestCodeStatus: "Compiled" | "CompileFailed" | "NotChecked";
         TestRequirement: {
             /** @description R1, R2, … in the order the instructions state them. */
             id: string;
@@ -5286,6 +5360,7 @@ export interface components {
              * @description The newest approved version of this assignment's tests, the one gradings will use; null when none is approved.
              */
             approvedVersion?: number | null;
+            code?: components["schemas"]["TestCode"];
             model: string;
             /** Format: date-time */
             createdAt: string;

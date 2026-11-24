@@ -155,6 +155,7 @@ public class JobReporter
         {
             JobType.AnalyzeMistakes => "Common mistakes analysis",
             JobType.GenerateTests => "Test case generation",
+            JobType.GenerateTestCode => "Test code generation",
             _ => $"{job.Type} job",
         };
         return $"{name} {job.Status.ToString().ToLowerInvariant()}{error}";

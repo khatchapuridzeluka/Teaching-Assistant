@@ -94,4 +94,26 @@ public class AssignmentTestsController : ControllerBase
 
         return Ok(testSet);
     }
+
+    /// <summary>
+    /// Queues one paid model call that writes the JUnit test code for an approved class-design test set and compiles it in the sandbox; it also runs on its own when you approve.
+    /// </summary>
+    /// <response code="202">Code generation queued (or the running one is returned); follow it with GET /jobs/{jobId}</response>
+    /// <response code="400">The test set is not approved, is console style, or a newer version exists</response>
+    /// <response code="404">No test set with this ID for this assignment</response>
+    [HttpPost("courses/{courseId}/assignments/{assignmentId}/tests/{testSetId:guid}/code/generate")]
+    [ProducesResponseType(typeof(JobResponse), StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<JobResponse>> GenerateCodeAsync(
+        string courseId, string assignmentId, Guid testSetId, CancellationToken cancellationToken)
+    {
+        var job = await _testDesignService.QueueCodeAsync(assignmentId, testSetId, cancellationToken);
+        if (job is null)
+        {
+            return NotFound();
+        }
+
+        return Accepted($"/jobs/{job.Id}", job);
+    }
 }

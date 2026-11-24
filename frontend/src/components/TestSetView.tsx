@@ -1,8 +1,9 @@
 import { type ReactNode, useEffect, useState } from "react";
-import type { TestCase, TestCategory, TestRequirement, TestSet } from "../api/client";
+import type { JobInfo, TestCase, TestCategory, TestRequirement, TestSet } from "../api/client";
 import { useApproveTestSet, useSaveTestSet } from "../api/hooks";
 import { formatDate } from "../format";
 import { Check, CircleCheck, Copy, FileCode2, FlaskConical, ListChecks, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { TestCodeCard } from "./TestCodeCard";
 import { Button, Card, CardHeader, Chip, type ChipTone, ErrorPanel, Notice } from "./ui";
 
 export const categoryInfo: Record<TestCategory, { label: string; formLabel: string; tone: ChipTone }> = {
@@ -32,12 +33,14 @@ export function TestSetView({
   courseId,
   assignmentId,
   busy,
+  codeJob,
   onRegenerate,
 }: {
   testSet: TestSet;
   courseId: string;
   assignmentId: string;
   busy: boolean;
+  codeJob: JobInfo | undefined;
   onRegenerate: () => void;
 }) {
   const save = useSaveTestSet(courseId, assignmentId);
@@ -128,7 +131,7 @@ export function TestSetView({
         >
           {dirty
             ? `Saving your edits makes version ${testSet.version + 1} as a new draft; version ${testSet.version} stays approved until you approve the new one.`
-            : "This is the version gradings will use once running tests is built. Editing it makes a new draft version."}
+            : "This is the version gradings will use once running tests is built. Its test code is below; editing the cases makes a new draft version."}
         </Notice>
       ) : (
         <Notice
@@ -277,6 +280,10 @@ export function TestSetView({
           </div>
         </Card>
       </div>
+
+      {approved && classDesign && (
+        <TestCodeCard code={testSet.code ?? null} job={codeJob} testSetId={testSet.id} courseId={courseId} assignmentId={assignmentId} />
+      )}
     </>
   );
 }

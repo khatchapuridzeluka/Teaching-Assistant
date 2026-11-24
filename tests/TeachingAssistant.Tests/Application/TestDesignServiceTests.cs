@@ -32,6 +32,7 @@ public class TestDesignServiceTests
     private readonly FakeTestSets _testSets = new();
     private readonly FakeGrading _grading = new();
     private readonly FakePolicyRules _rules = new();
+    private readonly FakeTestCodeJobs _jobs = new();
 
     [Fact]
     public async Task Generate_SendsTheInstructionsSettingsPolicyAndReferenceSolution_AndSavesTheFirstDraft()
@@ -162,6 +163,7 @@ public class TestDesignServiceTests
         var edited = (await Service().SaveAsync("assignment", draft.Id, Unchanged(draft), TestContext.Current.CancellationToken))!;
 
         Assert.Equal((TestSetStatus.Approved, 1), (approved.Status, approved.ApprovedVersion));
+        Assert.Equal([draft.Id], _jobs.CodeJobs);
         Assert.Equal((2, TestSetStatus.Draft, 1), (edited.Version, edited.Status, edited.ApprovedVersion));
         Assert.NotEqual(draft.Id, edited.Id);
         Assert.Equal([TestSetStatus.Approved, TestSetStatus.Draft], _testSets.All.Select(t => t.Status));
@@ -223,7 +225,7 @@ public class TestDesignServiceTests
     };
 
     private TestDesignService Service() => new(_testSets, _grading, new FakeCourseGuidance(), _rules, new FakeAssignmentNotes(),
-        _model, new ModelCallContext(), TimeProvider.System);
+        _model, new ModelCallContext(), _jobs, TimeProvider.System);
 
     private sealed class FakeModel : ILanguageModel
     {
@@ -265,25 +267,6 @@ public class TestDesignServiceTests
         public Task<LanguageModelReply> AnalyzeAsync(
             string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
-    }
-
-    private sealed class FakeTestSets : ITestSetStore
-    {
-        public List<TestSet> All { get; } = [];
-
-        public Task<TestSet?> GetLatestAsync(string assignmentId, CancellationToken cancellationToken = default) =>
-            Task.FromResult(All.Where(t => t.AssignmentId == assignmentId).OrderByDescending(t => t.Version).FirstOrDefault());
-
-        public Task<TestSet?> GetLatestApprovedAsync(string assignmentId, CancellationToken cancellationToken = default) =>
-            Task.FromResult(All.Where(t => t.AssignmentId == assignmentId && t.Status == TestSetStatus.Approved)
-                .OrderByDescending(t => t.Version).FirstOrDefault());
-
-        public Task<TestSet?> FindAsync(Guid id, CancellationToken cancellationToken = default) =>
-            Task.FromResult(All.FirstOrDefault(t => t.Id == id));
-
-        public void Add(TestSet testSet) => All.Add(testSet);
-
-        public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
     private sealed class FakeGrading : IGradingService

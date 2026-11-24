@@ -311,7 +311,7 @@ export function AssignmentPage() {
       {submissions.isLoading && view !== "tests" && <SkeletonList rows={8} avatar />}
       {submissions.isError && <ErrorPanel error={submissions.error} />}
       {view === "tests" && (
-        <div className="min-h-0 lg:flex-1 lg:overflow-y-auto">
+        <div className="min-h-0 pb-20 lg:flex-1 lg:overflow-y-auto">
           <AssignmentTests courseId={courseId} assignmentId={assignmentId} assignmentTitle={assignment?.title ?? "Assignment"} />
         </div>
       )}

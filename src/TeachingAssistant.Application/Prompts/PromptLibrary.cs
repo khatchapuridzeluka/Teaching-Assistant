@@ -31,6 +31,9 @@ public static class PromptLibrary
     /// <summary>Designing an assignment's test cases (Prompts/tests.md).</summary>
     public static string Tests => Get("tests");
 
+    /// <summary>Writing an approved test set's JUnit code (Prompts/test-code.md).</summary>
+    public static string TestCode => Get("test-code");
+
     /// <summary>
     /// The grading system prompt (Prompts/grading.md) with the teacher's rubric layers in its <c>{{rubric}}</c> slot.
     /// </summary>

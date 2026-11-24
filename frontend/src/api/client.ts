@@ -38,6 +38,7 @@ export type TestCase = components["schemas"]["TestCase"];
 export type TestRequirement = components["schemas"]["TestRequirement"];
 export type GenerateTests = components["schemas"]["GenerateTestsRequest"];
 export type SaveTestSet = components["schemas"]["SaveTestSetRequest"];
+export type TestCode = components["schemas"]["TestCode"];
 export type TestCategory = components["schemas"]["TestCategory"];
 export type MistakeGroup = components["schemas"]["MistakeClusterResponse"];
 export type ModelCallPurpose = components["schemas"]["ModelCallPurpose"];

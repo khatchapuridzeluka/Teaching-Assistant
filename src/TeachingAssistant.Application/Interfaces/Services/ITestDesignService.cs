@@ -12,4 +12,6 @@ public interface ITestDesignService
         string assignmentId, Guid testSetId, SaveTestSetRequest request, CancellationToken cancellationToken = default);
 
     Task<TestSetResponse?> ApproveAsync(string assignmentId, Guid testSetId, CancellationToken cancellationToken = default);
+
+    Task<JobResponse?> QueueCodeAsync(string assignmentId, Guid testSetId, CancellationToken cancellationToken = default);
 }

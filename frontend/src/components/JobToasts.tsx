@@ -173,6 +173,10 @@ function messageFor(entry: TrackedJob, job: JobInfo): ToastMessage | null {
     return analysisMessage(entry, job, "Test cases ready", "Test case generation");
   }
 
+  if (job.type === "GenerateTestCode") {
+    return analysisMessage(entry, job, "Test code ready", "Test code generation");
+  }
+
   switch (job.status) {
     case "Queued":
       if (job.attempts > 0) {

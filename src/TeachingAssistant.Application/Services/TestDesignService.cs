@@ -60,7 +60,7 @@ public class TestDesignService : ITestDesignService
         }
         """;
 
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    internal static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         Converters = { new JsonStringEnumConverter() },
     };
@@ -72,12 +72,15 @@ public class TestDesignService : ITestDesignService
     private readonly IAssignmentNoteStore _notes;
     private readonly ILanguageModel _languageModel;
     private readonly ModelCallContext _callContext;
+    private readonly IJobService _jobs;
     private readonly TimeProvider _timeProvider;
 
     public TestDesignService(
         ITestSetStore testSets, IGradingService grading, ICourseGuidanceStore courseGuidance, IPolicyRuleStore rules,
-        IAssignmentNoteStore notes, ILanguageModel languageModel, ModelCallContext callContext, TimeProvider timeProvider)
+        IAssignmentNoteStore notes, ILanguageModel languageModel, ModelCallContext callContext, IJobService jobs,
+        TimeProvider timeProvider)
     {
+        _jobs = jobs;
         _testSets = testSets;
         _grading = grading;
         _courseGuidance = courseGuidance;
@@ -146,6 +149,18 @@ public class TestDesignService : ITestDesignService
         return await RespondAsync(testSet, cancellationToken);
     }
 
+    public async Task<JobResponse?> QueueCodeAsync(string assignmentId, Guid testSetId, CancellationToken cancellationToken = default)
+    {
+        var testSet = await FindLatestAsync(assignmentId, testSetId, cancellationToken);
+        if (testSet is null)
+        {
+            return null;
+        }
+
+        TestCodeService.EnsureCanHaveCode(testSet);
+        return await _jobs.QueueGenerateTestCodeAsync(testSet.CourseId, testSet.AssignmentId, testSet.Id, cancellationToken);
+    }
+
     public async Task<TestSetResponse?> ApproveAsync(string assignmentId, Guid testSetId, CancellationToken cancellationToken = default)
     {
         var testSet = await FindLatestAsync(assignmentId, testSetId, cancellationToken);
@@ -158,6 +173,10 @@ public class TestDesignService : ITestDesignService
         {
             testSet.Approve();
             await _testSets.SaveChangesAsync(cancellationToken);
+            if (testSet.Style == TestStyle.ClassDesign)
+            {
+                await _jobs.QueueGenerateTestCodeAsync(testSet.CourseId, testSet.AssignmentId, testSet.Id, cancellationToken);
+            }
         }
 
         return await RespondAsync(testSet, cancellationToken);
@@ -366,12 +385,22 @@ public class TestDesignService : ITestDesignService
         return new TestSetContent { Requirements = requirements, Interface = contract, Cases = cases };
     }
 
+    internal static TestSetContent ReadContent(TestSet testSet)
+    {
+        return JsonSerializer.Deserialize<TestSetContent>(testSet.Content, JsonOptions)
+               ?? throw new InvalidOperationException($"Test set {testSet.Id} has no content.");
+    }
+
+    internal static GenerateTestsRequest ReadRequest(TestSet testSet)
+    {
+        return JsonSerializer.Deserialize<GenerateTestsRequest>(testSet.Request, JsonOptions)
+               ?? throw new InvalidOperationException($"Test set {testSet.Id} has no request.");
+    }
+
     internal static TestSetResponse ToResponse(TestSet testSet, int? approvedVersion)
     {
-        var content = JsonSerializer.Deserialize<TestSetContent>(testSet.Content, JsonOptions)
-                      ?? throw new InvalidOperationException($"Test set {testSet.Id} has no content.");
-        var request = JsonSerializer.Deserialize<GenerateTestsRequest>(testSet.Request, JsonOptions)
-                      ?? throw new InvalidOperationException($"Test set {testSet.Id} has no request.");
+        var content = ReadContent(testSet);
+        var request = ReadRequest(testSet);
 
         return new TestSetResponse
         {
@@ -386,6 +415,7 @@ public class TestDesignService : ITestDesignService
             Interface = content.Interface,
             Cases = content.Cases,
             ApprovedVersion = approvedVersion,
+            Code = content.Code,
             Model = testSet.Model,
             CreatedAt = testSet.CreatedAt,
         };

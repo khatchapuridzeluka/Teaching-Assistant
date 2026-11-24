@@ -465,6 +465,23 @@ export const useApproveTestSet = (courseId: string, assignmentId: string) => {
       ),
     onSuccess: (testSet) => {
       queryClient.setQueryData(["courses", courseId, "assignments", assignmentId, "tests"], testSet);
+      void queryClient.invalidateQueries({ queryKey: ["courses", courseId, "assignments", assignmentId, "jobs"] });
+    },
+  });
+};
+
+export const useGenerateTestCode = (courseId: string, assignmentId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (testSetId: string) =>
+      unwrap(
+        api.POST("/courses/{courseId}/assignments/{assignmentId}/tests/{testSetId}/code/generate", {
+          params: { path: { courseId, assignmentId, testSetId } },
+        }),
+      ),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["courses", courseId, "assignments", assignmentId, "jobs"] });
+      void queryClient.invalidateQueries({ queryKey: ["jobs"] });
     },
   });
 };

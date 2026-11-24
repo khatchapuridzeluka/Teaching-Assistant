@@ -29,6 +29,7 @@ export function AssignmentTests({ courseId, assignmentId, assignmentTitle }: { c
   const [formOpen, setFormOpen] = useState(false);
 
   const latestJob = (jobs.data ?? []).find((job) => job.type === "GenerateTests");
+  const codeJob = (jobs.data ?? []).find((job) => job.type === "GenerateTestCode");
   const running = latestJob && (latestJob.status === "Queued" || latestJob.status === "Running") ? latestJob : undefined;
   const current = testSet.data ?? null;
   const failed =
@@ -42,6 +43,12 @@ export function AssignmentTests({ courseId, assignmentId, assignmentTitle }: { c
       void refetchTestSet();
     }
   }, [latestJob?.id, latestJob?.status, refetchTestSet]);
+
+  useEffect(() => {
+    if (codeJob?.status === "Succeeded") {
+      void refetchTestSet();
+    }
+  }, [codeJob?.id, codeJob?.status, refetchTestSet]);
 
   function submit(request: GenerateTests) {
     generate.mutate(request, {
@@ -84,7 +91,14 @@ export function AssignmentTests({ courseId, assignmentId, assignmentTitle }: { c
       )}
 
       {current && (
-        <TestSetView testSet={current} courseId={courseId} assignmentId={assignmentId} busy={!!running} onRegenerate={() => setFormOpen(true)} />
+        <TestSetView
+          testSet={current}
+          courseId={courseId}
+          assignmentId={assignmentId}
+          busy={!!running}
+          codeJob={codeJob}
+          onRegenerate={() => setFormOpen(true)}
+        />
       )}
 
       {formOpen && (

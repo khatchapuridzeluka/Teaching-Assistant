@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 #
-# The sandbox image student Java code runs in: a JDK plus Checkstyle, PMD and SpotBugs, nothing else.
+# The sandbox image student Java code runs in: a JDK plus Checkstyle, PMD, SpotBugs and the JUnit runner, nothing else.
 # Build one image per JDK (see sandbox/README.md): ta-java:27 first, ta-java:21 as the fallback.
 #
 # The image needs no network at run time. The runner starts it with --network none, a read-only root file system,
@@ -19,6 +19,8 @@ ARG PMD_VERSION=7.29.0
 ARG PMD_SHA256=d27177c185b837fa57f097e482d1253468aa035379c5eb2671fa0a279109b179
 ARG SPOTBUGS_VERSION=4.10.5
 ARG SPOTBUGS_SHA256=cce3244900cc215ccd9f5a8db29ed9468fc47824faf662f4fad005343d96007e
+ARG JUNIT_VERSION=6.1.3
+ARG JUNIT_SHA256=e62b96ac475dbcde8599ea905d088f65d90778f86e259b856a49fa5c4ea256ec
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends curl unzip \
@@ -46,6 +48,14 @@ RUN curl -fsSL -o spotbugs.tgz \
  && mv "spotbugs-${SPOTBUGS_VERSION}" /opt/spotbugs \
  && rm spotbugs.tgz
 
+# The JUnit console runner with JUnit Jupiter in one jar: the tests generated for an assignment compile against it and
+# run with it.
+RUN curl -fsSL -o junit.jar \
+      "https://repo1.maven.org/maven2/org/junit/platform/junit-platform-console-standalone/${JUNIT_VERSION}/junit-platform-console-standalone-${JUNIT_VERSION}.jar" \
+ && echo "${JUNIT_SHA256}  junit.jar" | sha256sum -c - \
+ && mkdir -p /opt/junit \
+ && mv junit.jar /opt/junit/junit.jar
+
 # ---- The sandbox ----
 FROM eclipse-temurin:${JDK_VERSION}-jdk
 
@@ -56,6 +66,7 @@ LABEL org.opencontainers.image.title="ta-java" \
 COPY --from=tools /opt/checkstyle /opt/checkstyle
 COPY --from=tools /opt/pmd /opt/pmd
 COPY --from=tools /opt/spotbugs /opt/spotbugs
+COPY --from=tools /opt/junit /opt/junit
 
 # Short commands for the runner's steps: checkstyle, pmd and spotbugs, each passing its arguments through.
 RUN printf '#!/bin/sh\nexec java -jar /opt/checkstyle/checkstyle.jar "$@"\n' > /usr/local/bin/checkstyle \

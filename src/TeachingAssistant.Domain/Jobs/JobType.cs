@@ -27,4 +27,6 @@ public enum JobType
     EvaluationGrade,
 
     GenerateTests,
+
+    GenerateTestCode,
 }

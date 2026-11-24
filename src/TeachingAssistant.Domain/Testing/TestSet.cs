@@ -57,6 +57,16 @@ public class TestSet
         Content = content;
     }
 
+    public void RecordCode(string content)
+    {
+        if (Status != TestSetStatus.Approved)
+        {
+            throw new InvalidOperationException("Test code is written for an approved test set only.");
+        }
+
+        Content = content;
+    }
+
     public void Approve()
     {
         Status = TestSetStatus.Approved;

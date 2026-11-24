@@ -293,6 +293,10 @@ public class GradingToolsTests
             bool regrade = false, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
+        public Task<JobResponse> QueueGenerateTestCodeAsync(
+            string courseId, string assignmentId, Guid testSetId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public Task<JobResponse> QueueGenerateTestsAsync(
             string courseId, string assignmentId, GenerateTestsRequest request, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();

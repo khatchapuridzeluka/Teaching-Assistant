@@ -161,11 +161,13 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IModelUsageService, ModelUsageService>();
         services.AddScoped<IMistakeAnalysisService, MistakeAnalysisService>();
         services.AddScoped<ITestDesignService, TestDesignService>();
+        services.AddScoped<ITestCodeService, TestCodeService>();
         services.AddScoped<IJobService, JobService>();
         services.AddScoped<IJobProcessor, JobProcessor>();
         services.AddScoped<IJobHandler, GradeVersionJobHandler>();
         services.AddScoped<IJobHandler, AnalyzeMistakesJobHandler>();
         services.AddScoped<IJobHandler, GenerateTestsJobHandler>();
+        services.AddScoped<IJobHandler, GenerateTestCodeJobHandler>();
         services.AddScoped<IJobHandler, AnalyzeStudentJobHandler>();
         services.AddScoped<IJobHandler, FetchStudentWorkJobHandler>();
         services.AddScoped<IJobHandler, AgentRunJobHandler>();

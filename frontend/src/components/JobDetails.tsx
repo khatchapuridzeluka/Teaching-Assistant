@@ -57,6 +57,11 @@ export const jobTypeInfo: Record<JobType, { label: string; description: string }
     description:
       "Designs test cases for one assignment in one AI call. It sends the stored instructions, your settings from the Create test cases form, your grading policy and the optional reference solution (never student work or names); the result is a new draft test set on the assignment's Tests view.",
   },
+  GenerateTestCode: {
+    label: "Test code",
+    description:
+      "Writes the JUnit test code for an approved class-design test set in one AI call. It sends the neutral interface and the approved cases (never student work or names), then compiles the tests in the sandbox with a placeholder adapter; the code and the compile result appear on the assignment's Tests view.",
+  },
   FetchAssignment: {
     label: "Fetch",
     description: "Downloads an assignment's new and changed submissions from Google Classroom (planned on the queue).",
@@ -157,6 +162,13 @@ const iconPaths: Record<JobType, ReactNode> = {
     <>
       <path d="M9 11l3 3L22 4" />
       <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+    </>
+  ),
+  GenerateTestCode: (
+    <>
+      <path d="m8 9-4 3 4 3" />
+      <path d="m16 9 4 3-4 3" />
+      <path d="m13.5 6-3 12" />
     </>
   ),
   FetchAssignment: (
