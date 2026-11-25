@@ -61,7 +61,7 @@ A regrade reuses the stored adapter, and editing cases reruns all adapters for f
 3. the **test cases**: id, description, category, the requirement it checks, steps (an input, or a sequence of calls), and the expected result or "from the reference solution";
 4. what it **couldn't test**, and why (for example clean code, which the grader judges from the code).
 
-Simple cases are stored as structured data the teacher can read and edit without Java. Cases that need real code (threads, timing, long call sequences) come later as JUnit the model writes and the teacher sees.
+Each case checks behaviour through the method that answers it directly (after an add: the size and the value at the promised position; after a remove: the returned value, the size and the neighbours), one value per check. The whole object as text (`toString`) is checked only in cases for a requirement about that format, so one formatting habit cannot fail every case and hide whether the rest works. The test code groups a case's checks in `assertAll`, so every failed check is reported. Simple cases are stored as structured data the teacher can read and edit without Java. Cases that need real code (threads, timing, long call sequences) come later as JUnit the model writes and the teacher sees.
 
 **Coverage**, checked by the system rather than claimed by the model: every requirement needs at least one test (gaps show in red while reviewing); later, code coverage of the reference solution with JaCoCo in the sandbox, so an unreached branch points at a missing case.
 

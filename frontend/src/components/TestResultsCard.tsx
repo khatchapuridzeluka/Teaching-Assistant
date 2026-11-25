@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import type { JobInfo, TestCase, TestOutcome, TestRun } from "../api/client";
-import { useRunTests, useTestRuns } from "../api/hooks";
+import { useRunTests, useRunTestsForVersion, useStoredSubmissions, useTestRuns } from "../api/hooks";
 import { formatDate } from "../format";
-import { Play, Table2 } from "lucide-react";
-import { Button, Card, CardHeader, Chip, ErrorPanel, Notice, SkeletonRows, Spinner } from "./ui";
+import { Loader2, Play, Table2 } from "lucide-react";
+import { Button, Card, CardHeader, Chip, ErrorPanel, Notice, SkeletonRows } from "./ui";
 
 const outcomeStyle: Record<TestOutcome, { cell: string; mark: string; label: string }> = {
   Passed: { cell: "bg-success-tint text-success-ink", mark: "✓", label: "passed" },
@@ -18,6 +18,12 @@ const runStatus: Record<Exclude<TestRun["status"], "Completed">, { label: string
   NotRun: { label: "Not run", tone: "muted" },
 };
 
+type Row = { key: string; studentName: string; versionId: string; versionNumber: number; run: TestRun | undefined };
+
+function isActive(job: JobInfo) {
+  return job.type === "RunTests" && (job.status === "Queued" || job.status === "Running");
+}
+
 export function TestResultsCard({
   courseId,
   assignmentId,
@@ -31,10 +37,13 @@ export function TestResultsCard({
   cases: TestCase[];
   jobs: JobInfo[];
 }) {
-  const active = jobs.filter((j) => j.type === "RunTests" && (j.status === "Queued" || j.status === "Running"));
+  const active = jobs.filter(isActive);
+  const runningVersions = new Set(active.map((j) => j.versionId));
   const runs = useTestRuns(courseId, assignmentId, testSetId, active.length > 0);
-  const start = useRunTests(courseId, assignmentId);
-  const [selected, setSelected] = useState<{ runId: string; caseId?: string } | null>(null);
+  const stored = useStoredSubmissions(courseId, assignmentId);
+  const runAll = useRunTests(courseId, assignmentId);
+  const runOne = useRunTestsForVersion(courseId, assignmentId);
+  const [selected, setSelected] = useState<{ versionId: string; caseId?: string } | null>(null);
   const wasRunning = useRef(false);
   const refetchRuns = runs.refetch;
 
@@ -45,18 +54,29 @@ export function TestResultsCard({
     wasRunning.current = active.length > 0;
   }, [active.length, refetchRuns]);
 
-  const list = runs.data ?? [];
-  const completed = list.filter((r) => r.status === "Completed");
+  const runsByVersion = new Map((runs.data ?? []).map((r) => [r.versionId, r]));
+  const rows: Row[] = (stored.data ?? [])
+    .map((submission) => {
+      const latest = [...submission.versions].filter((v) => v.status !== "Failed").sort((a, b) => b.number - a.number)[0];
+      return latest
+        ? { key: submission.id, studentName: submission.studentName, versionId: latest.id, versionNumber: latest.number, run: runsByVersion.get(latest.id) }
+        : null;
+    })
+    .filter((row): row is Row => row !== null)
+    .sort((a, b) => a.studentName.localeCompare(b.studentName));
+
+  const tested = rows.filter((r) => r.run);
+  const completed = tested.filter((r) => r.run!.status === "Completed").map((r) => r.run!);
   const allPassed = completed.filter((r) => r.results.length > 0 && r.results.every((x) => x.outcome === "Passed")).length;
-  const caseFailures = cases.map((c) => ({
-    testCase: c,
-    failed: completed.filter((r) => r.results.some((x) => x.caseId === c.id && x.outcome !== "Passed")).length,
-  }));
-  const hardest = caseFailures.reduce<{ testCase: TestCase; failed: number } | null>(
-    (best, item) => (item.failed > 0 && (!best || item.failed > best.failed) ? item : best),
-    null,
-  );
-  const selectedRun = list.find((r) => r.id === selected?.runId);
+  const hardest = cases
+    .map((c) => ({ testCase: c, failed: completed.filter((r) => r.results.some((x) => x.caseId === c.id && x.outcome !== "Passed")).length }))
+    .reduce<{ testCase: TestCase; failed: number } | null>((best, item) => (item.failed > 0 && (!best || item.failed > best.failed) ? item : best), null);
+  const selectedRow = rows.find((r) => r.versionId === selected?.versionId);
+
+  function run(versionId: string) {
+    setSelected({ versionId });
+    runOne.mutate({ testSetId, versionId });
+  }
 
   return (
     <Card>
@@ -65,40 +85,46 @@ export function TestResultsCard({
         title="Test results"
         subtitle="Each student's latest version against the approved tests"
         actions={
-          <Button small variant="primary" icon={<Play />} disabled={start.isPending || active.length > 0} onClick={() => start.mutate(testSetId)}>
-            {start.isPending ? "Queuing…" : list.length > 0 ? "Run tests again" : "Run tests on all submissions"}
-          </Button>
+          rows.length > 0 && (
+            <Button small icon={<Play />} disabled={runAll.isPending || active.length > 0} onClick={() => runAll.mutate(testSetId)}>
+              {runAll.isPending ? "Queuing…" : "Run for everyone"}
+            </Button>
+          )
         }
       />
       <div className="flex flex-col gap-3 px-[18px] py-3">
         <p className="text-xs text-ink-muted">
-          Runs in the sandbox. A version without an adapter yet gets one written first (one small AI call each); running again with the same
-          adapters is free.
+          <b className="font-semibold text-ink-soft">Run</b> tests one student's version in the sandbox: it compiles their code, writes their
+          adapter from their files (one small AI call, only the first time) and runs the test code. Running again reuses the adapter and is free.
         </p>
-        {active.length > 0 && <Spinner label={`Running tests… ${active.length} ${active.length === 1 ? "student" : "students"} still in the queue.`} />}
-        {start.isError && <ErrorPanel error={start.error} />}
-        {start.data && start.data.skipped.length > 0 && (
-          <Notice tone="info" title={`Queued ${start.data.queued}.`} onDismiss={() => start.reset()}>
-            Skipped: {start.data.skipped.join("; ")}
+        {runAll.isError && <ErrorPanel error={runAll.error} />}
+        {runOne.isError && <ErrorPanel error={runOne.error} />}
+        {runAll.data && runAll.data.skipped.length > 0 && (
+          <Notice tone="info" title={`Queued ${runAll.data.queued}.`} onDismiss={() => runAll.reset()}>
+            Skipped: {runAll.data.skipped.join("; ")}
           </Notice>
         )}
-        {runs.isLoading && <SkeletonRows rows={4} />}
+        {(runs.isLoading || stored.isLoading) && <SkeletonRows rows={4} />}
         {runs.isError && <ErrorPanel error={runs.error} />}
+        {stored.isSuccess && rows.length === 0 && <div className="text-ink-muted">No student has stored work yet. Fetch the submissions first.</div>}
 
-        {list.length > 0 && (
+        {rows.length > 0 && (
           <>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <Summary label="Tested" value={list.length} />
-              <Summary label="All passed" value={allPassed} tone="text-success" />
-              <Summary label="Some failing" value={completed.length - allPassed} tone="text-danger" />
-              <Summary label="Hardest case" value={hardest ? `${hardest.testCase.id}` : "–"} note={hardest ? `${hardest.failed} not passing` : undefined} />
-            </div>
+            {tested.length > 0 && (
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <Summary label="Tested" value={`${tested.length} / ${rows.length}`} />
+                <Summary label="All passed" value={allPassed} tone="text-success" />
+                <Summary label="Some failing" value={completed.length - allPassed} tone="text-danger" />
+                <Summary label="Hardest case" value={hardest ? hardest.testCase.id : "–"} note={hardest ? `${hardest.failed} not passing` : undefined} />
+              </div>
+            )}
 
             <div className="overflow-x-auto rounded-lg border border-line">
               <table className="w-full border-collapse text-left">
                 <thead>
                   <tr className="border-b border-line bg-paper text-[11px] text-ink-muted">
                     <th className="px-3 py-2 font-semibold">Student</th>
+                    <th className="px-2 py-2" />
                     {cases.map((c) => (
                       <th key={c.id} title={c.title} className="px-1 py-2 text-center font-semibold">
                         {c.id}
@@ -108,42 +134,29 @@ export function TestResultsCard({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-paper-dark">
-                  {list.map((run) => (
-                    <tr key={run.id} className={selected?.runId === run.id ? "bg-accent-tint/30" : ""}>
-                      <td className="whitespace-nowrap px-3 py-1.5">
-                        <button className="font-semibold hover:text-accent" onClick={() => setSelected({ runId: run.id })}>
-                          {run.studentName}
-                        </button>
-                        <span className="ml-1.5 text-xs text-ink-faint">v{run.versionNumber}</span>
-                      </td>
-                      {run.status === "Completed" ? (
-                        cases.map((c) => {
-                          const result = run.results.find((r) => r.caseId === c.id);
-                          const style = outcomeStyle[result?.outcome ?? "Missing"];
-                          return (
-                            <td key={c.id} className="px-1 py-1.5 text-center">
-                              <button
-                                title={`${c.id} ${c.title}: ${style.label}`}
-                                onClick={() => setSelected({ runId: run.id, caseId: c.id })}
-                                className={`inline-flex h-[22px] w-[26px] items-center justify-center rounded-[5px] text-[11px] font-bold ${style.cell}`}
-                              >
-                                {style.mark}
-                              </button>
-                            </td>
-                          );
-                        })
-                      ) : (
-                        <td colSpan={cases.length} className="px-2 py-1.5">
-                          <button onClick={() => setSelected({ runId: run.id })}>
-                            <Chip tone={runStatus[run.status].tone}>{runStatus[run.status].label}</Chip>
+                  {rows.map((row) => {
+                    const running = runningVersions.has(row.versionId) || (runOne.isPending && runOne.variables?.versionId === row.versionId);
+                    return (
+                      <tr key={row.key} className={selected?.versionId === row.versionId ? "bg-accent-tint/30" : ""}>
+                        <td className="whitespace-nowrap px-3 py-1.5">
+                          <button className="font-semibold hover:text-accent" onClick={() => setSelected({ versionId: row.versionId })}>
+                            {row.studentName}
                           </button>
+                          <span className="ml-1.5 text-xs text-ink-faint">v{row.versionNumber}</span>
                         </td>
-                      )}
-                      <td className="px-3 py-1.5 text-right text-ink-muted">
-                        {run.status === "Completed" ? `${run.passed} / ${cases.length}` : "–"}
-                      </td>
-                    </tr>
-                  ))}
+                        <td className="px-2 py-1.5">
+                          <Button small variant="ghost" icon={running ? <Loader2 className="animate-spin" /> : <Play />} disabled={running}
+                            onClick={() => run(row.versionId)}>
+                            {running ? "Running" : row.run ? "Run again" : "Run"}
+                          </Button>
+                        </td>
+                        <ResultCells row={row} cases={cases} onSelect={(caseId) => setSelected({ versionId: row.versionId, caseId })} />
+                        <td className="px-3 py-1.5 text-right text-ink-muted">
+                          {row.run?.status === "Completed" ? `${row.run.passed} / ${cases.length}` : "–"}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -160,9 +173,47 @@ export function TestResultsCard({
           </>
         )}
 
-        {selectedRun && <RunDetail run={selectedRun} caseId={selected?.caseId} cases={cases} />}
+        {selectedRow?.run && <RunDetail run={selectedRow.run} caseId={selected?.caseId} cases={cases} />}
       </div>
     </Card>
+  );
+}
+
+function ResultCells({ row, cases, onSelect }: { row: Row; cases: TestCase[]; onSelect: (caseId: string) => void }) {
+  if (!row.run) {
+    return (
+      <td colSpan={cases.length} className="px-2 py-1.5 text-xs text-ink-faint">
+        Not run yet
+      </td>
+    );
+  }
+
+  if (row.run.status !== "Completed") {
+    return (
+      <td colSpan={cases.length} className="px-2 py-1.5">
+        <Chip tone={runStatus[row.run.status].tone}>{runStatus[row.run.status].label}</Chip>
+      </td>
+    );
+  }
+
+  return (
+    <>
+      {cases.map((c) => {
+        const result = row.run!.results.find((r) => r.caseId === c.id);
+        const style = outcomeStyle[result?.outcome ?? "Missing"];
+        return (
+          <td key={c.id} className="px-1 py-1.5 text-center">
+            <button
+              title={`${c.id} ${c.title}: ${style.label}`}
+              onClick={() => onSelect(c.id)}
+              className={`inline-flex h-[22px] w-[26px] items-center justify-center rounded-[5px] text-[11px] font-bold ${style.cell}`}
+            >
+              {style.mark}
+            </button>
+          </td>
+        );
+      })}
+    </>
   );
 }
 

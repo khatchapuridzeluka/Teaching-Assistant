@@ -15,7 +15,12 @@ internal static class JobPayloads
 
     public static JobResponse ToResponse(Job job)
     {
-        Guid? versionId = job.Type == JobType.GradeVersion ? Read<GradeVersionPayload>(job.Payload).VersionId : null;
+        Guid? versionId = job.Type switch
+        {
+            JobType.GradeVersion => Read<GradeVersionPayload>(job.Payload).VersionId,
+            JobType.RunTests => Read<RunTestsPayload>(job.Payload).VersionId,
+            _ => null,
+        };
         Guid? gradingId = job is { Type: JobType.GradeVersion, Result: { } result } ? Read<GradeVersionResult>(result).GradingId : null;
 
         return new JobResponse

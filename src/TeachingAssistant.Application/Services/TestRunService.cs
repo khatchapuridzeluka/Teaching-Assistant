@@ -92,6 +92,20 @@ public partial class TestRunService : ITestRunService
         return new RunTestsResponse { Queued = queued, Skipped = skipped };
     }
 
+    public async Task<JobResponse?> QueueOneAsync(
+        string assignmentId, Guid testSetId, Guid versionId, CancellationToken cancellationToken = default)
+    {
+        var testSet = await _testSets.FindAsync(testSetId, cancellationToken);
+        var submission = await _submissions.FindByVersionAsync(versionId, cancellationToken);
+        if (testSet is null || testSet.AssignmentId != assignmentId || submission is null || submission.AssignmentId != assignmentId)
+        {
+            return null;
+        }
+
+        EnsureCanRun(testSet, TestDesignService.ReadContent(testSet));
+        return await _jobs.QueueRunTestsAsync(testSet.CourseId, assignmentId, testSet.Id, versionId, cancellationToken);
+    }
+
     public async Task<IReadOnlyList<TestRunResponse>?> GetLatestAsync(
         string assignmentId, Guid testSetId, CancellationToken cancellationToken = default)
     {

@@ -514,6 +514,22 @@ export const useRunTests = (courseId: string, assignmentId: string) => {
   });
 };
 
+export const useRunTestsForVersion = (courseId: string, assignmentId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ testSetId, versionId }: { testSetId: string; versionId: string }) =>
+      unwrap(
+        api.POST("/courses/{courseId}/assignments/{assignmentId}/tests/{testSetId}/runs/{versionId}", {
+          params: { path: { courseId, assignmentId, testSetId, versionId } },
+        }),
+      ),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["courses", courseId, "assignments", assignmentId, "jobs"] });
+      void queryClient.invalidateQueries({ queryKey: ["jobs"] });
+    },
+  });
+};
+
 export const useApproveExplanation = (courseId: string, assignmentId: string) => {
   const queryClient = useQueryClient();
   return useMutation({

@@ -160,4 +160,26 @@ public class AssignmentTestsController : ControllerBase
 
         return Accepted(queued);
     }
+
+    /// <summary>
+    /// Queues a test run of one student's version: it compiles the student's code, writes or reuses their adapter (one small paid call when there is none yet) and runs the test code in the sandbox.
+    /// </summary>
+    /// <response code="202">Run queued (or the running one is returned); follow it with GET /jobs/{jobId}</response>
+    /// <response code="400">The test set is not approved, has no test code, or its code does not compile</response>
+    /// <response code="404">No test set or version with these IDs for this assignment</response>
+    [HttpPost("courses/{courseId}/assignments/{assignmentId}/tests/{testSetId:guid}/runs/{versionId:guid}")]
+    [ProducesResponseType(typeof(JobResponse), StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<JobResponse>> RunOneAsync(
+        string courseId, string assignmentId, Guid testSetId, Guid versionId, CancellationToken cancellationToken)
+    {
+        var job = await _testRunService.QueueOneAsync(assignmentId, testSetId, versionId, cancellationToken);
+        if (job is null)
+        {
+            return NotFound();
+        }
+
+        return Accepted($"/jobs/{job.Id}", job);
+    }
 }

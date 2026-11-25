@@ -171,6 +171,23 @@ public class TestRunServiceTests
     }
 
     [Fact]
+    public async Task QueueOne_QueuesThatVersion_AndFindsNothingForAVersionOfAnotherAssignment()
+    {
+        var (testSet, version) = Setup();
+        var elsewhere = new Submission(SubmissionSource.GoogleClassroom, "course", "other-assignment", "student-3", "Other", "sub-3", "folder",
+            DateTimeOffset.UtcNow);
+        var otherVersion = elsewhere.AddVersion(VersionStatus.Ready, null, "hash", "folder/v1", null, DateTimeOffset.UtcNow, []);
+        _submissions.All.Add(elsewhere);
+
+        var job = await Service().QueueOneAsync("assignment", testSet.Id, version.Id, TestContext.Current.CancellationToken);
+        var none = await Service().QueueOneAsync("assignment", testSet.Id, otherVersion.Id, TestContext.Current.CancellationToken);
+
+        Assert.Equal(version.Id, job!.VersionId);
+        Assert.Null(none);
+        Assert.Equal([version.Id], _jobs.RunJobs);
+    }
+
+    [Fact]
     public void ReadReport_MapsTimeoutsAndExceptions_AndMarksCasesThatDidNotRun()
     {
         const string xml =

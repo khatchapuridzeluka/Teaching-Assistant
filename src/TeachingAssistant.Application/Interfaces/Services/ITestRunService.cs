@@ -8,5 +8,7 @@ public interface ITestRunService
 
     Task<RunTestsResponse?> QueueAllAsync(string assignmentId, Guid testSetId, CancellationToken cancellationToken = default);
 
+    Task<JobResponse?> QueueOneAsync(string assignmentId, Guid testSetId, Guid versionId, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<TestRunResponse>?> GetLatestAsync(string assignmentId, Guid testSetId, CancellationToken cancellationToken = default);
 }
