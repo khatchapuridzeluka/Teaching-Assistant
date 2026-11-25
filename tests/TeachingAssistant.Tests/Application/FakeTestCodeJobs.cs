@@ -21,10 +21,14 @@ internal sealed class FakeTestCodeJobs : IJobService
 
     public List<Guid> RunJobs { get; } = [];
 
+    public List<bool> NewAdapterJobs { get; } = [];
+
     public Task<JobResponse> QueueRunTestsAsync(
-        string courseId, string assignmentId, Guid testSetId, Guid versionId, CancellationToken cancellationToken = default)
+        string courseId, string assignmentId, Guid testSetId, Guid versionId, bool newAdapter = false,
+        CancellationToken cancellationToken = default)
     {
         RunJobs.Add(versionId);
+        NewAdapterJobs.Add(newAdapter);
         var job = new Job(JobType.RunTests, JobPayloads.Write(new RunTestsPayload { TestSetId = testSetId, VersionId = versionId }),
             DateTimeOffset.UtcNow, courseId: courseId, assignmentId: assignmentId);
         return Task.FromResult(JobPayloads.ToResponse(job));

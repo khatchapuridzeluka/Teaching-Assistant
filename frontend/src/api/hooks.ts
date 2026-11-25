@@ -517,10 +517,10 @@ export const useRunTests = (courseId: string, assignmentId: string) => {
 export const useRunTestsForVersion = (courseId: string, assignmentId: string) => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ testSetId, versionId }: { testSetId: string; versionId: string }) =>
+    mutationFn: ({ testSetId, versionId, newAdapter }: { testSetId: string; versionId: string; newAdapter?: boolean }) =>
       unwrap(
         api.POST("/courses/{courseId}/assignments/{assignmentId}/tests/{testSetId}/runs/{versionId}", {
-          params: { path: { courseId, assignmentId, testSetId, versionId } },
+          params: { path: { courseId, assignmentId, testSetId, versionId }, query: newAdapter ? { newAdapter } : undefined },
         }),
       ),
     onSuccess: () => {

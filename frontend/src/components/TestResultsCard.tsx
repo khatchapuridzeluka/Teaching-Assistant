@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { JobInfo, TestCase, TestOutcome, TestRun } from "../api/client";
 import { useRunTests, useRunTestsForVersion, useStoredSubmissions, useTestRuns } from "../api/hooks";
 import { formatDate } from "../format";
-import { Loader2, Play, Table2 } from "lucide-react";
+import { Loader2, Play, RefreshCw, Table2 } from "lucide-react";
 import { Button, Card, CardHeader, Chip, ErrorPanel, Notice, SkeletonRows } from "./ui";
 
 const outcomeStyle: Record<TestOutcome, { cell: string; mark: string; label: string }> = {
@@ -73,10 +73,13 @@ export function TestResultsCard({
     .reduce<{ testCase: TestCase; failed: number } | null>((best, item) => (item.failed > 0 && (!best || item.failed > best.failed) ? item : best), null);
   const selectedRow = rows.find((r) => r.versionId === selected?.versionId);
 
-  function run(versionId: string) {
+  function run(versionId: string, newAdapter = false) {
     setSelected({ versionId });
-    runOne.mutate({ testSetId, versionId });
+    runOne.mutate({ testSetId, versionId, newAdapter });
   }
+
+  const isRunning = (versionId: string) =>
+    runningVersions.has(versionId) || (runOne.isPending && runOne.variables?.versionId === versionId);
 
   return (
     <Card>
@@ -135,7 +138,7 @@ export function TestResultsCard({
                 </thead>
                 <tbody className="divide-y divide-paper-dark">
                   {rows.map((row) => {
-                    const running = runningVersions.has(row.versionId) || (runOne.isPending && runOne.variables?.versionId === row.versionId);
+                    const running = isRunning(row.versionId);
                     return (
                       <tr key={row.key} className={selected?.versionId === row.versionId ? "bg-accent-tint/30" : ""}>
                         <td className="whitespace-nowrap px-3 py-1.5">
@@ -173,7 +176,15 @@ export function TestResultsCard({
           </>
         )}
 
-        {selectedRow?.run && <RunDetail run={selectedRow.run} caseId={selected?.caseId} cases={cases} />}
+        {selectedRow?.run && (
+          <RunDetail
+            run={selectedRow.run}
+            caseId={selected?.caseId}
+            cases={cases}
+            running={isRunning(selectedRow.versionId)}
+            onNewAdapter={() => run(selectedRow.versionId, true)}
+          />
+        )}
       </div>
     </Card>
   );
@@ -227,7 +238,19 @@ function Summary({ label, value, tone = "text-ink", note }: { label: string; val
   );
 }
 
-function RunDetail({ run, caseId, cases }: { run: TestRun; caseId?: string; cases: TestCase[] }) {
+function RunDetail({
+  run,
+  caseId,
+  cases,
+  running,
+  onNewAdapter,
+}: {
+  run: TestRun;
+  caseId?: string;
+  cases: TestCase[];
+  running: boolean;
+  onNewAdapter: () => void;
+}) {
   const shown = caseId ? run.results.filter((r) => r.caseId === caseId) : run.results.filter((r) => r.outcome !== "Passed");
   const title = (id: string) => cases.find((c) => c.id === id)?.title ?? id;
 
@@ -253,6 +276,16 @@ function RunDetail({ run, caseId, cases }: { run: TestRun; caseId?: string; case
         <pre className="max-h-60 overflow-auto whitespace-pre-wrap rounded-md border border-line bg-white px-3 py-2 font-mono text-[11px] leading-relaxed text-ink-soft">
           {run.output}
         </pre>
+      )}
+      {(run.status === "Completed" || run.status === "HarnessFailed") && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Button small variant="ghost" icon={running ? <Loader2 className="animate-spin" /> : <RefreshCw />} disabled={running} onClick={onNewAdapter}>
+            {running ? "Running" : "Write adapter again"}
+          </Button>
+          <span className="text-xs text-ink-muted">
+            When this student's adapter looks wrong: writes a new one from their files (one small AI call) and runs the tests again.
+          </span>
+        </div>
       )}
       {run.adapter && (
         <details>

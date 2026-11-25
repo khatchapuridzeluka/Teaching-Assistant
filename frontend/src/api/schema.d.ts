@@ -856,9 +856,12 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Queues a test run of one student's version: it compiles the student's code, writes or reuses their adapter (one small paid call when there is none yet, or always with newAdapter=true) and runs the test code in the sandbox. */
         post: {
             parameters: {
-                query?: never;
+                query?: {
+                    newAdapter?: boolean;
+                };
                 header?: never;
                 path: {
                     courseId: string;
@@ -870,12 +873,31 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
+                /** @description Run queued (or the running one is returned); follow it with GET /jobs/{jobId} */
                 202: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "application/json": components["schemas"]["JobResponse"];
+                    };
+                };
+                /** @description The test set is not approved, has no test code, or its code does not compile */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description No test set or version with these IDs for this assignment */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProblemDetails"];
                     };
                 };
             };

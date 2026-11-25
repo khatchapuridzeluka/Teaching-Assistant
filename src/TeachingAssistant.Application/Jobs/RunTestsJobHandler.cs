@@ -17,7 +17,7 @@ public class RunTestsJobHandler : IJobHandler
     public async Task<string?> RunAsync(string payload, CancellationToken cancellationToken)
     {
         var input = JobPayloads.Read<RunTestsPayload>(payload);
-        await _testRuns.RunAsync(input.TestSetId, input.VersionId, cancellationToken);
+        await _testRuns.RunAsync(input.TestSetId, input.VersionId, input.NewAdapter, cancellationToken);
         return null;
     }
 }

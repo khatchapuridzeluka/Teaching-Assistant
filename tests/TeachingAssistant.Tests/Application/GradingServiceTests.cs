@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 using TeachingAssistant.Application.Contracts;
 using TeachingAssistant.Application.Exceptions;
 using TeachingAssistant.Application.Interfaces;
@@ -6,6 +7,7 @@ using TeachingAssistant.Application.Models;
 using TeachingAssistant.Application.Services;
 using TeachingAssistant.Domain.Grading;
 using TeachingAssistant.Domain.Ingestion;
+using TeachingAssistant.Domain.Testing;
 
 namespace TeachingAssistant.Tests.Application;
 
@@ -25,12 +27,16 @@ public class GradingServiceTests
     private readonly FakePolicyRules _rules = new();
     private readonly FakeAssignmentNotes _notes = new();
     private readonly FakeSandbox _sandbox = new() { Unavailable = "Docker is not running." };
+    private readonly FakeTestSets _testSets = new();
+    private readonly FakeTestRuns _testRuns = new();
 
     private readonly ModelCallContext _callContext = new();
 
     private GradingService Service() =>
         new(_store, _instructions, _storage, _wordReader, _model, _gradings, _principles, _courseGuidance, _rules, _notes,
-            new JavaBuildCheck(_sandbox, _storage), _callContext, TimeProvider.System);
+            new JavaBuildCheck(_sandbox, _storage),
+            new TestRunner(_testSets, _testRuns, _store, new JavaBuildCheck(_sandbox, _storage), _sandbox, _model, _callContext, TimeProvider.System),
+            _callContext, TimeProvider.System);
 
     [Fact]
     public void TheSystemPrompt_EndsWithTheAssignmentsActiveNotes_AfterTheRules()
@@ -241,6 +247,125 @@ public class GradingServiceTests
         Assert.Equal("Grade this submission against the instructions.", texts[^1]);
         var saved = Assert.Single(_gradings.Saved);
         Assert.Equal((BuildStatus.CompileFailed, "Zoo.java:1: error: incompatible types\n1 error"), (saved.BuildStatus, saved.BuildOutput));
+    }
+
+    [Fact]
+    public async Task Grade_WithApprovedTests_GivesTheGraderEachCasesResult_BeforeTheLastLine()
+    {
+        _instructions.Store("Write a list.");
+        var versionId = _store.AddVersion(Content(ContentKind.CodeArchive, "list.zip", "application/zip"));
+        _storage.Code["MyList.java"] = "class MyList {}";
+        var testSet = ApprovedTestSet();
+        StoreRun(testSet, versionId, TestRunStatus.Completed,
+            new TestCaseResult { CaseId = "T1", Outcome = TestOutcome.Passed },
+            new TestCaseResult { CaseId = "T2", Outcome = TestOutcome.Failed, Message = "asText() ==> expected: <[5, 7]> but was: < [ 5 , 7 ] >" });
+
+        await Service().GradeVersionAsync(versionId, TestContext.Current.CancellationToken);
+
+        var texts = _model.Parts!.OfType<TextPart>().Select(p => p.Text).ToList();
+        var section = texts[^2];
+        Assert.StartsWith("<automated_tests>\nTest set version 1, approved by the teacher; 1 of 2 cases passed.", section);
+        Assert.Contains("R1: Adding puts the value last", section);
+        Assert.Contains("T1 Add [R1]: passed\nT2 Format [R2]: FAILED\n  Steps: add(5); add(7); asText()\n  Expected: \"[5, 7]\"\n  Result: asText()", section);
+        Assert.DoesNotContain(StudentName, section);
+        Assert.Equal("Grade this submission against the instructions.", texts[^1]);
+        Assert.Contains("Tests: version 1, 1 of 2 passed", Assert.Single(_gradings.Saved).SentFiles);
+        Assert.Single(_testRuns.All);
+    }
+
+    [Fact]
+    public async Task Grade_WhenTheAdapterDidNotFit_LeavesTheTestsOut_AndSaysSoInWhatWasSent()
+    {
+        _instructions.Store("Write a list.");
+        var versionId = _store.AddVersion(Content(ContentKind.CodeArchive, "list.zip", "application/zip"));
+        _storage.Code["MyList.java"] = "class MyList {}";
+        StoreRun(ApprovedTestSet(), versionId, TestRunStatus.HarnessFailed);
+
+        await Service().GradeVersionAsync(versionId, TestContext.Current.CancellationToken);
+
+        Assert.DoesNotContain(_model.Parts!.OfType<TextPart>(), p => p.Text.Contains("<automated_tests>"));
+        Assert.Contains("Tests: version 1 not used (the adapter did not fit this submission)", Assert.Single(_gradings.Saved).SentFiles);
+    }
+
+    [Fact]
+    public async Task Grade_WithOnlyADraftTestSet_GradesWithoutTests()
+    {
+        _instructions.Store("Write a list.");
+        var versionId = _store.AddVersion(Content(ContentKind.CodeArchive, "list.zip", "application/zip"));
+        _storage.Code["MyList.java"] = "class MyList {}";
+        StoreRun(ApprovedTestSet(approve: false), versionId, TestRunStatus.Completed, new TestCaseResult { CaseId = "T1", Outcome = TestOutcome.Passed });
+
+        await Service().GradeVersionAsync(versionId, TestContext.Current.CancellationToken);
+
+        Assert.DoesNotContain(_model.Parts!.OfType<TextPart>(), p => p.Text.Contains("<automated_tests>"));
+        Assert.DoesNotContain(Assert.Single(_gradings.Saved).SentFiles, s => s.StartsWith("Tests:"));
+    }
+
+    [Fact]
+    public async Task Grade_WithApprovedTests_ButNoDocker_GradesWithoutTests()
+    {
+        _instructions.Store("Write a list.");
+        var versionId = _store.AddVersion(Content(ContentKind.CodeArchive, "list.zip", "application/zip"));
+        _storage.Code["MyList.java"] = "class MyList {}";
+        ApprovedTestSet();
+
+        await Service().GradeVersionAsync(versionId, TestContext.Current.CancellationToken);
+
+        Assert.DoesNotContain(_model.Parts!.OfType<TextPart>(), p => p.Text.Contains("<automated_tests>"));
+        Assert.DoesNotContain(Assert.Single(_gradings.Saved).SentFiles, s => s.StartsWith("Tests:"));
+        Assert.Equal(TestRunStatus.NotRun, Assert.Single(_testRuns.All).Status);
+    }
+
+    private TestSet ApprovedTestSet(bool approve = true)
+    {
+        var content = new TestSetContent
+        {
+            Requirements =
+            [
+                new TestRequirement { Id = "R1", Text = "Adding puts the value last", Testable = true },
+                new TestRequirement { Id = "R2", Text = "asText lists the values as [a, b]", Testable = true },
+            ],
+            Interface = "public interface TextList { void add(int v); String asText(); }",
+            Cases =
+            [
+                new TestCase { Id = "T1", Title = "Add", Category = TestCategory.Normal, RequirementIds = ["R1"], Steps = "add(5)\nsize()", Expected = "1" },
+                new TestCase
+                {
+                    Id = "T2", Title = "Format", Category = TestCategory.Normal, RequirementIds = ["R2"], Steps = "add(5)\nadd(7)\nasText()",
+                    Expected = "\"[5, 7]\"",
+                },
+            ],
+            Code = new TestCode
+            {
+                InterfaceFile = "TextList.java",
+                TestClass = "class AssignmentTests { }",
+                StubAdapter = "class StudentAdapter { }",
+                Status = TestCodeStatus.Compiled,
+                Model = "model",
+                CreatedAt = DateTimeOffset.UtcNow,
+            },
+        };
+        var request = new GenerateTestsRequest
+        {
+            Style = TestStyle.ClassDesign, Categories = [TestCategory.Normal], Amount = TestAmount.AboutThreePerCategory, ReferenceFiles = [],
+        };
+        var testSet = new TestSet("course-1", "assignment-1", 1, TestStyle.ClassDesign, JsonSerializer.Serialize(request, TestDesignService.JsonOptions),
+            JsonSerializer.Serialize(content, TestDesignService.JsonOptions), "model", DateTimeOffset.UtcNow);
+        if (approve)
+        {
+            testSet.Approve();
+        }
+
+        _testSets.Add(testSet);
+        return testSet;
+    }
+
+    private void StoreRun(TestSet testSet, Guid versionId, TestRunStatus status, params TestCaseResult[] results)
+    {
+        var details = new TestRunDetails { Results = results };
+        _testRuns.Add(new TestRun(testSet.Id, testSet.Version, versionId, "course-1", "assignment-1", "student-1", status,
+            "interface", "class StudentAdapter {}", "adapter-model", JsonSerializer.Serialize(details, TestDesignService.JsonOptions), null,
+            DateTimeOffset.UtcNow));
     }
 
     [Fact]

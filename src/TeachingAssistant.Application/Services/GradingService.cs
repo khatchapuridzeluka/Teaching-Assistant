@@ -48,6 +48,7 @@ public class GradingService : IGradingService
     private readonly IPolicyRuleStore _rules;
     private readonly IAssignmentNoteStore _notes;
     private readonly JavaBuildCheck _buildCheck;
+    private readonly TestRunner _testRunner;
     private readonly ModelCallContext _callContext;
     private readonly TimeProvider _timeProvider;
 
@@ -63,6 +64,7 @@ public class GradingService : IGradingService
         IPolicyRuleStore rules,
         IAssignmentNoteStore notes,
         JavaBuildCheck buildCheck,
+        TestRunner testRunner,
         ModelCallContext callContext,
         TimeProvider timeProvider)
     {
@@ -77,6 +79,7 @@ public class GradingService : IGradingService
         _rules = rules;
         _notes = notes;
         _buildCheck = buildCheck;
+        _testRunner = testRunner;
         _callContext = callContext;
         _timeProvider = timeProvider;
     }
@@ -335,6 +338,16 @@ public class GradingService : IGradingService
         }
 
         _callContext.Describe(submission.CourseId, submission.AssignmentId, versionId);
+        if (await _testRunner.RunForGradingAsync(submission, versionId, cancellationToken) is { } tests)
+        {
+            if (TestRunner.GradingSection(tests) is { } section)
+            {
+                prompt.Parts.Insert(prompt.Parts.Count - 1, new TextPart { Text = section });
+            }
+
+            prompt.Sent.Add(TestRunner.SentLabel(tests));
+        }
+
         var principles = await _principles.GetActiveAsync(cancellationToken);
         var guidance = await _courseGuidance.FindAsync(submission.CourseId, cancellationToken);
         var rules = await _rules.GetActiveAsync(cancellationToken);

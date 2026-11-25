@@ -163,6 +163,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IMistakeAnalysisService, MistakeAnalysisService>();
         services.AddScoped<ITestDesignService, TestDesignService>();
         services.AddScoped<ITestCodeService, TestCodeService>();
+        services.AddScoped<TestRunner>();
         services.AddScoped<ITestRunService, TestRunService>();
         services.AddScoped<IJobService, JobService>();
         services.AddScoped<IJobProcessor, JobProcessor>();

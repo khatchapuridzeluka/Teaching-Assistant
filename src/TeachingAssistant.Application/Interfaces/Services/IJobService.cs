@@ -44,7 +44,8 @@ public interface IJobService
         string courseId, string assignmentId, Guid testSetId, CancellationToken cancellationToken = default);
 
     Task<JobResponse> QueueRunTestsAsync(
-        string courseId, string assignmentId, Guid testSetId, Guid versionId, CancellationToken cancellationToken = default);
+        string courseId, string assignmentId, Guid testSetId, Guid versionId, bool newAdapter = false,
+        CancellationToken cancellationToken = default);
 
     Task<JobResponse> QueueAnalyzeStudentAsync(
         string courseId, string studentId, StudentAnalysisKind kind, CancellationToken cancellationToken = default);

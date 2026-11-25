@@ -30,7 +30,7 @@ public class TestRunServiceTests
         """;
 
     private readonly FakeTestSets _testSets = new();
-    private readonly FakeRuns _runs = new();
+    private readonly FakeTestRuns _runs = new();
     private readonly FakeSubmissions _submissions = new();
     private readonly FakeCodeStorage _storage = new();
     private readonly ScriptedSandbox _sandbox = new();
@@ -44,7 +44,7 @@ public class TestRunServiceTests
         _sandbox.Script.Enqueue(Ok("compile submission"));
         _sandbox.Script.Enqueue(TestRun(Report));
 
-        await Service().RunAsync(testSet.Id, version.Id, TestContext.Current.CancellationToken);
+        await Service().RunAsync(testSet.Id, version.Id, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(PromptLibrary.TestAdapter, _model.SystemPrompt);
         var prompt = Assert.Single(_model.Prompts);
@@ -75,7 +75,7 @@ public class TestRunServiceTests
         var (testSet, version) = Setup();
         _sandbox.Script.Enqueue(Failed("compile submission", "src/Wallet.java:1: error: ';' expected"));
 
-        await Service().RunAsync(testSet.Id, version.Id, TestContext.Current.CancellationToken);
+        await Service().RunAsync(testSet.Id, version.Id, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Empty(_model.Prompts);
         var run = Assert.Single(_runs.All);
@@ -91,7 +91,7 @@ public class TestRunServiceTests
         _sandbox.Script.Enqueue(Failed("compile", "StudentAdapter.java:3: error: cannot find symbol addMoney"));
         _sandbox.Script.Enqueue(TestRun(Report));
 
-        await Service().RunAsync(testSet.Id, version.Id, TestContext.Current.CancellationToken);
+        await Service().RunAsync(testSet.Id, version.Id, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(2, _model.Prompts.Count);
         Assert.Contains("<compiler_errors>\nStudentAdapter.java:3: error: cannot find symbol addMoney", _model.Prompts[1]);
@@ -107,7 +107,7 @@ public class TestRunServiceTests
         _sandbox.Script.Enqueue(Failed("compile", "StudentAdapter.java:3: error: one"));
         _sandbox.Script.Enqueue(Failed("compile", "StudentAdapter.java:3: error: two"));
 
-        await Service().RunAsync(testSet.Id, version.Id, TestContext.Current.CancellationToken);
+        await Service().RunAsync(testSet.Id, version.Id, cancellationToken: TestContext.Current.CancellationToken);
 
         var run = Assert.Single(_runs.All);
         Assert.Equal(TestRunStatus.HarnessFailed, run.Status);
@@ -121,11 +121,11 @@ public class TestRunServiceTests
         var (testSet, version) = Setup();
         _sandbox.Script.Enqueue(Ok("compile submission"));
         _sandbox.Script.Enqueue(TestRun(Report));
-        await Service().RunAsync(testSet.Id, version.Id, TestContext.Current.CancellationToken);
+        await Service().RunAsync(testSet.Id, version.Id, cancellationToken: TestContext.Current.CancellationToken);
         _sandbox.Script.Enqueue(Ok("compile submission"));
         _sandbox.Script.Enqueue(TestRun(Report));
 
-        await Service().RunAsync(testSet.Id, version.Id, TestContext.Current.CancellationToken);
+        await Service().RunAsync(testSet.Id, version.Id, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Single(_model.Prompts);
         Assert.Equal(2, _runs.All.Count);
@@ -134,12 +134,39 @@ public class TestRunServiceTests
     }
 
     [Fact]
+    public async Task Run_WithNewAdapter_WritesTheAdapterAgain_EvenWhenOneIsStored()
+    {
+        var (testSet, version) = Setup();
+        _sandbox.Script.Enqueue(Ok("compile submission"));
+        _sandbox.Script.Enqueue(TestRun(Report));
+        await Service().RunAsync(testSet.Id, version.Id, cancellationToken: TestContext.Current.CancellationToken);
+        _sandbox.Script.Enqueue(Ok("compile submission"));
+        _sandbox.Script.Enqueue(TestRun(Report));
+
+        await Service().RunAsync(testSet.Id, version.Id, newAdapter: true, TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, _model.Prompts.Count);
+        Assert.DoesNotContain("<previous_adapter>", _model.Prompts[1]);
+        Assert.Equal([TestRunStatus.Completed, TestRunStatus.Completed], _runs.All.Select(r => r.Status));
+    }
+
+    [Fact]
+    public async Task QueueOne_WithNewAdapter_PassesItToTheJob()
+    {
+        var (testSet, version) = Setup();
+
+        await Service().QueueOneAsync("assignment", testSet.Id, version.Id, newAdapter: true, TestContext.Current.CancellationToken);
+
+        Assert.Equal([true], _jobs.NewAdapterJobs);
+    }
+
+    [Fact]
     public async Task Run_WithoutDocker_RecordsThatItDidNotRun()
     {
         var (testSet, version) = Setup();
         _sandbox.Unavailable = true;
 
-        await Service().RunAsync(testSet.Id, version.Id, TestContext.Current.CancellationToken);
+        await Service().RunAsync(testSet.Id, version.Id, cancellationToken: TestContext.Current.CancellationToken);
 
         var run = Assert.Single(_runs.All);
         Assert.Equal((TestRunStatus.NotRun, "Docker is not running."), (run.Status, run.Output));
@@ -151,7 +178,7 @@ public class TestRunServiceTests
         var (testSet, version) = Setup(withCode: false);
 
         await Assert.ThrowsAsync<InvalidRequestException>(() =>
-            Service().RunAsync(testSet.Id, version.Id, TestContext.Current.CancellationToken));
+            Service().RunAsync(testSet.Id, version.Id, cancellationToken: TestContext.Current.CancellationToken));
         Assert.Empty(_sandbox.Requests);
     }
 
@@ -179,8 +206,8 @@ public class TestRunServiceTests
         var otherVersion = elsewhere.AddVersion(VersionStatus.Ready, null, "hash", "folder/v1", null, DateTimeOffset.UtcNow, []);
         _submissions.All.Add(elsewhere);
 
-        var job = await Service().QueueOneAsync("assignment", testSet.Id, version.Id, TestContext.Current.CancellationToken);
-        var none = await Service().QueueOneAsync("assignment", testSet.Id, otherVersion.Id, TestContext.Current.CancellationToken);
+        var job = await Service().QueueOneAsync("assignment", testSet.Id, version.Id, cancellationToken: TestContext.Current.CancellationToken);
+        var none = await Service().QueueOneAsync("assignment", testSet.Id, otherVersion.Id, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(version.Id, job!.VersionId);
         Assert.Null(none);
@@ -199,7 +226,7 @@ public class TestRunServiceTests
             """;
         TestCase Case(string id) => new() { Id = id, Title = id, Category = TestCategory.Normal, RequirementIds = [], Steps = "x" };
 
-        var results = TestRunService.ReadReport(xml, [Case("T1"), Case("T2"), Case("T3")]);
+        var results = TestRunner.ReadReport(xml, [Case("T1"), Case("T2"), Case("T3")]);
 
         Assert.Equal([TestOutcome.Failed, TestOutcome.Failed, TestOutcome.Missing], results.Select(r => r.Outcome));
         Assert.Contains("did not finish within 5 seconds", results[0].Message);
@@ -271,8 +298,8 @@ public class TestRunServiceTests
         Duration = TimeSpan.FromSeconds(1),
     };
 
-    private TestRunService Service() => new(_testSets, _runs, _submissions, new JavaBuildCheck(_sandbox, _storage), _sandbox, _model,
-        new ModelCallContext(), _jobs, TimeProvider.System);
+    private TestRunService Service() => new(_testSets, _runs, _submissions, new TestRunner(_testSets, _runs, _submissions,
+        new JavaBuildCheck(_sandbox, _storage), _sandbox, _model, new ModelCallContext(), TimeProvider.System), _jobs);
 
     private sealed class ScriptedSandbox : ISandboxRunner
     {
@@ -292,21 +319,6 @@ public class TestRunServiceTests
 
             return Task.FromResult(Script.Dequeue());
         }
-    }
-
-    private sealed class FakeRuns : ITestRunStore
-    {
-        public List<TestRun> All { get; } = [];
-
-        public Task<IReadOnlyList<TestRun>> GetLatestByTestSetAsync(Guid testSetId, CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<TestRun>>(All.Where(r => r.TestSetId == testSetId).AsEnumerable().Reverse().DistinctBy(r => r.VersionId).ToList());
-
-        public Task<TestRun?> FindLatestWithAdapterAsync(Guid versionId, CancellationToken cancellationToken = default) =>
-            Task.FromResult(All.LastOrDefault(r => r.VersionId == versionId && r.Status == TestRunStatus.Completed && r.Adapter != null));
-
-        public void Add(TestRun run) => All.Add(run);
-
-        public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
     private sealed class FakeSubmissions : ISubmissionStore

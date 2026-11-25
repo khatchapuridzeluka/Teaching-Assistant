@@ -82,10 +82,10 @@ public class TestRunDockerTests
             "package shop;\npublic class Wallet {\n    private int money;\n    public void addMoney(int m) { money = m; }\n    public int getMoney() { return money; }\n}\n");
         var runs = new Runs();
         var sandbox = new DockerSandboxRunner(Options.Create(new SandboxOptions()), NullLogger<DockerSandboxRunner>.Instance);
-        var service = new TestRunService(testSets, runs, new Submissions(submission), new JavaBuildCheck(sandbox, storage), sandbox,
-            new AdapterModel(), new ModelCallContext(), new FakeTestCodeJobs(), TimeProvider.System);
+        var service = new TestRunner(testSets, runs, new Submissions(submission), new JavaBuildCheck(sandbox, storage), sandbox,
+            new AdapterModel(), new ModelCallContext(), TimeProvider.System);
 
-        await service.RunAsync(testSet.Id, version.Id, TestContext.Current.CancellationToken);
+        await service.RunAsync(testSet.Id, version.Id, cancellationToken: TestContext.Current.CancellationToken);
 
         var run = Assert.Single(runs.All);
         Assert.True(run.Status == TestRunStatus.Completed, run.Output);

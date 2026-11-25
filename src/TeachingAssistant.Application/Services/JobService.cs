@@ -302,10 +302,11 @@ public class JobService : IJobService
     }
 
     public async Task<JobResponse> QueueRunTestsAsync(
-        string courseId, string assignmentId, Guid testSetId, Guid versionId, CancellationToken cancellationToken = default)
+        string courseId, string assignmentId, Guid testSetId, Guid versionId, bool newAdapter = false,
+        CancellationToken cancellationToken = default)
     {
-        var job = new Job(JobType.RunTests, JobPayloads.Write(new RunTestsPayload { TestSetId = testSetId, VersionId = versionId }),
-            _timeProvider.GetUtcNow(), dedupKey: $"run-tests:{testSetId}:{versionId}", courseId: courseId, assignmentId: assignmentId,
+        var job = new Job(JobType.RunTests, JobPayloads.Write(new RunTestsPayload { TestSetId = testSetId, VersionId = versionId, NewAdapter = newAdapter }),
+            _timeProvider.GetUtcNow(), dedupKey: newAdapter ? $"run-tests:{testSetId}:{versionId}:new-adapter" : $"run-tests:{testSetId}:{versionId}", courseId: courseId, assignmentId: assignmentId,
             maxAttempts: MaxGradingAttempts);
         var queued = await _jobs.AddOrGetActiveAsync(job, cancellationToken);
         _signal.Notify();
