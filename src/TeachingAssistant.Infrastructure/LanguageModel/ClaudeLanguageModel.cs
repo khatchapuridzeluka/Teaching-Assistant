@@ -28,6 +28,8 @@ public class ClaudeLanguageModel : ILanguageModel
 
     public string GradingModelId => _options.GradingModel;
 
+    public string AdapterModelId => _options.AdapterModel;
+
     public async Task<LanguageModelReply> CompleteAsync(string prompt, CancellationToken cancellationToken = default)
     {
         try
@@ -106,6 +108,13 @@ public class ClaudeLanguageModel : ILanguageModel
     {
         return StructuredAsync(systemPrompt, parts, outputSchema, Beta.Effort.Medium, "The model declined to design tests for this assignment.",
             cancellationToken);
+    }
+
+    public Task<LanguageModelReply> WriteAdapterAsync(
+        string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default)
+    {
+        return StructuredAsync(systemPrompt, parts, outputSchema, Beta.Effort.Medium, "The model declined to write this student's test adapter.",
+            cancellationToken, _options.AdapterModel);
     }
 
     private async Task<LanguageModelReply> StructuredAsync(

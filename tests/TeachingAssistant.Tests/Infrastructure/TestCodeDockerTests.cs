@@ -175,6 +175,15 @@ public class TestCodeDockerTests
 
         public string GradingModelId => "model";
 
+
+        public string AdapterModelId => "adapter-model";
+        public Task<LanguageModelReply> WriteAdapterAsync(
+
+            string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default) =>
+
+            throw new NotSupportedException();
+
+
         public Task<LanguageModelReply> DesignTestsAsync(
             string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default) =>
             Task.FromResult(new LanguageModelReply

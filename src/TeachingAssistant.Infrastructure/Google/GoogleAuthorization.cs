@@ -25,12 +25,13 @@ public class GoogleAuthorization
 
     private readonly GoogleOptions _options;
     private readonly Lazy<GoogleAuthorizationCodeFlow> _flow;
+    private readonly SemaphoreSlim _credentialGate = new(1, 1);
     private volatile UserCredential? _credential;
 
     public GoogleAuthorization(IOptions<GoogleOptions> options)
     {
         _options = options.Value;
-        TokenStore = new FileDataStore(_options.TokenStoreFolder, Path.IsPathRooted(_options.TokenStoreFolder));
+        TokenStore = new SerializedDataStore(new FileDataStore(_options.TokenStoreFolder, Path.IsPathRooted(_options.TokenStoreFolder)));
         _flow = new Lazy<GoogleAuthorizationCodeFlow>(() => new GoogleAuthorizationCodeFlow(
             new GoogleAuthorizationCodeFlow.Initializer
             {
@@ -40,7 +41,7 @@ public class GoogleAuthorization
             }));
     }
 
-    public FileDataStore TokenStore { get; }
+    public IDataStore TokenStore { get; }
 
     public ClientSecrets ClientSecrets => new() { ClientId = _options.ClientId, ClientSecret = _options.ClientSecret };
 
@@ -65,11 +66,24 @@ public class GoogleAuthorization
                 "Google:ClientId and Google:ClientSecret are not set. Add them with dotnet user-secrets.");
         }
 
-        var token = await flow.LoadTokenAsync(UserKey, cancellationToken)
-            ?? throw new SubmissionSourceNotConnectedException(
-                "Google account is not connected. Call POST /auth/google/connect.");
+        await _credentialGate.WaitAsync(cancellationToken);
+        try
+        {
+            if (_credential is { } created)
+            {
+                return created;
+            }
 
-        return _credential = new UserCredential(flow, UserKey, token);
+            var token = await flow.LoadTokenAsync(UserKey, cancellationToken)
+                ?? throw new SubmissionSourceNotConnectedException(
+                    "Google account is not connected. Click Connect on the Settings page.");
+
+            return _credential = new UserCredential(flow, UserKey, token);
+        }
+        finally
+        {
+            _credentialGate.Release();
+        }
     }
 
     public void ResetCredential() => _credential = null;

@@ -58,7 +58,7 @@ public class GoogleConnectionService : IGoogleConnectionService
 
         try
         {
-            var credential = new UserCredential(flow, GoogleAuthorization.UserKey, token);
+            var credential = await _authorization.GetCredentialAsync(cancellationToken);
             await credential.GetAccessTokenForRequestAsync(cancellationToken: cancellationToken);
             return new GoogleConnectionStatus { State = GoogleConnectionState.Connected, GrantedScopes = granted };
         }

@@ -498,6 +498,9 @@ public class AgentRunServiceTests
 
         public string GradingModelId => "fake-grading-model";
 
+
+        public string AdapterModelId => "adapter-model";
+
         public async Task<AgentReply> RunAgentAsync(
             string systemPrompt, IReadOnlyList<AgentEntry> history, IReadOnlyList<object> tools, AgentRunHooks? hooks = null,
             CancellationToken cancellationToken = default)
@@ -551,6 +554,12 @@ public class AgentRunServiceTests
         public Task<LanguageModelReply> AnalyzeAsync(
             string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
+        public Task<LanguageModelReply> WriteAdapterAsync(
+
+            string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default) =>
+
+            throw new NotSupportedException();
+
 
         public Task<LanguageModelReply> DesignTestsAsync(
             string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default) =>

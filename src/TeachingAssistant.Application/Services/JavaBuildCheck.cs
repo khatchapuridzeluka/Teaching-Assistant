@@ -390,7 +390,7 @@ public class JavaBuildCheck
         return unit.Root.Length == 0 ? "compile" : $"compile {unit.Root}/";
     }
 
-    private List<(string Path, byte[] Bytes, string Text)> ReadSources(SubmissionVersion version)
+    internal List<(string Path, byte[] Bytes, string Text)> ReadSources(SubmissionVersion version)
     {
         var sources = new List<(string Path, byte[] Bytes, string Text)>();
         foreach (var file in _storage.ListCode(version.StoragePath))

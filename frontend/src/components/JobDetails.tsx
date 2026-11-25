@@ -62,6 +62,11 @@ export const jobTypeInfo: Record<JobType, { label: string; description: string }
     description:
       "Writes the JUnit test code for an approved class-design test set in one AI call. It sends the neutral interface and the approved cases (never student work or names), then compiles the tests in the sandbox with a placeholder adapter; the code and the compile result appear on the assignment's Tests view.",
   },
+  RunTests: {
+    label: "Test run",
+    description:
+      "Runs an assignment's approved tests on one student's version in the sandbox: it compiles the student's code, writes their adapter (one small AI call with the interface and the student's code, never the name) or reuses the stored one, then runs the shared JUnit tests and stores the result of each case on the assignment's Tests view.",
+  },
   FetchAssignment: {
     label: "Fetch",
     description: "Downloads an assignment's new and changed submissions from Google Classroom (planned on the queue).",
@@ -169,6 +174,11 @@ const iconPaths: Record<JobType, ReactNode> = {
       <path d="m8 9-4 3 4 3" />
       <path d="m16 9 4 3-4 3" />
       <path d="m13.5 6-3 12" />
+    </>
+  ),
+  RunTests: (
+    <>
+      <path d="M6 4l14 8-14 8z" />
     </>
   ),
   FetchAssignment: (

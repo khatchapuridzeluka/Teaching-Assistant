@@ -34,6 +34,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<MistakeAnalysis> MistakeAnalyses => Set<MistakeAnalysis>();
 
     public DbSet<TestSet> TestSets => Set<TestSet>();
+
+    public DbSet<TestRun> TestRuns => Set<TestRun>();
     public DbSet<GradingPrinciple> GradingPrinciples => Set<GradingPrinciple>();
     public DbSet<CourseGuidance> CourseGuidance => Set<CourseGuidance>();
     public DbSet<PolicyRule> PolicyRules => Set<PolicyRule>();

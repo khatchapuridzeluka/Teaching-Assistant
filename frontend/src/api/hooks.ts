@@ -486,6 +486,34 @@ export const useGenerateTestCode = (courseId: string, assignmentId: string) => {
   });
 };
 
+export const useTestRuns = (courseId: string, assignmentId: string, testSetId: string, running: boolean) =>
+  useQuery({
+    queryKey: ["courses", courseId, "assignments", assignmentId, "tests", testSetId, "runs"],
+    queryFn: () =>
+      unwrap(
+        api.GET("/courses/{courseId}/assignments/{assignmentId}/tests/{testSetId}/runs", {
+          params: { path: { courseId, assignmentId, testSetId } },
+        }),
+      ),
+    refetchInterval: running ? 3000 : false,
+  });
+
+export const useRunTests = (courseId: string, assignmentId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (testSetId: string) =>
+      unwrap(
+        api.POST("/courses/{courseId}/assignments/{assignmentId}/tests/{testSetId}/runs", {
+          params: { path: { courseId, assignmentId, testSetId } },
+        }),
+      ),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["courses", courseId, "assignments", assignmentId, "jobs"] });
+      void queryClient.invalidateQueries({ queryKey: ["jobs"] });
+    },
+  });
+};
+
 export const useApproveExplanation = (courseId: string, assignmentId: string) => {
   const queryClient = useQueryClient();
   return useMutation({

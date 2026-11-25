@@ -97,6 +97,7 @@ export function AssignmentTests({ courseId, assignmentId, assignmentTitle }: { c
           assignmentId={assignmentId}
           busy={!!running}
           codeJob={codeJob}
+          jobs={jobs.data ?? []}
           onRegenerate={() => setFormOpen(true)}
         />
       )}

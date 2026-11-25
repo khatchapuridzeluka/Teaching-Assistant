@@ -2039,6 +2039,81 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
                     b.ToTable("student_strengths", (string)null);
                 });
 
+            modelBuilder.Entity("TeachingAssistant.Domain.Testing.TestRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Adapter")
+                        .HasColumnType("text")
+                        .HasColumnName("adapter");
+
+                    b.Property<string>("AdapterModel")
+                        .HasColumnType("text")
+                        .HasColumnName("adapter_model");
+
+                    b.Property<string>("AssignmentId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("assignment_id");
+
+                    b.Property<string>("CourseId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("course_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Interface")
+                        .HasColumnType("text")
+                        .HasColumnName("interface");
+
+                    b.Property<string>("Output")
+                        .HasColumnType("text")
+                        .HasColumnName("output");
+
+                    b.Property<string>("Results")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("results");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<string>("StudentId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("student_id");
+
+                    b.Property<Guid>("TestSetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("test_set_id");
+
+                    b.Property<int>("TestSetVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("test_set_version");
+
+                    b.Property<Guid>("VersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("version_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_test_runs");
+
+                    b.HasIndex("VersionId", "CreatedAt")
+                        .HasDatabaseName("ix_test_runs_version_id_created_at");
+
+                    b.HasIndex("TestSetId", "VersionId", "CreatedAt")
+                        .HasDatabaseName("ix_test_runs_test_set_id_version_id_created_at");
+
+                    b.ToTable("test_runs", (string)null);
+                });
+
             modelBuilder.Entity("TeachingAssistant.Domain.Testing.TestSet", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2430,6 +2505,16 @@ namespace TeachingAssistant.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_student_strengths_report_strengths_report_strength_id");
+                });
+
+            modelBuilder.Entity("TeachingAssistant.Domain.Testing.TestRun", b =>
+                {
+                    b.HasOne("TeachingAssistant.Domain.Testing.TestSet", null)
+                        .WithMany()
+                        .HasForeignKey("TestSetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_test_runs_test_sets_test_set_id");
                 });
 
             modelBuilder.Entity("TeachingAssistant.Domain.Grading.AiGrading", b =>

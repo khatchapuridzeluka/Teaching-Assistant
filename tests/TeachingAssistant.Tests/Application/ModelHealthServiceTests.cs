@@ -53,6 +53,9 @@ public class ModelHealthServiceTests
 
         public string GradingModelId => Id;
 
+
+        public string AdapterModelId => "adapter-model";
+
         public Task<LanguageModelReply> CompleteAsync(string prompt, CancellationToken cancellationToken = default) =>
             failure is null
                 ? Task.FromResult(new LanguageModelReply { Model = Id, Text = reply! })
@@ -70,6 +73,12 @@ public class ModelHealthServiceTests
         public Task<LanguageModelReply> AnalyzeAsync(
             string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
+        public Task<LanguageModelReply> WriteAdapterAsync(
+
+            string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default) =>
+
+            throw new NotSupportedException();
+
 
         public Task<LanguageModelReply> DesignTestsAsync(
             string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default) =>

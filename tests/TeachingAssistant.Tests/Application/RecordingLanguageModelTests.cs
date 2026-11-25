@@ -115,6 +115,9 @@ public class RecordingLanguageModelTests
 
         public string GradingModelId => "grading-model";
 
+
+        public string AdapterModelId => "adapter-model";
+
         public Task<LanguageModelReply> CompleteAsync(string prompt, CancellationToken cancellationToken = default) => Reply("chat-model");
 
         public Task<LanguageModelReply> ChatAsync(string systemPrompt, IReadOnlyList<ChatMessage> messages, CancellationToken cancellationToken = default) =>
@@ -136,6 +139,12 @@ public class RecordingLanguageModelTests
         public Task<LanguageModelReply> AnalyzeAsync(
             string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default) =>
             Reply("grading-model");
+        public Task<LanguageModelReply> WriteAdapterAsync(
+
+            string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default) =>
+
+            throw new NotSupportedException();
+
 
         public Task<LanguageModelReply> DesignTestsAsync(
             string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default) =>

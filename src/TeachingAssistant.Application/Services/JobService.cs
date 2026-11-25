@@ -301,6 +301,17 @@ public class JobService : IJobService
         return JobPayloads.ToResponse(queued);
     }
 
+    public async Task<JobResponse> QueueRunTestsAsync(
+        string courseId, string assignmentId, Guid testSetId, Guid versionId, CancellationToken cancellationToken = default)
+    {
+        var job = new Job(JobType.RunTests, JobPayloads.Write(new RunTestsPayload { TestSetId = testSetId, VersionId = versionId }),
+            _timeProvider.GetUtcNow(), dedupKey: $"run-tests:{testSetId}:{versionId}", courseId: courseId, assignmentId: assignmentId,
+            maxAttempts: MaxGradingAttempts);
+        var queued = await _jobs.AddOrGetActiveAsync(job, cancellationToken);
+        _signal.Notify();
+        return JobPayloads.ToResponse(queued);
+    }
+
     public async Task<JobResponse> QueueAnalyzeStudentAsync(
         string courseId, string studentId, StudentAnalysisKind kind, CancellationToken cancellationToken = default)
     {

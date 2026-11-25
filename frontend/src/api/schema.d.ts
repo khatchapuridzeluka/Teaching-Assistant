@@ -756,6 +756,97 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/courses/{courseId}/assignments/{assignmentId}/tests/{testSetId}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Returns the newest test run of each student's version for this test set: per case passed, failed or not implemented, the adapter and any compiler output. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    courseId: string;
+                    assignmentId: string;
+                    testSetId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Runs retrieved successfully (empty when nothing has run yet) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["TestRunResponse"][];
+                    };
+                };
+                /** @description No test set with this ID for this assignment */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Queues a test run of every student's latest stored version: each compiles the student's code, writes or reuses their adapter (one small paid call per new version) and runs the test code in the sandbox. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    courseId: string;
+                    assignmentId: string;
+                    testSetId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Runs queued; follow them with the assignment's jobs */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RunTestsResponse"];
+                    };
+                };
+                /** @description The test set is not approved, has no test code, or its code does not compile */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description No test set with this ID for this assignment */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/courses/{courseId}/assignments/{assignmentId}/common-mistakes": {
         parameters: {
             query?: never;
@@ -4565,7 +4656,7 @@ export interface components {
         /** @enum {string} */
         JobStatus: "Queued" | "Running" | "Succeeded" | "Failed" | "Canceled";
         /** @enum {string} */
-        JobType: "GradeVersion" | "GradeAssignment" | "FetchAssignment" | "SyncCourse" | "ReExtract" | "AnalyzeMistakes" | "GradeStudent" | "FetchStudentWork" | "AnalyzeStudent" | "AgentRun" | "EvaluationRun" | "EvaluationGrade" | "GenerateTests" | "GenerateTestCode";
+        JobType: "GradeVersion" | "GradeAssignment" | "FetchAssignment" | "SyncCourse" | "ReExtract" | "AnalyzeMistakes" | "GradeStudent" | "FetchStudentWork" | "AnalyzeStudent" | "AgentRun" | "EvaluationRun" | "EvaluationGrade" | "GenerateTests" | "GenerateTestCode" | "RunTests";
         MistakeAssignmentOption: {
             assignmentId: string;
             title?: string | null;
@@ -4669,7 +4760,7 @@ export interface components {
             percent: number;
         };
         /** @enum {string} */
-        ModelCallPurpose: "Grading" | "GradeAll" | "Chat" | "HealthCheck" | "MistakeAnalysis" | "StudentAnalysis" | "Evaluation" | "Try" | "TestDesign";
+        ModelCallPurpose: "Grading" | "GradeAll" | "Chat" | "HealthCheck" | "MistakeAnalysis" | "StudentAnalysis" | "Evaluation" | "Try" | "TestDesign" | "TestAdapter";
         ModelCallResponse: {
             /** Format: uuid */
             id: string;
@@ -4986,6 +5077,15 @@ export interface components {
         ReviewQueueResponse: {
             drafts: components["schemas"]["ReviewDraftItem"][];
             ungraded: components["schemas"]["UngradedSubmissionItem"][];
+        };
+        RunTestsResponse: {
+            /**
+             * Format: int32
+             * @description How many students' latest versions were queued for a test run.
+             */
+            queued: number;
+            /** @description Why some students were left out, one line each. */
+            skipped: string[];
         };
         SaveGradingReportRequest: {
             /** Format: double */
@@ -5312,6 +5412,13 @@ export interface components {
             /** @description The expected output, value or exception; null when it should come from running the reference solution. */
             expected?: string | null;
         };
+        TestCaseResult: {
+            /** @description The case this result belongs to (T1, T2, …). */
+            caseId: string;
+            outcome: components["schemas"]["TestOutcome"];
+            /** @description What went wrong, from the failed assertion or the exception; null when the case passed. */
+            message?: string | null;
+        };
         /** @enum {string} */
         TestCategory: "Normal" | "Boundary" | "Invalid" | "LargeInput" | "Concurrency";
         TestCode: {
@@ -5330,6 +5437,8 @@ export interface components {
         };
         /** @enum {string} */
         TestCodeStatus: "Compiled" | "CompileFailed" | "NotChecked";
+        /** @enum {string} */
+        TestOutcome: "Passed" | "Failed" | "NotImplemented" | "Missing";
         TestRequirement: {
             /** @description R1, R2, … in the order the instructions state them. */
             id: string;
@@ -5343,6 +5452,42 @@ export interface components {
              */
             testCount: number;
         };
+        TestRunResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            versionId: string;
+            /** Format: int32 */
+            versionNumber: number;
+            studentId: string;
+            studentName: string;
+            /**
+             * Format: int32
+             * @description The test set version the run used.
+             */
+            testSetVersion: number;
+            status: components["schemas"]["TestRunStatus"];
+            /** @description One result per case of the test set, in order; empty when the tests could not run. */
+            results: components["schemas"]["TestCaseResult"][];
+            /** Format: int32 */
+            passed: number;
+            /** Format: int32 */
+            failed: number;
+            /** Format: int32 */
+            notImplemented: number;
+            /** @description The adapter that connected the student's classes to the interface. */
+            adapter?: string | null;
+            /** @description Interface methods the adapter found nothing for in the student's code. */
+            unmapped: string[];
+            /** @description The adapter writer's notes on mappings a reader might question. */
+            notes?: string | null;
+            /** @description The compiler's errors or why the run could not finish. */
+            output?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        /** @enum {string} */
+        TestRunStatus: "Completed" | "StudentCompileFailed" | "HarnessFailed" | "NotRun";
         TestSetResponse: {
             /** Format: uuid */
             id: string;

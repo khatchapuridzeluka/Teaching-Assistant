@@ -9,6 +9,8 @@ public interface ILanguageModel
 
     string GradingModelId { get; }
 
+    string AdapterModelId { get; }
+
     Task<LanguageModelReply> CompleteAsync(string prompt, CancellationToken cancellationToken = default);
 
     Task<LanguageModelReply> ChatAsync(
@@ -27,5 +29,9 @@ public interface ILanguageModel
         string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default);
 
     Task<LanguageModelReply> DesignTestsAsync(
+        string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default);
+
+    /// <summary>Writes a student's test adapter with the configured adapter model, a cheaper one: the job is mechanical.</summary>
+    Task<LanguageModelReply> WriteAdapterAsync(
         string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default);
 }

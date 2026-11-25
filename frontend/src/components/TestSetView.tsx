@@ -4,6 +4,7 @@ import { useApproveTestSet, useSaveTestSet } from "../api/hooks";
 import { formatDate } from "../format";
 import { Check, CircleCheck, Copy, FileCode2, FlaskConical, ListChecks, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { TestCodeCard } from "./TestCodeCard";
+import { TestResultsCard } from "./TestResultsCard";
 import { Button, Card, CardHeader, Chip, type ChipTone, ErrorPanel, Notice } from "./ui";
 
 export const categoryInfo: Record<TestCategory, { label: string; formLabel: string; tone: ChipTone }> = {
@@ -34,6 +35,7 @@ export function TestSetView({
   assignmentId,
   busy,
   codeJob,
+  jobs,
   onRegenerate,
 }: {
   testSet: TestSet;
@@ -41,6 +43,7 @@ export function TestSetView({
   assignmentId: string;
   busy: boolean;
   codeJob: JobInfo | undefined;
+  jobs: JobInfo[];
   onRegenerate: () => void;
 }) {
   const save = useSaveTestSet(courseId, assignmentId);
@@ -283,6 +286,10 @@ export function TestSetView({
 
       {approved && classDesign && (
         <TestCodeCard code={testSet.code ?? null} job={codeJob} testSetId={testSet.id} courseId={courseId} assignmentId={assignmentId} />
+      )}
+
+      {approved && classDesign && testSet.code && testSet.code.status !== "CompileFailed" && (
+        <TestResultsCard courseId={courseId} assignmentId={assignmentId} testSetId={testSet.id} cases={testSet.cases} jobs={jobs} />
       )}
     </>
   );

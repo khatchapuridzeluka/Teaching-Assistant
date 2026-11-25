@@ -16,7 +16,7 @@ internal static class GoogleErrors
         catch (TokenResponseException ex)
         {
             throw new SubmissionSourceNotConnectedException(
-                $"Google authorization is no longer valid ({ex.Error.Error}). Call POST /auth/google/connect.", ex);
+                $"Google authorization is no longer valid ({ex.Error.Error}). Reconnect on the Settings page.", ex);
         }
         catch (GoogleApiException ex) when (ex.HttpStatusCode == HttpStatusCode.NotFound)
         {

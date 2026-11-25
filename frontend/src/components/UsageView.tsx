@@ -21,6 +21,7 @@ const purposeLabels: Record<string, string> = {
   Evaluation: "Evaluation run",
   Try: "Try with model",
   TestDesign: "Test cases",
+  TestAdapter: "Test adapters",
   Chat: "Ask agent",
   HealthCheck: "Model check",
 };

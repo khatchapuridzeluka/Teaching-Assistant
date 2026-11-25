@@ -386,12 +386,18 @@ public class StudentAnalysisServiceTests
 
         public string GradingModelId => "model";
 
+        public string AdapterModelId => "adapter-model";
+
         public Task<LanguageModelReply> AnalyzeAsync(
             string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default)
         {
             Prompt = string.Join("\n", parts.OfType<TextPart>().Select(p => p.Text));
             return Task.FromResult(new LanguageModelReply { Model = "model", Text = Reply });
         }
+
+        public Task<LanguageModelReply> WriteAdapterAsync(
+            string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
 
         public Task<LanguageModelReply> DesignTestsAsync(
             string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default) =>

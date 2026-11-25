@@ -29,4 +29,6 @@ public enum JobType
     GenerateTests,
 
     GenerateTestCode,
+
+    RunTests,
 }

@@ -389,6 +389,10 @@ public class StudentToolsTests
             string courseId, string assignmentId, Guid testSetId, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
+        public Task<JobResponse> QueueRunTestsAsync(
+            string courseId, string assignmentId, Guid testSetId, Guid versionId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public Task<JobResponse> QueueGenerateTestsAsync(
             string courseId, string assignmentId, GenerateTestsRequest request, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();

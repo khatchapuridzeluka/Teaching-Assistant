@@ -63,6 +63,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IModelCallStore, ModelCallStore>();
         services.AddScoped<IMistakeAnalysisStore, MistakeAnalysisStore>();
         services.AddScoped<ITestSetStore, TestSetStore>();
+        services.AddScoped<ITestRunStore, TestRunStore>();
         services.AddScoped<IGradingPrincipleStore, GradingPrincipleStore>();
         services.AddScoped<ICourseGuidanceStore, CourseGuidanceStore>();
         services.AddScoped<IPolicyRuleStore, PolicyRuleStore>();
@@ -162,12 +163,14 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IMistakeAnalysisService, MistakeAnalysisService>();
         services.AddScoped<ITestDesignService, TestDesignService>();
         services.AddScoped<ITestCodeService, TestCodeService>();
+        services.AddScoped<ITestRunService, TestRunService>();
         services.AddScoped<IJobService, JobService>();
         services.AddScoped<IJobProcessor, JobProcessor>();
         services.AddScoped<IJobHandler, GradeVersionJobHandler>();
         services.AddScoped<IJobHandler, AnalyzeMistakesJobHandler>();
         services.AddScoped<IJobHandler, GenerateTestsJobHandler>();
         services.AddScoped<IJobHandler, GenerateTestCodeJobHandler>();
+        services.AddScoped<IJobHandler, RunTestsJobHandler>();
         services.AddScoped<IJobHandler, AnalyzeStudentJobHandler>();
         services.AddScoped<IJobHandler, FetchStudentWorkJobHandler>();
         services.AddScoped<IJobHandler, AgentRunJobHandler>();

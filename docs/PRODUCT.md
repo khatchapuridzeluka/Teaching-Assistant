@@ -34,7 +34,7 @@ Java only, starting with class design and design patterns, then SQL/Maven/Gradle
 
 ## Automated tests (planned)
 
-Built so far: **generating** a draft test set (the form, the background job and the draft on the assignment's Tests view) **editing and approving** it, and **test code**: on approval one call turns the cases into a JUnit class against the interface (with a placeholder adapter so the sandbox can compile it at once), shown to the teacher with the compile result. Next: adapters per submission, running in the sandbox, and results in grading. The layout is mocked up in [design/tests-tab-mockup.html](design/tests-tab-mockup.html).
+Built so far: **generating** a draft test set (the form, the background job and the draft on the assignment's Tests view) **editing and approving** it, and **test code**: on approval one call turns the cases into a JUnit class against the interface (with a placeholder adapter so the sandbox can compile it at once), shown to the teacher with the compile result, and **test runs**: an adapter per student version (a cheaper model; reused while the interface is unchanged; one repair attempt when it does not compile), the student's code, the adapter and the shared tests compiled and run in the sandbox, results per case in a students × cases matrix. Next: results in grading. The layout is mocked up in [design/tests-tab-mockup.html](design/tests-tab-mockup.html).
 
 **The idea: what is tested is the same for every student; how it reaches each student's code is per submission.** Students name classes and methods freely, so tests can't call their code directly. Instead:
 

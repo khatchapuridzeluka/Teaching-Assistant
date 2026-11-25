@@ -9,11 +9,13 @@ namespace TeachingAssistant.WebAPI.Controllers;
 public class AssignmentTestsController : ControllerBase
 {
     private readonly ITestDesignService _testDesignService;
+    private readonly ITestRunService _testRunService;
     private readonly IJobService _jobService;
 
-    public AssignmentTestsController(ITestDesignService testDesignService, IJobService jobService)
+    public AssignmentTestsController(ITestDesignService testDesignService, ITestRunService testRunService, IJobService jobService)
     {
         _testDesignService = testDesignService;
+        _testRunService = testRunService;
         _jobService = jobService;
     }
 
@@ -115,5 +117,47 @@ public class AssignmentTestsController : ControllerBase
         }
 
         return Accepted($"/jobs/{job.Id}", job);
+    }
+
+    /// <summary>
+    /// Returns the newest test run of each student's version for this test set: per case passed, failed or not implemented, the adapter and any compiler output.
+    /// </summary>
+    /// <response code="200">Runs retrieved successfully (empty when nothing has run yet)</response>
+    /// <response code="404">No test set with this ID for this assignment</response>
+    [HttpGet("courses/{courseId}/assignments/{assignmentId}/tests/{testSetId:guid}/runs")]
+    [ProducesResponseType(typeof(IReadOnlyList<TestRunResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<IReadOnlyList<TestRunResponse>>> GetRunsAsync(
+        string courseId, string assignmentId, Guid testSetId, CancellationToken cancellationToken)
+    {
+        var runs = await _testRunService.GetLatestAsync(assignmentId, testSetId, cancellationToken);
+        if (runs is null)
+        {
+            return NotFound();
+        }
+
+        return Ok(runs);
+    }
+
+    /// <summary>
+    /// Queues a test run of every student's latest stored version: each compiles the student's code, writes or reuses their adapter (one small paid call per new version) and runs the test code in the sandbox.
+    /// </summary>
+    /// <response code="202">Runs queued; follow them with the assignment's jobs</response>
+    /// <response code="400">The test set is not approved, has no test code, or its code does not compile</response>
+    /// <response code="404">No test set with this ID for this assignment</response>
+    [HttpPost("courses/{courseId}/assignments/{assignmentId}/tests/{testSetId:guid}/runs")]
+    [ProducesResponseType(typeof(RunTestsResponse), StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<RunTestsResponse>> RunAsync(
+        string courseId, string assignmentId, Guid testSetId, CancellationToken cancellationToken)
+    {
+        var queued = await _testRunService.QueueAllAsync(assignmentId, testSetId, cancellationToken);
+        if (queued is null)
+        {
+            return NotFound();
+        }
+
+        return Accepted(queued);
     }
 }

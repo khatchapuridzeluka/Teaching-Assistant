@@ -19,4 +19,6 @@ public enum ModelCallPurpose
     Try,
 
     TestDesign,
+
+    TestAdapter,
 }

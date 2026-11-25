@@ -7,7 +7,7 @@ public class PromptLibraryTests
     [Fact]
     public void EveryPromptFile_IsEmbedded_AndReadsWithPlainLineEndings()
     {
-        Assert.Equal(["agent", "class-mistakes", "grading", "student-mistakes", "student-overview", "student-strengths", "test-code", "tests"],
+        Assert.Equal(["agent", "class-mistakes", "grading", "student-mistakes", "student-overview", "student-strengths", "test-adapter", "test-code", "tests"],
             PromptLibrary.Names());
 
         foreach (var name in PromptLibrary.Names())

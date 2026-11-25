@@ -34,6 +34,9 @@ public static class PromptLibrary
     /// <summary>Writing an approved test set's JUnit code (Prompts/test-code.md).</summary>
     public static string TestCode => Get("test-code");
 
+    /// <summary>Writing one student's test adapter (Prompts/test-adapter.md).</summary>
+    public static string TestAdapter => Get("test-adapter");
+
     /// <summary>
     /// The grading system prompt (Prompts/grading.md) with the teacher's rubric layers in its <c>{{rubric}}</c> slot.
     /// </summary>
