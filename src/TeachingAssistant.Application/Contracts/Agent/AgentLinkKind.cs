@@ -17,4 +17,6 @@ public enum AgentLinkKind
     StudentMistakes,
 
     StudentStrengths,
+
+    Tests,
 }

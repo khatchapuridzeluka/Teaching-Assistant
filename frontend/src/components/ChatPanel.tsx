@@ -358,6 +358,8 @@ function linkPath(link: AgentLink): string {
       return `${course}/students/${link.studentId ?? ""}/mistakes`;
     case "StudentStrengths":
       return `${course}/students/${link.studentId ?? ""}/strengths`;
+    case "Tests":
+      return `${course}/assignments/${link.assignmentId ?? ""}?view=tests`;
   }
 }
 

@@ -24,8 +24,9 @@ public class AgentRunServiceTests
         var agentTools = new AgentTools(_jobs, new JobReporter(_jobs, _jobs, _jobs, _jobs), _runContext);
         var gradingTools = new GradingTools(null!, null!, null!, _runContext, TimeProvider.System);
         var analysisTools = new StudentAnalysisTools(null!, null!, _runContext, TimeProvider.System);
-        return new AgentRunService(_chats, _jobs, _jobs, _model, _tools, _studentTools, agentTools, gradingTools, analysisTools, _runContext,
-            new ModelCallContext(), TimeProvider.System);
+        var testTools = new TestTools(null!, null!, null!, null!, null!, _runContext, TimeProvider.System);
+        return new AgentRunService(_chats, _jobs, _jobs, _model, _tools, _studentTools, agentTools, gradingTools, analysisTools, testTools,
+            _runContext, new ModelCallContext(), TimeProvider.System);
     }
 
     private async Task<AgentRunResponse> StartAsync(string text, Guid? conversationId = null)
@@ -122,7 +123,7 @@ public class AgentRunServiceTests
 
         Assert.Equal("what courses do I have?", Assert.Single(_model.History!).Text);
         Assert.Contains("(course id course-1, assignment id assignment-4)", _model.System);
-        Assert.Equal(5, _model.Tools!.Count);
+        Assert.Equal(6, _model.Tools!.Count);
         Assert.Same(_tools, _model.Tools[0]);
         Assert.Same(_studentTools, _model.Tools[1]);
     }

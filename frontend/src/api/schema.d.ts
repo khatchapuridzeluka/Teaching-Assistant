@@ -3827,7 +3827,7 @@ export interface components {
             readonly key: string;
         };
         /** @enum {string} */
-        AgentLinkKind: "CommonMistakes" | "Submission" | "Assignment" | "Student" | "GradingPdf" | "StudentOverview" | "StudentMistakes" | "StudentStrengths";
+        AgentLinkKind: "CommonMistakes" | "Submission" | "Assignment" | "Student" | "GradingPdf" | "StudentOverview" | "StudentMistakes" | "StudentStrengths" | "Tests";
         AgentMessageResponse: {
             /** Format: uuid */
             id: string;

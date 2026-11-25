@@ -73,9 +73,20 @@ internal sealed class FakeTestCodeJobs : IJobService
     public Task<JobResponse> QueueAnalyzeMistakesAsync(string courseId, string assignmentId, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
 
+    public List<GenerateTestsRequest> GenerateJobs { get; } = [];
+
     public Task<JobResponse> QueueGenerateTestsAsync(
-        string courseId, string assignmentId, GenerateTestsRequest request, CancellationToken cancellationToken = default) =>
-        throw new NotSupportedException();
+        string courseId, string assignmentId, GenerateTestsRequest request, CancellationToken cancellationToken = default)
+    {
+        GenerateJobs.Add(request);
+        var job = new Job(JobType.GenerateTests, JobPayloads.Write(new GenerateTestsPayload
+        {
+            CourseId = courseId,
+            AssignmentId = assignmentId,
+            Request = request,
+        }), DateTimeOffset.UtcNow, courseId: courseId, assignmentId: assignmentId);
+        return Task.FromResult(JobPayloads.ToResponse(job));
+    }
 
     public Task<JobResponse> QueueAnalyzeStudentAsync(
         string courseId, string studentId, StudentAnalysisKind kind, CancellationToken cancellationToken = default) =>

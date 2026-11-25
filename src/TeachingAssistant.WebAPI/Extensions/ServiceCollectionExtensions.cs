@@ -139,6 +139,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<AgentTools>();
         services.AddScoped<GradingTools>();
         services.AddScoped<StudentAnalysisTools>();
+        services.AddScoped<TestTools>();
         services.AddScoped<AgentRunContext>();
         services.AddScoped<JobReporter>();
         services.AddScoped<IAgentRunWaker, AgentRunWaker>();
