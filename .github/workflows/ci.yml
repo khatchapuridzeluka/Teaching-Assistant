@@ -114,8 +114,12 @@ jobs:
           COMMIT: ${{ github.sha }}
         run: |
           install -m 700 -d ~/.ssh
-          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' | sed '/^[[:space:]]*$/d' > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
+          if ! ssh-keygen -y -P '' -f ~/.ssh/deploy_key > /dev/null; then
+            echo "::error::VM_SSH_KEY is not a readable private key: paste the whole file, from the BEGIN line to the END line."
+            exit 1
+          fi
           if [ -n "$HOST_KEY" ]; then
             printf '%s %s\n' "$VM_HOST" "$HOST_KEY" > ~/.ssh/known_hosts
           else
