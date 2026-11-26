@@ -61,7 +61,7 @@ A change is done when all of these hold. Each item checks a rule stated elsewher
 1. `dotnet test --project tests/TeachingAssistant.Tests` passes.
 2. The build shows no IDE0011 warnings (Braces).
 3. If contracts changed, the API types are regenerated (API types, under Working conventions).
-4. If the change touches anything `README.md` describes, `README.md` is updated (README, under Working conventions).
+4. If the change touches anything the README or its docs describe, they are updated (README, under Working conventions).
 5. No paid LLM calls were made (non-negotiable 3), and the final message says what was verified and how.
 
 ## Tech stack
@@ -173,7 +173,7 @@ Generated code (EF Core migrations, `schema.d.ts`) is left as generated. For C# 
 
 - **The API runs in Rider** on :5288, usually with Vite on :5173, and Rider locks the WebAPI's DLLs: anything that builds the WebAPI while it runs fails, `dotnet ef` included. Build and test through the test project instead, or build the WebAPI with `-o` to a temp folder. After backend changes, ask the teacher to restart the API in Rider.
 - **API types:** after changing contracts and the teacher's restart, regenerate `frontend/src/api/schema.d.ts` with `npm --prefix frontend run gen:api`. Never hand-write or edit the types; a hand edit is only a stopgap until the regeneration.
-- **README:** when a change touches anything `README.md` describes (features and their status, stack, project structure, setup steps, configuration, API endpoints, security notes), update `README.md` in the same change.
+- **README:** update the docs a change touches, in the same change. `README.md` is the short front door: one line per feature with its status, the architecture, stack, project structure, setup, deployment and CI, the API by area, prompts, testing and security notes. A feature's full detail goes in `docs/FEATURES.md`, and every endpoint with its one-line description in `docs/API.md`; a new or changed endpoint updates `docs/API.md`, and the README's area table only when it adds an area or route group.
 - **No Prettier or other formatters on the frontend** — the project does not use one, and running it rewraps whole files.
 - **Comments:** none in `src/` or the frontend except the controller XML docs.
 - **Commits:** only when the teacher asks; the teacher often commits themselves.
