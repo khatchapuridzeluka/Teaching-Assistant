@@ -89,36 +89,36 @@ public class ClaudeLanguageModel : ILanguageModel
     }
 
     public Task<LanguageModelReply> GradeAsync(
-        string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, string? model = null,
+        IReadOnlyList<TextPart> system, IReadOnlyList<PromptPart> parts, string outputSchema, string? model = null,
         CancellationToken cancellationToken = default)
     {
-        return StructuredAsync(systemPrompt, parts, outputSchema, Beta.Effort.Medium, "The model declined to grade this submission.",
+        return StructuredAsync(system, parts, outputSchema, Beta.Effort.Medium, "The model declined to grade this submission.",
             cancellationToken, model);
     }
 
     public Task<LanguageModelReply> AnalyzeAsync(
         string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default)
     {
-        return StructuredAsync(systemPrompt, parts, outputSchema, Beta.Effort.Medium, "The model declined to analyze these mistakes.",
+        return StructuredAsync(System(systemPrompt), parts, outputSchema, Beta.Effort.Medium, "The model declined to analyze these mistakes.",
             cancellationToken);
     }
 
     public Task<LanguageModelReply> DesignTestsAsync(
         string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default)
     {
-        return StructuredAsync(systemPrompt, parts, outputSchema, Beta.Effort.Medium, "The model declined to design tests for this assignment.",
+        return StructuredAsync(System(systemPrompt), parts, outputSchema, Beta.Effort.Medium, "The model declined to design tests for this assignment.",
             cancellationToken);
     }
 
     public Task<LanguageModelReply> WriteAdapterAsync(
         string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, CancellationToken cancellationToken = default)
     {
-        return StructuredAsync(systemPrompt, parts, outputSchema, Beta.Effort.Medium, "The model declined to write this student's test adapter.",
+        return StructuredAsync(System(systemPrompt), parts, outputSchema, Beta.Effort.Medium, "The model declined to write this student's test adapter.",
             cancellationToken, _options.AdapterModel);
     }
 
     private async Task<LanguageModelReply> StructuredAsync(
-        string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, Beta.Effort effort, string refusal,
+        IReadOnlyList<TextPart> system, IReadOnlyList<PromptPart> parts, string outputSchema, Beta.Effort effort, string refusal,
         CancellationToken cancellationToken, string? model = null)
     {
         var chosen = string.IsNullOrWhiteSpace(model) ? _options.GradingModel : model;
@@ -144,7 +144,7 @@ public class ClaudeLanguageModel : ILanguageModel
                     },
                     Betas = [AnthropicBeta.ServerSideFallback2026_06_01],
                     Fallbacks = new List<Beta.BetaFallbackParam> { new(Model.ClaudeOpus4_8) },
-                    System = systemPrompt,
+                    System = system.Select(ToSystemBlock).ToList(),
                     Messages = [new Beta.BetaUserMessageParam { Content = parts.Select(ToBlock).ToList() }],
                 }
                 : new Beta.MessageCreateParams
@@ -156,7 +156,7 @@ public class ClaudeLanguageModel : ILanguageModel
                         Effort = effort,
                         Format = new Beta.BetaJsonOutputFormat { Schema = schema },
                     },
-                    System = systemPrompt,
+                    System = system.Select(ToSystemBlock).ToList(),
                     Messages = [new Beta.BetaUserMessageParam { Content = parts.Select(ToBlock).ToList() }],
                 };
 
@@ -222,13 +222,32 @@ public class ClaudeLanguageModel : ILanguageModel
         public required LanguageModelUsage Usage { get; init; }
     }
 
+    private static IReadOnlyList<TextPart> System(string systemPrompt) => [new TextPart { Text = systemPrompt }];
+
+    private static Beta.BetaTextBlockParam ToSystemBlock(TextPart part) => TextBlock(part);
+
+    private static Beta.BetaTextBlockParam TextBlock(TextPart part) => part.CacheAfter
+        ? new() { Text = part.Text, CacheControl = new Beta.BetaCacheControlEphemeral() }
+        : new() { Text = part.Text };
+
     private static Beta.BetaContentBlockParam ToBlock(PromptPart part) => part switch
     {
-        TextPart text => new Beta.BetaTextBlockParam { Text = text.Text },
+        TextPart text => TextBlock(text),
+        FilePart { MediaType: "application/pdf", CacheAfter: true } pdf => new Beta.BetaRequestDocumentBlock
+        {
+            Source = new Beta.BetaBase64PdfSource { Data = Convert.ToBase64String(pdf.Content) },
+            Title = pdf.Name,
+            CacheControl = new Beta.BetaCacheControlEphemeral(),
+        },
         FilePart { MediaType: "application/pdf" } pdf => new Beta.BetaRequestDocumentBlock
         {
             Source = new Beta.BetaBase64PdfSource { Data = Convert.ToBase64String(pdf.Content) },
             Title = pdf.Name,
+        },
+        FilePart { CacheAfter: true } image when FilePart.IsSupported(image.MediaType) => new Beta.BetaImageBlockParam
+        {
+            Source = new Beta.BetaBase64ImageSource { Data = Convert.ToBase64String(image.Content), MediaType = image.MediaType },
+            CacheControl = new Beta.BetaCacheControlEphemeral(),
         },
         FilePart image when FilePart.IsSupported(image.MediaType) => new Beta.BetaImageBlockParam
         {

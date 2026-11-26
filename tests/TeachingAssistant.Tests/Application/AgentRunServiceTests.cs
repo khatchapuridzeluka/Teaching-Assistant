@@ -549,7 +549,7 @@ public class AgentRunServiceTests
             throw new NotSupportedException();
 
         public Task<LanguageModelReply> GradeAsync(
-            string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, string? model, CancellationToken cancellationToken = default) =>
+            IReadOnlyList<TextPart> system, IReadOnlyList<PromptPart> parts, string outputSchema, string? model, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
         public Task<LanguageModelReply> AnalyzeAsync(

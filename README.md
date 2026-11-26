@@ -343,7 +343,7 @@ The model's fixed instructions are Markdown files in `src/TeachingAssistant.Appl
 | File | Used by |
 |---|---|
 | `agent.md` | the Ask agent chat (the open page is added after it in code) |
-| `grading.md` | grading one submission; `{{rubric}}` is replaced by the teacher's layers from the Rubric & policy page |
+| `grading.md` | grading one submission; `{{rubric}}`, at the end, is replaced by the teacher's principles, course guidance and policy rules from the Rubric & policy page (the assignment notes follow as a separate block, see Prompt caching) |
 | `class-mistakes.md` | the Common mistakes analysis of an assignment |
 | `student-mistakes.md`, `student-strengths.md`, `student-overview.md` | the three AI analyses on a student's pages |
 | `tests.md` | writing an assignment's test cases (requirements, cases and the neutral interface) from its instructions |
@@ -355,6 +355,19 @@ Edit the wording there and restart the API. The files are embedded in the Applic
 throws instead of reaching the model. What changes per call stays in code: the teacher's rubric layers (stored in the
 database and edited in the UI), the student's code and records, the JSON output schemas (they must match the C# records
 that parse the answer) and the tool descriptions (on each `[AgentTool]` method).
+
+### Prompt caching
+
+A grading request is ordered from the most shared to the least shared part, and Anthropic's prompt cache (kept on Anthropic's side for 5 minutes after the last use, per organization; nothing is stored by this app) reuses the shared beginning:
+
+| Part | Shared by | Cached |
+|---|---|---|
+| System block 1: `grading.md` with principles, course guidance and policy rules | every assignment of the course | yes, marker 1 |
+| System block 2: the assignment notes | every student of the assignment | with the part below |
+| User message: `<task>` and the instruction files | every student of the assignment | yes, marker 2 on the last instructions part |
+| The student's code and files, build and test results, the closing line | this student only | no |
+
+So the second and later gradings of an assignment within 5 minutes read the shared part at a small fraction of the input price, and a grading of another assignment of the course reuses block 1. Application only marks a part with `CacheAfter`; `ClaudeLanguageModel` turns that into Anthropic's `cache_control`. Whether it works shows in the cache-write and cache-read token columns of `model_calls` (the Model usage page). Evaluation runs use the same prompt, so they are cached the same way; other prompts are not marked yet.
 
 ## Testing
 

@@ -40,11 +40,20 @@ public static class GradingPromptSections
             sections.Add(PolicyHeading + "\n" + string.Join("\n", rules.Select(r => "- " + r.Detail)));
         }
 
-        if (notes is { Count: > 0 })
+        if (Notes(notes) is { } section)
         {
-            sections.Add(NotesHeading + "\n" + string.Join("\n", notes.Select(n => "- " + n.Detail)));
+            sections.Add(section);
         }
 
         return string.Join("\n\n", sections);
+    }
+
+    /// <summary>
+    /// The "Assignment notes" section alone, or null when there are none. Grading sends it as its own block after the
+    /// rest of the system prompt, so the part before it is the same for every assignment of the course and can be cached.
+    /// </summary>
+    public static string? Notes(IReadOnlyList<AssignmentNote>? notes)
+    {
+        return notes is { Count: > 0 } ? NotesHeading + "\n" + string.Join("\n", notes.Select(n => "- " + n.Detail)) : null;
     }
 }

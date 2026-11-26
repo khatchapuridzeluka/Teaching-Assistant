@@ -21,7 +21,7 @@ public class ClaudeLanguageModelTests
         var api = new FakeAnthropic(Stream("end_turn", "{\"score\":", "7.5}"));
         var model = CreateModel(api);
 
-        var reply = await model.GradeAsync("system", [new TextPart { Text = "submission" }], Schema,
+        var reply = await model.GradeAsync([new TextPart { Text = "system" }], [new TextPart { Text = "submission" }], Schema,
             cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal("{\"score\":7.5}", reply.Text);
@@ -36,12 +36,40 @@ public class ClaudeLanguageModelTests
     }
 
     [Fact]
+    public async Task Grade_MarksTheCacheOnlyOnTheBlocksTheApplicationMarked()
+    {
+        var api = new FakeAnthropic(Stream("end_turn", "{\"score\":7}"));
+        var model = CreateModel(api);
+
+        await model.GradeAsync(
+            [new TextPart { Text = "general rules", CacheAfter = true }, new TextPart { Text = "assignment notes" }],
+            [
+                new TextPart { Text = "<task>" },
+                new FilePart { Name = "task.pdf", MediaType = "application/pdf", Content = [1, 2, 3], CacheAfter = true },
+                new TextPart { Text = "student code" },
+            ],
+            Schema, cancellationToken: TestContext.Current.CancellationToken);
+
+        using var request = JsonDocument.Parse(api.RequestBody!);
+        var system = request.RootElement.GetProperty("system").EnumerateArray().ToList();
+        Assert.Equal(["general rules", "assignment notes"], system.Select(b => b.GetProperty("text").GetString()));
+        Assert.Equal("ephemeral", system[0].GetProperty("cache_control").GetProperty("type").GetString());
+        Assert.False(system[1].TryGetProperty("cache_control", out _));
+
+        var content = request.RootElement.GetProperty("messages")[0].GetProperty("content").EnumerateArray().ToList();
+        Assert.Equal(["text", "document", "text"], content.Select(b => b.GetProperty("type").GetString()));
+        Assert.False(content[0].TryGetProperty("cache_control", out _));
+        Assert.Equal("ephemeral", content[1].GetProperty("cache_control").GetProperty("type").GetString());
+        Assert.False(content[2].TryGetProperty("cache_control", out _));
+    }
+
+    [Fact]
     public async Task Grade_CutOffAtTheLengthLimit_FailsWithAnErrorThatIsNotRetried()
     {
         var model = CreateModel(new FakeAnthropic(Stream("max_tokens", "{\"score\":")));
 
         var error = await Assert.ThrowsAsync<LanguageModelResponseException>(() => model.GradeAsync(
-            "system", [new TextPart { Text = "submission" }], Schema, cancellationToken: TestContext.Current.CancellationToken));
+            [new TextPart { Text = "system" }], [new TextPart { Text = "submission" }], Schema, cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.Contains("length limit", error.Message);
         Assert.False(JobErrors.IsTemporary(error));
@@ -53,7 +81,7 @@ public class ClaudeLanguageModelTests
         var model = CreateModel(new FakeAnthropic(Stream("refusal")));
 
         var error = await Assert.ThrowsAsync<LanguageModelResponseException>(() => model.GradeAsync(
-            "system", [new TextPart { Text = "submission" }], Schema, cancellationToken: TestContext.Current.CancellationToken));
+            [new TextPart { Text = "system" }], [new TextPart { Text = "submission" }], Schema, cancellationToken: TestContext.Current.CancellationToken));
 
         Assert.False(JobErrors.IsTemporary(error));
     }

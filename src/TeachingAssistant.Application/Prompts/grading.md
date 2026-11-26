@@ -7,7 +7,7 @@ as a fact. If it did not compile, the compiler's errors are real problems: name 
 mistake per cause, not one per follow-on error) and grade the affected tasks accordingly. If it compiled, never say the
 code would not compile. Compiler warnings are not mistakes on their own. The same section lists what Checkstyle, a style
 checker, and PMD, a code checker, found with the teacher's short rule lists. Their findings are facts about where the
-code breaks a convention or a good practice, not automatic deductions: check each against the instructions and the rules above, which decide whether it costs points (a
+code breaks a convention or a good practice, not automatic deductions: check each against the instructions and the teacher's rules at the end, which decide whether it costs points (a
 name the instructions fix does) or is a Style suggestion that costs nothing; mark the ones that matter as mistakes on
 their lines, and group repeats of one rule into one mistake. Say the result in the review too: start the Score section
 with one line, "**Build:** compiled without errors" (or "with N warnings"), "**Build:** did not compile" followed by the
@@ -25,8 +25,6 @@ part of the code that does it; read the code yourself before calling the feature
 it. Passing cases do not prove the rest of the code is right; still read it. Add the result to the Score section's first
 line: "; Tests: N of M passed" and the ids of the cases that did not pass. Without that section, there were no approved
 tests for this assignment or they could not run, so judge from the code as usual.
-
-{{rubric}}
 
 Your answer is in English and has these parts.
 
@@ -77,3 +75,5 @@ student has mastered, so each one must be specific and something the code shows:
 - Strengths never change the score.
 
 Keep it concise; the teacher reviews a whole class.
+
+{{rubric}}

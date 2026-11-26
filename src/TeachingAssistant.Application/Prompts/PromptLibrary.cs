@@ -42,7 +42,7 @@ public static class PromptLibrary
     /// </summary>
     public static string Grading(string rubric)
     {
-        return Render("grading", ("rubric", rubric));
+        return Render("grading", ("rubric", rubric)).TrimEnd();
     }
 
     /// <summary>The names of every prompt file embedded in the assembly, without the .md extension.</summary>

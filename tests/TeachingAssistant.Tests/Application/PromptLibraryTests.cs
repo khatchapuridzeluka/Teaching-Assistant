@@ -33,15 +33,16 @@ public class PromptLibraryTests
     }
 
     [Fact]
-    public void Grading_PutsTheRubricBetweenTheIntroAndTheOutputRules()
+    public void Grading_PutsTheRubricLast_AfterTheOutputRules()
     {
         var prompt = PromptLibrary.Grading("How to grade:\n- Be fair.");
 
         Assert.StartsWith("You grade programming homework", prompt);
         Assert.Contains("say when you are unsure instead of sounding certain.\n\nWhen the message has a <build_and_test_results> section", prompt);
         Assert.Contains("Without that section, judge from the code.\n\nWhen the message has an <automated_tests> section", prompt);
-        Assert.Contains("so judge from the code as usual.\n\nHow to grade:\n- Be fair.\n\nYour answer is in English", prompt);
-        Assert.EndsWith("the teacher reviews a whole class.", prompt);
+        Assert.Contains("so judge from the code as usual.\n\nYour answer is in English", prompt);
+        Assert.EndsWith("the teacher reviews a whole class.\n\nHow to grade:\n- Be fair.", prompt);
+        Assert.EndsWith("the teacher reviews a whole class.", PromptLibrary.Grading(""));
     }
 
     [Fact]

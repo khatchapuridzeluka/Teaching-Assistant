@@ -39,19 +39,37 @@ public class GradingServiceTests
             _callContext, TimeProvider.System);
 
     [Fact]
-    public void TheSystemPrompt_EndsWithTheAssignmentsActiveNotes_AfterTheRules()
+    public void TheSystemPrompt_SendsTheAssignmentsActiveNotes_AsALastBlock_AfterTheCachedRules()
     {
         _principles.Add(1, "First", "Follow the points in the instructions.");
         _rules.Add(1, "Names", "Names fixed by the instructions cost 3 points.");
         _notes.Add("a-1", 1, "Pattern", "The Strategy pattern is the point of this task.");
         _notes.Add("a-1", 2, "Gone", "A deleted note.").Delete(DateTimeOffset.UtcNow);
+        _notes.Add("a-2", 1, "Lists", "Use an ArrayList, not an array.");
 
-        var system = GradingService.SystemPromptFor(_principles.GetActiveAsync().Result, null, _rules.GetActiveAsync().Result,
+        var first = GradingService.SystemPromptFor(_principles.GetActiveAsync().Result, null, _rules.GetActiveAsync().Result,
             _notes.GetActiveAsync("a-1").Result);
+        var second = GradingService.SystemPromptFor(_principles.GetActiveAsync().Result, null, _rules.GetActiveAsync().Result,
+            _notes.GetActiveAsync("a-2").Result);
 
-        Assert.Contains("cost 3 points.\n\nAssignment notes (", system);
-        Assert.Contains("):\n- The Strategy pattern is the point of this task.\n\nYour answer", system);
-        Assert.DoesNotContain("A deleted note.", system);
+        Assert.Equal(2, first.Count);
+        Assert.True(first[0].CacheAfter);
+        Assert.False(first[1].CacheAfter);
+        Assert.EndsWith("cost 3 points.", first[0].Text);
+        Assert.StartsWith("Assignment notes (", first[1].Text);
+        Assert.EndsWith("):\n- The Strategy pattern is the point of this task.", first[1].Text);
+        Assert.DoesNotContain("A deleted note.", first[1].Text);
+
+        Assert.Equal(first[0], second[0]);
+        Assert.NotEqual(first[1], second[1]);
+    }
+
+    [Fact]
+    public void TheSystemPrompt_WithoutNotes_IsOneCachedBlock()
+    {
+        var system = GradingService.SystemPromptFor(_principles.GetActiveAsync().Result, null, _rules.GetActiveAsync().Result, []);
+
+        Assert.True(Assert.Single(system).CacheAfter);
     }
 
     [Fact]
@@ -61,8 +79,8 @@ public class GradingServiceTests
 
         _rules.Add(1, "Names", "Names fixed by the instructions cost 3 points.");
         var system = GradingService.SystemPromptFor(_principles.GetActiveAsync().Result, "  Second-year students; be firm about names.  ",
-            _rules.GetActiveAsync().Result);
-        var without = GradingService.SystemPromptFor(_principles.GetActiveAsync().Result, null, _rules.GetActiveAsync().Result);
+            _rules.GetActiveAsync().Result).Single().Text;
+        var without = GradingService.SystemPromptFor(_principles.GetActiveAsync().Result, null, _rules.GetActiveAsync().Result).Single().Text;
 
         Assert.Contains("- Follow the points in the instructions.\n\nCourse guidance (", system);
         Assert.Contains("):\nSecond-year students; be firm about names.\n\nGrading policy", system);
@@ -80,11 +98,12 @@ public class GradingServiceTests
         _rules.Add(1, "First rule", "Names fixed by the instructions cost 3 points.");
         _rules.Add(3, "Gone rule", "A deleted rule.").Delete(DateTimeOffset.UtcNow);
 
-        var system = GradingService.SystemPromptFor(_principles.GetActiveAsync().Result, null, _rules.GetActiveAsync().Result);
-        var noRules = GradingService.SystemPromptFor(_principles.GetActiveAsync().Result, null, []);
+        var system = GradingService.SystemPromptFor(_principles.GetActiveAsync().Result, null, _rules.GetActiveAsync().Result).Single().Text;
+        var noRules = GradingService.SystemPromptFor(_principles.GetActiveAsync().Result, null, []).Single().Text;
 
         Assert.Contains("How to grade:\n- Follow the points in the instructions.\n- Judge by reading the code.\n\nGrading policy", system);
-        Assert.Contains("):\n- Names fixed by the instructions cost 3 points.\n- Comments cost nothing.\n\nYour answer", system);
+        Assert.EndsWith("):\n- Names fixed by the instructions cost 3 points.\n- Comments cost nothing.", system);
+        Assert.True(system.IndexOf("Your answer", StringComparison.Ordinal) < system.IndexOf("How to grade:", StringComparison.Ordinal));
         Assert.DoesNotContain("A deleted principle.", system);
         Assert.DoesNotContain("A deleted rule.", system);
         Assert.DoesNotContain("Grading policy", noRules);
@@ -481,6 +500,9 @@ public class GradingServiceTests
         var codeAt = _model.Parts!.FindIndex(p => p is TextPart t && t.Text.Contains("<submission>"));
         Assert.True(instructionsAt < codeAt);
 
+        // The cache marker sits on the last instructions part only, so everything after it is the student's own.
+        Assert.Equal([instructionsAt], _model.Parts!.Select((p, i) => (p, i)).Where(x => x.p.CacheAfter).Select(x => x.i));
+
         // Code goes as raw text with its path and line numbers, so the review can point at lines.
         var code = ((TextPart)_model.Parts![codeAt]).Text;
         Assert.Contains("<file path=\"src/Zoo.java\">", code);
@@ -848,6 +870,7 @@ public class GradingServiceTests
     private sealed class RecordingModel : ILanguageModel
     {
         public string? System { get; private set; }
+        public List<TextPart>? SystemParts { get; private set; }
         public List<PromptPart>? Parts { get; private set; }
 
         public string? Schema { get; private set; }
@@ -877,9 +900,10 @@ public class GradingServiceTests
             throw new NotSupportedException();
 
         public Task<LanguageModelReply> GradeAsync(
-            string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, string? model, CancellationToken cancellationToken = default)
+            IReadOnlyList<TextPart> system, IReadOnlyList<PromptPart> parts, string outputSchema, string? model, CancellationToken cancellationToken = default)
         {
-            System = systemPrompt;
+            SystemParts = system.ToList();
+            System = string.Join("\n\n", system.Select(p => p.Text));
             Parts = parts.ToList();
             Schema = outputSchema;
             return Task.FromResult(new LanguageModelReply { Model = "fake-grader", Text = Reply });

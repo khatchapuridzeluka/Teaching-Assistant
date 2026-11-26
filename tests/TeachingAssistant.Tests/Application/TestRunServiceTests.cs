@@ -390,7 +390,7 @@ public class TestRunServiceTests
             throw new NotSupportedException();
 
         public Task<LanguageModelReply> GradeAsync(
-            string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, string? model = null,
+            IReadOnlyList<TextPart> system, IReadOnlyList<PromptPart> parts, string outputSchema, string? model = null,
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 

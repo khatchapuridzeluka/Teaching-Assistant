@@ -22,7 +22,7 @@ public interface ILanguageModel
 
     /// <summary>Grades with the configured grading model, or with <paramref name="model"/> when given (evaluation runs).</summary>
     Task<LanguageModelReply> GradeAsync(
-        string systemPrompt, IReadOnlyList<PromptPart> parts, string outputSchema, string? model = null,
+        IReadOnlyList<TextPart> system, IReadOnlyList<PromptPart> parts, string outputSchema, string? model = null,
         CancellationToken cancellationToken = default);
 
     Task<LanguageModelReply> AnalyzeAsync(

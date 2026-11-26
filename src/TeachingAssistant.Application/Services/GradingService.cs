@@ -30,11 +30,16 @@ public class GradingService : IGradingService
         [".webp"] = "image/webp",
     };
 
-    internal static string SystemPromptFor(
+    internal static IReadOnlyList<TextPart> SystemPromptFor(
         IReadOnlyList<GradingPrinciple> principles, string? courseGuidance, IReadOnlyList<PolicyRule> rules,
         IReadOnlyList<AssignmentNote>? notes = null)
     {
-        return PromptLibrary.Grading(GradingPromptSections.Build(principles, courseGuidance, rules, notes));
+        var general = new TextPart
+        {
+            Text = PromptLibrary.Grading(GradingPromptSections.Build(principles, courseGuidance, rules)),
+            CacheAfter = true,
+        };
+        return GradingPromptSections.Notes(notes) is { } section ? [general, new TextPart { Text = section }] : [general];
     }
 
     private readonly ISubmissionStore _store;
@@ -386,6 +391,8 @@ public class GradingService : IGradingService
                 "The assignment has no instructions the model can read. Attach them in Classroom as a PDF or Word " +
                 "document, or write a task statement, then fetch again.");
         }
+
+        prompt.Parts[^1] = prompt.Parts[^1] with { CacheAfter = true };
 
         AddCode(prompt, version);
         AddStudentFiles(prompt, version);
