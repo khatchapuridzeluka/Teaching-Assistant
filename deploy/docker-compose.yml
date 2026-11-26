@@ -1,4 +1,6 @@
-# The deployed stack. On the VM, from the deploy folder: docker compose up -d --build
+# The deployed stack. A push to master deploys it through .github/workflows/ci.yml, which pulls the images CI built
+# (tagged with the commit) and runs docker compose up -d. By hand, on the VM from the deploy folder: docker compose pull
+# then docker compose up -d for the latest CI images, or docker compose up -d --build to build them on the VM instead.
 # Settings come from deploy/.env (git-ignored); see deploy/.env.example.
 name: teaching-assistant
 
@@ -6,7 +8,7 @@ x-api: &api
   build:
     context: ..
     dockerfile: deploy/api.Dockerfile
-  image: teaching-assistant-api
+  image: ${IMAGE_PREFIX:-ghcr.io/khatchapuridzeluka/teaching-assistant}-api:${IMAGE_TAG:-latest}
   environment: &api-environment
     ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=teaching_assistant;Username=teaching_assistant;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/.env};GSS Encryption Mode=Disable
     Anthropic__ApiKey: ${ANTHROPIC_API_KEY:?Set ANTHROPIC_API_KEY in deploy/.env}
@@ -23,7 +25,7 @@ services:
     build:
       context: ..
       dockerfile: deploy/frontend.Dockerfile
-    image: teaching-assistant-frontend
+    image: ${IMAGE_PREFIX:-ghcr.io/khatchapuridzeluka/teaching-assistant}-frontend:${IMAGE_TAG:-latest}
     environment:
       SITE_ADDRESS: ${DOMAIN:?Set DOMAIN in deploy/.env}
     ports:

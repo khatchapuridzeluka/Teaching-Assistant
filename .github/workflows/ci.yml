@@ -1,0 +1,140 @@
+# Every push and pull request: the backend tests (with the sandbox tests against a freshly built ta-java:27) and the
+# frontend type check and build. A push to master then builds both app images, pushes them to GitHub's registry and
+# deploys them to the VM over SSH. Setup (repository secrets, the VM's deploy key): README, "Continuous deployment".
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/teaching-assistant
+
+jobs:
+  backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Build the sandbox image the Docker tests use
+        run: docker build -t ta-java:27 sandbox/java
+
+      - name: Test
+        run: dotnet test --project tests/TeachingAssistant.Tests
+
+  frontend:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm --prefix frontend ci
+
+      - name: Type check and build
+        run: npm --prefix frontend run build
+
+  images:
+    name: Build and push images
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - name: api
+            dockerfile: deploy/api.Dockerfile
+          - name: frontend
+            dockerfile: deploy/frontend.Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}-${{ matrix.name }}:latest
+            ${{ env.IMAGE_PREFIX }}-${{ matrix.name }}:${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+  deploy:
+    name: Deploy to the VM
+    needs: images
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Pull the new images and restart the stack
+        shell: bash
+        env:
+          SSH_KEY: ${{ secrets.VM_SSH_KEY }}
+          HOST_KEY: ${{ secrets.VM_HOST_KEY }}
+          VM_HOST: ${{ secrets.VM_HOST }}
+          VM_USER: ${{ secrets.VM_USER }}
+          VM_APP_DIR: ${{ vars.VM_APP_DIR || '~/Teaching-Assistant' }}
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          if [ -n "$HOST_KEY" ]; then
+            printf '%s %s\n' "$VM_HOST" "$HOST_KEY" > ~/.ssh/known_hosts
+          else
+            ssh-keyscan -H "$VM_HOST" > ~/.ssh/known_hosts 2>/dev/null
+          fi
+          remote() { ssh -i ~/.ssh/deploy_key -o BatchMode=yes "$VM_USER@$VM_HOST" "$@"; }
+
+          printf '%s' "$REGISTRY_TOKEN" | remote docker login ghcr.io -u "$REGISTRY_USER" --password-stdin
+          remote bash -s -- "$VM_APP_DIR" "$COMMIT" <<'SCRIPT'
+          set -euo pipefail
+          trap 'docker logout ghcr.io >/dev/null' EXIT
+          cd "${1/#\~/$HOME}"
+          git fetch --quiet origin master
+          git merge --quiet --ff-only "$2"
+          docker build --quiet -t ta-java:27 sandbox/java
+          docker build --quiet -t ta-java:21 --build-arg JDK_VERSION=21 sandbox/java
+          cd deploy
+          export IMAGE_TAG="$2"
+          docker compose pull caddy app migrate
+          docker compose up -d --remove-orphans
+          docker image prune -f
+          SCRIPT

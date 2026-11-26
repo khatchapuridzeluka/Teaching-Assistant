@@ -6,7 +6,8 @@ Built for the **AI Agents Builder Program (HIGGS × KIU)**.
 
 > **Status:** in active development. Working: Google Classroom and GitHub ingestion, the Docker sandbox (compile, javac
 > warnings, Checkstyle, PMD), layered rubric grading with Claude, the review dashboard, class and student analyses, PDF
-> export, the chat agent and the Evaluation page (AI drafts vs. your approved reports). Next: hosting on GCP.
+> export, the chat agent, automated tests and the Evaluation page (AI drafts vs. your approved reports). Live at
+> https://gradewise.ge (a GCP VM with Docker Compose), deployed by GitHub Actions on every push to `master`.
 
 ---
 
@@ -105,6 +106,7 @@ frontend/                                React app (Vite)
   src/pages/                             Home, Course overview, Assignments, Assignment (list + board), Instructions, Students, AI drafts, Gradebook, Common mistakes, Review queue, System, Settings, planned sections
 deploy/                                  deployment on one VM: docker-compose.yml (Caddy, API, one-off migration, Postgres),
                                          the API image, the frontend image (built React app served by Caddy) and the Caddyfile
+.github/workflows/ci.yml                 CI/CD: tests and frontend build on every push, then images to ghcr.io and a deploy to the VM
 ```
 
 ## Getting started
@@ -219,7 +221,26 @@ Then, from `deploy/`:
 docker compose up -d --build
 ```
 
-Open `https://<domain>`, go to **Settings** and connect Google. To update, pull the new code and run the same command again; to stop, `docker compose stop`. The deployed copy runs in Production: no Swagger, no automatic migrations on start (the `migrate` service does that), and the configuration comes only from `deploy/.env`.
+Open `https://<domain>`, go to **Settings** and connect Google. Updates then come from continuous deployment (below); to build on the VM instead, pull the new code and run the same command again; to stop, `docker compose stop`. The deployed copy runs in Production: no Swagger, no automatic migrations on start (the `migrate` service does that), and the configuration comes only from `deploy/.env`.
+
+### Continuous deployment
+
+`.github/workflows/ci.yml` runs on every push and pull request to `master`:
+
+| Job | What it does |
+|---|---|
+| Backend tests | `dotnet test` on Ubuntu, after building `ta-java:27`, so the Docker sandbox tests run instead of being skipped. No test calls a paid model. |
+| Frontend build | `npm ci`, then the type check and production build. |
+| Build and push images | Push to `master` only, after both checks pass: builds `deploy/api.Dockerfile` and `deploy/frontend.Dockerfile` and pushes them to GitHub's registry as `ghcr.io/<owner>/teaching-assistant-api` and `-frontend`, tagged `latest` and with the commit. |
+| Deploy to the VM | Over SSH: fast-forwards the VM's checkout to the commit, rebuilds the sandbox images (cached, so quick when `sandbox/` did not change), logs in to the registry with the run's short-lived token, pulls the images tagged with the commit, runs `docker compose up -d` (the `migrate` service applies new migrations first) and logs out. |
+
+One-time setup:
+
+1. **A deploy key.** Create a key pair used only for this (`ssh-keygen -t ed25519 -f deploy_key -N ""`), add the public key to the VM user that owns the checkout (Compute Engine → the VM → Edit → SSH keys, or that user's `~/.ssh/authorized_keys`); that user must be in the `docker` group.
+2. **Repository secrets** (GitHub → Settings → Secrets and variables → Actions): `VM_SSH_KEY` (the private key), `VM_HOST` (the VM's IP address), `VM_USER` (that user) and, optionally, `VM_HOST_KEY` (the VM's `ssh-ed25519 AAAA…` host key from `/etc/ssh/ssh_host_ed25519_key.pub`, so the job does not trust the first key it sees). If the checkout is not at `~/Teaching-Assistant`, set the variable `VM_APP_DIR`.
+3. **An environment** named `production` (Settings → Environments). The deploy job runs in it, so a required reviewer can be added there to approve each deploy.
+
+The deploy job fails when the VM is stopped; start it and use **Re-run jobs**, or run the workflow by hand (**Run workflow**). The VM needs only outbound access to GitHub; secrets stay in `deploy/.env` on the VM and never pass through CI.
 
 ## API
 
@@ -337,7 +358,7 @@ class, add `--filter-class "*GradesTests"` (`--filter-method` and `--filter-name
 
 Tests focus on Application use cases and Domain rules, using hand-written fakes for ports such as `ILanguageModel`.
 The sandbox runner's tests use the real Docker and the `ta-java:27` image (see `sandbox/README.md`); they are skipped
-when Docker is not running or the image is not built.
+when Docker is not running or the image is not built. CI runs the whole suite on every push, with the image built (see Continuous deployment).
 
 ## Security and privacy
 
