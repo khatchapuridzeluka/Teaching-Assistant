@@ -4,6 +4,7 @@ using TeachingAssistant.Application.Exceptions;
 using TeachingAssistant.Application.Interfaces.Services;
 using TeachingAssistant.Application.Models;
 using TeachingAssistant.Application.Tools;
+using TeachingAssistant.Domain.Grading;
 using TeachingAssistant.Domain.Ingestion;
 
 namespace TeachingAssistant.Tests.Application;
@@ -11,10 +12,11 @@ namespace TeachingAssistant.Tests.Application;
 public class ClassroomToolsTests
 {
     private readonly FakeServices _services = new();
+    private readonly FakeGradingStore _gradings = new();
 
     private ClassroomTools Tools()
     {
-        return new ClassroomTools(_services, _services, _services, _services, _services);
+        return new ClassroomTools(_services, _services, _services, _services, _services, _gradings);
     }
 
     [Fact]
@@ -81,13 +83,26 @@ public class ClassroomToolsTests
     [Fact]
     public async Task ListSubmissions_DescribesTheLatestStoredVersionOfEachStudent()
     {
-        var result = await Tools().ListSubmissionsAsync("a-4", TestContext.Current.CancellationToken);
+        var result = await Tools().ListSubmissionsAsync("course-1", "a-4", TestContext.Current.CancellationToken);
 
         Assert.Equal("a-4", _services.ListedAssignmentId);
         Assert.Equal(
-            $"- Nino (submission id {FakeServices.SubmissionId}): version 2 of 2, status Ready, code extracted, "
-            + "turned in 2026-11-19 15:30 UTC, 1 file",
+            $"- Nino (student id student-1, submission id {FakeServices.SubmissionId}): version 2 of 2, status Ready, code extracted, "
+            + "turned in 2026-11-19 15:30 UTC, 1 file; no AI draft yet",
             result);
+    }
+
+    [Fact]
+    public async Task ListSubmissions_ShowsTheCurrentDraft_ItsScore_AndWhetherTheTeacherApprovedIt()
+    {
+        var older = new AiGrading(Guid.NewGuid(), "model", "review", 40, 100, null, 1, [], [], "{}", [], DateTimeOffset.UtcNow.AddMinutes(-5));
+        var current = new AiGrading(Guid.NewGuid(), "model", "review", 82.5, 100, null, 1, [], [], "{}", [], DateTimeOffset.UtcNow);
+        _gradings.AddDraft(older, "a-4", "external-1", "student-1", 1);
+        _gradings.AddDraft(current, "a-4", "external-1", "student-1", 1, ReportStatus.Approved);
+
+        var result = await Tools().ListSubmissionsAsync("course-1", "a-4", TestContext.Current.CancellationToken);
+
+        Assert.EndsWith("; AI draft of version 1: score 82.5 / 100, approved by the teacher; version 2 is newer and has no draft yet", result);
     }
 
     [Fact]
@@ -95,7 +110,7 @@ public class ClassroomToolsTests
     {
         _services.Stored = [];
 
-        var result = await Tools().ListSubmissionsAsync("a-4", TestContext.Current.CancellationToken);
+        var result = await Tools().ListSubmissionsAsync("course-1", "a-4", TestContext.Current.CancellationToken);
 
         Assert.Equal("No submissions of this assignment are stored yet. Fetch them first.", result);
     }
@@ -148,6 +163,7 @@ public class ClassroomToolsTests
             {
                 Id = SubmissionId,
                 ExternalSubmissionId = "external-1",
+                StudentId = "student-1",
                 StudentName = "Nino",
                 Versions = [
                     Version(1, new DateTimeOffset(2026, 11, 18, 9, 0, 0, TimeSpan.Zero)),

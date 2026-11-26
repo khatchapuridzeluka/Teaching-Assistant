@@ -4,6 +4,7 @@ using TeachingAssistant.Application.Interfaces;
 using TeachingAssistant.Application.Interfaces.Services;
 using TeachingAssistant.Application.Jobs;
 using TeachingAssistant.Application.Tools;
+using TeachingAssistant.Domain.Grading;
 using TeachingAssistant.Domain.Jobs;
 
 namespace TeachingAssistant.Application.Services;
@@ -173,6 +174,11 @@ public class JobReporter
             return "Common mistakes analysis finished; open the assignment's Common mistakes page for the result";
         }
 
+        return $"Common mistakes analysis ready: {DescribeAnalysis(analysis)}";
+    }
+
+    internal static string DescribeAnalysis(MistakeAnalysis analysis)
+    {
         var groups = analysis.Clusters
             .Where(c => !c.Ungrouped)
             .Select(c => (c.Title, Students: c.Members.Select(m => m.StudentId).Distinct().Count(), Mistakes: c.Members.Count))
@@ -181,7 +187,7 @@ public class JobReporter
             .ToList();
         var ungrouped = analysis.Clusters.Where(c => c.Ungrouped).Sum(c => c.Members.Count);
         var rest = ungrouped > 0 ? $"\n  ({ungrouped} mistakes not grouped)" : "";
-        return $"Common mistakes analysis ready: {analysis.Mistakes} mistakes from {analysis.Students} students.\n"
+        return $"{analysis.Mistakes} mistakes from {analysis.Students} students.\n"
             + $"  Overview: {analysis.Summary}\n  Groups:\n{string.Join("\n", groups)}{rest}\n  For the next lecture: {analysis.NextLecture}";
     }
 

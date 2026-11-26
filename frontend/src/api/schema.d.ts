@@ -5224,6 +5224,8 @@ export interface components {
             /** Format: uuid */
             id: string;
             externalSubmissionId: string;
+            /** @description The student's Classroom user id. */
+            studentId: string;
             studentName: string;
             versions: components["schemas"]["StoredVersionResponse"][];
         };

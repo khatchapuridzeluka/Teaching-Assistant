@@ -31,6 +31,7 @@ public class StoredSubmissionService : IStoredSubmissionService
             {
                 Id = s.Id,
                 ExternalSubmissionId = s.ExternalSubmissionId,
+                StudentId = s.StudentId,
                 StudentName = s.StudentName,
                 Versions = s.Versions.OrderByDescending(v => v.Number).Select(v => new StoredVersionResponse
                 {

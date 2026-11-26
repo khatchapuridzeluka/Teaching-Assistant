@@ -38,7 +38,7 @@ One line per area; [docs/FEATURES.md](docs/FEATURES.md) has the full detail of e
 | **Common mistakes** | Groups the class's mistakes for one assignment and suggests what to cover in the next lecture | ✅ |
 | **Students and grades** | Roster, every student's state and grade per assignment, a gradebook per course | ✅ |
 | **Student profiles** | Each student's mistake history (new vs. repeated), strengths and an AI overview over time | ✅ |
-| **Agent chat** | An "Ask agent" panel on every page: a Microsoft Agent Framework agent with tools that fetches, grades, runs tests, analyzes and exports PDFs, and waits for background work | ✅ |
+| **Agent chat** | An "Ask agent" panel on every page: a Microsoft Agent Framework agent with tools that fetches, grades, runs tests, analyzes, reads back gradings and analyses, and exports PDFs, and waits for background work | ✅ |
 | **PDF reports** | A styled report of one grading for the student | ✅ |
 | **Evaluation** | How often the AI's drafts agree with the teacher's approved reports, per model | ✅ |
 | **Teacher UI** | React dashboard with workspace pages, a Ctrl+K palette and a review queue across courses | ✅ |

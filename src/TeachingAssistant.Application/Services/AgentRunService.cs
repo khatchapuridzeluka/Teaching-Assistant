@@ -27,6 +27,7 @@ public class AgentRunService : IAgentRunService
     private readonly GradingTools _gradingTools;
     private readonly StudentAnalysisTools _analysisTools;
     private readonly TestTools _testTools;
+    private readonly ResultTools _resultTools;
     private readonly AgentRunContext _runContext;
     private readonly ModelCallContext _callContext;
     private readonly TimeProvider _timeProvider;
@@ -42,6 +43,7 @@ public class AgentRunService : IAgentRunService
         GradingTools gradingTools,
         StudentAnalysisTools analysisTools,
         TestTools testTools,
+        ResultTools resultTools,
         AgentRunContext runContext,
         ModelCallContext callContext,
         TimeProvider timeProvider)
@@ -56,6 +58,7 @@ public class AgentRunService : IAgentRunService
         _gradingTools = gradingTools;
         _analysisTools = analysisTools;
         _testTools = testTools;
+        _resultTools = resultTools;
         _runContext = runContext;
         _callContext = callContext;
         _timeProvider = timeProvider;
@@ -160,7 +163,7 @@ public class AgentRunService : IAgentRunService
                 ShouldStop = () => _runContext.StopRequested,
             };
             var reply = await _languageModel.RunAgentAsync(
-                system, history, [_classroomTools, _studentTools, _gradingTools, _analysisTools, _testTools, _agentTools], hooks, cancellationToken);
+                system, history, [_classroomTools, _studentTools, _gradingTools, _analysisTools, _testTools, _resultTools, _agentTools], hooks, cancellationToken);
             Finish(run, reply);
         }
         catch (OperationCanceledException)

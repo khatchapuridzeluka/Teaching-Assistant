@@ -2,7 +2,11 @@ using System.ComponentModel;
 using System.Globalization;
 using TeachingAssistant.Application.Contracts;
 using TeachingAssistant.Application.Exceptions;
+using TeachingAssistant.Application.Interfaces;
 using TeachingAssistant.Application.Interfaces.Services;
+using TeachingAssistant.Application.Models;
+using TeachingAssistant.Domain.Grading;
+using TeachingAssistant.Domain.Ingestion;
 
 namespace TeachingAssistant.Application.Tools;
 
@@ -13,16 +17,18 @@ public class ClassroomTools
     private readonly ISubmissionFetchService _fetchService;
     private readonly IStoredSubmissionService _storedService;
     private readonly ICourseSyncService _syncService;
+    private readonly IGradingStore _gradings;
 
     public ClassroomTools(
         ICourseService courseService, IAssignmentService assignmentService, ISubmissionFetchService fetchService,
-        IStoredSubmissionService storedService, ICourseSyncService syncService)
+        IStoredSubmissionService storedService, ICourseSyncService syncService, IGradingStore gradings)
     {
         _courseService = courseService;
         _assignmentService = assignmentService;
         _fetchService = fetchService;
         _storedService = storedService;
         _syncService = syncService;
+        _gradings = gradings;
     }
 
     [AgentTool("list_courses")]
@@ -94,35 +100,66 @@ public class ClassroomTools
 
     [AgentTool("list_submissions")]
     [Description(
-        "Lists the submissions of one assignment that are stored in the tool (already fetched): the student's name, the "
-        + "submission id, and for the latest version its number, status, whether code was extracted, when it was turned in and "
-        + "how many files it has. It does not contact Google Classroom; if it returns nothing, fetch the submissions first.")]
+        "Lists the submissions of one assignment that are stored in the tool (already fetched): the student's name and id, the "
+        + "submission id, for the latest version its number, status, whether code was extracted, when it was turned in and how "
+        + "many files it has, and the student's current AI draft: which version it grades, its score and whether the teacher "
+        + "has reviewed or approved it. It is free and does not contact Google Classroom; if it returns nothing, fetch the "
+        + "submissions first. Use it before grading, to see who already has a draft, and to answer who still needs grading.")]
     public Task<string> ListSubmissionsAsync(
+        [Description("The id of the course")] string courseId,
         [Description("The id of the assignment")] string assignmentId, CancellationToken cancellationToken)
     {
         return RunAsync(async () =>
         {
             var submissions = await _storedService.GetByAssignmentAsync(assignmentId, cancellationToken);
-            return submissions.Count == 0
-                ? "No submissions of this assignment are stored yet. Fetch them first."
-                : string.Join("\n", submissions.Select(Describe));
+            if (submissions.Count == 0)
+            {
+                return "No submissions of this assignment are stored yet. Fetch them first.";
+            }
+
+            var drafts = (await _gradings.GetSummariesAsync(SubmissionSource.GoogleClassroom, courseId, assignmentId, null, cancellationToken))
+                .Where(g => g.Status == GradingStatus.Draft)
+                .GroupBy(g => g.SubmissionId)
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(d => d.VersionNumber).ThenByDescending(d => d.CreatedAt).First());
+            return string.Join("\n", submissions.Select(s => Describe(s, drafts.GetValueOrDefault(s.ExternalSubmissionId))));
         });
     }
 
-    private static string Describe(StoredSubmissionResponse submission)
+    private static string Describe(StoredSubmissionResponse submission, GradingSummary? draft)
     {
+        var who = $"- {submission.StudentName} (student id {submission.StudentId}, submission id {submission.Id})";
         var latest = submission.Versions.MaxBy(v => v.Number);
         if (latest is null)
         {
-            return $"- {submission.StudentName} (submission id {submission.Id}): no stored version";
+            return $"{who}: no stored version";
         }
 
         var turnedIn = latest.TurnedInAt is { } at
             ? $"turned in {at.ToUniversalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)} UTC"
             : "turn-in time unknown";
-        return $"- {submission.StudentName} (submission id {submission.Id}): version {latest.Number} of {submission.Versions.Count}, "
+        return $"{who}: version {latest.Number} of {submission.Versions.Count}, "
             + $"status {latest.Status}, {(latest.HasCode ? "code extracted" : "no code extracted")}, {turnedIn}, "
-            + $"{latest.Files.Count} {(latest.Files.Count == 1 ? "file" : "files")}";
+            + $"{latest.Files.Count} {(latest.Files.Count == 1 ? "file" : "files")}; {DescribeDraft(draft, latest.Number)}";
+    }
+
+    private static string DescribeDraft(GradingSummary? draft, int latestVersion)
+    {
+        if (draft is null)
+        {
+            return "no AI draft yet";
+        }
+
+        var score = draft.Score is { } value
+            ? $"score {value.ToString(CultureInfo.InvariantCulture)}{(draft.MaxScore is { } max ? $" / {max.ToString(CultureInfo.InvariantCulture)}" : "")}"
+            : "no score";
+        var review = draft.ReportStatus switch
+        {
+            ReportStatus.Approved => "approved by the teacher",
+            ReportStatus.InReview => "in the teacher's review",
+            _ => "not reviewed yet",
+        };
+        var outdated = draft.VersionNumber < latestVersion ? $"; version {latestVersion} is newer and has no draft yet" : "";
+        return $"AI draft of version {draft.VersionNumber}: {score}, {review}{outdated}";
     }
 
     private static async Task<string> RunAsync(Func<Task<string>> tool)

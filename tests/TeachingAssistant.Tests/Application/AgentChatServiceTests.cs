@@ -11,7 +11,7 @@ namespace TeachingAssistant.Tests.Application;
 public class AgentChatServiceTests
 {
     private readonly RecordingModel _model = new();
-    private readonly ClassroomTools _tools = new(null!, null!, null!, null!, null!); // never called here: only the model calls tools
+    private readonly ClassroomTools _tools = new(null!, null!, null!, null!, null!, null!); // never called here: only the model calls tools
 
     [Fact]
     public async Task Reply_PassesTheConversationAndPageToTheModel()

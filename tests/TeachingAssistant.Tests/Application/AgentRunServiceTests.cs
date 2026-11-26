@@ -16,7 +16,7 @@ public class AgentRunServiceTests
     private readonly FakeAgentJobs _jobs = new();
     private readonly ScriptedModel _model = new();
     private readonly AgentRunContext _runContext = new();
-    private readonly ClassroomTools _tools = new(null!, null!, null!, null!, null!); // never called here: only the model calls tools
+    private readonly ClassroomTools _tools = new(null!, null!, null!, null!, null!, null!); // never called here: only the model calls tools
     private readonly StudentTools _studentTools = new(null!, null!, null!, null!, null!, null!, TimeProvider.System);
 
     private AgentRunService Service()
@@ -25,7 +25,8 @@ public class AgentRunServiceTests
         var gradingTools = new GradingTools(null!, null!, null!, _runContext, TimeProvider.System);
         var analysisTools = new StudentAnalysisTools(null!, null!, _runContext, TimeProvider.System);
         var testTools = new TestTools(null!, null!, null!, null!, null!, _runContext, TimeProvider.System);
-        return new AgentRunService(_chats, _jobs, _jobs, _model, _tools, _studentTools, agentTools, gradingTools, analysisTools, testTools,
+        var resultTools = new ResultTools(null!, null!, null!, _runContext);
+        return new AgentRunService(_chats, _jobs, _jobs, _model, _tools, _studentTools, agentTools, gradingTools, analysisTools, testTools, resultTools,
             _runContext, new ModelCallContext(), TimeProvider.System);
     }
 
@@ -123,7 +124,7 @@ public class AgentRunServiceTests
 
         Assert.Equal("what courses do I have?", Assert.Single(_model.History!).Text);
         Assert.Contains("(course id course-1, assignment id assignment-4)", _model.System);
-        Assert.Equal(6, _model.Tools!.Count);
+        Assert.Equal(7, _model.Tools!.Count);
         Assert.Same(_tools, _model.Tools[0]);
         Assert.Same(_studentTools, _model.Tools[1]);
     }
